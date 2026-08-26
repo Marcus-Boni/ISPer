@@ -53,8 +53,9 @@
 
   function setState(s, msg) {
     state = s;
-    pill.className = s;
+    pill.className = s === 'recording-handsfree' ? 'recording handsfree' : s;
     if (s === 'recording') { bars.fill(0); statusEl.textContent = 'gravando… solte para colar'; blip(880, .05); }
+    else if (s === 'recording-handsfree') statusEl.textContent = 'mãos-livres… 1 s de silêncio cola';
     else if (s === 'transcribing') statusEl.textContent = 'transcrevendo…';
     else if (s === 'done') { statusEl.textContent = msg ? '“' + truncate(msg, 40) + '”' : 'colado'; blip(1320, .07); }
     else if (s === 'error') statusEl.textContent = msg || 'erro';
@@ -78,10 +79,11 @@
     const w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
     const bw = w / N;
+    const rec = state.startsWith('recording');
     for (let i = 0; i < N; i++) {
-      const v = state === 'recording' ? bars[i] : bars[i] * 0.3;
+      const v = rec ? bars[i] : bars[i] * 0.3;
       const bh = Math.max(3 * devicePixelRatio, v * h * 0.92);
-      ctx.fillStyle = state === 'recording' ? 'rgba(240,126,114,.95)' : 'rgba(167,158,150,.45)';
+      ctx.fillStyle = rec ? 'rgba(240,126,114,.95)' : 'rgba(167,158,150,.45)';
       ctx.beginPath();
       ctx.roundRect(i * bw + 1, (h - bh) / 2, Math.max(1, bw - 3), bh, 2);
       ctx.fill();

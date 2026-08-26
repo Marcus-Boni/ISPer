@@ -1,15 +1,18 @@
 //! ISPer — app de ditado (Fase 2).
 //!
-//! Fluxo: segurar o atalho global → overlay aparece + gravação começa →
-//! soltar → transcreve com Whisper → cola (Ctrl+V) no app que está focado.
-//! O overlay é *não-focável*: o foco nunca sai do app do usuário.
+//! Dois modos, no mesmo atalho:
+//! - **Push-to-talk**: segure, fale, solte → transcreve e cola.
+//! - **Mãos-livres**: toque rápido (<350 ms), fale à vontade → ~1,2 s de
+//!   silêncio (ou um segundo toque) encerra, transcreve e cola.
+//!
+//! O overlay é *não-focável*: o foco nunca sai do app do usuário, então o
+//! Ctrl+V cai exatamente onde o cursor está.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::json;
 use tauri::menu::{Menu, MenuItem};
@@ -17,7 +20,8 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::ShortcutState;
 
-use isper_core::{recorder, WhisperEngine};
+use isper_core::recorder::{self, RecorderEvent};
+use isper_core::{RawAudio, WhisperEngine};
 
 /// Candidatos a atalho push-to-talk, em ordem de preferência. Outro programa
 /// pode já ter registrado o primeiro (neste PC, Ctrl+Alt+Espaço estava
@@ -30,13 +34,23 @@ const SHORTCUT_CANDIDATES: [(&str, &str); 4] = [
     ("ctrl+alt+i", "Ctrl+Alt+I"),
 ];
 const LANG: &str = "pt";
+/// Soltar antes disso = toque rápido → vira modo mãos-livres.
+const TAP_THRESHOLD: Duration = Duration::from_millis(350);
+
+/// Máquina de estados do ditado — um único lugar decide o que cada evento
+/// de tecla significa (inclusive o auto-repeat do teclado, que dispara
+/// `Pressed` repetido enquanto a tecla está segurada).
+enum Phase {
+    Idle,
+    Recording { started: Instant, handsfree: bool },
+    Processing,
+}
 
 struct AppState {
     /// Carregado em background no startup; `None` enquanto carrega.
     engine: Mutex<Option<Arc<WhisperEngine>>>,
     audio: recorder::AudioHandle,
-    recording: AtomicBool,
-    busy: AtomicBool,
+    phase: Mutex<Phase>,
 }
 
 fn main() {
@@ -55,8 +69,7 @@ fn main() {
             app.manage(AppState {
                 engine: Mutex::new(None),
                 audio: recorder::spawn(),
-                recording: AtomicBool::new(false),
-                busy: AtomicBool::new(false),
+                phase: Mutex::new(Phase::Idle),
             });
 
             // Overlay: rodapé do monitor primário, nunca focável.
@@ -90,7 +103,7 @@ fn main() {
             let hint = MenuItem::with_id(
                 app,
                 "hint",
-                format!("Segure {shortcut_label} para ditar"),
+                format!("Segure {shortcut_label} para ditar (toque rápido = mãos-livres)"),
                 false,
                 None::<&str>,
             )?;
@@ -126,6 +139,44 @@ fn main() {
                 }
             });
 
+            // Pipeline: toda gravação concluída (manual ou por VAD) chega aqui.
+            let events = app.state::<AppState>().audio.events();
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                for RecorderEvent::Finished(result) in events.iter() {
+                    *handle.state::<AppState>().phase.lock().unwrap() = Phase::Processing;
+
+                    let outcome = result
+                        .map_err(anyhow::Error::from)
+                        .and_then(|raw| dictate(&handle, raw));
+                    match outcome {
+                        Ok(text) => {
+                            let _ = handle
+                                .emit_to("overlay", "isper-state", json!({"state": "done", "text": text}));
+                        }
+                        Err(e) => {
+                            tracing::warn!("ditado falhou: {e}");
+                            let _ = handle.emit_to(
+                                "overlay",
+                                "isper-state",
+                                json!({"state": "error", "message": e.to_string()}),
+                            );
+                        }
+                    }
+
+                    // Deixa o resultado visível um instante antes de esconder.
+                    std::thread::sleep(Duration::from_millis(1200));
+                    let state = handle.state::<AppState>();
+                    let mut phase = state.phase.lock().unwrap();
+                    if matches!(*phase, Phase::Processing) {
+                        *phase = Phase::Idle;
+                        if let Some(overlay) = handle.get_webview_window("overlay") {
+                            let _ = overlay.hide();
+                        }
+                    }
+                }
+            });
+
             // Encaminha o nível do microfone para o waveform da UI.
             let levels = app.state::<AppState>().audio.levels();
             let handle = app.handle().clone();
@@ -143,60 +194,68 @@ fn main() {
 
 fn on_pressed(app: &AppHandle) {
     let state = app.state::<AppState>();
-    // `swap` garante que só UMA gravação começa mesmo com repeat de tecla.
-    if state.busy.load(Ordering::SeqCst) || state.recording.swap(true, Ordering::SeqCst) {
-        return;
+    let mut phase = state.phase.lock().unwrap();
+    match *phase {
+        Phase::Idle => {
+            *phase = Phase::Recording {
+                started: Instant::now(),
+                handsfree: false,
+            };
+            drop(phase);
+            let _ = app.emit_to("overlay", "isper-state", json!({"state": "recording"}));
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                let _ = overlay.show();
+            }
+            state.audio.start();
+        }
+        Phase::Recording { started, handsfree } => {
+            // Segundo toque encerra o mãos-livres na hora. Só conta DEPOIS de
+            // virar mãos-livres: o auto-repeat do teclado dispara `Pressed`
+            // repetido enquanto a tecla está segurada no push-to-talk.
+            if handsfree && started.elapsed() > Duration::from_millis(500) {
+                *phase = Phase::Processing;
+                drop(phase);
+                state.audio.stop();
+            }
+        }
+        Phase::Processing => {}
     }
-    let _ = app.emit_to("overlay", "isper-state", json!({"state": "recording"}));
-    if let Some(overlay) = app.get_webview_window("overlay") {
-        let _ = overlay.show();
-    }
-    state.audio.start();
 }
 
 fn on_released(app: &AppHandle) {
     let state = app.state::<AppState>();
-    if !state.recording.swap(false, Ordering::SeqCst) {
-        return;
+    let mut phase = state.phase.lock().unwrap();
+    if let Phase::Recording {
+        started,
+        handsfree: false,
+    } = *phase
+    {
+        if started.elapsed() < TAP_THRESHOLD {
+            // Toque rápido → mãos-livres: o VAD encerra quando você parar
+            // de falar (ou um segundo toque encerra na hora).
+            *phase = Phase::Recording {
+                started,
+                handsfree: true,
+            };
+            drop(phase);
+            state.audio.set_vad(true);
+            let _ = app.emit_to("overlay", "isper-state", json!({"state": "recording-handsfree"}));
+        } else {
+            // Push-to-talk: soltou = terminou.
+            *phase = Phase::Processing;
+            drop(phase);
+            state.audio.stop();
+        }
     }
-    state.busy.store(true, Ordering::SeqCst);
-
-    // Transcrição é pesada — sai da thread do atalho global.
-    let app = app.clone();
-    std::thread::spawn(move || {
-        match dictate(&app) {
-            Ok(text) => {
-                let _ = app.emit_to("overlay", "isper-state", json!({"state": "done", "text": text}));
-            }
-            Err(e) => {
-                tracing::warn!("ditado falhou: {e}");
-                let _ = app.emit_to(
-                    "overlay",
-                    "isper-state",
-                    json!({"state": "error", "message": e.to_string()}),
-                );
-            }
-        }
-        // Deixa o resultado visível um instante antes de esconder o overlay.
-        std::thread::sleep(Duration::from_millis(1600));
-        let state = app.state::<AppState>();
-        if !state.recording.load(Ordering::SeqCst) {
-            if let Some(overlay) = app.get_webview_window("overlay") {
-                let _ = overlay.hide();
-            }
-        }
-        state.busy.store(false, Ordering::SeqCst);
-    });
 }
 
-fn dictate(app: &AppHandle) -> anyhow::Result<String> {
-    let state = app.state::<AppState>();
-    let raw = state.audio.stop()?;
+fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<String> {
     if raw.duration_secs() < 0.4 {
         anyhow::bail!("segure o atalho enquanto fala");
     }
     let _ = app.emit_to("overlay", "isper-state", json!({"state": "transcribing"}));
 
+    let state = app.state::<AppState>();
     let engine = {
         let guard = state.engine.lock().unwrap();
         guard

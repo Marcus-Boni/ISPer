@@ -57,12 +57,17 @@ Outros modelos (large-v3-turbo etc.): https://huggingface.co/ggerganov/whisper.c
 cargo run --release -p isper-app
 ```
 
-O app fica na **bandeja do sistema**. Segure o atalho global (Ctrl+Alt+Espaço,
-ou o primeiro livre entre Ctrl+Shift+Espaço / Ctrl+Alt+D / Ctrl+Alt+I — a dica
-no menu da bandeja mostra qual foi registrado), **fale, e solte**: o texto é
-colado no app focado via Ctrl+V, com o clipboard anterior restaurado em
-seguida. Requer `models/ggml-small.bin` (ou a env `ISPER_MODEL` apontando para
-outro modelo ggml).
+O app fica na **bandeja do sistema**. O atalho global é Ctrl+Alt+Espaço, ou o
+primeiro livre entre Ctrl+Shift+Espaço / Ctrl+Alt+D / Ctrl+Alt+I — a dica no
+menu da bandeja mostra qual foi registrado. Dois modos:
+
+- **Push-to-talk**: segure o atalho, fale, solte → o texto é colado no app
+  focado via Ctrl+V (o clipboard anterior é restaurado em seguida).
+- **Mãos-livres**: toque rápido no atalho, fale à vontade → ~1,2 s de
+  silêncio (ou um segundo toque) encerra e cola sozinho.
+
+Requer `models/ggml-small.bin` (ou a env `ISPER_MODEL` apontando para outro
+modelo ggml).
 
 ### CLI (Fase 1)
 
