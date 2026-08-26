@@ -39,7 +39,35 @@ cargo build --release
 para forçar a recompilação do C++. Para conferir os flags usados:
 `Select-String -Path target\release\build\whisper-rs-sys-*\output -Pattern 'CL\.exe /c'`.)
 
-Na Fase 3, a feature `cuda` do whisper-rs ativa a RTX 4050 (requer CUDA Toolkit).
+### Build com CUDA (Fase 3)
+
+Requer o CUDA Toolkit (`winget install Nvidia.CUDA`). Depois:
+
+```powershell
+$env:CUDA_PATH = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3'
+$env:CUDA_PATH_V13_3 = $env:CUDA_PATH   # num shell aberto antes da instalação
+$env:CMAKE_CUDA_ARCHITECTURES = '89'    # só a arquitetura da RTX 4050 (Ada) — corta MUITO o tempo
+cargo build --release -p isper-app -p isper-cli --features "isper-app/cuda,isper-cli/cuda"
+```
+
+Pegadinhas encontradas:
+- Erro `The CUDA Toolkit directory '' does not exist` → o MSBuild não achou
+  `CUDA_PATH_V13_3` no ambiente (shells abertos antes da instalação não têm
+  a variável) — exporte-a como acima.
+- O instalador do CUDA pode não copiar a `Nvda.Build.CudaTasks.v13.3.dll` —
+  copie (como admin) os arquivos de
+  `<toolkit>\extras\visual_studio_integration\MSBuildExtensions\` para
+  `<BuildTools>\MSBuild\Microsoft\VC\v170\BuildCustomizations\`.
+
+- As DLLs de runtime do CUDA 13 (`cudart64_13.dll`, `cublas64_13.dll`…) ficam
+  em `<toolkit>\bin\x64` — o instalador põe no PATH de máquina, mas shells
+  abertos antes da instalação precisam adicionar o caminho manualmente
+  (sintoma: o exe morre na hora com STATUS_DLL_NOT_FOUND, sem mensagem).
+- O cargo não consegue substituir `isper-app.exe` com o app aberto
+  (`Acesso negado`) — feche pelo tray antes de rebuildar.
+
+Com CUDA, o app prefere `models/ggml-large-v3-turbo-q5_0.bin` automaticamente.
+Medido na RTX 4050: 10,4 s de áudio transcritos em 0,6 s (16× tempo real).
 
 ## Modelo
 

@@ -124,8 +124,11 @@ fn main() {
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 let result = find_model()
-                    .ok_or_else(|| "models/ggml-small.bin não encontrado".to_string())
-                    .and_then(|p| WhisperEngine::new(&p).map_err(|e| e.to_string()));
+                    .ok_or_else(|| "nenhum modelo encontrado na pasta models/".to_string())
+                    .and_then(|p| {
+                        tracing::info!("carregando modelo {}", p.display());
+                        WhisperEngine::new(&p).map_err(|e| e.to_string())
+                    });
                 match result {
                     Ok(engine) => {
                         *handle.state::<AppState>().engine.lock().unwrap() = Some(Arc::new(engine));
@@ -299,8 +302,23 @@ fn paste_text(text: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Procura `models/ggml-small.bin`: env ISPER_MODEL, depois cwd e os
-/// ancestrais do executável (funciona em `cargo run` e no app instalado).
+/// Modelos aceitos, em ordem de preferência. Com CUDA, o `large-v3-turbo`
+/// quantizado dá qualidade de large em tempo real na GPU; sem GPU, o `small`
+/// é o equilíbrio certo em CPU.
+const MODEL_CANDIDATES: &[&str] = if cfg!(feature = "cuda") {
+    &[
+        "models/ggml-large-v3-turbo-q5_0.bin",
+        "models/ggml-small.bin",
+    ]
+} else {
+    &[
+        "models/ggml-small.bin",
+        "models/ggml-large-v3-turbo-q5_0.bin",
+    ]
+};
+
+/// Procura um modelo: env ISPER_MODEL, depois cwd e os ancestrais do
+/// executável (funciona em `cargo run` e no app instalado).
 fn find_model() -> Option<PathBuf> {
     if let Ok(p) = std::env::var("ISPER_MODEL") {
         let p = PathBuf::from(p);
@@ -308,12 +326,17 @@ fn find_model() -> Option<PathBuf> {
             return Some(p);
         }
     }
-    let mut candidates: Vec<PathBuf> = Vec::new();
+    let mut dirs: Vec<PathBuf> = Vec::new();
     if let Ok(cwd) = std::env::current_dir() {
-        candidates.extend(cwd.ancestors().take(5).map(|d| d.join("models/ggml-small.bin")));
+        dirs.extend(cwd.ancestors().take(5).map(|d| d.to_path_buf()));
     }
     if let Ok(exe) = std::env::current_exe() {
-        candidates.extend(exe.ancestors().take(7).map(|d| d.join("models/ggml-small.bin")));
+        dirs.extend(exe.ancestors().take(7).map(|d| d.to_path_buf()));
     }
-    candidates.into_iter().find(|p| p.exists())
+    for name in MODEL_CANDIDATES {
+        if let Some(p) = dirs.iter().map(|d| d.join(name)).find(|p| p.exists()) {
+            return Some(p);
+        }
+    }
+    None
 }

@@ -3,6 +3,10 @@ name = "isper-core"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+# Aceleração NVIDIA: `cargo build --features cuda` (requer CUDA Toolkit)
+cuda = ["whisper-rs/cuda"]
+
 [dependencies]
 cpal = "0.18.2"
 crossbeam-channel = "0.5.16"

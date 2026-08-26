@@ -3,6 +3,9 @@ name = "isper-app"
 version = "0.2.0"
 edition = "2021"
 
+[features]
+cuda = ["isper-core/cuda"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

@@ -120,9 +120,9 @@ Gravar do mic → WAV 16 kHz → transcrever → imprimir. Sem UI: só o motor.
 **Pronto quando:** numa sessão do Claude Code no terminal, você aperta o atalho, fala, e o texto aparece no input — o caso de uso que motivou tudo. ✔ *("Testei e funcionou lindamente!" — 26/08)*
 **Você aprende:** IPC Tauri, gestão de janelas Win32, integração de sistema.
 
-## Fase 3 — Polimento premium (1–2 semanas)
+## Fase 3 — Polimento premium (em andamento — CUDA concluído em 26/08/2026)
 
-- [ ] Ativar CUDA + `large-v3-turbo` q5_0; meta de latência: **< 1,5 s** para frase de 10 s
+- [x] Ativar CUDA + `large-v3-turbo` q5_0 — a RTX 4050 transcreve 10,4 s de áudio em **0,6 s** (16,1× tempo real; meta de <1,5 s superada). O app prefere o turbo quando compilado com `--features cuda`, e a RAM caiu p/ ~300 MB (o modelo mora na VRAM)
 - [ ] Settings: modelo, idioma, atalho, dispositivo de entrada, tema claro/escuro, autostart
 - [ ] Gerenciador de modelos: download com barra de progresso + verificação de checksum
 - [ ] Histórico de ditados pesquisável (SQLite)
