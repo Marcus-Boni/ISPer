@@ -1,0 +1,8 @@
+# Artefatos de build do Rust
+/target
+
+# Modelos Whisper (grandes demais para o git — baixados sob demanda)
+/models
+
+# Saídas temporárias
+*.log

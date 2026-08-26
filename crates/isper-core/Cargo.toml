@@ -1,0 +1,13 @@
+[package]
+name = "isper-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cpal = "0.18.2"
+crossbeam-channel = "0.5.16"
+hound = "3.5.1"
+rubato = "0.16"
+thiserror = "2.0.20"
+tracing = "0.1.44"
+whisper-rs = "0.16.0"

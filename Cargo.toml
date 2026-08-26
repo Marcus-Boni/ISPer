@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["crates/isper-core", "crates/isper-cli"]
+
+# Perfil de release com otimização máxima — inferência de áudio é CPU-intensiva.
+[profile.release]
+lto = "thin"
+codegen-units = 1
