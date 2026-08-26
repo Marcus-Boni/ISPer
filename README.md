@@ -23,16 +23,21 @@ fixtures/            # WAVs de teste gerados com TTS do Windows (voz pt-BR Maria
 
 ## Build
 
-O whisper.cpp é compilado pelo CMake sem SIMD por padrão no MSVC (fica ~5× mais
-lento). O build.rs do `whisper-rs-sys` repassa qualquer env `GGML_*` como flag
-do CMake — então habilite AVX2 antes de compilar:
+**Pegadinha crítica no Windows/MSVC:** o crate `cmake` engole os flags de
+otimização do modo Release — o whisper.cpp acaba compilado **sem `/O2`**
+(equivale a `/Od`, ~5× mais lento). O build.rs do `whisper-rs-sys` repassa
+qualquer env `GGML_*` ou `CMAKE_*` como flag do CMake, então force otimização
+e SIMD antes de compilar (PowerShell):
 
-```bash
-set GGML_AVX2=ON& set GGML_FMA=ON& set GGML_F16C=ON& set GGML_BMI2=ON& cargo build --release
+```powershell
+$env:GGML_AVX2='ON'; $env:GGML_FMA='ON'; $env:GGML_F16C='ON'; $env:GGML_BMI2='ON'
+$env:CMAKE_C_FLAGS_RELEASE='/O2 /Ob2 /DNDEBUG'; $env:CMAKE_CXX_FLAGS_RELEASE='/O2 /Ob2 /DNDEBUG'
+cargo build --release
 ```
 
-(No PowerShell: `$env:GGML_AVX2='ON'` etc. Se mudar essas flags, rode antes
-`cargo clean -p whisper-rs-sys --release` para forçar a recompilação do C++.)
+(Se mudar essas flags, rode antes `cargo clean -p whisper-rs-sys --release`
+para forçar a recompilação do C++. Para conferir os flags usados:
+`Select-String -Path target\release\build\whisper-rs-sys-*\output -Pattern 'CL\.exe /c'`.)
 
 Na Fase 3, a feature `cuda` do whisper-rs ativa a RTX 4050 (requer CUDA Toolkit).
 
