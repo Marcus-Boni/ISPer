@@ -4,5 +4,8 @@
 # Modelos Whisper (grandes demais para o git — baixados sob demanda)
 /models
 
+# Schemas gerados pelo Tauri no build
+apps/isper-app/src-tauri/gen/
+
 # Saídas temporárias
 *.log

@@ -37,13 +37,33 @@ fn stream_err(e: cpal::Error) {
     tracing::error!("erro no stream de áudio: {e}");
 }
 
-/// Grava do microfone padrão por `duration`.
+/// Grava do microfone padrão por `duration` (bloqueante — usado pela CLI).
+pub fn record(duration: Duration) -> Result<RawAudio> {
+    let (tx, rx) = crossbeam_channel::unbounded::<Vec<f32>>();
+    let (stream, sample_rate, channels) = open_input_stream(tx)?;
+    stream.play().map_err(|e| IsperError::Audio(e.to_string()))?;
+    std::thread::sleep(duration);
+    drop(stream); // encerra a captura; o lado `tx` do canal morre junto
+
+    let samples: Vec<f32> = rx.try_iter().flatten().collect();
+    Ok(RawAudio {
+        samples,
+        sample_rate,
+        channels,
+    })
+}
+
+/// Abre um stream de captura do microfone padrão. As amostras chegam pelo
+/// canal `tx` já convertidas para f32 normalizado. O chamador dá `.play()`
+/// e encerra a captura dropando o stream (usado pelo `recorder` da Fase 2).
 ///
 /// O cpal entrega as amostras num callback que roda em OUTRA thread (a thread
-/// de áudio do WASAPI). Um canal (crossbeam) leva os buffers de volta para cá:
-/// é o jeito idiomático em Rust de tirar dados de um callback sem compartilhar
-/// estado mutável — o ownership de cada buffer é *transferido* pelo canal.
-pub fn record(duration: Duration) -> Result<RawAudio> {
+/// de áudio do WASAPI). O canal leva os buffers de volta: é o jeito idiomático
+/// em Rust de tirar dados de um callback sem compartilhar estado mutável —
+/// o ownership de cada buffer é *transferido* pelo canal.
+pub(crate) fn open_input_stream(
+    tx: crossbeam_channel::Sender<Vec<f32>>,
+) -> Result<(cpal::Stream, u32, u16)> {
     let host = cpal::default_host();
     let device = host
         .default_input_device()
@@ -60,7 +80,6 @@ pub fn record(duration: Duration) -> Result<RawAudio> {
         .unwrap_or_default();
     tracing::info!(device = %device_name, sample_rate, channels, "gravando");
 
-    let (tx, rx) = crossbeam_channel::unbounded::<Vec<f32>>();
     let stream_config: cpal::StreamConfig = config.config();
 
     // O formato das amostras depende do driver (f32 no WASAPI, i16 em outros).
@@ -107,16 +126,7 @@ pub fn record(duration: Duration) -> Result<RawAudio> {
         }
     };
 
-    stream.play().map_err(|e| IsperError::Audio(e.to_string()))?;
-    std::thread::sleep(duration);
-    drop(stream); // encerra a captura; o lado `tx` do canal morre junto
-
-    let samples: Vec<f32> = rx.try_iter().flatten().collect();
-    Ok(RawAudio {
-        samples,
-        sample_rate,
-        channels,
-    })
+    Ok((stream, sample_rate, channels))
 }
 
 /// Lê um WAV (int ou float, qualquer nº de canais) para RawAudio.

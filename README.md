@@ -51,6 +51,21 @@ Outros modelos (large-v3-turbo etc.): https://huggingface.co/ggerganov/whisper.c
 
 ## Uso
 
+### App de ditado (Fase 2)
+
+```bash
+cargo run --release -p isper-app
+```
+
+O app fica na **bandeja do sistema**. Segure o atalho global (Ctrl+Alt+Espaço,
+ou o primeiro livre entre Ctrl+Shift+Espaço / Ctrl+Alt+D / Ctrl+Alt+I — a dica
+no menu da bandeja mostra qual foi registrado), **fale, e solte**: o texto é
+colado no app focado via Ctrl+V, com o clipboard anterior restaurado em
+seguida. Requer `models/ggml-small.bin` (ou a env `ISPER_MODEL` apontando para
+outro modelo ggml).
+
+### CLI (Fase 1)
+
 ```bash
 cargo run --release -p isper-cli -- rec 5
 ```

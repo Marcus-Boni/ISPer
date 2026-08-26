@@ -6,6 +6,7 @@
 
 pub mod audio;
 pub mod engine;
+pub mod recorder;
 
 pub use audio::RawAudio;
 pub use engine::{Transcript, TranscriptSegment, WhisperEngine};

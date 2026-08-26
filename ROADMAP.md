@@ -107,17 +107,17 @@ Gravar do mic → WAV 16 kHz → transcrever → imprimir. Sem UI: só o motor.
 **Pronto quando:** você fala em pt-BR e o texto sai correto no terminal. ✔ ("Olá! O ISPR está transcrevendo perfeitamente. 1, 2, 3, 4, 5.")
 **Você aprende:** threads e ownership em callbacks de áudio, FFI com C++, o pipeline ASR inteiro.
 
-## Fase 2 — MVP de ditado, o "Wispr Flow local" (2–3 semanas)
+## Fase 2 — MVP de ditado, o "Wispr Flow local" (MVP rodando em 26/08/2026)
 
-- [ ] App Tauri 2 com ícone na bandeja (tray) e frontend (sugestão: Svelte ou React + Tailwind)
-- [ ] Hotkey global **push-to-talk** (segurar = gravar, soltar = transcrever) usando `ShortcutState::Pressed/Released` — ex.: `Ctrl+Win` ou tecla dedicada
+- [x] App Tauri 2 com ícone na bandeja (tray); frontend vanilla HTML/CSS/JS sem build step (Svelte/React ficam p/ a Fase 3 se a UI crescer)
+- [x] Hotkey global **push-to-talk** (segurar = gravar, soltar = transcrever) com `ShortcutState::Pressed/Released` — Ctrl+Alt+Espaço estava ocupado nesta máquina, então o app registra o primeiro livre de uma lista de candidatos (ficou **Ctrl+Shift+Espaço**; a dica na bandeja mostra qual)
 - [ ] Modo alternativo *toggle*: aperta uma vez, fala, VAD detecta ~1 s de silêncio e para sozinho
-- [ ] Overlay: janela sem borda, transparente, always-on-top, **não-focável**, com waveform animada do nível do mic (eventos IPC → canvas)
-- [ ] Inserção do texto: salvar clipboard atual → escrever texto → `Ctrl+V` simulado (`enigo`) → restaurar clipboard
-- [ ] Sons discretos de início/fim de gravação
-- [ ] Tratamento de erros visível (mic ocupado, modelo ausente)
+- [x] Overlay: janela sem borda, transparente, always-on-top, **não-focável** (`set_focusable(false)`), com waveform animada do nível do mic (eventos IPC → canvas)
+- [x] Inserção do texto: salvar clipboard atual → escrever texto → `Ctrl+V` simulado (`enigo`) → restaurar clipboard
+- [x] Sons discretos de início/fim (WebAudio na própria UI, sem arquivos)
+- [x] Tratamento de erros visível no overlay (áudio curto, modelo carregando, nada reconhecido)
 
-**Pronto quando:** numa sessão do Claude Code no terminal, você aperta o atalho, fala, e o texto aparece no input — o caso de uso que motivou tudo.
+**Pronto quando:** numa sessão do Claude Code no terminal, você aperta o atalho, fala, e o texto aparece no input — o caso de uso que motivou tudo. *(MVP rodando — aguardando o seu teste)*
 **Você aprende:** IPC Tauri, gestão de janelas Win32, integração de sistema.
 
 ## Fase 3 — Polimento premium (1–2 semanas)
