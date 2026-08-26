@@ -130,19 +130,20 @@ Gravar do mic → WAV 16 kHz → transcrever → imprimir. Sem UI: só o motor.
 - [ ] Instalador `.msi`/`.exe` (bundler do Tauri), ícone e identidade visual
 - [ ] Microinterações e animações na UI (aqui entra o "premium")
 
-## Fase 4 — Notetaker de reuniões Teams (3–4 semanas)
+## Fase 4 — Notetaker de reuniões Teams (núcleo funcionando em 26/08/2026)
 
 A jogada: **não precisa de bot nem API paga** — captura-se o áudio que sai da sua caixa de som (loopback WASAPI) + seu mic.
 
-- [ ] Capturar áudio do sistema com o crate `wasapi` (modo loopback) em paralelo ao mic
-- [ ] (Avançado) Loopback **por processo**: capturar só o áudio do Teams (API do Windows 10 2004+)
-- [ ] Transcrição contínua em blocos com timestamps (janela deslizante com sobreposição p/ não cortar palavras)
-- [ ] Separação básica de falantes: canal do mic = "Eu", loopback = "Participantes"
+- [x] Capturar áudio do sistema com o crate `wasapi` em paralelo ao mic — com três defesas descobertas na prática (o loopback do cpal estagna neste endpoint USB): **keepalive** de silêncio integrado (o endpoint nunca suspende), **drenagem completa** (GetBuffer devolve 1 pacote de ~10 ms por chamada) e **watchdog por bytes** (reabre o cliente se ficar 1 s sem dados). Validado: 20/20 s capturados com stream contínuo, transcrição do WAV capturado perfeita
+- [ ] (Avançado) Loopback **por processo**: capturar só o Teams — o `wasapi` já expõe `new_application_loopback_client(pid)`, fica p/ a próxima iteração
+- [x] Transcrição contínua em blocos (~20 s, cortados no ponto mais silencioso p/ não partir palavra) com timestamps pelo **relógio da reunião** (o loopback não entrega amostras nas pausas — contar amostras derraparia)
+- [x] Separação básica de falantes: canal do mic = "Eu", loopback = "Participantes", intercalados por timestamp
 - [ ] Diarização real (quem falou o quê) com `sherpa-onnx` — item stretch
-- [ ] Biblioteca de reuniões: SQLite + exportar Markdown (título, data, transcript, participantes)
+- [x] Biblioteca de reuniões: SQLite (`%APPDATA%\ISPer\isper.db`) + exportar Markdown (`Documentos\ISPer\Reunioes\`)
 - [ ] Detectar reunião ativa (janela do Teams aberta + áudio fluindo) → notificação "Gravar transcrição?"
+- [ ] Validar numa reunião real do Teams (ou vídeo do YouTube) — *seu teste!*
 
-⚠️ **LGPD/etiqueta:** avise os participantes de que a reunião está sendo transcrita.
+⚠️ **LGPD/etiqueta:** avise os participantes de que a reunião está sendo transcrita (o Markdown gerado já traz o lembrete).
 
 ## Fase 5 — Inteligência (contínuo)
 

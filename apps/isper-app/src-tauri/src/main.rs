@@ -20,6 +20,7 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::ShortcutState;
 
+use isper_core::meeting::{self, MeetingHandle};
 use isper_core::recorder::{self, RecorderEvent};
 use isper_core::{RawAudio, WhisperEngine};
 
@@ -51,6 +52,10 @@ struct AppState {
     engine: Mutex<Option<Arc<WhisperEngine>>>,
     audio: recorder::AudioHandle,
     phase: Mutex<Phase>,
+    /// Gravação de reunião em andamento (Fase 4).
+    meeting: Mutex<Option<MeetingHandle>>,
+    /// Item do menu da bandeja que alterna a gravação (p/ trocar o texto).
+    meeting_item: Mutex<Option<MenuItem<tauri::Wry>>>,
 }
 
 fn main() {
@@ -70,6 +75,8 @@ fn main() {
                 engine: Mutex::new(None),
                 audio: recorder::spawn(),
                 phase: Mutex::new(Phase::Idle),
+                meeting: Mutex::new(None),
+                meeting_item: Mutex::new(None),
             });
 
             // Overlay: rodapé do monitor primário, nunca focável.
@@ -107,15 +114,25 @@ fn main() {
                 false,
                 None::<&str>,
             )?;
+            let meeting_item = MenuItem::with_id(
+                app,
+                "meeting",
+                "Iniciar gravação de reunião",
+                true,
+                None::<&str>,
+            )?;
             let quit = MenuItem::with_id(app, "quit", "Sair do ISPer", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&hint, &quit])?;
+            let menu = Menu::with_items(app, &[&hint, &meeting_item, &quit])?;
+            *app.state::<AppState>().meeting_item.lock().unwrap() = Some(meeting_item);
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().expect("ícone do app").clone())
                 .menu(&menu)
-                .tooltip("ISPer — ditado 100% local")
+                .tooltip("ISPer — ditado e reuniões, 100% local")
                 .on_menu_event(|app, event| {
                     if event.id() == "quit" {
                         app.exit(0);
+                    } else if event.id() == "meeting" {
+                        toggle_meeting(app);
                     }
                 })
                 .build(app)?;
@@ -169,14 +186,14 @@ fn main() {
 
                     // Deixa o resultado visível um instante antes de esconder.
                     std::thread::sleep(Duration::from_millis(1200));
-                    let state = handle.state::<AppState>();
-                    let mut phase = state.phase.lock().unwrap();
-                    if matches!(*phase, Phase::Processing) {
-                        *phase = Phase::Idle;
-                        if let Some(overlay) = handle.get_webview_window("overlay") {
-                            let _ = overlay.hide();
+                    {
+                        let state = handle.state::<AppState>();
+                        let mut phase = state.phase.lock().unwrap();
+                        if matches!(*phase, Phase::Processing) {
+                            *phase = Phase::Idle;
                         }
                     }
+                    maybe_restore_overlay(&handle);
                 }
             });
 
@@ -276,6 +293,128 @@ fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<String> {
     tracing::info!(audio_secs, infer_secs = t.infer_secs, "transcrito: {text}");
     paste_text(&text)?;
     Ok(text)
+}
+
+/// Depois de um ditado ou reunião: se houver reunião ativa, o overlay volta
+/// a mostrar o estado dela; senão, esconde.
+fn maybe_restore_overlay(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    if !matches!(*state.phase.lock().unwrap(), Phase::Idle) {
+        return; // um novo ditado já assumiu o overlay
+    }
+    if state.meeting.lock().unwrap().is_some() {
+        let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting"}));
+    } else if let Some(overlay) = app.get_webview_window("overlay") {
+        let _ = overlay.hide();
+    }
+}
+
+fn set_meeting_text(app: &AppHandle, text: &str) {
+    let state = app.state::<AppState>();
+    let guard = state.meeting_item.lock().unwrap();
+    if let Some(item) = guard.as_ref() {
+        let _ = item.set_text(text);
+    }
+}
+
+/// Alterna a gravação de reunião pelo menu da bandeja.
+fn toggle_meeting(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut slot = state.meeting.lock().unwrap();
+
+    if let Some(handle) = slot.take() {
+        // Encerrar: transcreve o resto, salva e abre o Markdown.
+        drop(slot);
+        set_meeting_text(app, "Iniciar gravação de reunião");
+        let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting-processing"}));
+        if let Some(overlay) = app.get_webview_window("overlay") {
+            let _ = overlay.show();
+        }
+        let app = app.clone();
+        std::thread::spawn(move || {
+            match finish_meeting(handle) {
+                Ok(path) => {
+                    tracing::info!("reunião salva em {path}");
+                    let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting-done"}));
+                }
+                Err(e) => {
+                    tracing::warn!("reunião falhou: {e}");
+                    let _ = app.emit_to(
+                        "overlay",
+                        "isper-state",
+                        json!({"state": "error", "message": e.to_string()}),
+                    );
+                }
+            }
+            std::thread::sleep(Duration::from_millis(2500));
+            maybe_restore_overlay(&app);
+        });
+    } else {
+        // Iniciar.
+        drop(slot);
+        let engine = { state.engine.lock().unwrap().clone() };
+        let started = engine
+            .ok_or_else(|| anyhow::anyhow!("o modelo ainda está carregando — tente em instantes"))
+            .and_then(|engine| meeting::start(engine).map_err(anyhow::Error::from));
+        match started {
+            Ok(handle) => {
+                *state.meeting.lock().unwrap() = Some(handle);
+                set_meeting_text(app, "Encerrar e transcrever a reunião");
+                let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting"}));
+                if let Some(overlay) = app.get_webview_window("overlay") {
+                    let _ = overlay.show();
+                }
+            }
+            Err(e) => {
+                tracing::error!("não consegui iniciar a reunião: {e}");
+                let _ = app.emit_to(
+                    "overlay",
+                    "isper-state",
+                    json!({"state": "error", "message": e.to_string()}),
+                );
+                if let Some(overlay) = app.get_webview_window("overlay") {
+                    let _ = overlay.show();
+                }
+                let app = app.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(2500));
+                    maybe_restore_overlay(&app);
+                });
+            }
+        }
+    }
+}
+
+/// Encerra a gravação, salva o Markdown em Documentos\ISPer\Reunioes e no
+/// banco SQLite em %APPDATA%\ISPer, e abre o arquivo no app padrão.
+fn finish_meeting(handle: MeetingHandle) -> anyhow::Result<String> {
+    let result = handle.stop()?;
+    if result.segments.is_empty() {
+        anyhow::bail!("nenhuma fala detectada na reunião");
+    }
+    let now = chrono::Local::now();
+    let started_at = now.format("%d/%m/%Y %H:%M").to_string();
+    let title = format!("Reunião — {started_at}");
+    let md = meeting::to_markdown(&title, &started_at, &result);
+
+    let docs = PathBuf::from(std::env::var("USERPROFILE")?)
+        .join("Documents")
+        .join("ISPer")
+        .join("Reunioes");
+    std::fs::create_dir_all(&docs)?;
+    let md_path = docs.join(format!("reuniao-{}.md", now.format("%Y%m%d-%H%M%S")));
+    std::fs::write(&md_path, md)?;
+
+    let db_dir = PathBuf::from(std::env::var("APPDATA")?).join("ISPer");
+    std::fs::create_dir_all(&db_dir)?;
+    let store = isper_core::store::MeetingStore::open(&db_dir.join("isper.db"))?;
+    store.save(&title, &started_at, &result)?;
+
+    let _ = std::process::Command::new("cmd")
+        .args(["/C", "start", "", &md_path.to_string_lossy()])
+        .spawn();
+
+    Ok(md_path.display().to_string())
 }
 
 /// Cola `text` no app focado: salva o clipboard, injeta o texto, simula

@@ -31,10 +31,19 @@ impl RawAudio {
         let mono = to_mono(&self.samples, self.channels);
         resample_to_16k(&mono, self.sample_rate)
     }
+
+    /// Volume médio (RMS) — usado p/ pular blocos silenciosos sem gastar GPU.
+    pub fn rms(&self) -> f32 {
+        if self.samples.is_empty() {
+            return 0.0;
+        }
+        (self.samples.iter().map(|s| s * s).sum::<f32>() / self.samples.len() as f32).sqrt()
+    }
 }
 
 fn stream_err(e: cpal::Error) {
-    tracing::error!("erro no stream de áudio: {e}");
+    // Underrun/overrun no início do loopback é transitório e inofensivo.
+    tracing::warn!("aviso no stream de áudio: {e}");
 }
 
 /// Grava do microfone padrão por `duration` (bloqueante — usado pela CLI).
@@ -55,7 +64,10 @@ pub fn record(duration: Duration) -> Result<RawAudio> {
 
 /// Abre um stream de captura do microfone padrão. As amostras chegam pelo
 /// canal `tx` já convertidas para f32 normalizado. O chamador dá `.play()`
-/// e encerra a captura dropando o stream (usado pelo `recorder` da Fase 2).
+/// e encerra a captura dropando o stream.
+///
+/// (O loopback do sistema vive no módulo [`crate::loopback`]: o caminho de
+/// loopback do cpal estagna quando os eventos WASAPI param de chegar.)
 ///
 /// O cpal entrega as amostras num callback que roda em OUTRA thread (a thread
 /// de áudio do WASAPI). O canal leva os buffers de volta: é o jeito idiomático
@@ -78,7 +90,7 @@ pub(crate) fn open_input_stream(
         .description()
         .map(|d| d.name().to_string())
         .unwrap_or_default();
-    tracing::info!(device = %device_name, sample_rate, channels, "gravando");
+    tracing::info!(device = %device_name, sample_rate, channels, "capturando mic");
 
     let stream_config: cpal::StreamConfig = config.config();
 

@@ -13,6 +13,9 @@ use crate::{IsperError, Result};
 
 pub struct WhisperEngine {
     ctx: WhisperContext,
+    /// Serializa inferências: ditado e blocos de reunião compartilham o
+    /// mesmo modelo na GPU sem disputa.
+    infer_lock: std::sync::Mutex<()>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,12 +50,17 @@ impl WhisperEngine {
             .ok_or_else(|| IsperError::Whisper("caminho de modelo inválido".into()))?;
         let ctx = WhisperContext::new_with_params(path_str, WhisperContextParameters::default())
             .map_err(|e| IsperError::Whisper(e.to_string()))?;
-        Ok(Self { ctx })
+        Ok(Self {
+            ctx,
+            infer_lock: std::sync::Mutex::new(()),
+        })
     }
 
     /// Transcreve áudio já em 16 kHz mono f32 (use `RawAudio::into_whisper_input`).
     /// `lang` é o código do idioma ("pt", "en") ou "auto" para detecção.
     pub fn transcribe(&self, samples_16k: &[f32], lang: &str) -> Result<Transcript> {
+        // Uma inferência por vez — ditado e reunião dividem a GPU em paz.
+        let _guard = self.infer_lock.lock().unwrap();
         let mut state = self
             .ctx
             .create_state()

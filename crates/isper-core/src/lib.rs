@@ -6,7 +6,10 @@
 
 pub mod audio;
 pub mod engine;
+pub mod loopback;
+pub mod meeting;
 pub mod recorder;
+pub mod store;
 
 pub use audio::RawAudio;
 pub use engine::{Transcript, TranscriptSegment, WhisperEngine};
@@ -29,6 +32,8 @@ pub enum IsperError {
     Resample(String),
     #[error("erro do Whisper: {0}")]
     Whisper(String),
+    #[error("erro de banco de dados: {0}")]
+    Db(#[from] rusqlite::Error),
     #[error("erro de E/S: {0}")]
     Io(#[from] std::io::Error),
 }

@@ -51,11 +51,20 @@
 
   const truncate = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
 
+  const CLASS_MAP = {
+    'recording-handsfree': 'recording handsfree',
+    'meeting': 'recording meeting',
+    'meeting-processing': 'transcribing',
+    'meeting-done': 'done'
+  };
   function setState(s, msg) {
     state = s;
-    pill.className = s === 'recording-handsfree' ? 'recording handsfree' : s;
+    pill.className = CLASS_MAP[s] || s;
     if (s === 'recording') { bars.fill(0); statusEl.textContent = 'gravando… solte para colar'; blip(880, .05); }
     else if (s === 'recording-handsfree') statusEl.textContent = 'mãos-livres… 1 s de silêncio cola';
+    else if (s === 'meeting') statusEl.textContent = 'gravando reunião — Eu + Participantes';
+    else if (s === 'meeting-processing') statusEl.textContent = 'transcrevendo a reunião…';
+    else if (s === 'meeting-done') { statusEl.textContent = 'reunião salva e aberta ✓'; blip(1320, .07); }
     else if (s === 'transcribing') statusEl.textContent = 'transcrevendo…';
     else if (s === 'done') { statusEl.textContent = msg ? '“' + truncate(msg, 40) + '”' : 'colado'; blip(1320, .07); }
     else if (s === 'error') statusEl.textContent = msg || 'erro';

@@ -97,6 +97,26 @@ menu da bandeja mostra qual foi registrado. Dois modos:
 Requer `models/ggml-small.bin` (ou a env `ISPER_MODEL` apontando para outro
 modelo ggml).
 
+### Notetaker de reuniões (Fase 4)
+
+No app: bandeja → **"Iniciar gravação de reunião"**. O pill mostra o estado;
+o mesmo menu encerra ("Encerrar e transcrever a reunião") — o transcript
+abre sozinho e fica salvo em `Documentos\ISPer\Reunioes\*.md` + SQLite em
+`%APPDATA%\ISPer\isper.db`. Mic = "Eu"; áudio do sistema (loopback) =
+"Participantes". Avise os participantes (LGPD).
+
+Na CLI (laboratório):
+
+```bash
+cargo run --release -p isper-cli -- meeting 30
+```
+
+Depuração do loopback (taxa de entrega por segundo + WAV):
+
+```bash
+cargo run --release -p isper-cli --bin loopdump -- 15
+```
+
 ### CLI (Fase 1)
 
 ```bash

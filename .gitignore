@@ -7,5 +7,7 @@
 # Schemas gerados pelo Tauri no build
 apps/isper-app/src-tauri/gen/
 
-# Saídas temporárias
+# Saídas temporárias e dados locais (transcrições de teste, banco)
 *.log
+*.db
+/reunioes
