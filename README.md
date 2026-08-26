@@ -114,3 +114,8 @@ Opções: `--model <caminho>` (padrão `models/ggml-small.bin`), `--lang <pt|en|
 ```bash
 cargo test -p isper-core
 ```
+
+## Licença
+
+[MIT](LICENSE). Whisper (MIT) · whisper.cpp (MIT) · Tauri (MIT/Apache-2.0) —
+todos os modelos usados têm pesos abertos.

@@ -1,0 +1,11 @@
+# Normaliza fins de linha: LF no repositório, nativo no checkout
+* text=auto
+
+# Binários — nunca tocar
+*.png binary
+*.ico binary
+*.icns binary
+*.wav binary
+*.bin binary
+*.dll binary
+*.exe binary
