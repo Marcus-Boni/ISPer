@@ -32,7 +32,18 @@ impl MeetingStore {
             );
             CREATE INDEX IF NOT EXISTS idx_segments_meeting ON segments(meeting_id);",
         )?;
+        // Migração leve: coluna nova em bancos antigos (erro = já existe).
+        let _ = conn.execute("ALTER TABLE meetings ADD COLUMN summary TEXT", []);
         Ok(Self { conn })
+    }
+
+    /// Guarda o resumo gerado por IA (Fase 5).
+    pub fn set_summary(&self, meeting_id: i64, summary: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE meetings SET summary = ?1 WHERE id = ?2",
+            params![summary, meeting_id],
+        )?;
+        Ok(())
     }
 
     /// Salva uma reunião completa e devolve o id.

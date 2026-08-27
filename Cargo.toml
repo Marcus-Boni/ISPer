@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/isper-core", "crates/isper-cli", "apps/isper-app/src-tauri"]
+members = [
+    "crates/isper-core",
+    "crates/isper-llm",
+    "crates/isper-cli",
+    "apps/isper-app/src-tauri",
+]
 
 # Perfil de release com otimização máxima — inferência de áudio é CPU-intensiva.
 [profile.release]

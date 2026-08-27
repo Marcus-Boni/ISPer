@@ -38,6 +38,27 @@ enum Cmd {
     /// Grava uma reunião (mic = "Eu" + áudio do sistema = "Participantes")
     /// por N segundos, transcreve em blocos e salva Markdown + SQLite
     Meeting { seconds: u64 },
+    /// Configura a inteligência de nuvem (Fase 5)
+    #[command(subcommand)]
+    Llm(LlmCmd),
+}
+
+#[derive(Subcommand)]
+enum LlmCmd {
+    /// Escolhe o provider (claude, groq ou gemini) e opcionalmente o modelo
+    Use {
+        provider: String,
+        #[arg(long)]
+        model: Option<String>,
+    },
+    /// Guarda a chave de API no Credential Manager do Windows (pede no prompt)
+    SetKey { provider: String },
+    /// Remove a chave guardada
+    DeleteKey { provider: String },
+    /// Mostra o provider configurado e se há chave guardada
+    Status,
+    /// Faz uma chamada de teste ao provider configurado
+    Test,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -46,7 +67,72 @@ fn main() -> anyhow::Result<()> {
 
     match &cli.cmd {
         Cmd::Meeting { seconds } => run_meeting(&cli, *seconds),
+        Cmd::Llm(llm_cmd) => run_llm(llm_cmd),
         _ => run_dictation(&cli),
+    }
+}
+
+fn run_llm(cmd: &LlmCmd) -> anyhow::Result<()> {
+    match cmd {
+        LlmCmd::Use { provider, model } => {
+            let settings = isper_llm::LlmSettings {
+                provider: provider.to_lowercase(),
+                model: model.clone(),
+            };
+            isper_llm::save_settings(&settings)?;
+            println!(
+                "provider: {} | modelo: {}",
+                settings.provider,
+                settings.model.as_deref().unwrap_or("(padrão do provider)")
+            );
+            if isper_llm::get_api_key(&settings.provider)?.is_none() {
+                println!("falta a chave: rode `isper-cli llm set-key {}`", settings.provider);
+            }
+            Ok(())
+        }
+        LlmCmd::SetKey { provider } => {
+            let provider = provider.to_lowercase();
+            let key = rpassword::prompt_password(format!(
+                "Cole a chave de API de '{provider}' (não aparece ao digitar): "
+            ))?;
+            if key.trim().is_empty() {
+                anyhow::bail!("chave vazia — nada salvo");
+            }
+            isper_llm::set_api_key(&provider, &key)?;
+            println!("chave de '{provider}' salva no Credential Manager do Windows");
+            Ok(())
+        }
+        LlmCmd::DeleteKey { provider } => {
+            isper_llm::delete_api_key(&provider.to_lowercase())?;
+            println!("chave removida (se existia)");
+            Ok(())
+        }
+        LlmCmd::Status => {
+            let settings = isper_llm::load_settings();
+            if settings.provider.is_empty() {
+                println!("nenhum provider configurado — `isper-cli llm use <claude|groq|gemini>`");
+                return Ok(());
+            }
+            let has_key = isper_llm::get_api_key(&settings.provider)?.is_some();
+            println!(
+                "provider: {} | modelo: {} | chave: {}",
+                settings.provider,
+                settings.model.as_deref().unwrap_or("(padrão do provider)"),
+                if has_key { "guardada" } else { "FALTANDO (llm set-key)" }
+            );
+            Ok(())
+        }
+        LlmCmd::Test => {
+            let settings = isper_llm::load_settings();
+            let provider = isper_llm::provider_from_settings(&settings)?;
+            println!("testando {} ({})...", provider.name(), provider.model());
+            let reply = provider.complete(
+                "Você é o teste de conexão do ISPer. Responda em português, em uma linha.",
+                "Diga apenas: conexão ok!",
+            )?;
+            println!("resposta: {}", reply.trim());
+            Ok(())
+        }
     }
 }
 
@@ -58,7 +144,7 @@ fn run_dictation(cli: &Cli) -> anyhow::Result<()> {
         }
         Cmd::File { path } => audio::load_wav(path)
             .with_context(|| format!("falha ao ler {}", path.display()))?,
-        Cmd::Meeting { .. } => unreachable!(),
+        Cmd::Meeting { .. } | Cmd::Llm(_) => unreachable!(),
     };
 
     println!(
@@ -126,5 +212,36 @@ fn run_meeting(cli: &Cli, seconds: u64) -> anyhow::Result<()> {
     let id = db.save(&title, &started_at, &result)?;
 
     println!("salvo: {md_path} | banco: isper.db (reuniao id {id})");
+
+    // Fase 5: resumo por IA, se houver provider configurado.
+    let settings = isper_llm::load_settings();
+    match isper_llm::provider_from_settings(&settings) {
+        Ok(provider) => {
+            println!("gerando resumo via {} ({})...", provider.name(), provider.model());
+            let transcript = meeting::to_markdown(&title, &started_at, &result);
+            match isper_llm::summarize_meeting(provider.as_ref(), &transcript) {
+                Ok(summary) => {
+                    let block = format!(
+                        "\n\n---\n\n{}\n\n> Resumo gerado via {} ({}) — revise antes de usar.\n",
+                        summary.trim(),
+                        provider.name(),
+                        provider.model()
+                    );
+                    use std::io::Write;
+                    std::fs::OpenOptions::new()
+                        .append(true)
+                        .open(&md_path)?
+                        .write_all(block.as_bytes())?;
+                    let _ = db.set_summary(id, summary.trim());
+                    println!("\n{}", summary.trim());
+                }
+                Err(e) => println!("resumo falhou (transcript preservado): {e}"),
+            }
+        }
+        Err(isper_llm::LlmError::NotConfigured) => {
+            println!("(sem resumo por IA — configure com `isper-cli llm use groq`)");
+        }
+        Err(e) => println!("resumo indisponível: {e}"),
+    }
     Ok(())
 }

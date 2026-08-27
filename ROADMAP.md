@@ -145,15 +145,16 @@ A jogada: **não precisa de bot nem API paga** — captura-se o áudio que sai d
 
 ⚠️ **LGPD/etiqueta:** avise os participantes de que a reunião está sendo transcrita (o Markdown gerado já traz o lembrete).
 
-## Fase 5 — Inteligência (contínuo)
+## Fase 5 — Inteligência (camada de IA construída em 26/08/2026)
 
 > **Decisão (26/08/2026):** LLM de **nuvem via API**, não local. Rodar um LLM local pesaria na máquina — os 6 GB de VRAM já servem o Whisper durante as reuniões.
 
-- [ ] Camada de provider abstraída (trait `LlmProvider`) — trocar de API sem reescrever o app
-- [ ] Resumo pós-reunião, action items e decisões via API de nuvem (ex.: Claude API; alternativas com free tier: Groq, Gemini)
+- [x] Camada de provider abstraída (trait `LlmProvider` no crate `isper-llm`) — **Claude API** (padrão `claude-opus-5`, com fallback de recusa server-side), **Groq** (free tier, `llama-3.3-70b-versatile`) e **Gemini** (free tier, `gemini-2.5-flash`); HTTP cru via `ureq` (Rust não tem SDK oficial da Anthropic); modelo configurável por provider
+- [x] Resumo pós-reunião, pontos principais, action items e decisões — anexado ao Markdown da reunião e gravado na coluna `summary` do SQLite, tanto no app quanto na CLI; se a API falhar, o transcript já está salvo
 - [ ] Insights em tempo real: janela deslizante do transcript → prompt periódico ("o que ficou pendente?", "prometi algo?")
 - [ ] Busca semântica no histórico de reuniões (embeddings leves — decidir provider na hora)
-- [ ] Privacidade: só o **texto** do transcript vai à API — áudio nunca sai da máquina; chave de API no Credential Manager do Windows
+- [x] Privacidade: só o **texto** do transcript vai à API — áudio nunca sai da máquina; chave no **Credential Manager do Windows** (crate `keyring`; env `ISPER_<PROVIDER>_API_KEY` como fallback); a chave da Gemini vai em header, nunca na URL
+- [ ] Validar com sua chave: `isper-cli llm use groq` → `llm set-key groq` → `llm test` — *seu teste!*
 
 ---
 

@@ -332,7 +332,7 @@ fn toggle_meeting(app: &AppHandle) {
         }
         let app = app.clone();
         std::thread::spawn(move || {
-            match finish_meeting(handle) {
+            match finish_meeting(&app, handle) {
                 Ok(path) => {
                     tracing::info!("reunião salva em {path}");
                     let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting-done"}));
@@ -386,8 +386,9 @@ fn toggle_meeting(app: &AppHandle) {
 }
 
 /// Encerra a gravação, salva o Markdown em Documentos\ISPer\Reunioes e no
-/// banco SQLite em %APPDATA%\ISPer, e abre o arquivo no app padrão.
-fn finish_meeting(handle: MeetingHandle) -> anyhow::Result<String> {
+/// banco SQLite em %APPDATA%\ISPer, gera o resumo por IA (Fase 5, se
+/// configurado) e abre o arquivo no app padrão.
+fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<String> {
     let result = handle.stop()?;
     if result.segments.is_empty() {
         anyhow::bail!("nenhuma fala detectada na reunião");
@@ -397,18 +398,48 @@ fn finish_meeting(handle: MeetingHandle) -> anyhow::Result<String> {
     let title = format!("Reunião — {started_at}");
     let md = meeting::to_markdown(&title, &started_at, &result);
 
+    // O transcript é salvo ANTES do resumo: se a API falhar, nada se perde.
     let docs = PathBuf::from(std::env::var("USERPROFILE")?)
         .join("Documents")
         .join("ISPer")
         .join("Reunioes");
     std::fs::create_dir_all(&docs)?;
     let md_path = docs.join(format!("reuniao-{}.md", now.format("%Y%m%d-%H%M%S")));
-    std::fs::write(&md_path, md)?;
+    std::fs::write(&md_path, &md)?;
 
     let db_dir = PathBuf::from(std::env::var("APPDATA")?).join("ISPer");
     std::fs::create_dir_all(&db_dir)?;
     let store = isper_core::store::MeetingStore::open(&db_dir.join("isper.db"))?;
-    store.save(&title, &started_at, &result)?;
+    let meeting_id = store.save(&title, &started_at, &result)?;
+
+    // Fase 5: resumo por IA de nuvem — só o TEXTO do transcript sai da máquina.
+    let settings = isper_llm::load_settings();
+    match isper_llm::provider_from_settings(&settings) {
+        Ok(provider) => {
+            let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting-summary"}));
+            match isper_llm::summarize_meeting(provider.as_ref(), &md) {
+                Ok(summary) => {
+                    let block = format!(
+                        "\n\n---\n\n{}\n\n> Resumo gerado via {} ({}) — revise antes de usar.\n",
+                        summary.trim(),
+                        provider.name(),
+                        provider.model()
+                    );
+                    use std::io::Write;
+                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open(&md_path) {
+                        let _ = f.write_all(block.as_bytes());
+                    }
+                    let _ = store.set_summary(meeting_id, summary.trim());
+                    tracing::info!("resumo gerado via {}", provider.name());
+                }
+                Err(e) => tracing::warn!("resumo falhou (transcript preservado): {e}"),
+            }
+        }
+        Err(isper_llm::LlmError::NotConfigured) => {
+            tracing::info!("sem provider de IA configurado — reunião salva sem resumo");
+        }
+        Err(e) => tracing::warn!("resumo indisponível: {e}"),
+    }
 
     let _ = std::process::Command::new("cmd")
         .args(["/C", "start", "", &md_path.to_string_lossy()])

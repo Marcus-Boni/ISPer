@@ -55,6 +55,7 @@
     'recording-handsfree': 'recording handsfree',
     'meeting': 'recording meeting',
     'meeting-processing': 'transcribing',
+    'meeting-summary': 'transcribing',
     'meeting-done': 'done'
   };
   function setState(s, msg) {
@@ -64,6 +65,7 @@
     else if (s === 'recording-handsfree') statusEl.textContent = 'mãos-livres… 1 s de silêncio cola';
     else if (s === 'meeting') statusEl.textContent = 'gravando reunião — Eu + Participantes';
     else if (s === 'meeting-processing') statusEl.textContent = 'transcrevendo a reunião…';
+    else if (s === 'meeting-summary') statusEl.textContent = 'resumindo com IA…';
     else if (s === 'meeting-done') { statusEl.textContent = 'reunião salva e aberta ✓'; blip(1320, .07); }
     else if (s === 'transcribing') statusEl.textContent = 'transcrevendo…';
     else if (s === 'done') { statusEl.textContent = msg ? '“' + truncate(msg, 40) + '”' : 'colado'; blip(1320, .07); }

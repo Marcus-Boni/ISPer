@@ -117,6 +117,32 @@ Depuração do loopback (taxa de entrega por segundo + WAV):
 cargo run --release -p isper-cli --bin loopdump -- 15
 ```
 
+### Inteligência de nuvem (Fase 5)
+
+Ao fim de cada reunião, o ISPer pode gerar **resumo, pontos principais,
+action items e decisões** via API de LLM — anexados ao Markdown e ao banco.
+Configure uma vez:
+
+```bash
+cargo run --release -p isper-cli -- llm use groq
+```
+
+```bash
+cargo run --release -p isper-cli -- llm set-key groq
+```
+
+```bash
+cargo run --release -p isper-cli -- llm test
+```
+
+Providers: `groq` (chave gratuita em console.groq.com/keys), `gemini`
+(aistudio.google.com/apikey) e `claude` (console.anthropic.com; usa
+`claude-opus-5` por padrão). Troque o modelo com
+`llm use <provider> --model <id>`. A chave fica no **Credential Manager do
+Windows** — nunca em arquivo. Privacidade: só o TEXTO do transcript é
+enviado; o áudio nunca sai da máquina. Sem provider configurado, tudo
+funciona normalmente — apenas sem resumo.
+
 ### CLI (Fase 1)
 
 ```bash
