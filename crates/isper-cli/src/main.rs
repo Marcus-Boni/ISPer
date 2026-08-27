@@ -158,7 +158,7 @@ fn run_dictation(cli: &Cli) -> anyhow::Result<()> {
     println!("carregando modelo {} ...", cli.model.display());
     let engine = WhisperEngine::new(&cli.model)?;
 
-    let t = engine.transcribe(&samples, &cli.lang)?;
+    let t = engine.transcribe(&samples, &cli.lang, None)?;
     println!();
     for seg in &t.segments {
         println!("[{:>6.2}s -> {:>6.2}s] {}", seg.start_secs, seg.end_secs, seg.text);
@@ -178,7 +178,8 @@ fn run_meeting(cli: &Cli, seconds: u64) -> anyhow::Result<()> {
     let engine = Arc::new(WhisperEngine::new(&cli.model)?);
 
     println!("== gravando reuniao por {seconds}s (mic = Eu, sistema = Participantes) ==");
-    let handle = meeting::start(engine).context("falha ao abrir captura da reunião")?;
+    let handle = meeting::start(engine, cli.lang.clone(), None)
+        .context("falha ao abrir captura da reunião")?;
     std::thread::sleep(Duration::from_secs(seconds));
 
     println!("encerrando... transcrevendo blocos restantes");

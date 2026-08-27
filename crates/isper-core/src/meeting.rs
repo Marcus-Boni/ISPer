@@ -20,7 +20,6 @@ const CHUNK_SECS: f32 = 20.0;
 /// Blocos mais silenciosos que isso nem vão para o Whisper (economiza GPU e
 /// evita as alucinações clássicas em silêncio, tipo "Legendas pela...").
 const SILENCE_RMS: f32 = 0.0035;
-const LANG: &str = "pt";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Speaker {
@@ -77,7 +76,12 @@ type Job = (Speaker, f32, RawAudio);
 
 /// Inicia a gravação nos dois canais. Valida que ambos abriram antes de
 /// retornar — se o loopback ou o mic falhar, você fica sabendo já.
-pub fn start(engine: Arc<WhisperEngine>) -> Result<MeetingHandle> {
+/// `lang` e `initial_prompt` seguem para todas as transcrições da reunião.
+pub fn start(
+    engine: Arc<WhisperEngine>,
+    lang: String,
+    initial_prompt: Option<String>,
+) -> Result<MeetingHandle> {
     let (job_tx, job_rx) = unbounded::<Job>();
     let (done_tx, done_rx) = unbounded();
     let (ready_tx, ready_rx) = unbounded::<Result<()>>();
@@ -114,7 +118,7 @@ pub fn start(engine: Arc<WhisperEngine>) -> Result<MeetingHandle> {
     }
 
     std::thread::spawn(move || {
-        let result = transcribe_worker(engine, job_rx, started);
+        let result = transcribe_worker(engine, lang, initial_prompt, job_rx, started);
         let _ = done_tx.send(result);
     });
 
@@ -307,6 +311,8 @@ fn quiet_cut(buf: &[f32], sample_rate: u32, ch: usize) -> usize {
 /// Consome os blocos dos dois canais e monta a lista final de segmentos.
 fn transcribe_worker(
     engine: Arc<WhisperEngine>,
+    lang: String,
+    initial_prompt: Option<String>,
     job_rx: Receiver<Job>,
     started: Instant,
 ) -> Result<MeetingResult> {
@@ -319,7 +325,7 @@ fn transcribe_worker(
         }
         match raw
             .into_whisper_input()
-            .and_then(|s| engine.transcribe(&s, LANG))
+            .and_then(|s| engine.transcribe(&s, &lang, initial_prompt.as_deref()))
         {
             Ok(t) => {
                 tracing::info!(

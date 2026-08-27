@@ -120,14 +120,14 @@ Gravar do mic → WAV 16 kHz → transcrever → imprimir. Sem UI: só o motor.
 **Pronto quando:** numa sessão do Claude Code no terminal, você aperta o atalho, fala, e o texto aparece no input — o caso de uso que motivou tudo. ✔ *("Testei e funcionou lindamente!" — 26/08)*
 **Você aprende:** IPC Tauri, gestão de janelas Win32, integração de sistema.
 
-## Fase 3 — Polimento premium (em andamento — CUDA concluído em 26/08/2026)
+## Fase 3 — Polimento premium (quase completa — falta gerenciador de modelos e instalador)
 
 - [x] Ativar CUDA + `large-v3-turbo` q5_0 — a RTX 4050 transcreve 10,4 s de áudio em **0,6 s** (16,1× tempo real; meta de <1,5 s superada). O app prefere o turbo quando compilado com `--features cuda`, e a RAM caiu p/ ~300 MB (o modelo mora na VRAM)
-- [ ] Settings: modelo, idioma, atalho, dispositivo de entrada, tema claro/escuro, autostart
+- [x] Settings (27/08): janela de Configurações na bandeja — **atalho** (reaplicado na hora, sem reiniciar), **idioma**, **dicionário pessoal**, **provider de IA + chave + teste de conexão** e **autostart**. Dispositivo de entrada e tema ficam para depois
 - [ ] Gerenciador de modelos: download com barra de progresso + verificação de checksum
-- [ ] Histórico de ditados pesquisável (SQLite)
-- [ ] Dicionário pessoal: termos que o Whisper erra (nomes próprios, "OptSolv", jargões) corrigidos via `initial_prompt` ou pós-processamento
-- [ ] Instalador `.msi`/`.exe` (bundler do Tauri), ícone e identidade visual
+- [x] Histórico de ditados no SQLite (27/08): tabela `dictations` em `%APPDATA%\ISPer\isper.db` — cada texto colado fica registrado com data e métricas; um viewer na UI fica para depois
+- [x] Dicionário pessoal (27/08): os termos configurados viram o `initial_prompt` do Whisper em ditados E reuniões — nomes próprios e siglas saem certos
+- [ ] Instalador `.msi`/`.exe` (bundler do Tauri) — requer empacotar as DLLs do CUDA e baixar o modelo no primeiro uso
 - [ ] Microinterações e animações na UI (aqui entra o "premium")
 
 ## Fase 4 — Notetaker de reuniões Teams (núcleo funcionando em 26/08/2026)

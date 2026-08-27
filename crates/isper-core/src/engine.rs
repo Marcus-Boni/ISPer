@@ -58,7 +58,14 @@ impl WhisperEngine {
 
     /// Transcreve áudio já em 16 kHz mono f32 (use `RawAudio::into_whisper_input`).
     /// `lang` é o código do idioma ("pt", "en") ou "auto" para detecção.
-    pub fn transcribe(&self, samples_16k: &[f32], lang: &str) -> Result<Transcript> {
+    /// `initial_prompt` alimenta o dicionário pessoal: o Whisper tende a
+    /// grafar corretamente termos que "acabou de ver" (nomes próprios, siglas).
+    pub fn transcribe(
+        &self,
+        samples_16k: &[f32],
+        lang: &str,
+        initial_prompt: Option<&str>,
+    ) -> Result<Transcript> {
         // Uma inferência por vez — ditado e reunião dividem a GPU em paz.
         let _guard = self.infer_lock.lock().unwrap();
         let mut state = self
@@ -70,6 +77,9 @@ impl WhisperEngine {
         // fica para reuniões (Fase 4), onde qualidade importa mais que latência.
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         params.set_language(Some(lang));
+        if let Some(prompt) = initial_prompt {
+            params.set_initial_prompt(prompt);
+        }
         let threads = std::thread::available_parallelism()
             .map(|n| n.get() as i32)
             .unwrap_or(4);

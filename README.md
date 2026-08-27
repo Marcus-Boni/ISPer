@@ -97,6 +97,12 @@ menu da bandeja mostra qual foi registrado. Dois modos:
 Requer `models/ggml-small.bin` (ou a env `ISPER_MODEL` apontando para outro
 modelo ggml).
 
+Na bandeja, **"Configurações…"** abre a tela com: atalho global (trocado na
+hora, sem reiniciar), idioma, **dicionário pessoal** (termos que o Whisper
+deve grafar certo — viram o `initial_prompt`), provider de IA com chave e
+teste de conexão, e iniciar com o Windows. Cada ditado também fica no
+histórico (`%APPDATA%\ISPer\isper.db`, tabela `dictations`).
+
 ### Notetaker de reuniões (Fase 4)
 
 No app: bandeja → **"Iniciar gravação de reunião"**. O pill mostra o estado;

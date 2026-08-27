@@ -32,9 +32,27 @@ impl MeetingStore {
             );
             CREATE INDEX IF NOT EXISTS idx_segments_meeting ON segments(meeting_id);",
         )?;
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS dictations (
+                id         INTEGER PRIMARY KEY,
+                at         TEXT NOT NULL,
+                text       TEXT NOT NULL,
+                audio_secs REAL,
+                infer_secs REAL
+            );",
+        )?;
         // Migração leve: coluna nova em bancos antigos (erro = já existe).
         let _ = conn.execute("ALTER TABLE meetings ADD COLUMN summary TEXT", []);
         Ok(Self { conn })
+    }
+
+    /// Histórico de ditados (Fase 3): cada texto colado fica pesquisável.
+    pub fn save_dictation(&self, at: &str, text: &str, audio_secs: f32, infer_secs: f32) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO dictations (at, text, audio_secs, infer_secs) VALUES (?1, ?2, ?3, ?4)",
+            params![at, text, audio_secs, infer_secs],
+        )?;
+        Ok(())
     }
 
     /// Guarda o resumo gerado por IA (Fase 5).
