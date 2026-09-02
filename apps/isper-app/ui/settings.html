@@ -88,7 +88,12 @@
     <option value="claude">Claude API</option>
   </select>
   <label for="model">Modelo (vazio = padrão do provider)</label>
-  <input type="text" id="model" placeholder="ex.: claude-opus-5">
+  <div class="row">
+    <input type="text" id="model" list="models" placeholder="ex.: openai/gpt-oss-120b">
+    <button class="ghost" id="listmodels">Listar modelos</button>
+  </div>
+  <datalist id="models"></datalist>
+  <p class="hint">Os catálogos mudam (e variam por conta): "Listar modelos" consulta a API com a sua chave e preenche as opções do campo.</p>
   <label for="key">Chave de API <span id="keystate"></span></label>
   <div class="row">
     <input type="password" id="key" placeholder="cole a chave e clique em Guardar">
@@ -164,6 +169,25 @@
       status('chave guardada no Credential Manager', 'ok');
     } catch (e) {
       status('erro ao guardar chave: ' + e, 'err');
+    }
+  });
+
+  $('listmodels').addEventListener('click', async () => {
+    const provider = $('provider').value;
+    if (provider === 'none') { status('escolha um provider primeiro', 'err'); return; }
+    $('listmodels').disabled = true;
+    status('consultando modelos…');
+    try {
+      const models = await invoke('list_llm_models', { provider, model: null });
+      const dl = $('models');
+      dl.replaceChildren();
+      for (const m of models) { const o = document.createElement('option'); o.value = m; dl.appendChild(o); }
+      status(models.length + ' modelos disponíveis — clique no campo Modelo para escolher', 'ok');
+      $('model').focus();
+    } catch (e) {
+      status('não consegui listar: ' + e, 'err');
+    } finally {
+      $('listmodels').disabled = false;
     }
   });
 

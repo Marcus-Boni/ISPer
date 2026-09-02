@@ -27,6 +27,8 @@ pub enum LlmError {
     NoApiKey(String),
     #[error("provider desconhecido: '{0}' (opções: claude, groq, gemini)")]
     UnknownProvider(String),
+    #[error("o modelo '{0}' não existe ou sua conta não tem acesso a ele — liste os disponíveis (`isper-cli llm models` ou o botão 'Listar modelos' nas Configurações) e escolha outro")]
+    ModelNotFound(String),
     #[error("erro HTTP da API: {0}")]
     Http(String),
     #[error("resposta inesperada da API: {0}")]

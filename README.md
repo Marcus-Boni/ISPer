@@ -148,7 +148,9 @@ cargo run --release -p isper-cli -- llm test
 
 Providers: `groq` (chave gratuita em console.groq.com/keys), `gemini`
 (aistudio.google.com/apikey) e `claude` (console.anthropic.com; usa
-`claude-opus-5` por padrão). Troque o modelo com
+`claude-opus-5` por padrão). Os catálogos de modelos mudam rápido e variam
+por conta — liste os que a SUA chave enxerga com `llm models` (ou o botão
+"Listar modelos" nas Configurações) e escolha com
 `llm use <provider> --model <id>`. A chave fica no **Credential Manager do
 Windows** — nunca em arquivo. Privacidade: só o TEXTO do transcript é
 enviado; o áudio nunca sai da máquina. Sem provider configurado, tudo

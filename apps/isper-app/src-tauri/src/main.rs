@@ -81,7 +81,8 @@ fn main() {
             get_settings,
             apply_settings,
             set_llm_key,
-            test_llm
+            test_llm,
+            list_llm_models
         ])
         .setup(|app| {
             let cfg = config::load();
@@ -657,6 +658,22 @@ async fn test_llm() -> Result<String, String> {
             )
             .map(|r| format!("{} ({}): {}", provider.name(), provider.model(), r.trim()))
             .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Lista os modelos disponíveis para a chave guardada do provider indicado
+/// (o que está selecionado na tela, mesmo antes de salvar).
+#[tauri::command]
+async fn list_llm_models(provider: String, model: Option<String>) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let settings = isper_llm::LlmSettings {
+            provider: provider.trim().to_lowercase(),
+            model,
+        };
+        let p = isper_llm::provider_from_settings(&settings).map_err(|e| e.to_string())?;
+        p.list_models().map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())?

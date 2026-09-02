@@ -59,6 +59,8 @@ enum LlmCmd {
     Status,
     /// Faz uma chamada de teste ao provider configurado
     Test,
+    /// Lista os modelos disponíveis para a sua chave no provider configurado
+    Models,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -131,6 +133,18 @@ fn run_llm(cmd: &LlmCmd) -> anyhow::Result<()> {
                 "Diga apenas: conexão ok!",
             )?;
             println!("resposta: {}", reply.trim());
+            Ok(())
+        }
+        LlmCmd::Models => {
+            let settings = isper_llm::load_settings();
+            let provider = isper_llm::provider_from_settings(&settings)?;
+            let models = provider.list_models()?;
+            println!("modelos disponíveis em {} ({}):", provider.name(), models.len());
+            for m in &models {
+                let mark = if m == provider.model() { "  <- atual" } else { "" };
+                println!("  {m}{mark}");
+            }
+            println!("\nuse: isper-cli llm use {} --model <id>", provider.name());
             Ok(())
         }
     }
