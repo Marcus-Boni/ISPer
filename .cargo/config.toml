@@ -1,0 +1,18 @@
+# Variáveis de ambiente aplicadas pelo cargo aos build scripts — assim
+# `cargo build` de qualquer shell compila o whisper.cpp otimizado, sem ter
+# que exportar nada na mão (ver README → Build).
+#
+# O build.rs do whisper-rs-sys repassa qualquer GGML_* / CMAKE_* ao CMake.
+[env]
+# SIMD do Ryzen 7 7735HS
+GGML_AVX2 = "ON"
+GGML_FMA = "ON"
+GGML_F16C = "ON"
+GGML_BMI2 = "ON"
+# O crate `cmake` engole os flags de otimização Release no MSVC (whisper.cpp
+# ficava ~13x mais lento) — forçamos aqui.
+CMAKE_C_FLAGS_RELEASE = "/O2 /Ob2 /DNDEBUG"
+CMAKE_CXX_FLAGS_RELEASE = "/O2 /Ob2 /DNDEBUG"
+# Só a arquitetura da RTX 4050 (Ada, compute 8.9): corta MUITO o tempo de
+# compilação dos kernels CUDA.
+CMAKE_CUDA_ARCHITECTURES = "89"

@@ -23,32 +23,37 @@ fixtures/            # WAVs de teste gerados com TTS do Windows (voz pt-BR Maria
 
 ## Build
 
-**Pegadinha crítica no Windows/MSVC:** o crate `cmake` engole os flags de
-otimização do modo Release — o whisper.cpp acaba compilado **sem `/O2`**
-(equivale a `/Od`, ~5× mais lento). O build.rs do `whisper-rs-sys` repassa
-qualquer env `GGML_*` ou `CMAKE_*` como flag do CMake, então force otimização
-e SIMD antes de compilar (PowerShell):
+Basta:
 
-```powershell
-$env:GGML_AVX2='ON'; $env:GGML_FMA='ON'; $env:GGML_F16C='ON'; $env:GGML_BMI2='ON'
-$env:CMAKE_C_FLAGS_RELEASE='/O2 /Ob2 /DNDEBUG'; $env:CMAKE_CXX_FLAGS_RELEASE='/O2 /Ob2 /DNDEBUG'
+```bash
 cargo build --release
 ```
 
-(Se mudar essas flags, rode antes `cargo clean -p whisper-rs-sys --release`
-para forçar a recompilação do C++. Para conferir os flags usados:
-`Select-String -Path target\release\build\whisper-rs-sys-*\output -Pattern 'CL\.exe /c'`.)
+CUDA vem **ligado por padrão** (`default = ["cuda"]` em `isper-cli` e
+`isper-app`); sem GPU NVIDIA use `--no-default-features`. As flags de
+otimização e SIMD ficam em [`.cargo/config.toml`](.cargo/config.toml) — o
+cargo as aplica automaticamente ao build script, de qualquer shell.
+
+**Por que elas existem (pegadinha crítica no Windows/MSVC):** o crate `cmake`
+engole os flags de otimização do modo Release — sem intervenção, o whisper.cpp
+sai compilado **sem `/O2`** (equivale a `/Od`, ~13× mais lento). O build.rs
+do `whisper-rs-sys` repassa qualquer env `GGML_*` ou `CMAKE_*` ao CMake, e é
+isso que o `.cargo/config.toml` explora. Se mudar essas flags, rode antes
+`cargo clean -p whisper-rs-sys --release`; para conferir os flags usados:
+`Select-String -Path target\release\build\whisper-rs-sys-*\output -Pattern 'CL\.exe /c'`.
 
 ### Build com CUDA (Fase 3)
 
 Requer o CUDA Toolkit (`winget install Nvidia.CUDA`). Depois:
 
-```powershell
-$env:CUDA_PATH = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3'
-$env:CUDA_PATH_V13_3 = $env:CUDA_PATH   # num shell aberto antes da instalação
-$env:CMAKE_CUDA_ARCHITECTURES = '89'    # só a arquitetura da RTX 4050 (Ada) — corta MUITO o tempo
-cargo build --release -p isper-app -p isper-cli --features "isper-app/cuda,isper-cli/cuda"
+```bash
+cargo build --release
 ```
+
+(Num shell aberto **antes** da instalação do CUDA, exporte
+`CUDA_PATH` e `CUDA_PATH_V13_3` apontando para o toolkit — shells novos já
+os recebem do instalador. `CMAKE_CUDA_ARCHITECTURES=89` — só a arquitetura da
+RTX 4050 — já está no `.cargo/config.toml` e corta MUITO o tempo de build.)
 
 Pegadinhas encontradas:
 - Erro `The CUDA Toolkit directory '' does not exist` → o MSBuild não achou

@@ -2,8 +2,14 @@
 name = "isper-cli"
 version = "0.1.0"
 edition = "2024"
+# O pacote tem dois binários (isper-cli e loopdump) — sem isto, `cargo run`
+# não sabe qual executar.
+default-run = "isper-cli"
 
 [features]
+# CUDA ligado por padrão (esta máquina tem RTX 4050). Sem GPU NVIDIA:
+# `cargo build --no-default-features`.
+default = ["cuda"]
 cuda = ["isper-core/cuda"]
 
 [dependencies]

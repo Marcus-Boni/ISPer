@@ -4,6 +4,8 @@ version = "0.2.0"
 edition = "2021"
 
 [features]
+# CUDA ligado por padrão (RTX 4050). Sem GPU NVIDIA: --no-default-features.
+default = ["cuda"]
 cuda = ["isper-core/cuda"]
 
 [build-dependencies]
