@@ -20,6 +20,8 @@ crossbeam-channel = "0.5.16"
 hound = "3.5.1"
 isper-core = { version = "0.1.0", path = "../isper-core" }
 isper-llm = { version = "0.1.0", path = "../isper-llm" }
+isper-models = { version = "0.1.0", path = "../isper-models" }
+isper-diarize = { version = "0.1.0", path = "../isper-diarize" }
 rpassword = "7"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"

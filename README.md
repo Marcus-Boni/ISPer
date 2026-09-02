@@ -74,13 +74,24 @@ Pegadinhas encontradas:
 Com CUDA, o app prefere `models/ggml-large-v3-turbo-q5_0.bin` automaticamente.
 Medido na RTX 4050: 10,4 s de áudio transcritos em 0,6 s (16× tempo real).
 
-## Modelo
+## Modelos
+
+O ISPer tem um **gerenciador de modelos** (crate `isper-models`): catálogo,
+download com progresso e **SHA-256 verificado contra o publicado no Hugging
+Face**, tudo em `%LOCALAPPDATA%\ISPer\models`. Sem nenhum modelo instalado, o
+app abre as Configurações sozinho para você baixar um.
 
 ```bash
-curl -L -o models/ggml-small.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+cargo run --release -p isper-cli -- models list
 ```
 
-Outros modelos (large-v3-turbo etc.): https://huggingface.co/ggerganov/whisper.cpp
+```bash
+cargo run --release -p isper-cli -- models download ggml-large-v3-turbo-q5_0.bin
+```
+
+No app: Configurações → **Modelos Whisper** (baixar, remover e escolher; a
+troca é a quente). Em desenvolvimento, arquivos em `models/` na raiz do
+repositório também são reconhecidos.
 
 ## Uso
 
@@ -116,10 +127,26 @@ abre sozinho e fica salvo em `Documentos\ISPer\Reunioes\*.md` + SQLite em
 `%APPDATA%\ISPer\isper.db`. Mic = "Eu"; áudio do sistema (loopback) =
 "Participantes". Avise os participantes (LGPD).
 
+**Só o Teams**: em Configurações → Reuniões, escolha "Só o Microsoft Teams" —
+o ISPer usa o *process loopback* do Windows e ignora notificações, músicas e
+outros apps (se o Teams não estiver aberto, cai para o sistema e avisa).
+
+**Quem falou o quê**: Configurações → Reuniões → "Baixar modelos (~45 MB)"
+instala pyannote + 3D-Speaker (via sherpa-onnx, 100% local); ao encerrar a
+reunião, "Participantes" vira "Participante 1", "Participante 2"… O número de
+falantes é descoberto por agrupamento; se juntar ou separar demais, calibre
+o threshold sem recompilar: `ISPER_DIARIZE_THRESHOLD=0.2` (menor = mais
+falantes distintos; padrão 0.3). Para calibrar offline sem regravar:
+`isper-cli diarize fixtures/duas-vozes-16k.wav`.
+
 Na CLI (laboratório):
 
 ```bash
-cargo run --release -p isper-cli -- meeting 30
+cargo run --release -p isper-cli -- meeting 30 --source teams
+```
+
+```bash
+cargo run --release -p isper-cli -- models download-diarize
 ```
 
 Depuração do loopback (taxa de entrega por segundo + WAV):
@@ -167,6 +194,22 @@ cargo run --release -p isper-cli -- file fixtures/fala-16k.wav
 ```
 
 Opções: `--model <caminho>` (padrão `models/ggml-small.bin`), `--lang <pt|en|auto>`.
+
+## Instalador (.exe / .msi)
+
+```bash
+cd apps/isper-app && npx --yes @tauri-apps/cli@latest build
+```
+
+Gera `target/release/bundle/nsis/ISPer_<versão>_x64-setup.exe` (~398 MB;
+instalação por usuário, sem UAC) e, com `--bundles msi`, o
+`bundle/msi/ISPer_<versão>_x64_en-US.msi` (o bundler baixa NSIS/WiX do GitHub
+na primeira vez). As DLLs de runtime do CUDA (`cudart`, `cublas`, `cublasLt`
+— ~500 MB, o `cublasLt` sozinho tem 442 MB) vão empacotadas: copie-as de
+`<CUDA>\bin\x64` para `apps/isper-app/src-tauri/resources/cuda/` antes de
+gerar (a pasta é gitignored). **Feche o ISPer antes de gerar** (o bundler
+reescreve o exe). O instalador não traz modelos: no primeiro uso o app abre as
+Configurações para baixar um.
 
 ## Testes
 

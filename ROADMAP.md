@@ -120,25 +120,25 @@ Gravar do mic → WAV 16 kHz → transcrever → imprimir. Sem UI: só o motor.
 **Pronto quando:** numa sessão do Claude Code no terminal, você aperta o atalho, fala, e o texto aparece no input — o caso de uso que motivou tudo. ✔ *("Testei e funcionou lindamente!" — 26/08)*
 **Você aprende:** IPC Tauri, gestão de janelas Win32, integração de sistema.
 
-## Fase 3 — Polimento premium (quase completa — falta gerenciador de modelos e instalador)
+## Fase 3 — Polimento premium ✅ (completa em 02/09/2026 — só microinterações ficam para depois)
 
 - [x] Ativar CUDA + `large-v3-turbo` q5_0 — a RTX 4050 transcreve 10,4 s de áudio em **0,6 s** (16,1× tempo real; meta de <1,5 s superada). O app prefere o turbo quando compilado com `--features cuda`, e a RAM caiu p/ ~300 MB (o modelo mora na VRAM)
 - [x] Settings (27/08): janela de Configurações na bandeja — **atalho** (reaplicado na hora, sem reiniciar), **idioma**, **dicionário pessoal**, **provider de IA + chave + teste de conexão** e **autostart**. Dispositivo de entrada e tema ficam para depois
-- [ ] Gerenciador de modelos: download com barra de progresso + verificação de checksum
+- [x] Gerenciador de modelos (01/09): crate `isper-models` — catálogo, download com progresso, **SHA-256 conferido contra o `lfs.oid` publicado pelo Hugging Face** (nada de checksum hardcoded), pasta `%LOCALAPPDATA%\ISPer\models`, escrita atômica `.part` → final; UI em Configurações → Modelos (baixar/remover/escolher, troca a quente); sem modelo instalado o app abre as Configurações sozinho
 - [x] Histórico de ditados no SQLite (27/08): tabela `dictations` em `%APPDATA%\ISPer\isper.db` — cada texto colado fica registrado com data e métricas; um viewer na UI fica para depois
 - [x] Dicionário pessoal (27/08): os termos configurados viram o `initial_prompt` do Whisper em ditados E reuniões — nomes próprios e siglas saem certos
-- [ ] Instalador `.msi`/`.exe` (bundler do Tauri) — requer empacotar as DLLs do CUDA e baixar o modelo no primeiro uso
+- [x] Instalador (02/09): `ISPer_0.5.0_x64-setup.exe` (NSIS, instalação por usuário sem UAC, pt-BR) gerado pelo bundler do Tauri com as DLLs do CUDA empacotadas — **398 MB** (o `cublasLt64_13.dll` sozinho tem 442 MB antes da compressão); sem modelos dentro — o app abre as Configurações no primeiro uso para baixar. MSI via WiX também configurado (download do WiX depende de rede)
 - [ ] Microinterações e animações na UI (aqui entra o "premium")
 
-## Fase 4 — Notetaker de reuniões Teams (núcleo funcionando em 26/08/2026)
+## Fase 4 — Notetaker de reuniões Teams ✅ (completa em 02/09/2026 — validar numa reunião real)
 
 A jogada: **não precisa de bot nem API paga** — captura-se o áudio que sai da sua caixa de som (loopback WASAPI) + seu mic.
 
 - [x] Capturar áudio do sistema com o crate `wasapi` em paralelo ao mic — com três defesas descobertas na prática (o loopback do cpal estagna neste endpoint USB): **keepalive** de silêncio integrado (o endpoint nunca suspende), **drenagem completa** (GetBuffer devolve 1 pacote de ~10 ms por chamada) e **watchdog por bytes** (reabre o cliente se ficar 1 s sem dados). Validado: 20/20 s capturados com stream contínuo, transcrição do WAV capturado perfeita
-- [ ] (Avançado) Loopback **por processo**: capturar só o Teams — o `wasapi` já expõe `new_application_loopback_client(pid)`, fica p/ a próxima iteração
+- [x] (Avançado) Loopback **por processo** (01/09): `LoopbackSource::Process` usa `new_application_loopback_client(pid, include_tree=true)` do `wasapi` — acha o processo-raiz do Teams (`ms-teams.exe`/`Teams.exe`, filhos WebView2 inclusos); se não estiver rodando, cai para o sistema e avisa no pill. Configurável em Configurações → Reuniões e na CLI (`--source teams|process:<exe>`)
 - [x] Transcrição contínua em blocos (~20 s, cortados no ponto mais silencioso p/ não partir palavra) com timestamps pelo **relógio da reunião** (o loopback não entrega amostras nas pausas — contar amostras derraparia)
 - [x] Separação básica de falantes: canal do mic = "Eu", loopback = "Participantes", intercalados por timestamp
-- [ ] Diarização real (quem falou o quê) com `sherpa-onnx` — item stretch
+- [x] Diarização real (01/09): crate `isper-diarize` (sherpa-onnx via `sherpa-rs` com binários pré-compilados; pyannote segmentation 3.0 + 3D-Speaker ERes2Net, ~45 MB baixados pelo gerenciador). Roda ao encerrar sobre o áudio concatenado dos participantes; o core guarda o mapa bloco→relógio para casar os turnos com os segmentos do Whisper → "Participante 1, 2, 3…". Número de falantes descoberto por agrupamento (threshold padrão 0.3, ajustável via `ISPER_DIARIZE_THRESHOLD`; `isper-cli diarize <wav>` calibra offline). Validado na fixture Maria→Zira→Maria: a 0.2 separou as duas vozes corretamente; rótulos renumerados por ordem de aparição. Calibração final com vozes reais pendente
 - [x] Biblioteca de reuniões: SQLite (`%APPDATA%\ISPer\isper.db`) + exportar Markdown (`Documentos\ISPer\Reunioes\`)
 - [ ] Detectar reunião ativa (janela do Teams aberta + áudio fluindo) → notificação "Gravar transcrição?"
 - [ ] Validar numa reunião real do Teams (ou vídeo do YouTube) — *seu teste!*

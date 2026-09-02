@@ -7,6 +7,9 @@
 # Schemas gerados pelo Tauri no build
 apps/isper-app/src-tauri/gen/
 
+# DLLs do CUDA copiadas para o instalador (centenas de MB — copie do toolkit)
+apps/isper-app/src-tauri/resources/
+
 # Saídas temporárias e dados locais (transcrições de teste, banco)
 *.log
 *.db

@@ -1,8 +1,10 @@
 //! Depuração do loopback: captura N segundos do áudio do sistema, mostra a
 //! taxa de entrega a cada segundo e salva um WAV para inspeção.
-//! Uso: cargo run --release -p isper-cli --bin loopdump -- 15
+//! Uso: cargo run --release -p isper-cli --bin loopdump -- 15 [system|teams|process:x.exe]
 
 use std::time::{Duration, Instant};
+
+use isper_core::loopback::LoopbackSource;
 
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().with_target(false).compact().init();
@@ -10,13 +12,18 @@ fn main() -> anyhow::Result<()> {
         .nth(1)
         .and_then(|a| a.parse().ok())
         .unwrap_or(15);
+    let source = LoopbackSource::parse(&std::env::args().nth(2).unwrap_or_default());
 
     let (stop_tx, stop_rx) = crossbeam_channel::unbounded();
     let (data_tx, data_rx) = crossbeam_channel::unbounded();
     let (ready_tx, ready_rx) = crossbeam_channel::unbounded();
-    std::thread::spawn(move || isper_core::loopback::run(stop_rx, data_tx, ready_tx));
+    std::thread::spawn(move || isper_core::loopback::run(source, stop_rx, data_tx, ready_tx));
 
-    let (rate, ch) = ready_rx.recv_timeout(Duration::from_secs(5))??;
+    let ready = ready_rx.recv_timeout(Duration::from_secs(8))??;
+    let (rate, ch) = (ready.sample_rate, ready.channels);
+    if let Some(w) = &ready.warning {
+        println!("aviso: {w}");
+    }
     println!("loopback aberto: {rate} Hz, {ch} canais — gravando {secs}s...");
 
     let started = Instant::now();

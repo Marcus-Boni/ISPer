@@ -23,7 +23,8 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::ShortcutState;
 
 use config::AppConfig;
-use isper_core::meeting::{self, MeetingHandle};
+use isper_core::loopback::LoopbackSource;
+use isper_core::meeting::{self, MeetingHandle, MeetingOptions};
 use isper_core::recorder::{self, RecorderEvent};
 use isper_core::store::MeetingStore;
 use isper_core::{RawAudio, WhisperEngine};
@@ -82,7 +83,12 @@ fn main() {
             apply_settings,
             set_llm_key,
             test_llm,
-            list_llm_models
+            list_llm_models,
+            models_status,
+            download_model,
+            delete_model,
+            diarize_status,
+            download_diarize_models
         ])
         .setup(|app| {
             let cfg = config::load();
@@ -144,26 +150,7 @@ fn main() {
                 .build(app)?;
 
             // O modelo (~0,5 GB) carrega em background p/ não travar o startup.
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                let result = find_model()
-                    .ok_or_else(|| "nenhum modelo encontrado na pasta models/".to_string())
-                    .and_then(|p| {
-                        tracing::info!("carregando modelo {}", p.display());
-                        WhisperEngine::new(&p).map_err(|e| e.to_string())
-                    });
-                match result {
-                    Ok(engine) => {
-                        *handle.state::<AppState>().engine.lock().unwrap() = Some(Arc::new(engine));
-                        tracing::info!("modelo Whisper carregado");
-                    }
-                    Err(e) => {
-                        tracing::error!("falha ao carregar modelo: {e}");
-                        let _ = handle
-                            .emit_to("overlay", "isper-state", json!({"state": "error", "message": e}));
-                    }
-                }
-            });
+            load_engine_in_background(app.handle().clone());
 
             // Pipeline: toda gravação de ditado concluída chega aqui.
             let events = app.state::<AppState>().audio.events();
@@ -416,18 +403,26 @@ fn toggle_meeting(app: &AppHandle) {
     } else {
         drop(slot);
         let engine = { state.engine.lock().unwrap().clone() };
-        let (lang, prompt) = {
+        let opts = {
             let cfg = state.config.lock().unwrap();
-            (cfg.lang.clone(), cfg.initial_prompt())
+            MeetingOptions {
+                lang: cfg.lang.clone(),
+                initial_prompt: cfg.initial_prompt(),
+                source: LoopbackSource::parse(&cfg.meeting_source),
+            }
         };
         let started = engine
             .ok_or_else(|| anyhow::anyhow!("o modelo ainda está carregando — tente em instantes"))
-            .and_then(|engine| meeting::start(engine, lang, prompt).map_err(anyhow::Error::from));
+            .and_then(|engine| meeting::start(engine, opts).map_err(anyhow::Error::from));
         match started {
             Ok(handle) => {
+                let mut payload = json!({"state": "meeting"});
+                if !handle.warnings.is_empty() {
+                    payload["message"] = json!(handle.warnings.join(" · "));
+                }
                 *state.meeting.lock().unwrap() = Some(handle);
                 set_meeting_text(app, "Encerrar e transcrever a reunião");
-                let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting"}));
+                let _ = app.emit_to("overlay", "isper-state", payload);
                 if let Some(overlay) = app.get_webview_window("overlay") {
                     let _ = overlay.show();
                 }
@@ -462,9 +457,23 @@ fn open_store() -> anyhow::Result<MeetingStore> {
 /// banco SQLite, gera o resumo por IA (Fase 5, se configurado) e abre o
 /// arquivo no app padrão.
 fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<String> {
-    let result = handle.stop()?;
+    let mut result = handle.stop()?;
     if result.segments.is_empty() {
         anyhow::bail!("nenhuma fala detectada na reunião");
+    }
+
+    // Fase 4: quem falou o quê — só se os modelos de diarização existirem.
+    if isper_diarize::models_installed() && !result.others_audio_16k.is_empty() {
+        let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting-diarize"}));
+        match isper_diarize::diarize(&result.others_audio_16k) {
+            Ok(turns) => {
+                let t: Vec<(f32, f32, usize)> =
+                    turns.iter().map(|t| (t.start, t.end, t.speaker)).collect();
+                result.apply_speaker_turns(&t);
+                tracing::info!("{} participante(s) identificado(s)", result.distinct_participants());
+            }
+            Err(e) => tracing::warn!("diarização falhou (rótulos genéricos mantidos): {e}"),
+        }
     }
     let now = chrono::Local::now();
     let started_at = now.format("%d/%m/%Y %H:%M").to_string();
@@ -547,6 +556,9 @@ struct SettingsDto {
     active_shortcut: String,
     lang: String,
     dictionary: String,
+    model: Option<String>,
+    meeting_source: String,
+    has_gpu: bool,
     llm_provider: String,
     llm_model: Option<String>,
     llm_key_present: bool,
@@ -558,9 +570,149 @@ struct SettingsPatch {
     shortcut: Option<String>,
     lang: String,
     dictionary: String,
+    model: Option<String>,
+    meeting_source: String,
     llm_provider: String,
     llm_model: Option<String>,
     autostart: bool,
+}
+
+#[derive(serde::Serialize)]
+struct ModelDto {
+    file: String,
+    label: String,
+    approx_mb: u32,
+    note: String,
+    needs_gpu: bool,
+    installed: bool,
+    active: bool,
+}
+
+/// Em desenvolvimento, o `models/` do repositório também vale como fonte.
+fn dev_dirs() -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    if let Ok(cwd) = std::env::current_dir() {
+        dirs.extend(cwd.ancestors().take(5).map(|d| d.to_path_buf()));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        dirs.extend(exe.ancestors().take(7).map(|d| d.to_path_buf()));
+    }
+    dirs
+}
+
+/// Carrega (ou recarrega) o modelo Whisper em background. Sem nenhum modelo
+/// instalado, abre as Configurações para o usuário baixar um.
+fn load_engine_in_background(app: AppHandle) {
+    std::thread::spawn(move || {
+        let preferred = app.state::<AppState>().config.lock().unwrap().model.clone();
+        let Some(path) =
+            isper_models::resolve_whisper_model(preferred.as_deref(), cfg!(feature = "cuda"), &dev_dirs())
+        else {
+            tracing::warn!("nenhum modelo instalado — abrindo Configurações");
+            let app2 = app.clone();
+            let _ = app.run_on_main_thread(move || open_settings(&app2));
+            return;
+        };
+        tracing::info!("carregando modelo {}", path.display());
+        match WhisperEngine::new(&path) {
+            Ok(engine) => {
+                *app.state::<AppState>().engine.lock().unwrap() = Some(Arc::new(engine));
+                tracing::info!("modelo Whisper carregado");
+            }
+            Err(e) => {
+                tracing::error!("falha ao carregar modelo: {e}");
+                let _ = app.emit_to(
+                    "overlay",
+                    "isper-state",
+                    json!({"state": "error", "message": e.to_string()}),
+                );
+            }
+        }
+    });
+}
+
+#[tauri::command]
+fn models_status(app: AppHandle) -> Vec<ModelDto> {
+    let preferred = app.state::<AppState>().config.lock().unwrap().model.clone();
+    let dirs = dev_dirs();
+    let active_file = isper_models::resolve_whisper_model(preferred.as_deref(), cfg!(feature = "cuda"), &dirs)
+        .and_then(|p| p.file_name().map(|f| f.to_string_lossy().into_owned()));
+    isper_models::WHISPER_CATALOG
+        .iter()
+        .map(|m| ModelDto {
+            file: m.file.to_string(),
+            label: m.label.to_string(),
+            approx_mb: m.approx_mb,
+            note: m.note.to_string(),
+            needs_gpu: m.needs_gpu,
+            installed: isper_models::installed_path(m.file).is_some()
+                || dirs.iter().any(|d| d.join("models").join(m.file).exists()),
+            active: active_file.as_deref() == Some(m.file),
+        })
+        .collect()
+}
+
+/// Baixa um modelo do catálogo emitindo `isper-model-progress` para a
+/// janela de Configurações. Se ainda não havia modelo carregado, carrega.
+#[tauri::command]
+async fn download_model(app: AppHandle, file: String) -> Result<(), String> {
+    let app2 = app.clone();
+    let file2 = file.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut last = 0u64;
+        isper_models::download_whisper(&file2, &mut |done, total| {
+            // No máximo ~1 evento por MB — a UI não precisa de mais.
+            if done - last >= 1_000_000 || done == total {
+                last = done;
+                let _ = app2.emit_to(
+                    "settings",
+                    "isper-model-progress",
+                    json!({"file": file2, "done": done, "total": total}),
+                );
+            }
+        })
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
+    if app.state::<AppState>().engine.lock().unwrap().is_none() {
+        load_engine_in_background(app.clone());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_model(file: String) -> Result<(), String> {
+    isper_models::remove(&file).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn diarize_status() -> bool {
+    isper_diarize::models_installed()
+}
+
+/// Baixa os modelos de diarização, com progresso em `isper-model-progress`
+/// (file = "diarize").
+#[tauri::command]
+async fn download_diarize_models(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut last = 0u64;
+        isper_diarize::download_models(&mut |name, done, total| {
+            if done - last >= 500_000 || done == total {
+                last = done;
+                let _ = app.emit_to(
+                    "settings",
+                    "isper-model-progress",
+                    json!({"file": "diarize", "name": name, "done": done, "total": total}),
+                );
+            }
+        })
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -581,6 +733,9 @@ fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         active_shortcut,
         lang: cfg.lang,
         dictionary: cfg.dictionary.join("\n"),
+        model: cfg.model,
+        meeting_source: cfg.meeting_source,
+        has_gpu: cfg!(feature = "cuda"),
         llm_provider: if llm.provider.is_empty() {
             "none".into()
         } else {
@@ -602,6 +757,7 @@ fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<String, String
         .map(|l| l.trim().to_string())
         .filter(|l| !l.is_empty())
         .collect();
+    let previous_model = state.config.lock().unwrap().model.clone();
     let cfg = AppConfig {
         shortcut: patch.shortcut.filter(|s| !s.trim().is_empty()),
         lang: {
@@ -609,9 +765,19 @@ fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<String, String
             if l.is_empty() { "pt".into() } else { l }
         },
         dictionary,
+        model: patch.model.filter(|m| !m.trim().is_empty()),
+        meeting_source: {
+            let s = patch.meeting_source.trim().to_lowercase();
+            if s.is_empty() { "system".into() } else { s }
+        },
     };
     config::save(&cfg).map_err(|e| e.to_string())?;
     *state.config.lock().unwrap() = cfg.clone();
+
+    // Troca de modelo a quente: o antigo continua servindo até o novo carregar.
+    if cfg.model != previous_model {
+        load_engine_in_background(app.clone());
+    }
 
     // Reaplica o atalho na hora — sem reiniciar o app.
     let label = register_best_shortcut(&app, cfg.shortcut.as_deref());
@@ -705,41 +871,3 @@ fn paste_text(text: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Modelos aceitos, em ordem de preferência. Com CUDA, o `large-v3-turbo`
-/// quantizado dá qualidade de large em tempo real na GPU; sem GPU, o `small`
-/// é o equilíbrio certo em CPU.
-const MODEL_CANDIDATES: &[&str] = if cfg!(feature = "cuda") {
-    &[
-        "models/ggml-large-v3-turbo-q5_0.bin",
-        "models/ggml-small.bin",
-    ]
-} else {
-    &[
-        "models/ggml-small.bin",
-        "models/ggml-large-v3-turbo-q5_0.bin",
-    ]
-};
-
-/// Procura um modelo: env ISPER_MODEL, depois cwd e os ancestrais do
-/// executável (funciona em `cargo run` e no app instalado).
-fn find_model() -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("ISPER_MODEL") {
-        let p = PathBuf::from(p);
-        if p.exists() {
-            return Some(p);
-        }
-    }
-    let mut dirs: Vec<PathBuf> = Vec::new();
-    if let Ok(cwd) = std::env::current_dir() {
-        dirs.extend(cwd.ancestors().take(5).map(|d| d.to_path_buf()));
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        dirs.extend(exe.ancestors().take(7).map(|d| d.to_path_buf()));
-    }
-    for name in MODEL_CANDIDATES {
-        if let Some(p) = dirs.iter().map(|d| d.join(name)).find(|p| p.exists()) {
-            return Some(p);
-        }
-    }
-    None
-}

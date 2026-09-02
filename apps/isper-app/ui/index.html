@@ -55,6 +55,7 @@
     'recording-handsfree': 'recording handsfree',
     'meeting': 'recording meeting',
     'meeting-processing': 'transcribing',
+    'meeting-diarize': 'transcribing',
     'meeting-summary': 'transcribing',
     'meeting-done': 'done'
   };
@@ -63,8 +64,9 @@
     pill.className = CLASS_MAP[s] || s;
     if (s === 'recording') { bars.fill(0); statusEl.textContent = 'gravando… solte para colar'; blip(880, .05); }
     else if (s === 'recording-handsfree') statusEl.textContent = 'mãos-livres… 1 s de silêncio cola';
-    else if (s === 'meeting') statusEl.textContent = 'gravando reunião — Eu + Participantes';
+    else if (s === 'meeting') statusEl.textContent = msg ? 'gravando reunião — ' + msg : 'gravando reunião — Eu + Participantes';
     else if (s === 'meeting-processing') statusEl.textContent = 'transcrevendo a reunião…';
+    else if (s === 'meeting-diarize') statusEl.textContent = 'identificando quem falou…';
     else if (s === 'meeting-summary') statusEl.textContent = 'resumindo com IA…';
     else if (s === 'meeting-done') { statusEl.textContent = 'reunião salva e aberta ✓'; blip(1320, .07); }
     else if (s === 'transcribing') statusEl.textContent = 'transcrevendo…';

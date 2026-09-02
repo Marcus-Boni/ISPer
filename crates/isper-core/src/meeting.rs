@@ -13,7 +13,17 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use crate::audio::RawAudio;
+use crate::loopback::LoopbackSource;
 use crate::{audio, loopback, IsperError, Result, WhisperEngine};
+
+/// Opções de uma gravação de reunião.
+#[derive(Debug, Clone)]
+pub struct MeetingOptions {
+    pub lang: String,
+    pub initial_prompt: Option<String>,
+    /// De onde vem o áudio dos "Participantes" (sistema inteiro ou só um app).
+    pub source: LoopbackSource,
+}
 
 /// Tamanho alvo de cada bloco de transcrição.
 const CHUNK_SECS: f32 = 20.0;
@@ -24,16 +34,29 @@ const SILENCE_RMS: f32 = 0.0035;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Speaker {
     Me,
+    /// Alguém do loopback, sem identificação individual.
     Others,
+    /// Alguém do loopback identificado pela diarização (1, 2, 3…).
+    Participant(u8),
 }
 
 impl Speaker {
-    pub fn label(&self) -> &'static str {
+    pub fn label(&self) -> String {
         match self {
-            Speaker::Me => "Eu",
-            Speaker::Others => "Participantes",
+            Speaker::Me => "Eu".into(),
+            Speaker::Others => "Participantes".into(),
+            Speaker::Participant(n) => format!("Participante {n}"),
         }
     }
+}
+
+/// Um bloco de áudio dos participantes já em 16 kHz: onde começa no relógio
+/// da reunião e onde caiu no áudio concatenado guardado p/ diarização.
+#[derive(Debug, Clone, Copy)]
+pub struct AudioBlock {
+    pub wall_start: f32,
+    pub concat_start: f32,
+    pub secs: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -48,12 +71,89 @@ pub struct MeetingResult {
     /// Segmentos dos dois canais, em ordem cronológica.
     pub segments: Vec<MeetingSegment>,
     pub duration_secs: f32,
+    /// Áudio dos participantes (16 kHz mono) concatenado — insumo da
+    /// diarização, que roda depois, fora do core (crate `isper-diarize`).
+    pub others_audio_16k: Vec<f32>,
+    /// Mapa bloco a bloco entre o áudio concatenado e o relógio da reunião.
+    pub others_blocks: Vec<AudioBlock>,
+}
+
+/// Tempo no relógio da reunião → posição no áudio concatenado.
+fn wall_to_concat(blocks: &[AudioBlock], t: f32) -> Option<f32> {
+    blocks
+        .iter()
+        .find(|b| t >= b.wall_start && t <= b.wall_start + b.secs)
+        .map(|b| b.concat_start + (t - b.wall_start))
+}
+
+impl MeetingResult {
+    /// Aplica turnos de falante (em tempo do áudio concatenado, como a
+    /// diarização devolve) aos segmentos "Participantes": cada segmento vira
+    /// "Participante N" do turno com maior sobreposição.
+    pub fn apply_speaker_turns(&mut self, turns: &[(f32, f32, usize)]) {
+        // Renumera os falantes por ordem de aparição: os ids do agrupamento
+        // podem ter buracos (clusters minúsculos são filtrados) e o leitor
+        // espera "Participante 1, 2, 3…".
+        let mut order: Vec<(f32, usize)> = turns.iter().map(|(s, _, spk)| (*s, *spk)).collect();
+        order.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let mut renumber: Vec<(usize, u8)> = Vec::new();
+        for (_, spk) in order {
+            if !renumber.iter().any(|(id, _)| *id == spk) {
+                let next = (renumber.len() + 1).min(255) as u8;
+                renumber.push((spk, next));
+            }
+        }
+        let number_of = |spk: usize| -> u8 {
+            renumber
+                .iter()
+                .find(|(id, _)| *id == spk)
+                .map(|(_, n)| *n)
+                .unwrap_or(1)
+        };
+
+        // Empréstimos disjuntos: lemos `others_blocks` enquanto mutamos `segments`.
+        let blocks = &self.others_blocks;
+        for seg in self.segments.iter_mut() {
+            if seg.speaker != Speaker::Others {
+                continue;
+            }
+            let Some(cs) = wall_to_concat(blocks, seg.start_secs) else {
+                continue;
+            };
+            let ce = cs + (seg.end_secs - seg.start_secs).max(0.1);
+            let best = turns
+                .iter()
+                .map(|(s, e, spk)| ((e.min(ce) - s.max(cs)).max(0.0), *spk))
+                .filter(|(overlap, _)| *overlap > 0.0)
+                .max_by(|a, b| a.0.total_cmp(&b.0));
+            if let Some((_, spk)) = best {
+                seg.speaker = Speaker::Participant(number_of(spk));
+            }
+        }
+    }
+
+    /// Quantos participantes distintos foram identificados.
+    pub fn distinct_participants(&self) -> usize {
+        let mut ids: Vec<u8> = self
+            .segments
+            .iter()
+            .filter_map(|s| match s.speaker {
+                Speaker::Participant(n) => Some(n),
+                _ => None,
+            })
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids.len()
+    }
 }
 
 pub struct MeetingHandle {
     stop_txs: Vec<Sender<()>>,
     done_rx: Receiver<Result<MeetingResult>>,
     started: Instant,
+    /// Avisos não-fatais da abertura (ex.: Teams não encontrado → sistema).
+    pub warnings: Vec<String>,
 }
 
 impl MeetingHandle {
@@ -76,32 +176,34 @@ type Job = (Speaker, f32, RawAudio);
 
 /// Inicia a gravação nos dois canais. Valida que ambos abriram antes de
 /// retornar — se o loopback ou o mic falhar, você fica sabendo já.
-/// `lang` e `initial_prompt` seguem para todas as transcrições da reunião.
-pub fn start(
-    engine: Arc<WhisperEngine>,
-    lang: String,
-    initial_prompt: Option<String>,
-) -> Result<MeetingHandle> {
+pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<MeetingHandle> {
     let (job_tx, job_rx) = unbounded::<Job>();
     let (done_tx, done_rx) = unbounded();
-    let (ready_tx, ready_rx) = unbounded::<Result<()>>();
+    let (ready_tx, ready_rx) = unbounded::<Result<Option<String>>>();
     let started = Instant::now();
+    let MeetingOptions {
+        lang,
+        initial_prompt,
+        source,
+    } = opts;
 
+    // Abre os canais EM SEQUÊNCIA (loopback primeiro, mic depois): quando mic e
+    // alto-falante são o mesmo dispositivo USB, abrir os dois ao mesmo tempo
+    // fazia o loopback perder os primeiros segundos.
     let mut stop_txs = Vec::new();
-    for speaker in [Speaker::Me, Speaker::Others] {
+    let mut warnings = Vec::new();
+    for speaker in [Speaker::Others, Speaker::Me] {
         let (stop_tx, stop_rx) = unbounded::<()>();
         stop_txs.push(stop_tx);
         let job_tx = job_tx.clone();
         let ready_tx = ready_tx.clone();
-        std::thread::spawn(move || capture_channel(speaker, started, stop_rx, job_tx, ready_tx));
-    }
-    // O worker termina quando os DOIS capturadores largarem o canal de jobs.
-    drop(job_tx);
-
-    // Espera os dois canais confirmarem que abriram.
-    for _ in 0..2 {
-        match ready_rx.recv_timeout(Duration::from_secs(5)) {
-            Ok(Ok(())) => {}
+        let source = source.clone();
+        std::thread::spawn(move || {
+            capture_channel(speaker, source, started, stop_rx, job_tx, ready_tx)
+        });
+        match ready_rx.recv_timeout(Duration::from_secs(8)) {
+            Ok(Ok(None)) => {}
+            Ok(Ok(Some(w))) => warnings.push(w),
             Ok(Err(e)) => {
                 for tx in &stop_txs {
                     let _ = tx.send(());
@@ -116,6 +218,8 @@ pub fn start(
             }
         }
     }
+    // O worker termina quando os DOIS capturadores largarem o canal de jobs.
+    drop(job_tx);
 
     std::thread::spawn(move || {
         let result = transcribe_worker(engine, lang, initial_prompt, job_rx, started);
@@ -126,16 +230,18 @@ pub fn start(
         stop_txs,
         done_rx,
         started,
+        warnings,
     })
 }
 
 /// Abre a fonte certa para o canal e roda o fatiador de blocos.
 fn capture_channel(
     speaker: Speaker,
+    source: LoopbackSource,
     started: Instant,
     stop_rx: Receiver<()>,
     job_tx: Sender<Job>,
-    ready_tx: Sender<Result<()>>,
+    ready_tx: Sender<Result<Option<String>>>,
 ) {
     use cpal::traits::StreamTrait;
 
@@ -154,7 +260,7 @@ fn capture_channel(
                 let _ = ready_tx.send(Err(IsperError::Audio(e.to_string())));
                 return;
             }
-            let _ = ready_tx.send(Ok(()));
+            let _ = ready_tx.send(Ok(None));
             chunk_loop(
                 speaker,
                 started,
@@ -166,14 +272,15 @@ fn capture_channel(
                 move || drop(stream), // dropar o stream encerra a captura
             );
         }
-        // "Participantes": loopback via wasapi (polling), numa thread própria.
-        Speaker::Others => {
+        // "Participantes": loopback via wasapi, numa thread própria.
+        // (Participant(_) só existe após a diarização — nunca chega aqui.)
+        Speaker::Others | Speaker::Participant(_) => {
             let (pump_stop_tx, pump_stop_rx) = unbounded::<()>();
             let (data_tx, data_rx) = unbounded();
             let (lb_ready_tx, lb_ready_rx) = unbounded();
-            std::thread::spawn(move || loopback::run(pump_stop_rx, data_tx, lb_ready_tx));
-            let (sample_rate, channels) = match lb_ready_rx.recv_timeout(Duration::from_secs(5)) {
-                Ok(Ok(meta)) => meta,
+            std::thread::spawn(move || loopback::run(source, pump_stop_rx, data_tx, lb_ready_tx));
+            let ready = match lb_ready_rx.recv_timeout(Duration::from_secs(8)) {
+                Ok(Ok(ready)) => ready,
                 Ok(Err(e)) => {
                     let _ = ready_tx.send(Err(e));
                     return;
@@ -183,7 +290,8 @@ fn capture_channel(
                     return;
                 }
             };
-            let _ = ready_tx.send(Ok(()));
+            let (sample_rate, channels) = (ready.sample_rate, ready.channels);
+            let _ = ready_tx.send(Ok(ready.warning));
             chunk_loop(
                 speaker,
                 started,
@@ -317,19 +425,33 @@ fn transcribe_worker(
     started: Instant,
 ) -> Result<MeetingResult> {
     let mut segments: Vec<MeetingSegment> = Vec::new();
+    let mut others_audio_16k: Vec<f32> = Vec::new();
+    let mut others_blocks: Vec<AudioBlock> = Vec::new();
     for (speaker, offset, raw) in job_rx.iter() {
         let block_secs = raw.duration_secs();
         if raw.rms() < SILENCE_RMS {
-            tracing::debug!(speaker = speaker.label(), offset, "bloco silencioso pulado");
+            tracing::debug!(speaker = %speaker.label(), offset, "bloco silencioso pulado");
             continue;
         }
-        match raw
-            .into_whisper_input()
-            .and_then(|s| engine.transcribe(&s, &lang, initial_prompt.as_deref()))
-        {
+        let samples = match raw.into_whisper_input() {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!("bloco falhou no resample: {e}");
+                continue;
+            }
+        };
+        if speaker == Speaker::Others {
+            others_blocks.push(AudioBlock {
+                wall_start: offset,
+                concat_start: others_audio_16k.len() as f32 / crate::WHISPER_SAMPLE_RATE as f32,
+                secs: samples.len() as f32 / crate::WHISPER_SAMPLE_RATE as f32,
+            });
+            others_audio_16k.extend_from_slice(&samples);
+        }
+        match engine.transcribe(&samples, &lang, initial_prompt.as_deref()) {
             Ok(t) => {
                 tracing::info!(
-                    speaker = speaker.label(),
+                    speaker = %speaker.label(),
                     offset,
                     block_secs,
                     infer_secs = t.infer_secs,
@@ -354,6 +476,8 @@ fn transcribe_worker(
     Ok(MeetingResult {
         segments,
         duration_secs: started.elapsed().as_secs_f32(),
+        others_audio_16k,
+        others_blocks,
     })
 }
 

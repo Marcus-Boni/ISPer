@@ -1,0 +1,12 @@
+[package]
+name = "isper-diarize"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Binários pré-compilados do sherpa-onnx (feature download-binaries) — sem
+# compilar C++; `tts` desligado (não usamos).
+sherpa-rs = { version = "0.6", default-features = false, features = ["download-binaries"] }
+isper-models = { path = "../isper-models" }
+thiserror = "2"
+tracing = "0.1"

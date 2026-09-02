@@ -42,6 +42,15 @@
   .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
   .check input { width: auto; }
   .check span { font-size: 13px; }
+  .mrow { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+  .mrow:first-child { border-top: none; }
+  .mname { font-size: 13px; }
+  .mnote { font-size: 11.5px; color: var(--muted); }
+  .mprog { height: 4px; background: var(--field); border-radius: 2px; overflow: hidden; margin-top: 6px; display: none; }
+  .mprog > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-left: 6px; }
+  .tag.ok { color: var(--good); border-color: var(--good); }
+  code { font-family: Consolas, monospace; font-size: 11.5px; }
   #status {
     min-height: 20px; font-size: 12.5px; color: var(--muted);
     white-space: pre-wrap; margin-top: 10px;
@@ -76,6 +85,30 @@
   <label for="dict">Dicionário pessoal (um termo por linha)</label>
   <textarea id="dict" placeholder="OptSolv&#10;ISPer&#10;nomes próprios, siglas, jargões…"></textarea>
   <p class="hint">Esses termos são mostrados ao Whisper antes de cada transcrição — ele passa a grafá-los corretamente.</p>
+</div>
+
+<div class="card">
+  <h2>Modelos Whisper</h2>
+  <p class="hint" id="gpuhint"></p>
+  <div id="modelslist"></div>
+  <p class="hint">Baixados do Hugging Face com verificação SHA-256 para <code>%LOCALAPPDATA%\ISPer\models</code>. Marque o que quer usar e clique em Salvar — a troca é a quente.</p>
+</div>
+
+<div class="card">
+  <h2>Reuniões</h2>
+  <label for="source">Áudio dos participantes</label>
+  <select id="source">
+    <option value="system">Todo o sistema (padrão)</option>
+    <option value="teams">Só o Microsoft Teams</option>
+  </select>
+  <p class="hint">"Só o Teams" usa o process loopback do Windows — ignora notificações, músicas e outros apps. Se o Teams não estiver aberto na hora, o ISPer cai para o sistema e avisa no pill.</p>
+  <label>Quem falou o quê (diarização)</label>
+  <div class="row">
+    <span class="hint" id="diarstate" style="margin:0">…</span>
+    <button class="ghost" id="diardl">Baixar modelos (~45 MB)</button>
+  </div>
+  <div class="mprog" id="diarprog"><div></div></div>
+  <p class="hint">Com os modelos instalados, "Participantes" vira "Participante 1", "Participante 2"… — pyannote + 3D-Speaker via sherpa-onnx, 100% local, ao encerrar a reunião.</p>
 </div>
 
 <div class="card">
@@ -120,8 +153,11 @@
 
 <script>
   const { invoke } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
   const $ = (id) => document.getElementById(id);
   const status = (msg, cls = '') => { $('status').textContent = msg; $('status').className = cls; };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  let selectedModel = null;
 
   async function load() {
     try {
@@ -130,28 +166,112 @@
       $('shortcut').value = s.shortcut || '';
       $('lang').value = s.lang || 'pt';
       $('dict').value = s.dictionary || '';
+      $('source').value = s.meeting_source || 'system';
       $('provider').value = s.llm_provider || 'none';
       $('model').value = s.llm_model || '';
       $('keystate').textContent = s.llm_key_present ? '(guardada ✓)' : '';
+      $('gpuhint').textContent = s.has_gpu
+        ? 'Build com CUDA (GPU NVIDIA): os modelos Large rodam em tempo real.'
+        : 'Build sem CUDA: prefira o Small ou o Medium.';
+      selectedModel = s.model || null;
+      await renderModels();
     } catch (e) {
       status('erro ao carregar: ' + e, 'err');
     }
   }
 
+  async function renderModels() {
+    const list = $('modelslist');
+    list.replaceChildren();
+    let models = [];
+    try { models = await invoke('models_status'); } catch (e) { status('erro ao listar modelos: ' + e, 'err'); return; }
+    if (!models.some(m => m.installed)) status('nenhum modelo instalado — baixe um em "Modelos Whisper" para o ISPer funcionar', 'err');
+    for (const m of models) {
+      const row = el('div', 'mrow');
+      row.dataset.file = m.file;
+      const radio = el('input');
+      radio.type = 'radio'; radio.name = 'model'; radio.value = m.file;
+      radio.disabled = !m.installed; radio.title = 'usar este modelo';
+      radio.checked = selectedModel ? selectedModel === m.file : m.active;
+      radio.addEventListener('change', () => { selectedModel = m.file; });
+      const info = el('div');
+      const name = el('div', 'mname', m.label + ' · ' + m.approx_mb + ' MB');
+      name.appendChild(el('span', 'tag' + (m.installed ? ' ok' : ''), m.installed ? (m.active ? 'em uso' : 'instalado') : 'não baixado'));
+      info.appendChild(name);
+      info.appendChild(el('div', 'mnote', m.note + (m.needs_gpu ? ' · pede GPU' : '')));
+      const prog = el('div', 'mprog'); prog.appendChild(el('div'));
+      info.appendChild(prog);
+      const btn = el('button', 'ghost', m.installed ? 'Remover' : 'Baixar');
+      btn.addEventListener('click', () => m.installed ? removeModel(m.file) : downloadModel(m.file, btn, prog));
+      row.append(radio, info, btn);
+      list.appendChild(row);
+    }
+  }
+
+  async function downloadModel(file, btn, prog) {
+    btn.disabled = true; btn.textContent = 'Baixando…'; prog.style.display = 'block';
+    status('baixando ' + file + '…');
+    try {
+      await invoke('download_model', { file });
+      status(file + ' baixado e verificado ✓', 'ok');
+    } catch (e) {
+      status('download falhou: ' + e, 'err');
+    }
+    await renderModels();
+  }
+
+  async function removeModel(file) {
+    try { await invoke('delete_model', { file }); status(file + ' removido', 'ok'); }
+    catch (e) { status('erro: ' + e, 'err'); }
+    await renderModels();
+  }
+
+  listen('isper-model-progress', (e) => {
+    const { file, done, total } = e.payload;
+    let bar;
+    if (file === 'diarize') {
+      $('diarprog').style.display = 'block';
+      bar = $('diarprog').firstElementChild;
+    } else {
+      const row = document.querySelector('.mrow[data-file="' + file + '"]');
+      bar = row && row.querySelector('.mprog > div');
+    }
+    if (bar && total > 0) bar.style.width = Math.round(done * 100 / total) + '%';
+  });
+
+  async function refreshDiarize() {
+    try {
+      const ok = await invoke('diarize_status');
+      $('diarstate').textContent = ok ? 'modelos instalados ✓ — falantes identificados ao encerrar' : 'não instalado — rótulo genérico "Participantes"';
+      $('diardl').style.display = ok ? 'none' : '';
+    } catch (_) {}
+  }
+  $('diardl').addEventListener('click', async () => {
+    $('diardl').disabled = true; $('diardl').textContent = 'Baixando…';
+    try { await invoke('download_diarize_models'); status('modelos de diarização instalados ✓', 'ok'); }
+    catch (e) { status('download falhou: ' + e, 'err'); $('diardl').disabled = false; $('diardl').textContent = 'Baixar modelos (~45 MB)'; }
+    await refreshDiarize();
+  });
+  refreshDiarize();
+
   $('save').addEventListener('click', async () => {
     $('save').disabled = true;
     status('salvando…');
     try {
+      const checked = document.querySelector('input[name=model]:checked');
       const label = await invoke('apply_settings', { patch: {
         shortcut: $('shortcut').value || null,
         lang: $('lang').value,
         dictionary: $('dict').value,
+        model: checked ? checked.value : null,
+        meeting_source: $('source').value,
         llm_provider: $('provider').value,
         llm_model: $('model').value || null,
         autostart: $('autostart').checked,
       }});
       $('active').textContent = label;
       status('salvo — atalho ativo: ' + label, 'ok');
+      setTimeout(renderModels, 1500);
     } catch (e) {
       status('erro: ' + e, 'err');
     } finally {

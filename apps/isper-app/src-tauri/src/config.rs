@@ -19,6 +19,12 @@ pub struct AppConfig {
     /// (nomes próprios, siglas, jargões).
     #[serde(default)]
     pub dictionary: Vec<String>,
+    /// Arquivo do modelo Whisper (nome do catálogo). `None` = melhor disponível.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Fonte do áudio dos participantes: `system` · `teams` · `process:<exe>`.
+    #[serde(default = "default_source")]
+    pub meeting_source: String,
 }
 
 impl Default for AppConfig {
@@ -27,12 +33,18 @@ impl Default for AppConfig {
             shortcut: None,
             lang: default_lang(),
             dictionary: Vec::new(),
+            model: None,
+            meeting_source: default_source(),
         }
     }
 }
 
 fn default_lang() -> String {
     "pt".into()
+}
+
+fn default_source() -> String {
+    "system".into()
 }
 
 impl AppConfig {
