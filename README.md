@@ -127,6 +127,16 @@ abre sozinho e fica salvo em `Documentos\ISPer\Reunioes\*.md` + SQLite em
 `%APPDATA%\ISPer\isper.db`. Mic = "Eu"; áudio do sistema (loopback) =
 "Participantes". Avise os participantes (LGPD).
 
+**Biblioteca**: bandeja → "Biblioteca de reuniões…" (ou clique de novo no
+atalho do ISPer — a instância única encaminha para a janela) lista todas as
+reuniões com busca no título, resumo e transcript; cada uma abre com resumo,
+transcript por falante, renomear, abrir o `.md` e excluir do histórico (o
+arquivo fica). A aba Ditados mostra o histórico do que você ditou.
+
+**Indicador flutuante**: arraste-o para onde quiser (a posição é lembrada);
+passe o mouse para ver `–` (modo mini: só o ponto + cronômetro da reunião) e
+`×` (ocultar — volta em bandeja → "Mostrar indicador flutuante").
+
 **Só o Teams**: em Configurações → Reuniões, escolha "Só o Microsoft Teams" —
 o ISPer usa o *process loopback* do Windows e ignora notificações, músicas e
 outros apps (se o Teams não estiver aberto, cai para o sistema e avisa).

@@ -1,7 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissões das janelas do app (eventos e comandos internos)",
-  "windows": ["overlay", "settings"],
-  "permissions": ["core:default"]
+  "description": "Permissões das janelas do app: eventos, comandos internos e controle da própria janela (arrastar/redimensionar o indicador)",
+  "windows": ["overlay", "settings", "library"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-outer-position",
+    "core:window:allow-hide",
+    "core:window:allow-show"
+  ]
 }

@@ -25,6 +25,12 @@ pub struct AppConfig {
     /// Fonte do áudio dos participantes: `system` · `teams` · `process:<exe>`.
     #[serde(default = "default_source")]
     pub meeting_source: String,
+    /// Onde o usuário deixou o indicador (pixels físicos). `None` = rodapé centralizado.
+    #[serde(default)]
+    pub overlay_pos: Option<(i32, i32)>,
+    /// Indicador em modo mini (só o ponto + cronômetro).
+    #[serde(default)]
+    pub overlay_mini: bool,
 }
 
 impl Default for AppConfig {
@@ -35,6 +41,8 @@ impl Default for AppConfig {
             dictionary: Vec::new(),
             model: None,
             meeting_source: default_source(),
+            overlay_pos: None,
+            overlay_mini: false,
         }
     }
 }

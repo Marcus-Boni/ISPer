@@ -40,6 +40,9 @@ const SHORTCUT_CANDIDATES: [(&str, &str); 4] = [
 ];
 /// Soltar antes disso = toque rápido → vira modo mãos-livres.
 const TAP_THRESHOLD: Duration = Duration::from_millis(350);
+/// Tamanhos lógicos do indicador flutuante: normal e mini (ponto + cronômetro).
+const OVERLAY_FULL: (f64, f64) = (460.0, 104.0);
+const OVERLAY_MINI: (f64, f64) = (150.0, 56.0);
 
 /// Máquina de estados do ditado — um único lugar decide o que cada evento
 /// de tecla significa (inclusive o auto-repeat, que dispara `Pressed`
@@ -69,6 +72,11 @@ fn main() {
     tracing_subscriber::fmt().with_target(false).compact().init();
 
     tauri::Builder::default()
+        // Instância única: um segundo clique no atalho não abre outro ISPer —
+        // o pedido é encaminhado ao já aberto, que responde mostrando a Biblioteca.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            open_library(app);
+        }))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -88,7 +96,19 @@ fn main() {
             download_model,
             delete_model,
             diarize_status,
-            download_diarize_models
+            download_diarize_models,
+            list_meetings,
+            get_meeting,
+            rename_meeting,
+            delete_meeting,
+            open_meeting_file,
+            open_meetings_folder,
+            list_dictations,
+            delete_dictation,
+            overlay_prefs,
+            overlay_set_mini,
+            overlay_hide,
+            overlay_moved
         ])
         .setup(|app| {
             let cfg = config::load();
@@ -103,16 +123,24 @@ fn main() {
                 hint_item: Mutex::new(None),
             });
 
-            // Overlay: rodapé do monitor primário, nunca focável.
+            // Overlay: nunca focável; tamanho (mini/normal) e posição lembrados.
             let overlay = app.get_webview_window("overlay").expect("janela overlay");
             overlay.set_focusable(false)?;
-            if let Some(monitor) = overlay.primary_monitor()? {
-                let mon_size = monitor.size();
-                let mon_pos = monitor.position();
-                let win = overlay.outer_size()?;
-                let x = mon_pos.x + (mon_size.width as i32 - win.width as i32) / 2;
-                let y = mon_pos.y + mon_size.height as i32 - win.height as i32 - 96;
-                overlay.set_position(tauri::PhysicalPosition::new(x, y))?;
+            if cfg.overlay_mini {
+                let _ = overlay.set_size(tauri::LogicalSize::new(OVERLAY_MINI.0, OVERLAY_MINI.1));
+            }
+            match cfg.overlay_pos {
+                Some((x, y)) => overlay.set_position(tauri::PhysicalPosition::new(x, y))?,
+                None => {
+                    if let Some(monitor) = overlay.primary_monitor()? {
+                        let mon_size = monitor.size();
+                        let mon_pos = monitor.position();
+                        let win = overlay.outer_size()?;
+                        let x = mon_pos.x + (mon_size.width as i32 - win.width as i32) / 2;
+                        let y = mon_pos.y + mon_size.height as i32 - win.height as i32 - 96;
+                        overlay.set_position(tauri::PhysicalPosition::new(x, y))?;
+                    }
+                }
             }
 
             // Atalho global: o preferido das configurações, senão o primeiro livre.
@@ -121,6 +149,8 @@ fn main() {
 
             // Ícone na bandeja com menu.
             let hint = MenuItem::with_id(app, "hint", hint_text(&label), false, None::<&str>)?;
+            let library_item =
+                MenuItem::with_id(app, "library", "Biblioteca de reuniões…", true, None::<&str>)?;
             let settings_item =
                 MenuItem::with_id(app, "settings", "Configurações…", true, None::<&str>)?;
             let meeting_item = MenuItem::with_id(
@@ -130,8 +160,18 @@ fn main() {
                 true,
                 None::<&str>,
             )?;
+            let indicator_item = MenuItem::with_id(
+                app,
+                "indicator",
+                "Mostrar indicador flutuante",
+                true,
+                None::<&str>,
+            )?;
             let quit = MenuItem::with_id(app, "quit", "Sair do ISPer", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&hint, &settings_item, &meeting_item, &quit])?;
+            let menu = Menu::with_items(
+                app,
+                &[&hint, &library_item, &meeting_item, &indicator_item, &settings_item, &quit],
+            )?;
             {
                 let state = app.state::<AppState>();
                 *state.meeting_item.lock().unwrap() = Some(meeting_item);
@@ -144,6 +184,8 @@ fn main() {
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "quit" => app.exit(0),
                     "meeting" => toggle_meeting(app),
+                    "indicator" => show_indicator(app),
+                    "library" => open_library(app),
                     "settings" => open_settings(app),
                     _ => {}
                 })
@@ -453,6 +495,16 @@ fn open_store() -> anyhow::Result<MeetingStore> {
     Ok(MeetingStore::open(&dir.join("isper.db"))?)
 }
 
+/// `Documentos\ISPer\Reunioes` — onde os Markdowns das reuniões moram.
+fn meetings_dir() -> anyhow::Result<PathBuf> {
+    let dir = PathBuf::from(std::env::var("USERPROFILE")?)
+        .join("Documents")
+        .join("ISPer")
+        .join("Reunioes");
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
 /// Encerra a gravação, salva o Markdown em Documentos\ISPer\Reunioes e no
 /// banco SQLite, gera o resumo por IA (Fase 5, se configurado) e abre o
 /// arquivo no app padrão.
@@ -481,16 +533,17 @@ fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<Stri
     let md = meeting::to_markdown(&title, &started_at, &result);
 
     // O transcript é salvo ANTES do resumo: se a API falhar, nada se perde.
-    let docs = PathBuf::from(std::env::var("USERPROFILE")?)
-        .join("Documents")
-        .join("ISPer")
-        .join("Reunioes");
-    std::fs::create_dir_all(&docs)?;
+    let docs = meetings_dir()?;
     let md_path = docs.join(format!("reuniao-{}.md", now.format("%Y%m%d-%H%M%S")));
     std::fs::write(&md_path, &md)?;
 
     let store = open_store()?;
-    let meeting_id = store.save(&title, &started_at, &result)?;
+    let meeting_id = store.save(
+        &title,
+        &started_at,
+        &result,
+        Some(&md_path.to_string_lossy()),
+    )?;
 
     // Fase 5: resumo por IA de nuvem — só o TEXTO do transcript sai da máquina.
     let settings = isper_llm::load_settings();
@@ -757,7 +810,8 @@ fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<String, String
         .map(|l| l.trim().to_string())
         .filter(|l| !l.is_empty())
         .collect();
-    let previous_model = state.config.lock().unwrap().model.clone();
+    let previous = state.config.lock().unwrap().clone();
+    let previous_model = previous.model.clone();
     let cfg = AppConfig {
         shortcut: patch.shortcut.filter(|s| !s.trim().is_empty()),
         lang: {
@@ -770,6 +824,9 @@ fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<String, String
             let s = patch.meeting_source.trim().to_lowercase();
             if s.is_empty() { "system".into() } else { s }
         },
+        // Preferências do indicador não passam pela tela — preserva as atuais.
+        overlay_pos: previous.overlay_pos,
+        overlay_mini: previous.overlay_mini,
     };
     config::save(&cfg).map_err(|e| e.to_string())?;
     *state.config.lock().unwrap() = cfg.clone();
@@ -843,6 +900,190 @@ async fn list_llm_models(provider: String, model: Option<String>) -> Result<Vec<
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+// ----------------------------------------------------------- biblioteca
+
+fn open_library(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("library") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        return;
+    }
+    let result = tauri::WebviewWindowBuilder::new(
+        app,
+        "library",
+        tauri::WebviewUrl::App("library.html".into()),
+    )
+    .title("ISPer — Biblioteca")
+    .inner_size(980.0, 680.0)
+    .min_inner_size(720.0, 480.0)
+    .build();
+    if let Err(e) = result {
+        tracing::error!("não consegui abrir a biblioteca: {e}");
+    }
+}
+
+/// Mostra o indicador flutuante (útil depois de "ocultar" durante a reunião).
+fn show_indicator(app: &AppHandle) {
+    let meeting_active = app.state::<AppState>().meeting.lock().unwrap().is_some();
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        let _ = overlay.show();
+    }
+    if meeting_active {
+        let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting"}));
+    } else {
+        let _ = app.emit_to("overlay", "isper-state", json!({"state": "idle"}));
+        let app = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(2500));
+            maybe_restore_overlay(&app);
+        });
+    }
+}
+
+#[tauri::command]
+fn list_meetings(query: Option<String>) -> Result<Vec<isper_core::store::MeetingRow>, String> {
+    let store = open_store().map_err(|e| e.to_string())?;
+    match query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
+        Some(q) => store.search_meetings(q),
+        None => store.list_meetings(),
+    }
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_meeting(id: i64) -> Result<Option<isper_core::store::MeetingDetail>, String> {
+    open_store()
+        .map_err(|e| e.to_string())?
+        .get_meeting(id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn rename_meeting(id: i64, title: String) -> Result<(), String> {
+    if title.trim().is_empty() {
+        return Err("título vazio".into());
+    }
+    open_store()
+        .map_err(|e| e.to_string())?
+        .rename_meeting(id, &title)
+        .map_err(|e| e.to_string())
+}
+
+/// Remove do histórico; o arquivo .md continua na pasta (decisão do usuário).
+#[tauri::command]
+fn delete_meeting(id: i64) -> Result<(), String> {
+    open_store()
+        .map_err(|e| e.to_string())?
+        .delete_meeting(id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn open_meeting_file(id: i64) -> Result<(), String> {
+    let store = open_store().map_err(|e| e.to_string())?;
+    let detail = store
+        .get_meeting(id)
+        .map_err(|e| e.to_string())?
+        .ok_or("reunião não encontrada")?;
+    let path = detail
+        .meeting
+        .md_path
+        .ok_or("esta reunião não tem arquivo .md registrado")?;
+    if !std::path::Path::new(&path).exists() {
+        return Err(format!("arquivo não encontrado: {path}"));
+    }
+    std::process::Command::new("cmd")
+        .args(["/C", "start", "", &path])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn open_meetings_folder() -> Result<(), String> {
+    let dir = meetings_dir().map_err(|e| e.to_string())?;
+    std::process::Command::new("explorer")
+        .arg(&dir)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn list_dictations(query: Option<String>) -> Result<Vec<isper_core::store::DictationRow>, String> {
+    open_store()
+        .map_err(|e| e.to_string())?
+        .list_dictations(query.as_deref(), 300)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_dictation(id: i64) -> Result<(), String> {
+    open_store()
+        .map_err(|e| e.to_string())?
+        .delete_dictation(id)
+        .map_err(|e| e.to_string())
+}
+
+// ------------------------------------------------------------ indicador
+
+#[derive(serde::Serialize)]
+struct OverlayPrefs {
+    mini: bool,
+    meeting_active: bool,
+}
+
+#[tauri::command]
+fn overlay_prefs(app: AppHandle) -> OverlayPrefs {
+    let state = app.state::<AppState>();
+    let mini = state.config.lock().unwrap().overlay_mini;
+    let meeting_active = state.meeting.lock().unwrap().is_some();
+    OverlayPrefs {
+        mini,
+        meeting_active,
+    }
+}
+
+/// Alterna o indicador entre normal e mini, redimensionando a janela e
+/// lembrando a preferência.
+#[tauri::command]
+fn overlay_set_mini(app: AppHandle, mini: bool) -> Result<(), String> {
+    let (w, h) = if mini { OVERLAY_MINI } else { OVERLAY_FULL };
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        overlay
+            .set_size(tauri::LogicalSize::new(w, h))
+            .map_err(|e| e.to_string())?;
+    }
+    let state = app.state::<AppState>();
+    let cfg = {
+        let mut c = state.config.lock().unwrap();
+        c.overlay_mini = mini;
+        c.clone()
+    };
+    config::save(&cfg).map_err(|e| e.to_string())
+}
+
+/// Esconde o indicador (a gravação continua; volta pela bandeja).
+#[tauri::command]
+fn overlay_hide(app: AppHandle) {
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        let _ = overlay.hide();
+    }
+}
+
+/// Lembra onde o usuário deixou o indicador (pixels físicos).
+#[tauri::command]
+fn overlay_moved(app: AppHandle, x: i32, y: i32) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let cfg = {
+        let mut c = state.config.lock().unwrap();
+        c.overlay_pos = Some((x, y));
+        c.clone()
+    };
+    config::save(&cfg).map_err(|e| e.to_string())
 }
 
 // -------------------------------------------------------------- comuns

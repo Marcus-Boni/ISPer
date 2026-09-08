@@ -15,6 +15,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
 toml = "0.8"
 isper-core = { path = "../../../crates/isper-core" }
 isper-llm = { path = "../../../crates/isper-llm" }

@@ -251,7 +251,7 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
     std::fs::write(&md_path, meeting::to_markdown(&title, &started_at, &result))?;
 
     let db = MeetingStore::open(std::path::Path::new("isper.db"))?;
-    let id = db.save(&title, &started_at, &result)?;
+    let id = db.save(&title, &started_at, &result, Some(&md_path))?;
 
     println!("salvo: {md_path} | banco: isper.db (reuniao id {id})");
 

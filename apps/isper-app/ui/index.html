@@ -5,18 +5,20 @@
 <title>ISPer</title>
 <style>
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
-  * { box-sizing: border-box; user-select: none; cursor: default; }
+  * { box-sizing: border-box; user-select: none; }
   #pill {
     position: absolute; inset: 6px;
-    display: flex; align-items: center; gap: 14px;
-    padding: 0 20px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 12px 0 18px;
     background: rgba(22, 19, 17, .95);
     border: 1px solid rgba(255, 255, 255, .09);
     border-radius: 999px;
     box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
     font-family: "Segoe UI", system-ui, sans-serif;
     color: #ece7e1;
+    cursor: grab;
   }
+  #pill:active { cursor: grabbing; }
   #dot { width: 12px; height: 12px; border-radius: 50%; background: #6f6862; flex: none; transition: background .2s; }
   #pill.recording #dot { background: #f07e72; animation: pulse 1.3s ease-in-out infinite; }
   #pill.transcribing #dot { background: #e8c15a; animation: pulse .5s ease-in-out infinite; }
@@ -30,19 +32,45 @@
   }
   #pill.done #status { color: #84c297; }
   #pill.error #status { color: #f07e72; }
+  #timer {
+    display: none; flex: none;
+    font: 600 13px/1 Consolas, "Cascadia Mono", monospace;
+    color: #ece7e1; letter-spacing: .04em; font-variant-numeric: tabular-nums;
+  }
+  #pill.meeting #timer { display: block; }
+  .ctl { display: flex; gap: 4px; flex: none; opacity: 0; transition: opacity .15s; }
+  #pill:hover .ctl { opacity: 1; }
+  .ctl button {
+    width: 22px; height: 22px; border-radius: 50%; padding: 0;
+    border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06);
+    color: #a79e96; font: 14px/1 "Segoe UI", sans-serif; cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .ctl button:hover { color: #ece7e1; background: rgba(255,255,255,.14); }
+  /* Modo mini: só o ponto (+ cronômetro em reunião). */
+  body.mini #pill { gap: 10px; padding: 0 10px 0 14px; }
+  body.mini canvas, body.mini #status { display: none; }
+  body.mini .ctl { margin-left: auto; }
 </style>
 </head>
 <body>
-<div id="pill">
-  <div id="dot"></div>
-  <canvas id="wave"></canvas>
-  <div id="status">pronto</div>
+<div id="pill" data-tauri-drag-region>
+  <div id="dot" data-tauri-drag-region></div>
+  <canvas id="wave" data-tauri-drag-region></canvas>
+  <div id="status" data-tauri-drag-region>pronto</div>
+  <div id="timer" data-tauri-drag-region>00:00</div>
+  <div class="ctl">
+    <button id="mini" title="modo mini / normal">–</button>
+    <button id="hide" title="ocultar (volta em Bandeja → Mostrar indicador)">×</button>
+  </div>
 </div>
 <script>
   const { listen } = window.__TAURI__.event;
-  const pill = document.getElementById('pill');
-  const statusEl = document.getElementById('status');
-  const canvas = document.getElementById('wave');
+  const { invoke } = window.__TAURI__.core;
+  const $ = (id) => document.getElementById(id);
+  const pill = $('pill');
+  const statusEl = $('status');
+  const canvas = $('wave');
   const ctx = canvas.getContext('2d');
 
   const N = 48;
@@ -50,21 +78,37 @@
   let state = 'idle';
 
   const truncate = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
+  const fmt = (s) => { s = Math.max(0, Math.floor(s)); const m = Math.floor(s / 60); return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+
+  // Cronômetro da reunião (só a UI conta o tempo; começa no primeiro "meeting").
+  let meetingStartedAt = null, timerHandle = null;
+  function startTimer() {
+    if (!meetingStartedAt) meetingStartedAt = Date.now();
+    if (timerHandle) return;
+    timerHandle = setInterval(() => { $('timer').textContent = fmt((Date.now() - meetingStartedAt) / 1000); }, 500);
+  }
+  function stopTimer() {
+    clearInterval(timerHandle); timerHandle = null; meetingStartedAt = null;
+    $('timer').textContent = '00:00';
+  }
 
   const CLASS_MAP = {
     'recording-handsfree': 'recording handsfree',
     'meeting': 'recording meeting',
-    'meeting-processing': 'transcribing',
-    'meeting-diarize': 'transcribing',
-    'meeting-summary': 'transcribing',
+    'meeting-processing': 'transcribing meeting',
+    'meeting-diarize': 'transcribing meeting',
+    'meeting-summary': 'transcribing meeting',
     'meeting-done': 'done'
   };
   function setState(s, msg) {
     state = s;
     pill.className = CLASS_MAP[s] || s;
+    if (s === 'meeting') startTimer();
+    else if (s === 'meeting-done' || s === 'idle' || s === 'error') stopTimer();
+
     if (s === 'recording') { bars.fill(0); statusEl.textContent = 'gravando… solte para colar'; blip(880, .05); }
     else if (s === 'recording-handsfree') statusEl.textContent = 'mãos-livres… 1 s de silêncio cola';
-    else if (s === 'meeting') statusEl.textContent = msg ? 'gravando reunião — ' + msg : 'gravando reunião — Eu + Participantes';
+    else if (s === 'meeting') statusEl.textContent = msg ? 'reunião — ' + msg : 'gravando reunião — Eu + Participantes';
     else if (s === 'meeting-processing') statusEl.textContent = 'transcrevendo a reunião…';
     else if (s === 'meeting-diarize') statusEl.textContent = 'identificando quem falou…';
     else if (s === 'meeting-summary') statusEl.textContent = 'resumindo com IA…';
@@ -81,6 +125,36 @@
     if (bars.length > N) bars.shift();
   });
 
+  // Controles: mini/normal e ocultar. A preferência de tamanho é lembrada.
+  function applyMini(mini) {
+    document.body.classList.toggle('mini', mini);
+    $('mini').textContent = mini ? '+' : '–';
+    $('mini').title = mini ? 'voltar ao tamanho normal' : 'modo mini';
+  }
+  $('mini').addEventListener('click', async (ev) => {
+    ev.stopPropagation();
+    const mini = !document.body.classList.contains('mini');
+    applyMini(mini);
+    try { await invoke('overlay_set_mini', { mini }); } catch (_) {}
+  });
+  $('hide').addEventListener('click', async (ev) => {
+    ev.stopPropagation();
+    try { await invoke('overlay_hide'); } catch (_) {}
+  });
+
+  // Posição lembrada: salva (com debounce) quando o usuário arrasta.
+  let moveTimer = null;
+  listen('tauri://move', (e) => {
+    clearTimeout(moveTimer);
+    const { x, y } = e.payload;
+    moveTimer = setTimeout(() => { invoke('overlay_moved', { x, y }).catch(() => {}); }, 400);
+  });
+
+  invoke('overlay_prefs').then(p => {
+    applyMini(!!p.mini);
+    if (p.meeting_active) setState('meeting');
+  }).catch(() => {});
+
   function sizeCanvas() {
     canvas.width = canvas.clientWidth * devicePixelRatio;
     canvas.height = canvas.clientHeight * devicePixelRatio;
@@ -88,18 +162,20 @@
   addEventListener('resize', sizeCanvas);
 
   function draw() {
-    if (!canvas.width) sizeCanvas();
+    if (canvas.clientWidth && (!canvas.width || canvas.width !== canvas.clientWidth * devicePixelRatio)) sizeCanvas();
     const w = canvas.width, h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-    const bw = w / N;
-    const rec = state.startsWith('recording');
-    for (let i = 0; i < N; i++) {
-      const v = rec ? bars[i] : bars[i] * 0.3;
-      const bh = Math.max(3 * devicePixelRatio, v * h * 0.92);
-      ctx.fillStyle = rec ? 'rgba(240,126,114,.95)' : 'rgba(167,158,150,.45)';
-      ctx.beginPath();
-      ctx.roundRect(i * bw + 1, (h - bh) / 2, Math.max(1, bw - 3), bh, 2);
-      ctx.fill();
+    if (w && h) {
+      ctx.clearRect(0, 0, w, h);
+      const bw = w / N;
+      const rec = state.startsWith('recording');
+      for (let i = 0; i < N; i++) {
+        const v = rec ? bars[i] : bars[i] * 0.3;
+        const bh = Math.max(3 * devicePixelRatio, v * h * 0.92);
+        ctx.fillStyle = rec ? 'rgba(240,126,114,.95)' : 'rgba(167,158,150,.45)';
+        ctx.beginPath();
+        ctx.roundRect(i * bw + 1, (h - bh) / 2, Math.max(1, bw - 3), bh, 2);
+        ctx.fill();
+      }
     }
     requestAnimationFrame(draw);
   }

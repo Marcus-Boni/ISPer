@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ISPer — Biblioteca</title>
+<style>
+  :root {
+    --bg: #161311; --panel: #1e1a18; --panel2: #26211e; --line: #372f2b;
+    --ink: #ece7e1; --muted: #a79e96; --accent: #f07e72; --good: #84c297; --warn: #e8c15a;
+    --p1: #7cc4f0; --p2: #c9a0f0; --p3: #f0c97c; --p4: #7cf0c9; --p5: #f0a07c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: "Segoe UI", system-ui, sans-serif; font-size: 13.5px; }
+  body { display: grid; grid-template-rows: auto 1fr; }
+  header { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: .01em; }
+  header h1 span { color: var(--accent); }
+  .tabs { display: flex; gap: 4px; margin-left: 10px; }
+  .tab { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font: inherit; }
+  .tab.on { background: var(--panel2); color: var(--ink); }
+  #search { margin-left: auto; width: 320px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; outline: none; }
+  #search:focus { border-color: var(--accent); }
+  button.ghost { padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+  button.ghost:hover { background: var(--panel2); }
+  button.ghost:disabled { opacity: .45; cursor: default; }
+  button.danger { border-color: transparent; color: var(--accent); }
+  main { display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
+  #list { border-right: 1px solid var(--line); overflow-y: auto; }
+  .item { padding: 12px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .item:hover { background: var(--panel); }
+  .item.on { background: var(--panel2); box-shadow: inset 3px 0 0 var(--accent); }
+  .item .t { font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .m { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.ok { color: var(--good); border-color: var(--good); }
+  #detail { overflow-y: auto; padding: 22px 28px; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  .dhead { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 6px; }
+  .dhead h2 { font-size: 20px; font-weight: 600; margin: 0; flex: 1; cursor: text; }
+  .dhead input { flex: 1; font: 600 20px "Segoe UI", system-ui; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--accent); background: var(--bg); color: var(--ink); outline: none; }
+  .meta { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
+  .actions { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 22px 0 10px; }
+  .summary { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; white-space: pre-wrap; line-height: 1.55; }
+  .seg { display: grid; grid-template-columns: 52px 130px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); line-height: 1.5; }
+  .seg .ts { color: var(--muted); font: 12px Consolas, "Cascadia Mono", monospace; padding-top: 2px; }
+  .seg .sp { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sp.eu { color: var(--accent); } .sp.p1 { color: var(--p1); } .sp.p2 { color: var(--p2); } .sp.p3 { color: var(--p3); } .sp.p4 { color: var(--p4); } .sp.p5 { color: var(--p5); } .sp.px { color: var(--muted); }
+  .dict { display: grid; grid-template-columns: 150px 1fr auto auto; gap: 12px; align-items: start; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .dict .at { color: var(--muted); font: 12px Consolas, "Cascadia Mono", monospace; padding-top: 3px; }
+  .dict .tx { line-height: 1.5; }
+  .dict button { padding: 4px 10px; font-size: 12px; }
+  #status { position: fixed; bottom: 12px; right: 18px; font-size: 12px; color: var(--muted); }
+  #status.ok { color: var(--good); } #status.err { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>ISPer<span>.</span> Biblioteca</h1>
+  <div class="tabs">
+    <button class="tab on" id="tab-meetings">Reuniões</button>
+    <button class="tab" id="tab-dictations">Ditados</button>
+  </div>
+  <input id="search" type="search" placeholder="buscar no título, resumo e transcript…">
+  <button class="ghost" id="openfolder">Abrir pasta</button>
+</header>
+<main>
+  <div id="list"></div>
+  <div id="detail"><div class="empty">Selecione uma reunião à esquerda.</div></div>
+</main>
+<div id="status"></div>
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  const status = (msg, cls = '') => { $('status').textContent = msg; $('status').className = cls; };
+  const fmt = (s) => { s = Math.max(0, Math.floor(s)); const m = Math.floor(s / 60); return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+  function spClass(sp) {
+    if (sp === 'Eu') return 'eu';
+    const m = sp.match(/^Participante (\d+)/);
+    return m ? 'p' + Math.min(5, Number(m[1])) : 'px';
+  }
+
+  let tab = 'meetings';
+  let selected = null;
+
+  // ------------------------------------------------------------ reuniões
+  async function loadMeetings() {
+    const q = $('search').value;
+    let rows = [];
+    try { rows = await invoke('list_meetings', { query: q || null }); }
+    catch (e) { status('erro: ' + e, 'err'); return; }
+    const list = $('list');
+    list.replaceChildren();
+    if (!rows.length) { list.appendChild(el('div', 'empty', q ? 'nada encontrado' : 'nenhuma reunião ainda — grave uma pela bandeja')); return; }
+    for (const r of rows) {
+      const it = el('div', 'item' + (selected === r.id ? ' on' : ''));
+      it.appendChild(el('div', 't', r.title));
+      const m = el('div', 'm');
+      m.appendChild(el('span', '', r.started_at));
+      m.appendChild(el('span', '', fmt(r.duration_secs)));
+      m.appendChild(el('span', 'badge', r.participants + (r.participants === 1 ? ' participante' : ' participantes')));
+      if (r.has_summary) m.appendChild(el('span', 'badge ok', 'resumo IA'));
+      it.appendChild(m);
+      it.addEventListener('click', () => { selected = r.id; loadMeetings(); showMeeting(r.id); });
+      list.appendChild(it);
+    }
+  }
+
+  async function showMeeting(id) {
+    const d = $('detail');
+    d.replaceChildren();
+    let det;
+    try { det = await invoke('get_meeting', { id }); } catch (e) { status('erro: ' + e, 'err'); return; }
+    if (!det) { d.appendChild(el('div', 'empty', 'reunião não encontrada')); return; }
+    const m = det.meeting;
+
+    const head = el('div', 'dhead');
+    const h2 = el('h2', '', m.title);
+    h2.title = 'clique para renomear';
+    h2.addEventListener('click', () => {
+      const input = el('input'); input.value = m.title;
+      head.replaceChild(input, h2); input.focus(); input.select();
+      let done = false;
+      const commit = async () => {
+        if (done) return; done = true;
+        const t = input.value.trim();
+        if (t && t !== m.title) {
+          try { await invoke('rename_meeting', { id, title: t }); status('renomeada', 'ok'); }
+          catch (e) { status('erro: ' + e, 'err'); }
+        }
+        await loadMeetings(); showMeeting(id);
+      };
+      input.addEventListener('keydown', ev => { if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') { done = true; showMeeting(id); } });
+      input.addEventListener('blur', commit);
+    });
+    head.appendChild(h2);
+    d.appendChild(head);
+    d.appendChild(el('div', 'meta', m.started_at + ' · ' + fmt(m.duration_secs) + ' · ' + m.segments + ' segmentos · ' + m.participants + ' participante(s)'));
+
+    const actions = el('div', 'actions');
+    const bOpen = el('button', 'ghost', 'Abrir .md'); bOpen.disabled = !m.md_path;
+    bOpen.addEventListener('click', () => invoke('open_meeting_file', { id }).catch(e => status('erro: ' + e, 'err')));
+    const bDel = el('button', 'ghost danger', 'Excluir do histórico');
+    bDel.addEventListener('click', async () => {
+      if (!confirm('Excluir esta reunião do histórico?\nO arquivo .md continua na pasta.')) return;
+      try { await invoke('delete_meeting', { id }); selected = null; status('excluída do histórico', 'ok'); }
+      catch (e) { status('erro: ' + e, 'err'); }
+      $('detail').replaceChildren(el('div', 'empty', 'Selecione uma reunião à esquerda.'));
+      loadMeetings();
+    });
+    actions.append(bOpen, bDel);
+    d.appendChild(actions);
+
+    if (det.summary) {
+      d.appendChild(el('h3', '', 'Resumo (IA)'));
+      d.appendChild(el('div', 'summary', det.summary));
+    }
+    d.appendChild(el('h3', '', 'Transcript'));
+    let last = null, group = null;
+    for (const s of det.segments) {
+      if (s.speaker !== last) {
+        group = el('div', 'seg');
+        group.appendChild(el('div', 'ts', fmt(s.start_secs)));
+        group.appendChild(el('div', 'sp ' + spClass(s.speaker), s.speaker));
+        group.appendChild(el('div', 'tx', s.text));
+        d.appendChild(group);
+        last = s.speaker;
+      } else {
+        group.lastElementChild.textContent += ' ' + s.text;
+      }
+    }
+    if (!det.segments.length) d.appendChild(el('div', 'empty', 'sem transcript'));
+  }
+
+  // ------------------------------------------------------------- ditados
+  async function loadDictations() {
+    const q = $('search').value;
+    let rows = [];
+    try { rows = await invoke('list_dictations', { query: q || null }); }
+    catch (e) { status('erro: ' + e, 'err'); return; }
+    const list = $('list');
+    list.replaceChildren();
+    $('detail').replaceChildren(el('div', 'empty', rows.length + ' ditado(s) — "copiar" reutiliza um texto.'));
+    if (!rows.length) { list.appendChild(el('div', 'empty', q ? 'nada encontrado' : 'nenhum ditado ainda')); return; }
+    for (const r of rows) {
+      const row = el('div', 'dict');
+      row.appendChild(el('div', 'at', r.at));
+      row.appendChild(el('div', 'tx', r.text));
+      const bCopy = el('button', 'ghost', 'copiar');
+      bCopy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(r.text); status('copiado', 'ok'); }
+        catch (_) { status('não consegui copiar', 'err'); }
+      });
+      const bDel = el('button', 'ghost danger', '×'); bDel.title = 'remover do histórico';
+      bDel.addEventListener('click', async () => {
+        try { await invoke('delete_dictation', { id: r.id }); loadDictations(); }
+        catch (e) { status('erro: ' + e, 'err'); }
+      });
+      row.append(bCopy, bDel);
+      list.appendChild(row);
+    }
+  }
+
+  // ----------------------------------------------------------------- ui
+  function refresh() { if (tab === 'meetings') loadMeetings(); else loadDictations(); }
+  function setTab(t) {
+    tab = t;
+    $('tab-meetings').classList.toggle('on', t === 'meetings');
+    $('tab-dictations').classList.toggle('on', t === 'dictations');
+    $('search').placeholder = t === 'meetings' ? 'buscar no título, resumo e transcript…' : 'buscar nos ditados…';
+    if (t === 'meetings') $('detail').replaceChildren(el('div', 'empty', 'Selecione uma reunião à esquerda.'));
+    refresh();
+  }
+  $('tab-meetings').addEventListener('click', () => setTab('meetings'));
+  $('tab-dictations').addEventListener('click', () => setTab('dictations'));
+  let searchTimer = null;
+  $('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(refresh, 200); });
+  $('openfolder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => status('erro: ' + e, 'err')));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+  refresh();
+</script>
+</body>
+</html>

@@ -128,6 +128,9 @@ Gravar do mic → WAV 16 kHz → transcrever → imprimir. Sem UI: só o motor.
 - [x] Histórico de ditados no SQLite (27/08): tabela `dictations` em `%APPDATA%\ISPer\isper.db` — cada texto colado fica registrado com data e métricas; um viewer na UI fica para depois
 - [x] Dicionário pessoal (27/08): os termos configurados viram o `initial_prompt` do Whisper em ditados E reuniões — nomes próprios e siglas saem certos
 - [x] Instalador (02/09): `ISPer_0.5.0_x64-setup.exe` (NSIS, instalação por usuário sem UAC, pt-BR) gerado pelo bundler do Tauri com as DLLs do CUDA empacotadas — **398 MB** (o `cublasLt64_13.dll` sozinho tem 442 MB antes da compressão); sem modelos dentro — o app abre as Configurações no primeiro uso para baixar. MSI via WiX também configurado (download do WiX depende de rede)
+- [x] Instância única (07/09): `tauri-plugin-single-instance` — clicar de novo no atalho não abre outro ISPer; encaminha para o já aberto, que mostra a Biblioteca
+- [x] Biblioteca de reuniões (07/09): janela própria com busca (título/resumo/transcript), detalhe com resumo e transcript por falante (cores por participante), renomear, abrir `.md`, excluir do histórico (arquivo preservado) e aba de Ditados
+- [x] Indicador flutuante (07/09): arrastável (posição lembrada), modo mini (ponto + cronômetro da reunião), ocultar com retorno pela bandeja
 - [ ] Microinterações e animações na UI (aqui entra o "premium")
 
 ## Fase 4 — Notetaker de reuniões Teams ✅ (completa em 02/09/2026 — validar numa reunião real)
