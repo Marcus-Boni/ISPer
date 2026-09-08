@@ -264,8 +264,11 @@ fn main() {
             // Tela Início: só no lançamento manual (e se o usuário não desligou).
             // Vem ANTES do carregamento do modelo: sem modelo, é ela quem orienta
             // o download — as Configurações só abrem sozinhas se ela não existir.
+            // (No setup a criação direta é segura; fora dele, ver `open_or_focus`.)
             if cfg.show_home_on_launch && !autostarted {
-                open_home(app.handle());
+                if let Err(e) = build_home(app.handle()) {
+                    tracing::error!("não consegui abrir a tela Início: {e}");
+                }
             }
 
             // O modelo (~0,5 GB) carrega em background p/ não travar o startup.
@@ -671,13 +674,37 @@ fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<Stri
 
 // ------------------------------------------------------- configurações
 
-fn open_settings(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("settings") {
+/// Mostra a janela `label` se já existir; senão cria com `build` — numa
+/// thread própria. No Windows, construir um WebView2 na thread principal de
+/// dentro de um comando ou handler de evento congela o loop de eventos
+/// (issue conhecida do Tauri: "use async commands and separate threads when
+/// creating windows"). Foi a causa da Biblioteca em branco com o app inteiro
+/// travado — inclusive o indicador, que não redimensionava nem arrastava.
+fn open_or_focus<F>(app: &AppHandle, label: &'static str, build: F)
+where
+    F: FnOnce(&AppHandle) -> tauri::Result<tauri::WebviewWindow> + Send + 'static,
+{
+    if let Some(w) = app.get_webview_window(label) {
         let _ = w.show();
+        let _ = w.unminimize();
         let _ = w.set_focus();
         return;
     }
-    let result = tauri::WebviewWindowBuilder::new(
+    let app = app.clone();
+    std::thread::spawn(move || {
+        // Dois pedidos quase simultâneos: o segundo só foca o que o primeiro criou.
+        if let Some(w) = app.get_webview_window(label) {
+            let _ = w.set_focus();
+            return;
+        }
+        if let Err(e) = build(&app) {
+            tracing::error!("não consegui abrir a janela {label}: {e}");
+        }
+    });
+}
+
+fn build_settings(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+    tauri::WebviewWindowBuilder::new(
         app,
         "settings",
         tauri::WebviewUrl::App("settings.html".into()),
@@ -685,10 +712,11 @@ fn open_settings(app: &AppHandle) {
     .title("ISPer — Configurações")
     .inner_size(560.0, 700.0)
     .resizable(false)
-    .build();
-    if let Err(e) = result {
-        tracing::error!("não consegui abrir as configurações: {e}");
-    }
+    .build()
+}
+
+fn open_settings(app: &AppHandle) {
+    open_or_focus(app, "settings", build_settings);
 }
 
 #[derive(serde::Serialize)]
@@ -761,8 +789,7 @@ fn load_engine_in_background(app: AppHandle) {
             tracing::warn!("nenhum modelo instalado");
             set_engine_status(&app, EngineStatus::Missing);
             if app.get_webview_window("home").is_none() {
-                let app2 = app.clone();
-                let _ = app.run_on_main_thread(move || open_settings(&app2));
+                open_settings(&app);
             }
             return;
         };
@@ -1028,14 +1055,8 @@ async fn list_llm_models(provider: String, model: Option<String>) -> Result<Vec<
 
 // ----------------------------------------------------------- biblioteca
 
-fn open_library(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("library") {
-        let _ = w.show();
-        let _ = w.unminimize();
-        let _ = w.set_focus();
-        return;
-    }
-    let result = tauri::WebviewWindowBuilder::new(
+fn build_library(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+    tauri::WebviewWindowBuilder::new(
         app,
         "library",
         tauri::WebviewUrl::App("library.html".into()),
@@ -1043,10 +1064,11 @@ fn open_library(app: &AppHandle) {
     .title("ISPer — Biblioteca")
     .inner_size(980.0, 680.0)
     .min_inner_size(720.0, 480.0)
-    .build();
-    if let Err(e) = result {
-        tracing::error!("não consegui abrir a biblioteca: {e}");
-    }
+    .build()
+}
+
+fn open_library(app: &AppHandle) {
+    open_or_focus(app, "library", build_library);
 }
 
 /// Mostra o indicador flutuante (útil depois de "ocultar" durante a reunião).
@@ -1214,23 +1236,17 @@ fn overlay_moved(app: AppHandle, x: i32, y: i32) -> Result<(), String> {
 
 /// Janela central do app: estado do sistema, o que falta configurar,
 /// ações principais, totais e reuniões recentes.
+fn build_home(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+    tauri::WebviewWindowBuilder::new(app, "home", tauri::WebviewUrl::App("home.html".into()))
+        .title("ISPer")
+        .inner_size(960.0, 680.0)
+        .min_inner_size(780.0, 560.0)
+        .center()
+        .build()
+}
+
 fn open_home(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("home") {
-        let _ = w.show();
-        let _ = w.unminimize();
-        let _ = w.set_focus();
-        return;
-    }
-    let result =
-        tauri::WebviewWindowBuilder::new(app, "home", tauri::WebviewUrl::App("home.html".into()))
-            .title("ISPer")
-            .inner_size(960.0, 680.0)
-            .min_inner_size(780.0, 560.0)
-            .center()
-            .build();
-    if let Err(e) = result {
-        tracing::error!("não consegui abrir a tela Início: {e}");
-    }
+    open_or_focus(app, "home", build_home);
 }
 
 /// Avisa todas as janelas que o estado mudou (modelo, reunião, configurações,
@@ -1337,14 +1353,17 @@ async fn toggle_meeting_cmd(app: AppHandle) -> Result<(), String> {
 }
 
 /// Abre a Biblioteca; com `meeting`, já com essa reunião selecionada.
+/// `async`: comandos síncronos rodam na thread principal, onde criar janela
+/// é proibido no Windows (ver `open_or_focus`).
 #[tauri::command]
-fn open_library_window(app: AppHandle, meeting: Option<i64>) {
+async fn open_library_window(app: AppHandle, meeting: Option<i64>) -> Result<(), String> {
     *app.state::<AppState>().pending_meeting.lock().unwrap() = meeting;
     let already_open = app.get_webview_window("library").is_some();
     open_library(&app);
     if already_open && meeting.is_some() {
         let _ = app.emit_to("library", "isper-library-select", ());
     }
+    Ok(())
 }
 
 /// A Biblioteca chama ao carregar e ao receber `isper-library-select`.
@@ -1354,8 +1373,9 @@ fn take_pending_meeting(app: AppHandle) -> Option<i64> {
 }
 
 #[tauri::command]
-fn open_settings_window(app: AppHandle) {
+async fn open_settings_window(app: AppHandle) -> Result<(), String> {
     open_settings(&app);
+    Ok(())
 }
 
 #[tauri::command]

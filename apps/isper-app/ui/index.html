@@ -6,14 +6,16 @@
 <style>
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
   * { box-sizing: border-box; user-select: none; }
+  /* A sombra precisa caber DENTRO da janela (que é transparente e recorta
+     tudo): margem de 8px embaixo para um deslocamento de 2px + desfoque 6px. */
   #pill {
-    position: absolute; inset: 6px;
+    position: absolute; inset: 4px 6px 8px 6px;
     display: flex; align-items: center; gap: 12px;
     padding: 0 12px 0 18px;
     background: rgba(22, 19, 17, .95);
     border: 1px solid rgba(255, 255, 255, .09);
     border-radius: 999px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
     font-family: "Segoe UI", system-ui, sans-serif;
     color: #ece7e1;
     cursor: grab;
@@ -125,17 +127,24 @@
     if (bars.length > N) bars.shift();
   });
 
-  // Controles: mini/normal e ocultar. A preferência de tamanho é lembrada.
+  // Controles: mini/normal e ocultar. O layout segue o TAMANHO REAL da janela
+  // (fonte única): o botão só pede ao backend para redimensionar; a classe
+  // `mini` vem do evento de resize. Assim conteúdo e janela nunca divergem —
+  // nem se o pedido falhar ou atrasar.
   function applyMini(mini) {
     document.body.classList.toggle('mini', mini);
     $('mini').textContent = mini ? '+' : '–';
     $('mini').title = mini ? 'voltar ao tamanho normal' : 'modo mini';
   }
+  const syncMini = () => applyMini(innerWidth < 300);
+  addEventListener('resize', syncMini);
+  syncMini();
   $('mini').addEventListener('click', async (ev) => {
     ev.stopPropagation();
     const mini = !document.body.classList.contains('mini');
-    applyMini(mini);
+    $('mini').disabled = true;
     try { await invoke('overlay_set_mini', { mini }); } catch (_) {}
+    $('mini').disabled = false;
   });
   $('hide').addEventListener('click', async (ev) => {
     ev.stopPropagation();
@@ -150,8 +159,8 @@
     moveTimer = setTimeout(() => { invoke('overlay_moved', { x, y }).catch(() => {}); }, 400);
   });
 
+  // Reunião já em andamento quando a página carrega (ex.: indicador reaberto).
   invoke('overlay_prefs').then(p => {
-    applyMini(!!p.mini);
     if (p.meeting_active) setState('meeting');
   }).catch(() => {});
 
