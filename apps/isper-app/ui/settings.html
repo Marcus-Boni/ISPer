@@ -144,6 +144,11 @@
     <input type="checkbox" id="autostart">
     <span>Iniciar o ISPer junto com o Windows</span>
   </div>
+  <div class="check">
+    <input type="checkbox" id="showhome">
+    <span>Mostrar a tela Início ao abrir o ISPer</span>
+  </div>
+  <p class="hint">No início com o Windows o ISPer nasce quieto na bandeja; a tela Início também abre com um clique no ícone da bandeja.</p>
 </div>
 
 <div class="footer">
@@ -170,6 +175,7 @@
       $('provider').value = s.llm_provider || 'none';
       $('model').value = s.llm_model || '';
       $('keystate').textContent = s.llm_key_present ? '(guardada ✓)' : '';
+      $('showhome').checked = s.show_home_on_launch !== false;
       $('gpuhint').textContent = s.has_gpu
         ? 'Build com CUDA (GPU NVIDIA): os modelos Large rodam em tempo real.'
         : 'Build sem CUDA: prefira o Small ou o Medium.';
@@ -268,6 +274,7 @@
         llm_provider: $('provider').value,
         llm_model: $('model').value || null,
         autostart: $('autostart').checked,
+        show_home_on_launch: $('showhome').checked,
       }});
       $('active').textContent = label;
       status('salvo — atalho ativo: ' + label, 'ok');

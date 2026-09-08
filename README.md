@@ -101,7 +101,17 @@ repositório também são reconhecidos.
 cargo run --release -p isper-app
 ```
 
-O app fica na **bandeja do sistema**. O atalho global é Ctrl+Alt+Espaço, ou o
+O app fica na **bandeja do sistema** e abre com a **tela Início**: uma janela
+central com o estado do motor (modelo carregado, GPU, atalho ativo), fonte de
+áudio das reuniões, diarização e IA, o botão de gravar reunião (com
+cronômetro), um checklist do que falta ou é opcional configurar, totais e as
+reuniões recentes (clique abre a Biblioteca já na reunião). Ela volta com um
+clique esquerdo no ícone da bandeja ou clicando de novo no atalho do ISPer;
+no início junto com o Windows o app nasce quieto na bandeja. Para não abri-la
+no lançamento manual, desmarque "Mostrar esta tela ao abrir" no rodapé (ou em
+Configurações → Sistema).
+
+O atalho global é Ctrl+Alt+Espaço, ou o
 primeiro livre entre Ctrl+Shift+Espaço / Ctrl+Alt+D / Ctrl+Alt+I — a dica no
 menu da bandeja mostra qual foi registrado. Dois modos:
 
@@ -127,8 +137,8 @@ abre sozinho e fica salvo em `Documentos\ISPer\Reunioes\*.md` + SQLite em
 `%APPDATA%\ISPer\isper.db`. Mic = "Eu"; áudio do sistema (loopback) =
 "Participantes". Avise os participantes (LGPD).
 
-**Biblioteca**: bandeja → "Biblioteca de reuniões…" (ou clique de novo no
-atalho do ISPer — a instância única encaminha para a janela) lista todas as
+**Biblioteca**: bandeja → "Biblioteca de reuniões…" (ou o botão na tela
+Início) lista todas as
 reuniões com busca no título, resumo e transcript; cada uma abre com resumo,
 transcript por falante, renomear, abrir o `.md` e excluir do histórico (o
 arquivo fica). A aba Ditados mostra o histórico do que você ditou.

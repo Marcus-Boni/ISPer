@@ -6,6 +6,9 @@
 //! IA (Fase 5): resumo pós-reunião via provider de nuvem configurável.
 //! Configurações (Fase 3): janela própria — atalho, idioma, dicionário,
 //! IA e autostart — persistidas em %APPDATA%\ISPer\config.toml.
+//! Início: janela central com o estado do sistema, atalhos para tudo e as
+//! reuniões recentes — abre com o app (nunca no autostart), no clique
+//! esquerdo do ícone da bandeja e no segundo clique do atalho.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -17,7 +20,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::json;
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::ShortcutState;
@@ -43,6 +46,11 @@ const TAP_THRESHOLD: Duration = Duration::from_millis(350);
 /// Tamanhos lógicos do indicador flutuante: normal e mini (ponto + cronômetro).
 const OVERLAY_FULL: (f64, f64) = (460.0, 104.0);
 const OVERLAY_MINI: (f64, f64) = (150.0, 56.0);
+/// Argumento que o autostart passa ao ISPer: nesse caso ele nasce quieto na
+/// bandeja, sem abrir a tela Início.
+const AUTOSTART_FLAG: &str = "--autostart";
+/// Reuniões listadas na tela Início.
+const HOME_RECENT: i64 = 5;
 
 /// Máquina de estados do ditado — um único lugar decide o que cada evento
 /// de tecla significa (inclusive o auto-repeat, que dispara `Pressed`
@@ -53,9 +61,21 @@ enum Phase {
     Processing,
 }
 
+/// Estado do motor Whisper — fonte única para a tela Início responder
+/// "por que não transcreve?" sem adivinhar.
+#[derive(Clone, serde::Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum EngineStatus {
+    Loading,
+    Ready { file: String, label: String },
+    Missing,
+    Failed { message: String },
+}
+
 struct AppState {
     /// Carregado em background no startup; `None` enquanto carrega.
     engine: Mutex<Option<Arc<WhisperEngine>>>,
+    engine_status: Mutex<EngineStatus>,
     audio: recorder::AudioHandle,
     phase: Mutex<Phase>,
     config: Mutex<AppConfig>,
@@ -63,6 +83,10 @@ struct AppState {
     active_shortcut: Mutex<String>,
     /// Gravação de reunião em andamento (Fase 4).
     meeting: Mutex<Option<MeetingHandle>>,
+    /// Quando a reunião atual começou (cronômetro da tela Início).
+    meeting_started: Mutex<Option<Instant>>,
+    /// Reunião que a Biblioteca deve abrir já selecionada.
+    pending_meeting: Mutex<Option<i64>>,
     /// Itens do menu da bandeja cujo texto muda em tempo de execução.
     meeting_item: Mutex<Option<MenuItem<tauri::Wry>>>,
     hint_item: Mutex<Option<MenuItem<tauri::Wry>>>,
@@ -73,11 +97,16 @@ fn main() {
 
     tauri::Builder::default()
         // Instância única: um segundo clique no atalho não abre outro ISPer —
-        // o pedido é encaminhado ao já aberto, que responde mostrando a Biblioteca.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            open_library(app);
+        // o pedido é encaminhado ao já aberto, que responde com a tela Início.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if !args.iter().any(|a| a == AUTOSTART_FLAG) {
+                open_home(app);
+            }
         }))
-        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec![AUTOSTART_FLAG]),
+        ))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| match event.state {
@@ -108,17 +137,27 @@ fn main() {
             overlay_prefs,
             overlay_set_mini,
             overlay_hide,
-            overlay_moved
+            overlay_moved,
+            home_status,
+            toggle_meeting_cmd,
+            open_library_window,
+            take_pending_meeting,
+            open_settings_window,
+            show_indicator_cmd,
+            set_show_home
         ])
         .setup(|app| {
             let cfg = config::load();
             app.manage(AppState {
                 engine: Mutex::new(None),
+                engine_status: Mutex::new(EngineStatus::Loading),
                 audio: recorder::spawn(),
                 phase: Mutex::new(Phase::Idle),
                 config: Mutex::new(cfg.clone()),
                 active_shortcut: Mutex::new(String::new()),
                 meeting: Mutex::new(None),
+                meeting_started: Mutex::new(None),
+                pending_meeting: Mutex::new(None),
                 meeting_item: Mutex::new(None),
                 hint_item: Mutex::new(None),
             });
@@ -147,8 +186,10 @@ fn main() {
             let label = register_best_shortcut(app.handle(), cfg.shortcut.as_deref());
             *app.state::<AppState>().active_shortcut.lock().unwrap() = label.clone();
 
-            // Ícone na bandeja com menu.
+            // Ícone na bandeja: clique esquerdo abre o Início; direito, o menu.
             let hint = MenuItem::with_id(app, "hint", hint_text(&label), false, None::<&str>)?;
+            let home_item =
+                MenuItem::with_id(app, "home", "Abrir o ISPer (Início)", true, None::<&str>)?;
             let library_item =
                 MenuItem::with_id(app, "library", "Biblioteca de reuniões…", true, None::<&str>)?;
             let settings_item =
@@ -170,7 +211,15 @@ fn main() {
             let quit = MenuItem::with_id(app, "quit", "Sair do ISPer", true, None::<&str>)?;
             let menu = Menu::with_items(
                 app,
-                &[&hint, &library_item, &meeting_item, &indicator_item, &settings_item, &quit],
+                &[
+                    &hint,
+                    &home_item,
+                    &library_item,
+                    &meeting_item,
+                    &indicator_item,
+                    &settings_item,
+                    &quit,
+                ],
             )?;
             {
                 let state = app.state::<AppState>();
@@ -180,16 +229,44 @@ fn main() {
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().expect("ícone do app").clone())
                 .menu(&menu)
+                .show_menu_on_left_click(false)
                 .tooltip("ISPer — ditado e reuniões, 100% local")
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "quit" => app.exit(0),
-                    "meeting" => toggle_meeting(app),
+                    "home" => open_home(app),
+                    "meeting" => {
+                        let _ = toggle_meeting(app);
+                    }
                     "indicator" => show_indicator(app),
                     "library" => open_library(app),
                     "settings" => open_settings(app),
                     _ => {}
                 })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        open_home(tray.app_handle());
+                    }
+                })
                 .build(app)?;
+
+            // Autostart ligado numa versão anterior não passava a flag — reaplica
+            // o registro para que o próximo login também nasça quieto na bandeja.
+            let autostarted = std::env::args().skip(1).any(|a| a == AUTOSTART_FLAG);
+            if app.autolaunch().is_enabled().unwrap_or(false) {
+                let _ = app.autolaunch().enable();
+            }
+
+            // Tela Início: só no lançamento manual (e se o usuário não desligou).
+            // Vem ANTES do carregamento do modelo: sem modelo, é ela quem orienta
+            // o download — as Configurações só abrem sozinhas se ela não existir.
+            if cfg.show_home_on_launch && !autostarted {
+                open_home(app.handle());
+            }
 
             // O modelo (~0,5 GB) carrega em background p/ não travar o startup.
             load_engine_in_background(app.handle().clone());
@@ -411,14 +488,18 @@ fn set_meeting_text(app: &AppHandle, text: &str) {
     }
 }
 
-/// Alterna a gravação de reunião pelo menu da bandeja.
-fn toggle_meeting(app: &AppHandle) {
+/// Alterna a gravação de reunião (bandeja e tela Início). Encerrar devolve
+/// `Ok` na hora — a transcrição segue em background e avisa pelo indicador;
+/// falha ao INICIAR volta como erro para quem chamou mostrar.
+fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
     let state = app.state::<AppState>();
     let mut slot = state.meeting.lock().unwrap();
 
     if let Some(handle) = slot.take() {
         drop(slot);
+        *state.meeting_started.lock().unwrap() = None;
         set_meeting_text(app, "Iniciar gravação de reunião");
+        notify_status(app);
         let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting-processing"}));
         if let Some(overlay) = app.get_webview_window("overlay") {
             let _ = overlay.show();
@@ -439,52 +520,59 @@ fn toggle_meeting(app: &AppHandle) {
                     );
                 }
             }
+            // A Biblioteca e o Início mostram a reunião nova / os totais.
+            notify_status(&app);
             std::thread::sleep(Duration::from_millis(2500));
             maybe_restore_overlay(&app);
         });
-    } else {
-        drop(slot);
-        let engine = { state.engine.lock().unwrap().clone() };
-        let opts = {
-            let cfg = state.config.lock().unwrap();
-            MeetingOptions {
-                lang: cfg.lang.clone(),
-                initial_prompt: cfg.initial_prompt(),
-                source: LoopbackSource::parse(&cfg.meeting_source),
+        return Ok(());
+    }
+    drop(slot);
+
+    let engine = { state.engine.lock().unwrap().clone() };
+    let opts = {
+        let cfg = state.config.lock().unwrap();
+        MeetingOptions {
+            lang: cfg.lang.clone(),
+            initial_prompt: cfg.initial_prompt(),
+            source: LoopbackSource::parse(&cfg.meeting_source),
+        }
+    };
+    let started = engine
+        .ok_or_else(|| anyhow::anyhow!("o modelo ainda está carregando — tente em instantes"))
+        .and_then(|engine| meeting::start(engine, opts).map_err(anyhow::Error::from));
+    match started {
+        Ok(handle) => {
+            let mut payload = json!({"state": "meeting"});
+            if !handle.warnings.is_empty() {
+                payload["message"] = json!(handle.warnings.join(" · "));
             }
-        };
-        let started = engine
-            .ok_or_else(|| anyhow::anyhow!("o modelo ainda está carregando — tente em instantes"))
-            .and_then(|engine| meeting::start(engine, opts).map_err(anyhow::Error::from));
-        match started {
-            Ok(handle) => {
-                let mut payload = json!({"state": "meeting"});
-                if !handle.warnings.is_empty() {
-                    payload["message"] = json!(handle.warnings.join(" · "));
-                }
-                *state.meeting.lock().unwrap() = Some(handle);
-                set_meeting_text(app, "Encerrar e transcrever a reunião");
-                let _ = app.emit_to("overlay", "isper-state", payload);
-                if let Some(overlay) = app.get_webview_window("overlay") {
-                    let _ = overlay.show();
-                }
+            *state.meeting.lock().unwrap() = Some(handle);
+            *state.meeting_started.lock().unwrap() = Some(Instant::now());
+            set_meeting_text(app, "Encerrar e transcrever a reunião");
+            notify_status(app);
+            let _ = app.emit_to("overlay", "isper-state", payload);
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                let _ = overlay.show();
             }
-            Err(e) => {
-                tracing::error!("não consegui iniciar a reunião: {e}");
-                let _ = app.emit_to(
-                    "overlay",
-                    "isper-state",
-                    json!({"state": "error", "message": e.to_string()}),
-                );
-                if let Some(overlay) = app.get_webview_window("overlay") {
-                    let _ = overlay.show();
-                }
-                let app = app.clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(Duration::from_millis(2500));
-                    maybe_restore_overlay(&app);
-                });
+            Ok(())
+        }
+        Err(e) => {
+            tracing::error!("não consegui iniciar a reunião: {e}");
+            let _ = app.emit_to(
+                "overlay",
+                "isper-state",
+                json!({"state": "error", "message": e.to_string()}),
+            );
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                let _ = overlay.show();
             }
+            let app2 = app.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(2500));
+                maybe_restore_overlay(&app2);
+            });
+            Err(e)
         }
     }
 }
@@ -616,6 +704,7 @@ struct SettingsDto {
     llm_model: Option<String>,
     llm_key_present: bool,
     autostart: bool,
+    show_home_on_launch: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -628,6 +717,12 @@ struct SettingsPatch {
     llm_provider: String,
     llm_model: Option<String>,
     autostart: bool,
+    #[serde(default = "default_true")]
+    show_home_on_launch: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(serde::Serialize)]
@@ -653,27 +748,43 @@ fn dev_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-/// Carrega (ou recarrega) o modelo Whisper em background. Sem nenhum modelo
-/// instalado, abre as Configurações para o usuário baixar um.
+/// Carrega (ou recarrega) o modelo Whisper em background, publicando cada
+/// passo em `EngineStatus`. Sem nenhum modelo instalado, a tela Início (se
+/// aberta) orienta o download; senão, abrem-se as Configurações.
 fn load_engine_in_background(app: AppHandle) {
     std::thread::spawn(move || {
+        set_engine_status(&app, EngineStatus::Loading);
         let preferred = app.state::<AppState>().config.lock().unwrap().model.clone();
         let Some(path) =
             isper_models::resolve_whisper_model(preferred.as_deref(), cfg!(feature = "cuda"), &dev_dirs())
         else {
-            tracing::warn!("nenhum modelo instalado — abrindo Configurações");
-            let app2 = app.clone();
-            let _ = app.run_on_main_thread(move || open_settings(&app2));
+            tracing::warn!("nenhum modelo instalado");
+            set_engine_status(&app, EngineStatus::Missing);
+            if app.get_webview_window("home").is_none() {
+                let app2 = app.clone();
+                let _ = app.run_on_main_thread(move || open_settings(&app2));
+            }
             return;
         };
         tracing::info!("carregando modelo {}", path.display());
         match WhisperEngine::new(&path) {
             Ok(engine) => {
                 *app.state::<AppState>().engine.lock().unwrap() = Some(Arc::new(engine));
+                let file = path
+                    .file_name()
+                    .map(|f| f.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                let label = isper_models::catalog_entry(&file)
+                    .map(|m| m.label.to_string())
+                    .unwrap_or_else(|| {
+                        file.trim_start_matches("ggml-").trim_end_matches(".bin").to_string()
+                    });
+                set_engine_status(&app, EngineStatus::Ready { file, label });
                 tracing::info!("modelo Whisper carregado");
             }
             Err(e) => {
                 tracing::error!("falha ao carregar modelo: {e}");
+                set_engine_status(&app, EngineStatus::Failed { message: e.to_string() });
                 let _ = app.emit_to(
                     "overlay",
                     "isper-state",
@@ -682,6 +793,11 @@ fn load_engine_in_background(app: AppHandle) {
             }
         }
     });
+}
+
+fn set_engine_status(app: &AppHandle, status: EngineStatus) {
+    *app.state::<AppState>().engine_status.lock().unwrap() = status;
+    notify_status(app);
 }
 
 #[tauri::command]
@@ -750,12 +866,13 @@ fn diarize_status() -> bool {
 /// (file = "diarize").
 #[tauri::command]
 async fn download_diarize_models(app: AppHandle) -> Result<(), String> {
+    let progress_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let mut last = 0u64;
         isper_diarize::download_models(&mut |name, done, total| {
             if done - last >= 500_000 || done == total {
                 last = done;
-                let _ = app.emit_to(
+                let _ = progress_app.emit_to(
                     "settings",
                     "isper-model-progress",
                     json!({"file": "diarize", "name": name, "done": done, "total": total}),
@@ -765,7 +882,9 @@ async fn download_diarize_models(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+    notify_status(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -797,6 +916,7 @@ fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         llm_model: llm.model,
         llm_key_present,
         autostart: app.autolaunch().is_enabled().unwrap_or(false),
+        show_home_on_launch: cfg.show_home_on_launch,
     })
 }
 
@@ -827,6 +947,7 @@ fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<String, String
         // Preferências do indicador não passam pela tela — preserva as atuais.
         overlay_pos: previous.overlay_pos,
         overlay_mini: previous.overlay_mini,
+        show_home_on_launch: patch.show_home_on_launch,
     };
     config::save(&cfg).map_err(|e| e.to_string())?;
     *state.config.lock().unwrap() = cfg.clone();
@@ -858,15 +979,18 @@ fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<String, String
         autolaunch.disable()
     };
 
+    notify_status(&app);
     Ok(label)
 }
 
 #[tauri::command]
-fn set_llm_key(provider: String, key: String) -> Result<(), String> {
+fn set_llm_key(app: AppHandle, provider: String, key: String) -> Result<(), String> {
     if key.trim().is_empty() {
         return Err("chave vazia".into());
     }
-    isper_llm::set_api_key(&provider.trim().to_lowercase(), &key).map_err(|e| e.to_string())
+    isper_llm::set_api_key(&provider.trim().to_lowercase(), &key).map_err(|e| e.to_string())?;
+    notify_status(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -1081,6 +1205,171 @@ fn overlay_moved(app: AppHandle, x: i32, y: i32) -> Result<(), String> {
     let cfg = {
         let mut c = state.config.lock().unwrap();
         c.overlay_pos = Some((x, y));
+        c.clone()
+    };
+    config::save(&cfg).map_err(|e| e.to_string())
+}
+
+// --------------------------------------------------------------- início
+
+/// Janela central do app: estado do sistema, o que falta configurar,
+/// ações principais, totais e reuniões recentes.
+fn open_home(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("home") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        return;
+    }
+    let result =
+        tauri::WebviewWindowBuilder::new(app, "home", tauri::WebviewUrl::App("home.html".into()))
+            .title("ISPer")
+            .inner_size(960.0, 680.0)
+            .min_inner_size(780.0, 560.0)
+            .center()
+            .build();
+    if let Err(e) = result {
+        tracing::error!("não consegui abrir a tela Início: {e}");
+    }
+}
+
+/// Avisa todas as janelas que o estado mudou (modelo, reunião, configurações,
+/// downloads) — a tela Início relê `home_status` e a Biblioteca, sua lista.
+fn notify_status(app: &AppHandle) {
+    let _ = app.emit("isper-status", ());
+}
+
+#[derive(serde::Serialize)]
+struct HomeStatus {
+    version: &'static str,
+    gpu: bool,
+    engine: EngineStatus,
+    shortcut: String,
+    lang: String,
+    dictionary_terms: usize,
+    meeting_active: bool,
+    meeting_elapsed_secs: Option<u64>,
+    meeting_source: String,
+    diarize_installed: bool,
+    llm_provider: Option<String>,
+    llm_model: Option<String>,
+    llm_key_present: bool,
+    autostart: bool,
+    show_home_on_launch: bool,
+    meetings_dir: String,
+    stats: isper_core::store::Stats,
+    recent: Vec<isper_core::store::MeetingRow>,
+}
+
+/// Fotografia de tudo que a tela Início mostra — uma chamada, sem estado no
+/// front (que só renderiza e reage ao evento `isper-status`).
+#[tauri::command]
+fn home_status(app: AppHandle) -> HomeStatus {
+    let state = app.state::<AppState>();
+    let cfg = state.config.lock().unwrap().clone();
+    let engine = state.engine_status.lock().unwrap().clone();
+    let shortcut = state.active_shortcut.lock().unwrap().clone();
+    let meeting_active = state.meeting.lock().unwrap().is_some();
+    let meeting_elapsed_secs = state
+        .meeting_started
+        .lock()
+        .unwrap()
+        .map(|t| t.elapsed().as_secs());
+
+    let llm = isper_llm::load_settings();
+    let (llm_provider, llm_model, llm_key_present) = if llm.provider.is_empty() {
+        (None, None, false)
+    } else {
+        let key_present = isper_llm::get_api_key(&llm.provider).ok().flatten().is_some();
+        // Sem modelo escolhido, mostra o padrão do provider (só resolve com chave).
+        let model = llm.model.clone().or_else(|| {
+            isper_llm::provider_from_settings(&llm)
+                .ok()
+                .map(|p| p.model().to_string())
+        });
+        (Some(llm.provider.clone()), model, key_present)
+    };
+
+    let (stats, recent) = match open_store() {
+        Ok(store) => (
+            store.stats().unwrap_or_default(),
+            store.recent_meetings(HOME_RECENT).unwrap_or_default(),
+        ),
+        Err(e) => {
+            tracing::warn!("banco indisponível para a tela Início: {e}");
+            Default::default()
+        }
+    };
+
+    HomeStatus {
+        version: env!("CARGO_PKG_VERSION"),
+        gpu: cfg!(feature = "cuda"),
+        engine,
+        shortcut,
+        lang: cfg.lang,
+        dictionary_terms: cfg.dictionary.len(),
+        meeting_active,
+        meeting_elapsed_secs,
+        meeting_source: cfg.meeting_source,
+        diarize_installed: isper_diarize::models_installed(),
+        llm_provider,
+        llm_model,
+        llm_key_present,
+        autostart: app.autolaunch().is_enabled().unwrap_or(false),
+        show_home_on_launch: cfg.show_home_on_launch,
+        meetings_dir: meetings_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default(),
+        stats,
+        recent,
+    }
+}
+
+/// Inicia/encerra a reunião a partir do Início. Roda fora da thread principal:
+/// abrir os dispositivos de áudio leva um instante e a UI não pode congelar.
+#[tauri::command]
+async fn toggle_meeting_cmd(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        toggle_meeting(&app).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Abre a Biblioteca; com `meeting`, já com essa reunião selecionada.
+#[tauri::command]
+fn open_library_window(app: AppHandle, meeting: Option<i64>) {
+    *app.state::<AppState>().pending_meeting.lock().unwrap() = meeting;
+    let already_open = app.get_webview_window("library").is_some();
+    open_library(&app);
+    if already_open && meeting.is_some() {
+        let _ = app.emit_to("library", "isper-library-select", ());
+    }
+}
+
+/// A Biblioteca chama ao carregar e ao receber `isper-library-select`.
+#[tauri::command]
+fn take_pending_meeting(app: AppHandle) -> Option<i64> {
+    app.state::<AppState>().pending_meeting.lock().unwrap().take()
+}
+
+#[tauri::command]
+fn open_settings_window(app: AppHandle) {
+    open_settings(&app);
+}
+
+#[tauri::command]
+fn show_indicator_cmd(app: AppHandle) {
+    show_indicator(&app);
+}
+
+/// Toggle do rodapé do Início: abrir (ou não) esta tela com o app.
+#[tauri::command]
+fn set_show_home(app: AppHandle, show: bool) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let cfg = {
+        let mut c = state.config.lock().unwrap();
+        c.show_home_on_launch = show;
         c.clone()
     };
     config::save(&cfg).map_err(|e| e.to_string())

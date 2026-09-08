@@ -51,6 +51,20 @@ pub struct DictationRow {
     pub audio_secs: Option<f32>,
 }
 
+/// Totais para a tela Início (uma consulta por tabela, sem carregar linhas).
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct Stats {
+    pub meetings: i64,
+    /// Soma das durações das reuniões.
+    pub meeting_secs: f64,
+    pub with_summary: i64,
+    pub dictations: i64,
+    /// Soma do áudio ditado.
+    pub dictation_secs: f64,
+    /// Palavras ditadas (aproximação: espaços + 1 por ditado).
+    pub dictation_words: i64,
+}
+
 const MEETING_COLUMNS: &str = "m.id, m.title, m.started_at, m.duration_secs,
     (m.summary IS NOT NULL AND m.summary != ''), m.md_path,
     (SELECT COUNT(*) FROM segments s WHERE s.meeting_id = m.id),
@@ -191,6 +205,43 @@ impl MeetingStore {
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt.query_map([], row_to_meeting)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// As `limit` reuniões mais recentes (tela Início).
+    pub fn recent_meetings(&self, limit: i64) -> Result<Vec<MeetingRow>> {
+        let sql = format!("SELECT {MEETING_COLUMNS} FROM meetings m ORDER BY m.id DESC LIMIT ?1");
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(params![limit.max(0)], row_to_meeting)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Totais de reuniões e ditados.
+    pub fn stats(&self) -> Result<Stats> {
+        let (meetings, meeting_secs, with_summary) = self.conn.query_row(
+            "SELECT COUNT(*),
+                    COALESCE(SUM(duration_secs), 0),
+                    COALESCE(SUM(summary IS NOT NULL AND summary != ''), 0)
+             FROM meetings",
+            [],
+            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, f64>(1)?, r.get::<_, i64>(2)?)),
+        )?;
+        let (dictations, dictation_secs, dictation_words) = self.conn.query_row(
+            "SELECT COUNT(*),
+                    COALESCE(SUM(audio_secs), 0),
+                    COALESCE(SUM(CASE WHEN trim(text) = '' THEN 0
+                                 ELSE length(trim(text)) - length(replace(trim(text), ' ', '')) + 1 END), 0)
+             FROM dictations",
+            [],
+            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, f64>(1)?, r.get::<_, i64>(2)?)),
+        )?;
+        Ok(Stats {
+            meetings,
+            meeting_secs,
+            with_summary,
+            dictations,
+            dictation_secs,
+            dictation_words,
+        })
     }
 
     /// Reuniões cujo título, resumo ou transcript contém `q` (busca literal,

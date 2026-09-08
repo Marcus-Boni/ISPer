@@ -218,7 +218,25 @@
   $('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(refresh, 200); });
   $('openfolder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => status('erro: ' + e, 'err')));
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+
+  // Aberta pelo Início com uma reunião escolhida: seleciona ao carregar e
+  // sempre que o Início pedir de novo com esta janela já aberta.
+  async function selectPending() {
+    let id = null;
+    try { id = await invoke('take_pending_meeting'); } catch (_) { return; }
+    if (id == null) return;
+    if (tab !== 'meetings') setTab('meetings');
+    selected = id;
+    await loadMeetings();
+    showMeeting(id);
+  }
+  const { listen } = window.__TAURI__.event;
+  listen('isper-library-select', selectPending);
+  // Reunião nova salva, modelo trocado etc. — a lista se mantém atual.
+  listen('isper-status', refresh);
+
   refresh();
+  selectPending();
 </script>
 </body>
 </html>

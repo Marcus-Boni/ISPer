@@ -31,6 +31,9 @@ pub struct AppConfig {
     /// Indicador em modo mini (só o ponto + cronômetro).
     #[serde(default)]
     pub overlay_mini: bool,
+    /// Abrir a tela Início quando o usuário abre o ISPer (nunca no autostart).
+    #[serde(default = "default_true")]
+    pub show_home_on_launch: bool,
 }
 
 impl Default for AppConfig {
@@ -43,12 +46,17 @@ impl Default for AppConfig {
             meeting_source: default_source(),
             overlay_pos: None,
             overlay_mini: false,
+            show_home_on_launch: true,
         }
     }
 }
 
 fn default_lang() -> String {
     "pt".into()
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_source() -> String {

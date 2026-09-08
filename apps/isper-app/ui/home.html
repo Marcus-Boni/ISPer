@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ISPer</title>
+<style>
+  :root {
+    --bg: #161311; --panel: #1e1a18; --panel2: #26211e; --line: #372f2b;
+    --ink: #ece7e1; --muted: #a79e96; --accent: #f07e72; --good: #84c297; --warn: #e8c15a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: "Segoe UI", system-ui, sans-serif; font-size: 13.5px; }
+  body { display: grid; grid-template-rows: auto 1fr auto; }
+
+  /* ---- cabeçalho ---- */
+  header { display: flex; align-items: center; gap: 12px; padding: 13px 22px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .brand { font-size: 16px; font-weight: 600; letter-spacing: .01em; }
+  .brand span { color: var(--accent); }
+  .ver { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+  .state { display: flex; align-items: center; gap: 8px; margin-left: 6px; font-size: 12.5px; color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+  .state.ready .dot { background: var(--good); }
+  .state.loading .dot { background: var(--warn); animation: pulse 1.4s ease-in-out infinite; }
+  .state.missing .dot, .state.failed .dot { background: var(--accent); }
+  .state.meeting { color: var(--ink); }
+  .state.meeting .dot { background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
+  .spacer { flex: 1; }
+
+  /* ---- conteúdo ---- */
+  main { overflow-y: auto; padding: 20px 22px; display: grid; gap: 14px; align-content: start; }
+  .hero { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 0 0 10px; }
+  .lead { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+  .desc { color: var(--muted); line-height: 1.5; margin: 0 0 12px; }
+  .keys { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 2px 0 12px; }
+  kbd.key { font: 600 13px/1 "Segoe UI", system-ui, sans-serif; padding: 8px 12px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); border-bottom-width: 3px; color: var(--ink); min-width: 38px; text-align: center; }
+  .plus { color: var(--muted); }
+  .specs { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 12.5px; margin: 0 0 12px; }
+  .specs dt { color: var(--muted); }
+  .specs dd { margin: 0; overflow-wrap: anywhere; }
+  .chip { display: inline-block; font-size: 11px; line-height: 1.3; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-left: 6px; vertical-align: 1px; }
+  .chip.ok { color: var(--good); border-color: var(--good); }
+  .chip.warn { color: var(--warn); border-color: var(--warn); }
+
+  button { font: inherit; cursor: pointer; border-radius: 9px; padding: 8px 14px; border: 1px solid var(--line); background: transparent; color: var(--ink); }
+  button:hover { background: var(--panel2); }
+  button.primary { background: var(--accent); color: #1b0f0d; border-color: transparent; font-weight: 600; }
+  button.primary:hover { background: var(--accent); filter: brightness(1.07); }
+  button.stop { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; filter: none; }
+  button.link { background: none; border: none; color: var(--accent); padding: 0; font-size: 12.5px; border-radius: 4px; }
+  button.link:hover { text-decoration: underline; background: none; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .timer { font: 600 14px Consolas, "Cascadia Mono", monospace; color: var(--accent); }
+
+  .todo .item { display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .todo .item:first-child { border-top: none; padding-top: 2px; }
+  .todo .n { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font-size: 11px; color: var(--muted); }
+  .todo .item.must .n { border-color: var(--accent); color: var(--accent); }
+  .todo .t { font-weight: 600; margin-bottom: 2px; }
+  .todo .d { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat .v { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+  .stat .l { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  .recent .head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .recent .head .eyebrow { margin: 0; flex: 1; }
+  .meeting { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .meeting:first-child { border-top: none; }
+  .meeting:hover .t { color: var(--accent); }
+  .meeting .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meeting .m { color: var(--muted); font-size: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.ok { color: var(--good); border-color: var(--good); }
+  .empty { color: var(--muted); line-height: 1.5; padding: 10px 0 4px; }
+
+  /* ---- rodapé ---- */
+  footer { display: flex; align-items: center; gap: 14px; padding: 10px 22px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); background: var(--panel); }
+  footer label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  footer input { margin: 0; }
+
+  #toast { position: fixed; left: 50%; bottom: 58px; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; font-size: 12.5px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 80vw; }
+  #toast.show { opacity: 1; }
+  #toast.err { color: var(--accent); border-color: var(--accent); }
+  #toast.ok { color: var(--good); }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } }
+  @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">ISPer<span>.</span></div>
+  <span class="ver" id="ver">…</span>
+  <div class="state" id="state" role="status" aria-live="polite"><span class="dot"></span><span id="statetext">carregando…</span></div>
+  <div class="spacer"></div>
+  <button id="b-indicator" title="Mostrar o indicador flutuante">Indicador</button>
+  <button id="b-library">Biblioteca</button>
+  <button id="b-settings">Configurações</button>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="card">
+      <p class="eyebrow">Ditado em qualquer app</p>
+      <div class="keys" id="keys" aria-label="atalho global"></div>
+      <p class="lead">Segure para falar, solte para colar.</p>
+      <p class="desc">Um toque rápido liga o modo mãos-livres: fale à vontade e o ISPer cola sozinho após ~1,2 s de silêncio (ou um segundo toque). Funciona em qualquer campo de texto — Teams, e-mail, terminal.</p>
+      <dl class="specs">
+        <dt>Modelo</dt><dd id="s-model">…</dd>
+        <dt>Idioma</dt><dd id="s-lang">…</dd>
+        <dt>Dicionário</dt><dd id="s-dict">…</dd>
+      </dl>
+      <button class="link" id="l-dictate">Ajustar atalho, idioma e dicionário →</button>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Reuniões</p>
+      <p class="lead" id="m-lead">Grave, transcreva e resuma.</p>
+      <p class="desc" id="m-desc">Seu microfone vira "Eu"; o áudio dos participantes vem do próprio Windows. Ao encerrar, o transcript vai para a Biblioteca e para um arquivo .md.</p>
+      <div class="row" style="margin-bottom:14px">
+        <button class="primary" id="b-meeting">Iniciar gravação de reunião</button>
+        <span class="timer" id="m-timer"></span>
+      </div>
+      <dl class="specs">
+        <dt>Áudio</dt><dd id="s-source">…</dd>
+        <dt>Falantes</dt><dd id="s-diar">…</dd>
+        <dt>Resumo por IA</dt><dd id="s-llm">…</dd>
+      </dl>
+      <p class="desc" style="margin:0;font-size:12px">Avise os participantes de que a reunião está sendo transcrita (LGPD).</p>
+    </div>
+  </section>
+
+  <section class="card todo" id="todo" hidden>
+    <p class="eyebrow" id="todo-title">Para aproveitar tudo</p>
+    <div id="todo-list"></div>
+  </section>
+
+  <section class="stats" id="stats" aria-label="totais"></section>
+
+  <section class="card recent">
+    <div class="head">
+      <p class="eyebrow">Reuniões recentes</p>
+      <button class="link" id="l-all">Ver todas na Biblioteca →</button>
+    </div>
+    <div id="recent"></div>
+  </section>
+</main>
+
+<footer>
+  <span>100% local — o áudio nunca sai da sua máquina.</span>
+  <button class="link" id="l-folder">Abrir pasta de reuniões</button>
+  <span class="spacer"></span>
+  <label><input type="checkbox" id="showhome"> Mostrar esta tela ao abrir o ISPer</label>
+</footer>
+<div id="toast" role="status"></div>
+
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+
+  let toastTimer = null;
+  function toast(msg, cls = '') {
+    const t = $('toast');
+    t.textContent = msg; t.className = 'show ' + cls;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = ''; }, 2800);
+  }
+  const fmt = (s) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60; return (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(r).padStart(2, '0'); };
+  const fmtDur = (secs) => { if (secs < 60) return Math.round(secs) + ' s'; if (secs < 3600) return Math.round(secs / 60) + ' min'; return (secs / 3600).toFixed(1).replace('.', ',') + ' h'; };
+  const num = (n) => Number(n || 0).toLocaleString('pt-BR');
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  const LANG = { pt: 'Português', en: 'Inglês', auto: 'Detecção automática' };
+  const SOURCE = { system: 'Todo o sistema', teams: 'Só o Microsoft Teams' };
+  const PROVIDER = { groq: 'Groq', gemini: 'Gemini', claude: 'Claude' };
+
+  let meetingStart = null;   // ms; null = sem reunião
+  let busy = false;          // clique em andamento no botão de reunião
+  let current = null;        // último HomeStatus recebido
+
+  const openSettings = () => invoke('open_settings_window').catch(e => toast('erro: ' + e, 'err'));
+  const openLibrary = (meeting = null) => invoke('open_library_window', { meeting }).catch(e => toast('erro: ' + e, 'err'));
+
+  // ------------------------------------------------------------ render
+  function setState(cls, text) { $('state').className = 'state ' + cls; $('statetext').textContent = text; }
+
+  function renderKeys(label) {
+    const keys = $('keys');
+    keys.replaceChildren();
+    if (!label || label.startsWith('(')) { keys.appendChild(el('span', 'desc', 'Nenhum atalho livre — escolha outro nas Configurações.')); return; }
+    label.split('+').forEach((k, i) => {
+      if (i) keys.appendChild(el('span', 'plus', '+'));
+      keys.appendChild(el('kbd', 'key', k.trim()));
+    });
+  }
+
+  function renderStatePill(st) {
+    const e = st.engine;
+    if (st.meeting_active) setState('meeting', 'gravando reunião');
+    else if (e.kind === 'ready') setState('ready', 'pronto para ditar');
+    else if (e.kind === 'loading') setState('loading', 'carregando o modelo…');
+    else if (e.kind === 'missing') setState('missing', 'nenhum modelo instalado');
+    else setState('failed', 'o modelo não carregou');
+  }
+
+  function renderDictation(st) {
+    const e = st.engine;
+    renderKeys(st.shortcut);
+    const model = $('s-model');
+    model.replaceChildren();
+    if (e.kind === 'ready') { model.append(e.label); model.appendChild(el('span', 'chip ok', st.gpu ? 'GPU · CUDA' : 'CPU')); }
+    else if (e.kind === 'loading') model.textContent = 'carregando…';
+    else if (e.kind === 'missing') { model.append('nenhum instalado'); model.appendChild(el('span', 'chip warn', 'ação necessária')); }
+    else model.textContent = 'falhou: ' + e.message;
+    $('s-lang').textContent = LANG[st.lang] || st.lang;
+    $('s-dict').textContent = st.dictionary_terms
+      ? plural(st.dictionary_terms, 'termo', 'termos') + ' que o Whisper deve grafar certo'
+      : 'vazio — adicione nomes e siglas que o Whisper costuma errar';
+  }
+
+  function renderMeeting(st) {
+    const b = $('b-meeting');
+    const ready = st.engine.kind === 'ready';
+    if (st.meeting_active) {
+      meetingStart = Date.now() - (st.meeting_elapsed_secs || 0) * 1000;
+      b.textContent = 'Encerrar e transcrever'; b.className = 'stop';
+      $('m-lead').textContent = 'Reunião em gravação.';
+      $('m-desc').textContent = 'Pode fechar esta janela — o indicador flutuante continua na tela e a bandeja também encerra. Ao encerrar, a transcrição (e o resumo, se ativo) leva alguns segundos.';
+    } else {
+      meetingStart = null;
+      $('m-timer').textContent = '';
+      b.textContent = 'Iniciar gravação de reunião'; b.className = 'primary';
+      $('m-lead').textContent = 'Grave, transcreva e resuma.';
+      $('m-desc').textContent = 'Seu microfone vira "Eu"; o áudio dos participantes vem do próprio Windows. Ao encerrar, o transcript vai para a Biblioteca e para um arquivo .md.';
+    }
+    b.disabled = busy || (!st.meeting_active && !ready);
+    b.title = (!st.meeting_active && !ready) ? 'disponível assim que o modelo carregar' : '';
+    tick();
+
+    const src = st.meeting_source || 'system';
+    $('s-source').textContent = SOURCE[src] || (src.startsWith('process:') ? 'Só ' + src.slice(8) : src);
+
+    const diar = $('s-diar');
+    diar.replaceChildren();
+    if (st.diarize_installed) { diar.append('identificados ao encerrar'); diar.appendChild(el('span', 'chip ok', 'Participante 1, 2…')); }
+    else { diar.append('rótulo genérico "Participantes"'); diar.appendChild(el('span', 'chip', 'opcional')); }
+
+    const llm = $('s-llm');
+    llm.replaceChildren();
+    if (st.llm_provider) {
+      llm.append(PROVIDER[st.llm_provider] || st.llm_provider);
+      if (st.llm_model) llm.append(' · ' + st.llm_model);
+      llm.appendChild(el('span', 'chip ' + (st.llm_key_present ? 'ok' : 'warn'), st.llm_key_present ? 'chave guardada' : 'sem chave'));
+    } else {
+      llm.append('desligado');
+      llm.appendChild(el('span', 'chip', 'opcional'));
+    }
+  }
+
+  function renderTodo(st) {
+    const e = st.engine, items = [];
+    if (e.kind === 'missing') items.push({ must: true, t: 'Baixe um modelo Whisper', d: 'Sem ele o ISPer não transcreve. ' + (st.gpu ? 'Com GPU, o Large v3 Turbo (q5) é o recomendado.' : 'Sem GPU, o Small é o recomendado.'), a: 'Baixar nas Configurações', f: openSettings });
+    if (e.kind === 'failed') items.push({ must: true, t: 'O modelo não carregou', d: e.message, a: 'Ver modelos', f: openSettings });
+    if (!st.shortcut || st.shortcut.startsWith('(')) items.push({ must: true, t: 'Nenhum atalho global livre', d: 'Outro programa ocupa todos os candidatos — escolha um diferente nas Configurações.', a: 'Escolher atalho', f: openSettings });
+    if (e.kind === 'ready' && st.stats.dictations === 0) items.push({ t: 'Faça o primeiro ditado', d: 'Clique em qualquer campo de texto, segure ' + st.shortcut + ', fale e solte. O texto aparece colado onde estava o cursor.' });
+    if (st.stats.meetings === 0) items.push({ t: 'Grave a primeira reunião', d: 'Use o botão acima (ou a bandeja) ao entrar na reunião e encerre ao fim — o transcript abre sozinho e fica na Biblioteca.' });
+    if (!st.llm_provider) items.push({ t: 'Resumos automáticos (opcional)', d: 'Conecte Groq, Gemini ou Claude para receber resumo, decisões e action items ao fim de cada reunião. Só o texto do transcript é enviado — áudio, nunca.', a: 'Configurar IA', f: openSettings });
+    else if (!st.llm_key_present) items.push({ must: true, t: 'Falta a chave do provider de IA', d: 'O resumo está ligado (' + (PROVIDER[st.llm_provider] || st.llm_provider) + '), mas não há chave guardada — as reuniões ficam sem resumo.', a: 'Guardar chave', f: openSettings });
+    if (!st.diarize_installed) items.push({ t: 'Quem falou o quê (opcional)', d: 'Baixe os modelos de diarização (~45 MB) e "Participantes" vira "Participante 1", "Participante 2"… — 100% local.', a: 'Baixar nas Configurações', f: openSettings });
+
+    const box = $('todo'), list = $('todo-list');
+    list.replaceChildren();
+    box.hidden = items.length === 0;
+    $('todo-title').textContent = items.some(i => i.must) ? 'Precisa de atenção' : 'Para aproveitar tudo';
+    items.forEach((it, i) => {
+      const row = el('div', 'item' + (it.must ? ' must' : ''));
+      row.appendChild(el('div', 'n', String(i + 1)));
+      const txt = el('div');
+      txt.appendChild(el('div', 't', it.t));
+      txt.appendChild(el('div', 'd', it.d));
+      row.appendChild(txt);
+      if (it.a) { const b = el('button', '', it.a); b.addEventListener('click', it.f); row.appendChild(b); }
+      else row.appendChild(el('span'));
+      list.appendChild(row);
+    });
+  }
+
+  function renderStats(s) {
+    const box = $('stats');
+    box.replaceChildren();
+    const tile = (v, l) => { const t = el('div', 'stat'); t.appendChild(el('div', 'v', v)); t.appendChild(el('div', 'l', l)); return t; };
+    box.appendChild(tile(num(s.meetings), s.with_summary ? 'reuniões · ' + s.with_summary + ' com resumo' : 'reuniões gravadas'));
+    box.appendChild(tile(s.meeting_secs ? fmtDur(s.meeting_secs) : '0 min', 'de reunião transcrita'));
+    box.appendChild(tile(num(s.dictations), 'ditados'));
+    box.appendChild(tile(num(s.dictation_words), s.dictation_secs ? 'palavras ditadas · ' + fmtDur(s.dictation_secs) + ' de fala' : 'palavras ditadas'));
+  }
+
+  function renderRecent(rows) {
+    const box = $('recent');
+    box.replaceChildren();
+    if (!rows.length) { box.appendChild(el('div', 'empty', 'Nenhuma reunião ainda. A primeira aparece aqui assim que você encerrar a gravação.')); return; }
+    for (const r of rows) {
+      const it = el('div', 'meeting');
+      it.tabIndex = 0; it.setAttribute('role', 'button');
+      it.appendChild(el('div', 't', r.title));
+      const m = el('div', 'm');
+      m.appendChild(el('span', '', r.started_at));
+      m.appendChild(el('span', '', fmt(r.duration_secs)));
+      m.appendChild(el('span', 'badge', plural(r.participants, 'participante', 'participantes')));
+      if (r.has_summary) m.appendChild(el('span', 'badge ok', 'resumo IA'));
+      it.appendChild(m);
+      const open = () => openLibrary(r.id);
+      it.addEventListener('click', open);
+      it.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } });
+      box.appendChild(it);
+    }
+  }
+
+  function render(st) {
+    current = st;
+    $('ver').textContent = 'v' + st.version;
+    renderStatePill(st);
+    renderDictation(st);
+    renderMeeting(st);
+    renderTodo(st);
+    renderStats(st.stats);
+    renderRecent(st.recent);
+    $('showhome').checked = !!st.show_home_on_launch;
+    $('l-folder').title = st.meetings_dir || '';
+  }
+
+  // Cronômetro da reunião (1 Hz) — o backend só informa o instante inicial.
+  function tick() {
+    if (meetingStart == null) return;
+    const t = fmt((Date.now() - meetingStart) / 1000);
+    $('m-timer').textContent = t;
+    $('statetext').textContent = 'gravando reunião · ' + t;
+  }
+  setInterval(tick, 1000);
+
+  // ------------------------------------------------------------ ações
+  async function refresh() {
+    try { render(await invoke('home_status')); }
+    catch (e) { toast('não consegui ler o estado: ' + e, 'err'); }
+  }
+
+  $('b-meeting').addEventListener('click', async () => {
+    busy = true;
+    const b = $('b-meeting');
+    b.disabled = true;
+    const stopping = current && current.meeting_active;
+    b.textContent = stopping ? 'Encerrando…' : 'Abrindo áudio…';
+    try {
+      await invoke('toggle_meeting_cmd');
+      toast(stopping ? 'transcrevendo — o arquivo abre sozinho ao terminar' : 'gravando — o indicador flutuante mostra o andamento', 'ok');
+    } catch (e) {
+      toast(String(e), 'err');
+    } finally {
+      busy = false;
+      refresh();
+    }
+  });
+  $('b-library').addEventListener('click', () => openLibrary());
+  $('l-all').addEventListener('click', () => openLibrary());
+  $('b-settings').addEventListener('click', openSettings);
+  $('l-dictate').addEventListener('click', openSettings);
+  $('b-indicator').addEventListener('click', () => invoke('show_indicator_cmd').catch(e => toast('erro: ' + e, 'err')));
+  $('l-folder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => toast('erro: ' + e, 'err')));
+  $('showhome').addEventListener('change', (ev) => {
+    const show = ev.target.checked;
+    invoke('set_show_home', { show })
+      .then(() => toast(show ? 'esta tela volta a abrir com o ISPer' : 'o ISPer passa a abrir só na bandeja — clique no ícone para ver esta tela', 'ok'))
+      .catch(e => toast('erro: ' + e, 'err'));
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') window.__TAURI__.window.getCurrentWindow().close();
+  });
+
+  // Estado sempre atual: evento do backend + voltar para a janela.
+  listen('isper-status', refresh);
+  window.addEventListener('focus', refresh);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+  refresh();
+</script>
+</body>
+</html>
