@@ -1,0 +1,138 @@
+//! Indicador flutuante: sempre no topo (SetWindowPos), mostrar/ocultar, mini e posição lembrada.
+
+use crate::prelude::*;
+
+/// HWND do indicador, capturado uma vez no setup (a janela vive até o fim do app).
+pub(crate) fn overlay_hwnd(overlay: &tauri::WebviewWindow) -> isize {
+    #[cfg(windows)]
+    {
+        overlay.hwnd().map(|h| h.0 as isize).unwrap_or(0)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = overlay;
+        0
+    }
+}
+
+/// Reafirma o indicador no topo da faixa "sempre no topo" do Windows. O
+/// `alwaysOnTop` da config só liga a flag: qualquer outra janela topmost
+/// ativada depois (Teams em chamada, players, outros overlays) passa na frente,
+/// e a nossa — que nunca é ativada — não voltaria sozinha. O tao ignora
+/// `set_always_on_top(true)` com a flag já ligada, daí o SetWindowPos direto:
+/// sem ativar, sem mover, sem redimensionar.
+pub(crate) fn assert_topmost(app: &AppHandle) {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        };
+        let hwnd = app.state::<AppState>().overlay_hwnd;
+        if hwnd != 0 {
+            // SAFETY: o HWND pertence a uma janela que só é destruída ao sair do
+            // app; SetWindowPos pode ser chamado de qualquer thread.
+            unsafe {
+                SetWindowPos(
+                    hwnd as _,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                );
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        if let Some(overlay) = app.get_webview_window("overlay") {
+            let _ = overlay.set_always_on_top(true);
+        }
+    }
+}
+
+/// Mostra o indicador e garante que ele fica por cima de tudo.
+pub(crate) fn show_overlay(app: &AppHandle) {
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        let _ = overlay.show();
+    }
+    assert_topmost(app);
+}
+
+/// Mostra o indicador flutuante (útil depois de "ocultar" durante a reunião).
+pub(crate) fn show_indicator(app: &AppHandle) {
+    let meeting_active = app.state::<AppState>().meeting.lock().unwrap().is_some();
+    show_overlay(app);
+    if meeting_active {
+        let _ = app.emit("isper-state", json!({"state": "meeting"}));
+    } else {
+        let _ = app.emit("isper-state", json!({"state": "idle"}));
+        let app = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(2500));
+            maybe_restore_overlay(&app);
+        });
+    }
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct OverlayPrefs {
+    mini: bool,
+    meeting_active: bool,
+}
+
+#[tauri::command]
+pub(crate) fn overlay_prefs(app: AppHandle) -> OverlayPrefs {
+    let state = app.state::<AppState>();
+    let mini = state.config.lock().unwrap().overlay_mini;
+    let meeting_active = state.meeting.lock().unwrap().is_some();
+    OverlayPrefs {
+        mini,
+        meeting_active,
+    }
+}
+
+/// Alterna o indicador entre normal e mini, redimensionando a janela e
+/// lembrando a preferência.
+#[tauri::command]
+pub(crate) fn overlay_set_mini(app: AppHandle, mini: bool) -> Result<(), String> {
+    let (w, h) = if mini { OVERLAY_MINI } else { OVERLAY_FULL };
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        overlay
+            .set_size(tauri::LogicalSize::new(w, h))
+            .map_err(|e| e.to_string())?;
+    }
+    let state = app.state::<AppState>();
+    let cfg = {
+        let mut c = state.config.lock().unwrap();
+        c.overlay_mini = mini;
+        c.clone()
+    };
+    config::save(&cfg).map_err(|e| e.to_string())
+}
+
+/// Esconde o indicador (a gravação continua; volta pela bandeja).
+#[tauri::command]
+pub(crate) fn overlay_hide(app: AppHandle) {
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        let _ = overlay.hide();
+    }
+}
+
+/// Lembra onde o usuário deixou o indicador (pixels físicos).
+#[tauri::command]
+pub(crate) fn overlay_moved(app: AppHandle, x: i32, y: i32) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let cfg = {
+        let mut c = state.config.lock().unwrap();
+        c.overlay_pos = Some((x, y));
+        c.clone()
+    };
+    config::save(&cfg).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub(crate) fn show_indicator_cmd(app: AppHandle) {
+    show_indicator(&app);
+}

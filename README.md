@@ -12,6 +12,9 @@ crates/isper-models/ # catálogo e download de modelos (SHA-256 do Hugging Face)
 crates/isper-llm/    # providers de IA (Groq, Gemini, Claude) e resumo pós-reunião
 crates/isper-diarize/# quem falou o quê (sherpa-onnx: pyannote + 3D-Speaker)
 apps/isper-app/      # app Tauri 2: src-tauri (Rust) + ui (HTML/CSS/JS sem build step)
+  src-tauri/src/     # main.rs (bootstrap) + módulos por responsabilidade: state,
+                     # shortcuts, tray, dictation, meetings, views, overlay,
+                     # settings, library, home, notify, config (prelude reexporta)
   ui/assets/         # design system: base.css (tokens, componentes, movimento),
                      # ui.js (toast, count-up, confirmação inline…) e fontes OFL locais
 models/              # modelos ggml (gitignored — baixar, ver abaixo)
