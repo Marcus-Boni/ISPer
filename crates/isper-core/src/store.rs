@@ -100,8 +100,14 @@ fn like_pattern(q: &str) -> String {
 
 impl MeetingStore {
     /// Abre (ou cria) o banco no caminho dado.
+    ///
+    /// WAL + `busy_timeout`: o app abre várias conexões (janelas, diarização
+    /// em segundo plano gravando enquanto a Biblioteca lê) — sem isso, um
+    /// leitor e um escritor simultâneos dariam "database is locked".
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        let _ = conn.pragma_update(None, "journal_mode", "WAL");
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS meetings (
                 id            INTEGER PRIMARY KEY,

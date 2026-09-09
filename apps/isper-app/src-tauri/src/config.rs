@@ -47,6 +47,10 @@ pub struct AppConfig {
     /// `clean` (só limpeza) · `formal` · `casual`.
     #[serde(default = "default_polish_style")]
     pub polish_style: String,
+    /// Ao salvar a reunião: `notify` (toast do Windows; clicar abre a
+    /// Biblioteca) · `open` (abre o `.md` no app padrão) · `silent`.
+    #[serde(default = "default_after_meeting")]
+    pub after_meeting: String,
 }
 
 impl Default for AppConfig {
@@ -64,12 +68,17 @@ impl Default for AppConfig {
             meeting_shortcut: default_meeting_shortcut(),
             polish: false,
             polish_style: default_polish_style(),
+            after_meeting: default_after_meeting(),
         }
     }
 }
 
 fn default_meeting_shortcut() -> Option<String> {
     Some("ctrl+alt+m".into())
+}
+
+fn default_after_meeting() -> String {
+    "notify".into()
 }
 
 fn default_polish_style() -> String {
@@ -100,7 +109,7 @@ impl AppConfig {
     }
 }
 
-fn path() -> Option<PathBuf> {
+pub fn path() -> Option<PathBuf> {
     std::env::var("APPDATA")
         .ok()
         .map(|a| PathBuf::from(a).join("ISPer").join("config.toml"))
@@ -119,11 +128,16 @@ pub fn load() -> AppConfig {
     }
 }
 
+/// Grava de forma atômica: escreve num `.tmp` ao lado e renomeia por cima.
+/// Um desligamento no meio da escrita nunca deixa um `config.toml` truncado
+/// (que viraria "config inválido → padrão" no próximo início).
 pub fn save(cfg: &AppConfig) -> anyhow::Result<()> {
     let p = path().ok_or_else(|| anyhow::anyhow!("APPDATA não definido"))?;
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    std::fs::write(p, toml::to_string_pretty(cfg)?)?;
+    let tmp = p.with_extension("toml.tmp");
+    std::fs::write(&tmp, toml::to_string_pretty(cfg)?)?;
+    std::fs::rename(&tmp, &p)?;
     Ok(())
 }

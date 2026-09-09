@@ -215,7 +215,7 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
     // Fase 4: quem falou o quê (se os modelos de diarização estiverem instalados).
     if isper_diarize::models_installed() && !result.others_audio_16k.is_empty() {
         println!("identificando falantes...");
-        match isper_diarize::diarize(&result.others_audio_16k) {
+        match isper_diarize::diarize(&result.others_audio_f32()) {
             Ok(turns) => {
                 let t: Vec<(f32, f32, usize)> =
                     turns.iter().map(|t| (t.start, t.end, t.speaker)).collect();

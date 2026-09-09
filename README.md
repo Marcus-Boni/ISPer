@@ -160,6 +160,19 @@ transcript abre sozinho e fica salvo em `Documentos\ISPer\Reunioes\*.md` +
 SQLite em `%APPDATA%\ISPer\isper.db`. Mic = "Eu"; áudio do sistema
 (loopback) = "Participantes". Avise os participantes (LGPD).
 
+**Ao salvar**: por padrão o ISPer mostra uma **notificação do Windows**
+("Reunião salva — título · duração · resumo pronto"); clicar nela abre a
+Biblioteca já naquela reunião. Em Configurações → Reuniões dá para trocar por
+"abrir o arquivo .md" (comportamento antigo) ou "nada". Quando a
+identificação de falantes termina, chega uma segunda notificação, silenciosa.
+O ISPer registra o próprio nome e ícone para notificações no registro do
+usuário (`HKCU\Software\Classes\AppUserModelId\com.isper.desktop`) — por isso
+funciona mesmo rodando o `.exe` sem instalador. "Testar notificação" nas
+Configurações mostra uma de exemplo.
+
+**Sair com reunião em andamento** (bandeja → Sair) encerra e salva a reunião
+antes de fechar — nada se perde.
+
 **Ao vivo**: cada bloco de ~20 s é transcrito durante a reunião — as falas
 aparecem no card de reunião da tela Início conforme chegam, e a última fala
 passa pelo indicador flutuante. Tudo local; nenhum áudio ou texto sai da
@@ -291,11 +304,29 @@ gerar (a pasta é gitignored). **Feche o ISPer antes de gerar** (o bundler
 reescreve o exe). O instalador não traz modelos: no primeiro uso o app abre as
 Configurações para baixar um.
 
-## Testes
+## Logs e diagnóstico
+
+O app grava logs em `%LOCALAPPDATA%\ISPer\logs\isper.log.<data>` (um arquivo
+por dia, 14 dias guardados) além do stdout. Configurações → Sistema →
+**Diagnóstico** lista versão, motor, modelo, DLLs do CUDA, microfones e
+caminhos, com "Copiar diagnóstico" e "Abrir pasta de logs" — é o que mandar
+ao pedir ajuda.
+
+## Testes e CI
 
 ```bash
-cargo test -p isper-core
+cargo test --release -p isper-core --features cuda
 ```
+
+```bash
+cargo test --release -p isper-llm
+```
+
+(`--release` reaproveita o whisper.cpp já compilado; no perfil debug o
+`cargo test` recompila o whisper.cpp + CUDA do zero, o que leva minutos.)
+O GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda
+formatação, os testes dos crates e um `cargo check` do app sem CUDA a cada
+push.
 
 ## Licença
 

@@ -13,6 +13,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
+mod notify;
 
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -124,8 +125,56 @@ struct LiveSegment {
     text: String,
 }
 
+/// `%LOCALAPPDATA%\ISPer\logs` — um arquivo por dia, 14 dias guardados.
+fn logs_dir() -> Option<PathBuf> {
+    let dir = PathBuf::from(std::env::var("LOCALAPPDATA").ok()?).join("ISPer").join("logs");
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir)
+}
+
+/// Log no stdout (útil no terminal) E em arquivo com rotação diária: o exe é
+/// `windows_subsystem`, então sem o arquivo ninguém vê um aviso sequer.
+/// O guard devolvido precisa viver até o fim do `main` (descarrega o buffer).
+fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGuard> {
+    use tracing_subscriber::prelude::*;
+    use tracing_subscriber::EnvFilter;
+    // `info` por padrão; `RUST_LOG=debug` (ou `isper_core=trace`) para investigar.
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let stdout = tracing_subscriber::fmt::layer().with_target(false).compact();
+    let Some(dir) = logs_dir() else {
+        tracing_subscriber::registry().with(filter).with(stdout).init();
+        return None;
+    };
+    // Retenção: apaga logs com mais de 14 dias.
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        let cutoff = std::time::SystemTime::now() - Duration::from_secs(14 * 24 * 3600);
+        for e in entries.flatten() {
+            let old = e.metadata().and_then(|m| m.modified()).map(|t| t < cutoff).unwrap_or(false);
+            if old && e.file_name().to_string_lossy().starts_with("isper.log") {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
+    }
+    let file = tracing_appender::rolling::daily(&dir, "isper.log");
+    let (writer, guard) = tracing_appender::non_blocking(file);
+    let file_layer = tracing_subscriber::fmt::layer()
+        .with_target(false)
+        .with_ansi(false)
+        .with_writer(writer);
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(stdout)
+        .with(file_layer)
+        .init();
+    Some(guard)
+}
+
 fn main() {
-    tracing_subscriber::fmt().with_target(false).compact().init();
+    let _log_guard = init_logging();
+    tracing::info!("ISPer {} iniciando", env!("CARGO_PKG_VERSION"));
+    if let Err(e) = notify::ensure_registered() {
+        tracing::warn!("não consegui registrar o ISPer para notificações: {e}");
+    }
 
     tauri::Builder::default()
         // Instância única: um segundo clique no atalho não abre outro ISPer —
@@ -189,6 +238,9 @@ fn main() {
             live_transcript,
             rename_speaker,
             export_meeting,
+            open_logs_folder,
+            diagnostics,
+            notify_test,
             home_status,
             toggle_meeting_cmd,
             open_library_window,
@@ -295,7 +347,7 @@ fn main() {
                 .show_menu_on_left_click(false)
                 .tooltip("ISPer — ditado e reuniões, 100% local")
                 .on_menu_event(|app, event| match event.id().as_ref() {
-                    "quit" => app.exit(0),
+                    "quit" => quit_app(app),
                     "home" => open_home(app),
                     "meeting" => {
                         let _ = toggle_meeting(app);
@@ -951,9 +1003,19 @@ fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<Stri
         Err(e) => tracing::warn!("resumo indisponível: {e}"),
     }
 
-    let _ = std::process::Command::new("cmd")
-        .args(["/C", "start", "", &md_path.to_string_lossy()])
-        .spawn();
+    // O que fazer com a reunião pronta: notificar (padrão), abrir o .md ou nada.
+    let after = app.state::<AppState>().config.lock().unwrap().after_meeting.clone();
+    let has_summary = store
+        .get_meeting(meeting_id)
+        .ok()
+        .flatten()
+        .map(|d| d.summary.is_some())
+        .unwrap_or(false);
+    match after.as_str() {
+        "open" => open_file(&md_path),
+        "silent" => {}
+        _ => notify_meeting_saved(app, meeting_id, &title, result.duration_secs, has_summary, &md_path),
+    }
 
     // Fase 4: quem falou o quê — em segundo plano, se os modelos existirem.
     if isper_diarize::models_installed() && !result.others_audio_16k.is_empty() {
@@ -961,6 +1023,81 @@ fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<Stri
     }
 
     Ok(md_path.display().to_string())
+}
+
+/// Abre um arquivo no programa padrão do Windows.
+fn open_file(path: &Path) {
+    let _ = std::process::Command::new("cmd")
+        .args(["/C", "start", "", &path.to_string_lossy()])
+        .spawn();
+}
+
+/// Toast "Reunião salva" — clicar abre a Biblioteca já naquela reunião. Se o
+/// Windows recusar a notificação, abre o arquivo (o usuário não fica sem nada).
+fn notify_meeting_saved(
+    app: &AppHandle,
+    meeting_id: i64,
+    title: &str,
+    duration_secs: f32,
+    has_summary: bool,
+    md_path: &Path,
+) {
+    let line2 = format!(
+        "{}{} · clique para abrir na Biblioteca",
+        meeting::fmt_ts(duration_secs),
+        if has_summary { " · resumo pronto" } else { "" }
+    );
+    let app2 = app.clone();
+    let shown = notify::show(
+        notify::Toast {
+            title: "Reunião salva",
+            line1: title,
+            line2: Some(&line2),
+            silent: false,
+        },
+        move || open_library_at(&app2, meeting_id),
+    );
+    match shown {
+        Ok(()) => tracing::info!(meeting_id, "notificação de reunião salva enviada"),
+        Err(e) => {
+            tracing::warn!("notificação indisponível ({e}) — abrindo o arquivo");
+            open_file(md_path);
+        }
+    }
+}
+
+/// Abre (ou foca) a Biblioteca já com a reunião selecionada.
+fn open_library_at(app: &AppHandle, meeting_id: i64) {
+    *app.state::<AppState>().pending_meeting.lock().unwrap() = Some(meeting_id);
+    let already_open = app.get_webview_window("library").is_some();
+    open_library(app);
+    if already_open {
+        let _ = app.emit_to("library", "isper-library-select", ());
+    }
+}
+
+/// Sair pela bandeja. Com uma reunião em andamento, encerra e SALVA antes —
+/// sem isso a gravação inteira se perderia com um clique.
+fn quit_app(app: &AppHandle) {
+    let handle = app.state::<AppState>().meeting.lock().unwrap().take();
+    let Some(handle) = handle else {
+        tracing::info!("saindo");
+        app.exit(0);
+        return;
+    };
+    tracing::info!("saindo com reunião ativa — encerrando e salvando antes");
+    *app.state::<AppState>().meeting_started.lock().unwrap() = None;
+    set_tray_recording(app, false);
+    let _ = app.emit("isper-state", json!({"state": "meeting-processing"}));
+    show_overlay(app);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        match finish_meeting(&app, handle) {
+            Ok(path) => tracing::info!("reunião salva antes de sair em {path}"),
+            Err(e) => tracing::warn!("ao salvar antes de sair: {e}"),
+        }
+        app.exit(0);
+    });
 }
 
 /// Roda a diarização numa thread, e ao terminar troca "Participantes" por
@@ -976,7 +1113,10 @@ fn diarize_in_background(app: AppHandle, meeting_id: i64, mut result: meeting::M
         let started = Instant::now();
         let audio_secs = result.others_audio_16k.len() as f32 / isper_core::WHISPER_SAMPLE_RATE as f32;
         tracing::info!(meeting_id, audio_secs, "diarização iniciada em segundo plano");
-        match isper_diarize::diarize(&result.others_audio_16k) {
+        let audio = result.others_audio_f32();
+        let outcome = isper_diarize::diarize(&audio);
+        drop(audio);
+        match outcome {
             Ok(turns) => {
                 let t: Vec<(f32, f32, usize)> =
                     turns.iter().map(|t| (t.start, t.end, t.speaker)).collect();
@@ -988,17 +1128,40 @@ fn diarize_in_background(app: AppHandle, meeting_id: i64, mut result: meeting::M
                     .zip(&labels)
                     .map(|(s, l)| (s.start_secs, l.as_str()))
                     .collect();
+                let participants = result.distinct_participants();
                 match open_store().and_then(|store| {
                     let n = store.relabel_segments(meeting_id, &pairs)?;
                     rewrite_markdown(&store, meeting_id);
-                    Ok(n)
+                    let title = store
+                        .get_meeting(meeting_id)?
+                        .map(|d| d.meeting.title)
+                        .unwrap_or_default();
+                    Ok((n, title))
                 }) {
-                    Ok(n) => tracing::info!(
-                        meeting_id,
-                        secs = started.elapsed().as_secs_f32(),
-                        "{} participante(s) identificado(s); {n} falas rotuladas",
-                        result.distinct_participants()
-                    ),
+                    Ok((n, title)) => {
+                        tracing::info!(
+                            meeting_id,
+                            secs = started.elapsed().as_secs_f32(),
+                            "{participants} participante(s) identificado(s); {n} falas rotuladas"
+                        );
+                        let notify_on = app.state::<AppState>().config.lock().unwrap().after_meeting == "notify";
+                        if notify_on && n > 0 {
+                            let line2 = format!(
+                                "{} · clique para ver quem falou o quê",
+                                if participants == 1 { "1 participante".to_string() } else { format!("{participants} participantes") }
+                            );
+                            let app2 = app.clone();
+                            let _ = notify::show(
+                                notify::Toast {
+                                    title: "Falantes identificados",
+                                    line1: &title,
+                                    line2: Some(&line2),
+                                    silent: true,
+                                },
+                                move || open_library_at(&app2, meeting_id),
+                            );
+                        }
+                    }
                     Err(e) => tracing::warn!("diarização pronta, mas não consegui gravar: {e}"),
                 }
             }
@@ -1081,6 +1244,7 @@ struct SettingsDto {
     active_meeting_shortcut: String,
     polish: bool,
     polish_style: String,
+    after_meeting: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -1103,6 +1267,8 @@ struct SettingsPatch {
     polish: bool,
     #[serde(default)]
     polish_style: Option<String>,
+    #[serde(default)]
+    after_meeting: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -1306,6 +1472,7 @@ fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         active_meeting_shortcut,
         polish: cfg.polish,
         polish_style: cfg.polish_style,
+        after_meeting: cfg.after_meeting,
     })
 }
 
@@ -1343,6 +1510,10 @@ fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<String, String
         polish_style: {
             let s = patch.polish_style.unwrap_or_default().trim().to_lowercase();
             if isper_llm::POLISH_STYLES.contains(&s.as_str()) { s } else { "clean".into() }
+        },
+        after_meeting: {
+            let s = patch.after_meeting.unwrap_or_default().trim().to_lowercase();
+            if ["notify", "open", "silent"].contains(&s.as_str()) { s } else { "notify".into() }
         },
     };
     config::save(&cfg).map_err(|e| e.to_string())?;
@@ -1904,13 +2075,94 @@ async fn toggle_meeting_cmd(app: AppHandle) -> Result<(), String> {
 /// é proibido no Windows (ver `open_or_focus`).
 #[tauri::command]
 async fn open_library_window(app: AppHandle, meeting: Option<i64>) -> Result<(), String> {
-    *app.state::<AppState>().pending_meeting.lock().unwrap() = meeting;
-    let already_open = app.get_webview_window("library").is_some();
-    open_library(&app);
-    if already_open && meeting.is_some() {
-        let _ = app.emit_to("library", "isper-library-select", ());
+    match meeting {
+        Some(id) => open_library_at(&app, id),
+        None => open_library(&app),
     }
     Ok(())
+}
+
+/// Abre a pasta de logs no Explorer (Configurações → Sistema).
+#[tauri::command]
+fn open_logs_folder() -> Result<(), String> {
+    let dir = logs_dir().ok_or("pasta de logs indisponível")?;
+    std::process::Command::new("explorer")
+        .arg(&dir)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Dispara um toast de teste (botão nas Configurações) — prova que o Windows
+/// aceita as notificações do ISPer nesta máquina.
+#[tauri::command]
+async fn notify_test(app: AppHandle) -> Result<(), String> {
+    let app2 = app.clone();
+    notify::show(
+        notify::Toast {
+            title: "ISPer",
+            line1: "As notificações estão funcionando.",
+            line2: Some("É assim que você saberá que uma reunião foi salva."),
+            silent: false,
+        },
+        move || open_home(&app2),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[derive(serde::Serialize)]
+struct Diagnostics {
+    version: &'static str,
+    gpu_build: bool,
+    engine: EngineStatus,
+    model_path: Option<String>,
+    models_dir: String,
+    diarize_installed: bool,
+    db_path: String,
+    config_path: String,
+    logs_dir: String,
+    meetings_dir: String,
+    input_devices: Vec<String>,
+    /// (nome da DLL, encontrada?) — o motivo clássico de "o exe não abre".
+    cuda_dlls: Vec<(String, bool)>,
+    exe_path: String,
+}
+
+/// Raio-X para suporte: caminhos, modelo, DLLs do CUDA, dispositivos.
+#[tauri::command]
+fn diagnostics(app: AppHandle) -> Diagnostics {
+    let state = app.state::<AppState>();
+    let engine = state.engine_status.lock().unwrap().clone();
+    let preferred = state.config.lock().unwrap().model.clone();
+    let model_path = isper_models::resolve_whisper_model(preferred.as_deref(), cfg!(feature = "cuda"), &dev_dirs())
+        .map(|p| p.display().to_string());
+    let exe = std::env::current_exe().ok();
+    let exe_dir = exe.as_ref().and_then(|p| p.parent().map(Path::to_path_buf));
+    let path_dirs: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect())
+        .unwrap_or_default();
+    let cuda_dlls = ["cudart64_13.dll", "cublas64_13.dll", "cublasLt64_13.dll"]
+        .iter()
+        .map(|dll| {
+            let found = exe_dir.iter().chain(path_dirs.iter()).any(|d| d.join(dll).exists());
+            (dll.to_string(), found)
+        })
+        .collect();
+    Diagnostics {
+        version: env!("CARGO_PKG_VERSION"),
+        gpu_build: cfg!(feature = "cuda"),
+        engine,
+        model_path,
+        models_dir: isper_models::models_dir().map(|p| p.display().to_string()).unwrap_or_default(),
+        diarize_installed: isper_diarize::models_installed(),
+        db_path: std::env::var("APPDATA").map(|a| format!("{a}\\ISPer\\isper.db")).unwrap_or_default(),
+        config_path: config::path().map(|p| p.display().to_string()).unwrap_or_default(),
+        logs_dir: logs_dir().map(|p| p.display().to_string()).unwrap_or_default(),
+        meetings_dir: meetings_dir().map(|p| p.display().to_string()).unwrap_or_default(),
+        input_devices: isper_core::audio::list_input_devices(),
+        cuda_dlls,
+        exe_path: exe.map(|p| p.display().to_string()).unwrap_or_default(),
+    }
 }
 
 /// A Biblioteca chama ao carregar e ao receber `isper-library-select`.

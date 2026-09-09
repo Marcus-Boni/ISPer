@@ -22,6 +22,10 @@
   .mprog.on { display: flex; }
   .mprog .progress { flex: 1; }
   .mprog .pct { font: 11px var(--font-mono); color: var(--muted); min-width: 34px; text-align: right; }
+  .diag { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; font-size: 12px; margin-top: 6px; }
+  .diag dt { color: var(--muted); }
+  .diag dd { margin: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); }
+  .diag dd.ok { color: var(--good); } .diag dd.bad { color: var(--accent); }
   #status { min-height: 20px; font-size: 12.5px; color: var(--muted); white-space: pre-wrap; transition: color var(--dur-3); }
   #status.ok { color: var(--good); }
   #status.err { color: var(--accent); }
@@ -87,6 +91,16 @@
     </select>
     <button class="btn" id="cap-mshortcut" title="pressione a combinação que quiser">Gravar atalho</button>
   </div>
+  <label class="lbl" for="after">Ao salvar a reunião</label>
+  <select id="after" class="field">
+    <option value="notify">Notificação do Windows — clicar abre a Biblioteca (padrão)</option>
+    <option value="open">Abrir o arquivo .md no programa padrão</option>
+    <option value="silent">Nada — fica só na Biblioteca</option>
+  </select>
+  <div class="row" style="margin-top:8px">
+    <span class="hint" style="margin:0">A identificação de falantes, quando termina, também avisa por notificação silenciosa.</span>
+    <button class="btn btn-sm" id="notifytest">Testar notificação</button>
+  </div>
   <label class="lbl" for="source">Áudio dos participantes</label>
   <select id="source" class="field">
     <option value="system">Todo o sistema (padrão)</option>
@@ -146,6 +160,13 @@
     <label class="switch"><input type="checkbox" id="showhome"><span class="track"><span class="thumb"></span></span>Mostrar a tela Início ao abrir o ISPer</label>
   </div>
   <p class="hint">No início com o Windows o ISPer nasce quieto na bandeja; a tela Início também abre com um clique no ícone da bandeja.</p>
+  <label class="lbl">Diagnóstico</label>
+  <div id="diag" class="diag"><div class="skeleton sk-line" style="width:60%"></div></div>
+  <div class="row" style="margin-top:10px">
+    <button class="btn btn-sm" id="copydiag" style="flex:0 0 auto">Copiar diagnóstico</button>
+    <button class="btn btn-sm btn-ghost" id="openlogs" style="flex:0 0 auto">Abrir pasta de logs</button>
+    <span class="hint" style="margin:0">Os logs ficam em <code>%LOCALAPPDATA%\ISPer\logs</code> (um arquivo por dia, 14 dias). Ao pedir ajuda, mande o diagnóstico e o log do dia.</span>
+  </div>
 </div>
 
 <div class="footer">
@@ -224,6 +245,7 @@
       await loadMics(s.input_device || '');
       $('polish').checked = !!s.polish;
       $('pstyle').value = s.polish_style || 'clean';
+      $('after').value = s.after_meeting || 'notify';
       $('lang').value = s.lang || 'pt';
       $('dict').value = s.dictionary || '';
       $('source').value = s.meeting_source || 'system';
@@ -342,6 +364,7 @@
         meeting_shortcut: $('mshortcut').value || null,
         polish: $('polish').checked,
         polish_style: $('pstyle').value,
+        after_meeting: $('after').value,
       }});
       $('active').textContent = label;
       UI.busy(b, false);
@@ -411,6 +434,43 @@
     if (ev.key === 'Escape') window.__TAURI__.window.getCurrentWindow().close();
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); $('save').click(); }
   });
+
+  // ---- diagnóstico (Sistema)
+  let diagText = '';
+  async function loadDiagnostics() {
+    let d;
+    try { d = await invoke('diagnostics'); } catch (e) { $('diag').replaceChildren(el('span', 'hint', 'indisponível: ' + e)); return; }
+    const box = $('diag');
+    box.replaceChildren();
+    const lines = [];
+    const add = (k, v, cls) => { box.appendChild(el('dt', '', k)); box.appendChild(el('dd', cls || '', v)); lines.push(k + ': ' + v); };
+    const engine = d.engine.kind === 'ready' ? 'pronto — ' + d.engine.label : d.engine.kind === 'loading' ? 'carregando' : d.engine.kind === 'missing' ? 'sem modelo' : 'falhou: ' + d.engine.message;
+    add('Versão', 'ISPer ' + d.version + (d.gpu_build ? ' · build CUDA' : ' · build CPU'));
+    add('Motor Whisper', engine, d.engine.kind === 'ready' ? 'ok' : d.engine.kind === 'loading' ? '' : 'bad');
+    add('Modelo', d.model_path || '(nenhum)');
+    add('Diarização', d.diarize_installed ? 'modelos instalados' : 'não instalada', d.diarize_installed ? 'ok' : '');
+    for (const [dll, found] of d.cuda_dlls) add(dll, found ? 'encontrada' : 'NÃO encontrada', found ? 'ok' : (d.gpu_build ? 'bad' : ''));
+    add('Microfones', d.input_devices.length ? d.input_devices.join(' · ') : '(nenhum detectado)', d.input_devices.length ? '' : 'bad');
+    add('Executável', d.exe_path);
+    add('Modelos', d.models_dir);
+    add('Banco', d.db_path);
+    add('Config', d.config_path);
+    add('Logs', d.logs_dir);
+    add('Reuniões', d.meetings_dir);
+    diagText = lines.join('\n');
+  }
+  $('copydiag').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(diagText); UI.flash($('copydiag'), 'copiado ✓'); }
+    catch (_) { status('não consegui copiar', 'err'); }
+  });
+  $('openlogs').addEventListener('click', () => invoke('open_logs_folder').catch(e => status('erro: ' + e, 'err')));
+  $('notifytest').addEventListener('click', async () => {
+    const b = $('notifytest');
+    UI.busy(b, true);
+    try { await invoke('notify_test'); UI.busy(b, false); UI.flash(b, 'enviada ✓'); status('a notificação apareceu no canto da tela? Se não, veja Configurações do Windows → Notificações', 'ok'); }
+    catch (e) { UI.busy(b, false); status('notificação falhou: ' + e, 'err'); }
+  });
+  loadDiagnostics();
 
   load();
 </script>

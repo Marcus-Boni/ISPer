@@ -1,0 +1,57 @@
+# CI do ISPer: formatação, testes e checagem do app — no Windows, sem CUDA.
+#
+# O runner windows-latest já traz MSVC, CMake e LLVM (libclang p/ bindgen);
+# o whisper.cpp é compilado em CPU. O app é só checado (`cargo check`) com
+# `--no-default-features` (sem CUDA) e com DLLs do CUDA vazias no lugar das
+# reais, porque o build script do Tauri exige que os `bundle.resources`
+# existam. Nada aqui baixa modelos.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: fmt · test · check (Windows, CPU)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # O whisper.cpp compilado (whisper-rs-sys) é o que mais pesa.
+          cache-on-failure: true
+
+      - name: Formatação
+        run: cargo fmt --all -- --check
+        continue-on-error: true # informativo até o código ser formatado por completo
+
+      - name: Testes (núcleo, IA, modelos, diarização)
+        run: cargo test --release -p isper-core -p isper-llm -p isper-models -p isper-diarize
+
+      - name: DLLs do CUDA de mentira (o bundler exige que existam)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/cuda | Out-Null
+          foreach ($dll in @('cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll')) {
+            New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/cuda/$dll" | Out-Null
+          }
+
+      - name: Checagem do app (sem CUDA) e da CLI
+        run: cargo check --release -p isper-app -p isper-cli --no-default-features

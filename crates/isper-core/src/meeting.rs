@@ -135,9 +135,11 @@ pub struct MeetingResult {
     /// Segmentos dos dois canais, em ordem cronológica.
     pub segments: Vec<MeetingSegment>,
     pub duration_secs: f32,
-    /// Áudio dos participantes (16 kHz mono) concatenado — insumo da
-    /// diarização, que roda depois, fora do core (crate `isper-diarize`).
-    pub others_audio_16k: Vec<f32>,
+    /// Áudio dos participantes (16 kHz mono, PCM 16 bits) concatenado — insumo
+    /// da diarização, que roda depois, fora do core (crate `isper-diarize`).
+    /// Em i16 para caber na memória em reuniões longas: 1 h = 115 MB (em f32
+    /// seria o dobro); [`Self::others_audio_f32`] converte na hora de usar.
+    pub others_audio_16k: Vec<i16>,
     /// Mapa bloco a bloco entre o áudio concatenado e o relógio da reunião.
     pub others_blocks: Vec<AudioBlock>,
 }
@@ -151,6 +153,14 @@ fn wall_to_concat(blocks: &[AudioBlock], t: f32) -> Option<f32> {
 }
 
 impl MeetingResult {
+    /// Áudio dos participantes em f32 normalizado, como a diarização espera.
+    pub fn others_audio_f32(&self) -> Vec<f32> {
+        self.others_audio_16k
+            .iter()
+            .map(|s| *s as f32 / i16::MAX as f32)
+            .collect()
+    }
+
     /// Aplica turnos de falante (em tempo do áudio concatenado, como a
     /// diarização devolve) aos segmentos "Participantes": cada segmento vira
     /// "Participante N" do turno com maior sobreposição.
@@ -495,7 +505,7 @@ fn transcribe_worker(
     started: Instant,
 ) -> Result<MeetingResult> {
     let mut segments: Vec<MeetingSegment> = Vec::new();
-    let mut others_audio_16k: Vec<f32> = Vec::new();
+    let mut others_audio_16k: Vec<i16> = Vec::new();
     let mut others_blocks: Vec<AudioBlock> = Vec::new();
     for (speaker, offset, raw) in job_rx.iter() {
         let block_secs = raw.duration_secs();
@@ -516,7 +526,11 @@ fn transcribe_worker(
                 concat_start: others_audio_16k.len() as f32 / crate::WHISPER_SAMPLE_RATE as f32,
                 secs: samples.len() as f32 / crate::WHISPER_SAMPLE_RATE as f32,
             });
-            others_audio_16k.extend_from_slice(&samples);
+            others_audio_16k.extend(
+                samples
+                    .iter()
+                    .map(|s| (s.clamp(-1.0, 1.0) * i16::MAX as f32).round() as i16),
+            );
         }
         match engine.transcribe(&samples, &lang, initial_prompt.as_deref()) {
             Ok(t) => {

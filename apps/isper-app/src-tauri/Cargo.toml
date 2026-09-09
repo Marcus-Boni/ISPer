@@ -1,6 +1,6 @@
 [package]
 name = "isper-app"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2021"
 
 [features]
@@ -25,7 +25,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
 tracing = "0.1"
-tracing-subscriber = "0.3"
+# env-filter: nível `info` por padrão (as dependências em DEBUG são ruidosas —
+# o keyring, por exemplo, loga cada acesso ao Credential Manager), com
+# RUST_LOG para investigar.
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Log em arquivo com rotação diária (%LOCALAPPDATA%\ISPer\logs) — o exe é
+# windows_subsystem, então o stdout ninguém vê.
+tracing-appender = "0.2"
 arboard = "3.6.1"
 enigo = "0.6.1"
 chrono = "0.4.45"
@@ -34,3 +40,7 @@ chrono = "0.4.45"
 # SetWindowPos direto: reafirma o indicador no topo da faixa "sempre no topo"
 # (o tao não reaplica a flag quando ela já está ligada).
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+# Toasts do Windows (mesma base do plugin oficial) + registro do nosso
+# AppUserModelID no HKCU para o exe "solto" aparecer como ISPer, com ícone.
+tauri-winrt-notification = "0.7"
+winreg = "0.55"
