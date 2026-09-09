@@ -372,9 +372,9 @@
     set('dictation_words', s.dictation_words, s.dictation_secs ? 'palavras ditadas · ' + fmtDur(s.dictation_secs) + ' de fala' : 'palavras ditadas', true);
   }
 
-  function renderRecent(rows) {
+  function renderRecent(rows, diarizing) {
     const box = $('recent');
-    const signature = rows.map(r => r.id + ':' + r.title + ':' + r.has_summary).join('|');
+    const signature = rows.map(r => r.id + ':' + r.title + ':' + r.has_summary + ':' + r.participants).join('|') + '#' + (diarizing || '');
     if (box.dataset.sig === signature) return;
     box.dataset.sig = signature;
     box.replaceChildren();
@@ -392,7 +392,14 @@
       const m = el('div', 'm');
       m.appendChild(el('span', '', r.started_at));
       m.appendChild(el('span', 'num', fmtClock(r.duration_secs)));
-      m.appendChild(el('span', 'badge', plural(r.participants, 'participante', 'participantes')));
+      if (diarizing === r.id) {
+        const b = el('span', 'badge'); b.style.cssText = 'display:inline-flex;align-items:center;gap:6px;color:var(--warn);border-color:rgba(232,193,90,.45)';
+        b.appendChild(el('span', 'dot warn pulse')); b.append('identificando falantes…');
+        b.title = 'a diarização roda em segundo plano na CPU — leva cerca de 40% da duração da reunião; o transcript já está disponível';
+        m.appendChild(b);
+      } else {
+        m.appendChild(el('span', 'badge', plural(r.participants, 'participante', 'participantes')));
+      }
       if (r.has_summary) m.appendChild(el('span', 'badge ok', 'resumo IA'));
       it.appendChild(m);
       const open = () => openLibrary(r.id);
@@ -411,7 +418,7 @@
     renderMeeting(st);
     renderTodo(st);
     renderStats(st.stats);
-    renderRecent(st.recent);
+    renderRecent(st.recent, st.diarizing_meeting);
     $('showhome').checked = !!st.show_home_on_launch;
     $('l-folder').title = st.meetings_dir || '';
     firstRender = false;

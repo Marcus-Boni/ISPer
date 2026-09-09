@@ -207,12 +207,17 @@ o ISPer usa o *process loopback* do Windows e ignora notificações, músicas e
 outros apps (se o Teams não estiver aberto, cai para o sistema e avisa).
 
 **Quem falou o quê**: Configurações → Reuniões → "Baixar modelos (~45 MB)"
-instala pyannote + 3D-Speaker (via sherpa-onnx, 100% local); ao encerrar a
-reunião, "Participantes" vira "Participante 1", "Participante 2"… O número de
-falantes é descoberto por agrupamento; se juntar ou separar demais, calibre
-o threshold sem recompilar: `ISPER_DIARIZE_THRESHOLD=0.2` (menor = mais
-falantes distintos; padrão 0.3). Para calibrar offline sem regravar:
-`isper-cli diarize fixtures/duas-vozes-16k.wav`.
+instala pyannote + 3D-Speaker (via sherpa-onnx, 100% local). A reunião é
+salva e aberta **na hora** com "Participantes"; a identificação roda **em
+segundo plano** (na CPU ela leva cerca de 40% da duração da reunião — o
+sherpa-onnx usa uma thread só) e, ao terminar, "Participantes" vira
+"Participante 1", "Participante 2"… no banco, na Biblioteca e no `.md`; o
+Início mostra "identificando falantes…" na reunião enquanto isso. O número
+de falantes é descoberto por agrupamento; se juntar ou separar demais,
+calibre o threshold sem recompilar: `ISPER_DIARIZE_THRESHOLD=0.2` (menor =
+mais falantes distintos; padrão 0.3). Para calibrar offline sem regravar:
+`isper-cli diarize fixtures/duas-vozes-16k.wav`. Fechar o ISPer no meio
+cancela a identificação daquela reunião (os rótulos genéricos ficam).
 
 Na CLI (laboratório):
 

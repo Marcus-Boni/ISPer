@@ -108,6 +108,8 @@ struct AppState {
     last_meeting_toggle: Mutex<Option<Instant>>,
     /// Falas da reunião em andamento, na ordem em que foram transcritas.
     live: Mutex<Vec<LiveSegment>>,
+    /// Reunião cuja diarização está rodando em segundo plano (chip no Início).
+    diarizing: Mutex<Option<i64>>,
     /// Ícone da bandeja e suas duas versões (normal / gravando).
     tray: Mutex<Option<TrayIcon>>,
     tray_icons: Mutex<Option<(Image<'static>, Image<'static>)>>,
@@ -216,6 +218,7 @@ fn main() {
                 active_meeting_shortcut: Mutex::new(String::new()),
                 last_meeting_toggle: Mutex::new(None),
                 live: Mutex::new(Vec::new()),
+                diarizing: Mutex::new(None),
                 tray: Mutex::new(None),
                 tray_icons: Mutex::new(None),
             });
@@ -874,26 +877,14 @@ fn meetings_dir() -> anyhow::Result<PathBuf> {
 }
 
 /// Encerra a gravação, salva o Markdown em Documentos\ISPer\Reunioes e no
-/// banco SQLite, gera o resumo por IA (Fase 5, se configurado) e abre o
-/// arquivo no app padrão.
+/// banco SQLite, gera título + resumo por IA (Fase 5, se configurado) e abre o
+/// arquivo. A diarização (quem falou o quê) roda DEPOIS, em segundo plano:
+/// na CPU ela leva ~40% da duração da reunião — bloquear o fim da reunião
+/// por isso fazia ninguém esperar, e os rótulos ficavam genéricos para sempre.
 fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<String> {
-    let mut result = handle.stop()?;
+    let result = handle.stop()?;
     if result.segments.is_empty() {
         anyhow::bail!("nenhuma fala detectada na reunião");
-    }
-
-    // Fase 4: quem falou o quê — só se os modelos de diarização existirem.
-    if isper_diarize::models_installed() && !result.others_audio_16k.is_empty() {
-        let _ = app.emit("isper-state", json!({"state": "meeting-diarize"}));
-        match isper_diarize::diarize(&result.others_audio_16k) {
-            Ok(turns) => {
-                let t: Vec<(f32, f32, usize)> =
-                    turns.iter().map(|t| (t.start, t.end, t.speaker)).collect();
-                result.apply_speaker_turns(&t);
-                tracing::info!("{} participante(s) identificado(s)", result.distinct_participants());
-            }
-            Err(e) => tracing::warn!("diarização falhou (rótulos genéricos mantidos): {e}"),
-        }
     }
     let now = chrono::Local::now();
     let started_at = now.format("%d/%m/%Y %H:%M").to_string();
@@ -964,7 +955,64 @@ fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<Stri
         .args(["/C", "start", "", &md_path.to_string_lossy()])
         .spawn();
 
+    // Fase 4: quem falou o quê — em segundo plano, se os modelos existirem.
+    if isper_diarize::models_installed() && !result.others_audio_16k.is_empty() {
+        diarize_in_background(app.clone(), meeting_id, result);
+    }
+
     Ok(md_path.display().to_string())
+}
+
+/// Roda a diarização numa thread, e ao terminar troca "Participantes" por
+/// "Participante N" no banco, regrava o `.md` e avisa as janelas. Enquanto
+/// roda, `diarizing` aponta para a reunião (o Início mostra um chip).
+fn diarize_in_background(app: AppHandle, meeting_id: i64, mut result: meeting::MeetingResult) {
+    {
+        let state = app.state::<AppState>();
+        *state.diarizing.lock().unwrap() = Some(meeting_id);
+    }
+    notify_status(&app);
+    std::thread::spawn(move || {
+        let started = Instant::now();
+        let audio_secs = result.others_audio_16k.len() as f32 / isper_core::WHISPER_SAMPLE_RATE as f32;
+        tracing::info!(meeting_id, audio_secs, "diarização iniciada em segundo plano");
+        match isper_diarize::diarize(&result.others_audio_16k) {
+            Ok(turns) => {
+                let t: Vec<(f32, f32, usize)> =
+                    turns.iter().map(|t| (t.start, t.end, t.speaker)).collect();
+                result.apply_speaker_turns(&t);
+                let labels: Vec<String> = result.segments.iter().map(|s| s.speaker.label()).collect();
+                let pairs: Vec<(f32, &str)> = result
+                    .segments
+                    .iter()
+                    .zip(&labels)
+                    .map(|(s, l)| (s.start_secs, l.as_str()))
+                    .collect();
+                match open_store().and_then(|store| {
+                    let n = store.relabel_segments(meeting_id, &pairs)?;
+                    rewrite_markdown(&store, meeting_id);
+                    Ok(n)
+                }) {
+                    Ok(n) => tracing::info!(
+                        meeting_id,
+                        secs = started.elapsed().as_secs_f32(),
+                        "{} participante(s) identificado(s); {n} falas rotuladas",
+                        result.distinct_participants()
+                    ),
+                    Err(e) => tracing::warn!("diarização pronta, mas não consegui gravar: {e}"),
+                }
+            }
+            Err(e) => tracing::warn!("diarização falhou (rótulos genéricos mantidos): {e}"),
+        }
+        {
+            let state = app.state::<AppState>();
+            let mut d = state.diarizing.lock().unwrap();
+            if *d == Some(meeting_id) {
+                *d = None;
+            }
+        }
+        notify_status(&app);
+    });
 }
 
 // ------------------------------------------------------- configurações
@@ -1765,6 +1813,8 @@ struct HomeStatus {
     polish: bool,
     polish_style: String,
     input_device: Option<String>,
+    /// Reunião com diarização em andamento (depois de salva).
+    diarizing_meeting: Option<i64>,
 }
 
 /// Fotografia de tudo que a tela Início mostra — uma chamada, sem estado no
@@ -1776,6 +1826,7 @@ fn home_status(app: AppHandle) -> HomeStatus {
     let engine = state.engine_status.lock().unwrap().clone();
     let shortcut = state.active_shortcut.lock().unwrap().clone();
     let meeting_shortcut = state.active_meeting_shortcut.lock().unwrap().clone();
+    let diarizing_meeting = *state.diarizing.lock().unwrap();
     let meeting_active = state.meeting.lock().unwrap().is_some();
     let meeting_elapsed_secs = state
         .meeting_started
@@ -1833,6 +1884,7 @@ fn home_status(app: AppHandle) -> HomeStatus {
         polish: cfg.polish,
         polish_style: cfg.polish_style,
         input_device: cfg.input_device,
+        diarizing_meeting,
     }
 }
 

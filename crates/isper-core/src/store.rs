@@ -175,6 +175,25 @@ impl MeetingStore {
         Ok(())
     }
 
+    /// Aplica rótulos de falante segmento a segmento (casados pelo início, com
+    /// tolerância) — usado quando a diarização termina em segundo plano, depois
+    /// de a reunião já estar salva com "Participantes". Devolve quantos mudaram.
+    pub fn relabel_segments(&self, meeting_id: i64, labels: &[(f32, &str)]) -> Result<usize> {
+        let tx = self.conn.unchecked_transaction()?;
+        let mut changed = 0usize;
+        {
+            let mut stmt = tx.prepare(
+                "UPDATE segments SET speaker = ?1
+                 WHERE meeting_id = ?2 AND abs(start_secs - ?3) < 0.002 AND speaker != ?1",
+            )?;
+            for (start, speaker) in labels {
+                changed += stmt.execute(params![speaker, meeting_id, *start as f64])?;
+            }
+        }
+        tx.commit()?;
+        Ok(changed)
+    }
+
     /// Renomeia um falante em todos os segmentos da reunião ("Participante 1"
     /// → "Tatiana"). Devolve quantos segmentos mudaram.
     pub fn rename_speaker(&self, meeting_id: i64, from: &str, to: &str) -> Result<usize> {
@@ -324,6 +343,15 @@ impl MeetingStore {
         }))
     }
 
+    /// Distintos falantes de uma reunião, na ordem de aparição.
+    pub fn speakers(&self, meeting_id: i64) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT speaker FROM segments WHERE meeting_id = ?1 GROUP BY speaker ORDER BY MIN(start_secs)",
+        )?;
+        let rows = stmt.query_map(params![meeting_id], |r| r.get::<_, String>(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     /// Ditados mais recentes (filtrados por `q`, se houver), até `limit`.
     pub fn list_dictations(&self, q: Option<&str>, limit: i64) -> Result<Vec<DictationRow>> {
         let map = |r: &rusqlite::Row<'_>| {
@@ -353,5 +381,70 @@ impl MeetingStore {
             }
         };
         Ok(rows)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::meeting::{MeetingResult, MeetingSegment, Speaker};
+
+    fn temp_store(name: &str) -> MeetingStore {
+        let path = std::env::temp_dir().join(format!("isper-store-test-{name}-{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        MeetingStore::open(&path).expect("abrir banco temporário")
+    }
+
+    fn sample_result() -> MeetingResult {
+        let seg = |speaker, start: f32, text: &str| MeetingSegment {
+            speaker,
+            start_secs: start,
+            end_secs: start + 1.0,
+            text: text.into(),
+        };
+        MeetingResult {
+            segments: vec![
+                seg(Speaker::Me, 0.0, "Olá."),
+                seg(Speaker::Others, 2.0, "Oi."),
+                seg(Speaker::Others, 4.5, "Tudo bem?"),
+            ],
+            duration_secs: 6.0,
+            others_audio_16k: Vec::new(),
+            others_blocks: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn relabel_troca_so_os_segmentos_casados() {
+        let store = temp_store("relabel");
+        let id = store.save("Reunião", "09/09/2026 10:00", &sample_result(), None).unwrap();
+        let n = store
+            .relabel_segments(id, &[(2.0, "Participante 1"), (4.5, "Participante 2"), (99.0, "Ninguém")])
+            .unwrap();
+        assert_eq!(n, 2);
+        assert_eq!(store.speakers(id).unwrap(), vec!["Eu", "Participante 1", "Participante 2"]);
+    }
+
+    #[test]
+    fn rename_speaker_vale_para_a_reuniao_inteira() {
+        let store = temp_store("rename");
+        let id = store.save("Reunião", "09/09/2026 10:00", &sample_result(), None).unwrap();
+        assert_eq!(store.rename_speaker(id, "Participantes", "Tatiana").unwrap(), 2);
+        let detail = store.get_meeting(id).unwrap().unwrap();
+        assert!(detail.segments.iter().filter(|s| s.speaker == "Tatiana").count() == 2);
+        assert_eq!(detail.meeting.participants, 1);
+    }
+
+    #[test]
+    fn ditado_guarda_o_original_quando_polido() {
+        let store = temp_store("dictation");
+        store.save_dictation("09/09/2026 10:00:00", "Bom dia, tudo bem?", Some("é bom dia hã tudo bem"), 2.0, 0.3).unwrap();
+        store.save_dictation("09/09/2026 10:00:05", "sem polimento", None, 1.0, 0.2).unwrap();
+        let rows = store.list_dictations(None, 10).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[1].raw_text.as_deref(), Some("é bom dia hã tudo bem"));
+        assert_eq!(rows[0].raw_text, None);
+        let hits = store.list_dictations(Some("polimento"), 10).unwrap();
+        assert_eq!(hits.len(), 1);
     }
 }
