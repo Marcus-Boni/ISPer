@@ -156,7 +156,16 @@ arquivo fica). A aba Ditados mostra o histórico do que você ditou.
 
 **Indicador flutuante**: arraste-o para onde quiser (a posição é lembrada);
 passe o mouse para ver `–` (modo mini: só o ponto + cronômetro da reunião) e
-`×` (ocultar — volta em bandeja → "Mostrar indicador flutuante").
+`×` (ocultar — volta em bandeja → "Mostrar indicador flutuante"). Enquanto
+visível ele fica **acima de qualquer janela**, inclusive de outras "sempre no
+topo" (Teams em chamada, players): o ISPer reafirma essa prioridade ao
+mostrá-lo e a cada 1,5 s, sem roubar o foco do que você está usando.
+
+**Buscar dentro de uma reunião**: com a reunião aberta, a barra "buscar nesta
+reunião" (ou Ctrl+F) destaca cada ocorrência no resumo e no transcript — sem
+diferenciar maiúsculas nem acentos —, com contador, Enter/Shift+Enter para
+navegar e "Só trechos" para ver apenas as falas que contêm o termo. Se a
+reunião apareceu por causa da busca geral, o termo já vem destacado.
 
 **Só o Teams**: em Configurações → Reuniões, escolha "Só o Microsoft Teams" —
 o ISPer usa o *process loopback* do Windows e ignora notificações, músicas e

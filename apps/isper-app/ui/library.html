@@ -40,7 +40,7 @@
   .badge { font-size: 11px; padding: 1px 7px; border-radius: var(--r-pill); border: 1px solid var(--line); color: var(--muted); }
   .badge.ok { color: var(--good); border-color: rgba(132, 194, 151, .45); }
 
-  #detail { overflow-y: auto; padding: 24px 30px; }
+  #detail { overflow-y: auto; padding: 24px 30px; position: relative; }
   .placeholder { color: var(--muted); padding: 60px 20px; text-align: center; display: grid; gap: 10px; justify-items: center; }
   .placeholder .empty-art { width: 56px; }
   .dhead { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 6px; }
@@ -48,13 +48,32 @@
   .dhead h2:hover { background: var(--panel); box-shadow: 0 0 0 6px var(--panel); }
   .dhead input { flex: 1; font: 500 26px var(--font-display); letter-spacing: -.015em; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--accent); background: var(--bg-2); color: var(--ink); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
   .meta { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
-  .actions { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .actions { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
   h3.eyebrow { margin: 24px 0 10px; }
   .summary { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; white-space: pre-wrap; line-height: 1.6; }
-  .seg { display: grid; grid-template-columns: 52px 130px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); line-height: 1.5; }
-  .seg .ts { color: var(--muted-2); font: 12px var(--font-mono); padding-top: 2px; }
+  .seg { display: grid; grid-template-columns: 52px 130px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); line-height: 1.5; transition: background var(--dur-2); }
+  .seg .ts { color: var(--muted-2); font: 12px var(--font-mono); padding-top: 2px; transition: color var(--dur-2); }
   .seg .sp { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sp.eu { color: var(--accent); } .sp.p1 { color: var(--p1); } .sp.p2 { color: var(--p2); } .sp.p3 { color: var(--p3); } .sp.p4 { color: var(--p4); } .sp.p5 { color: var(--p5); } .sp.px { color: var(--muted); }
+
+  /* Busca dentro da reunião: barra fixa no topo do painel + destaques. */
+  .dsearch {
+    position: sticky; top: -24px; z-index: 2; margin: 0 -30px 6px; padding: 10px 30px;
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(22, 19, 17, .86); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  .dsearch .search { margin-left: 0; width: auto; flex: 1; max-width: 380px; }
+  .dsearch .count { min-width: 84px; text-align: left; }
+  .dsearch .count.none { color: var(--warn); }
+  .dsearch .filter[aria-pressed="true"] { background: var(--warn-soft); color: var(--warn); border-color: rgba(232, 193, 90, .5); }
+  .dsearch kbd { font: 11px var(--font-mono); color: var(--muted-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  mark { background: rgba(232, 193, 90, .28); color: inherit; border-radius: 3px; padding: 0 1px; box-shadow: 0 0 0 1px rgba(232, 193, 90, .18); transition: background var(--dur-2); }
+  mark.cur { background: var(--warn); color: var(--accent-ink); box-shadow: 0 0 0 2px rgba(232, 193, 90, .35); }
+  .seg.hit { background: rgba(232, 193, 90, .05); }
+  .seg.hit .ts { color: var(--warn); }
+  #detail.filtering .seg:not(.hit), #detail.filtering .sumbox:not(.hit) { display: none; }
+  .filtered-note { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; }
 
   .dict { display: grid; grid-template-columns: 150px 1fr auto auto; gap: 12px; align-items: start; padding: 10px 16px; border-bottom: 1px solid var(--line); transition: background var(--dur-2); }
   .dict:hover { background: var(--panel); }
@@ -101,7 +120,41 @@
 
   let tab = 'meetings';
   let selected = null;
-  let loading = 0;   // nº de buscas em voo (evita mostrar skeleton em atualizações silenciosas)
+  const meetingQuery = {};   // id → último termo buscado dentro da reunião
+
+  // --------------------------------------------- busca com destaque (texto)
+  // Casamento literal, sem diferenciar maiúsculas nem acentos ("reuniao" acha
+  // "Reunião"). Cada caractere é "dobrado" separadamente para mapear os
+  // índices do texto dobrado de volta ao original.
+  const fold = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  function findRanges(raw, q) {
+    const fq = fold(q);
+    if (!fq) return [];
+    const norm = [], idx = [];
+    for (let i = 0; i < raw.length; i++) { for (const ch of fold(raw[i])) { norm.push(ch); idx.push(i); } }
+    const hay = norm.join('');
+    const out = [];
+    let p = hay.indexOf(fq);
+    while (p !== -1) {
+      out.push([idx[p], idx[p + fq.length - 1] + 1]);
+      p = hay.indexOf(fq, p + fq.length);
+    }
+    return out;
+  }
+  // Reescreve `node` com o texto cru e <mark> nos trechos casados; devolve quantos.
+  function paint(node, q) {
+    const raw = node.dataset.raw || '';
+    const ranges = q ? findRanges(raw, q) : [];
+    node.replaceChildren();
+    let last = 0;
+    for (const [a, b] of ranges) {
+      if (a > last) node.append(raw.slice(last, a));
+      node.appendChild(el('mark', '', raw.slice(a, b)));
+      last = b;
+    }
+    if (last < raw.length) node.append(raw.slice(last));
+    return ranges.length;
+  }
 
   // ------------------------------------------------------------ reuniões
   async function loadMeetings(silent = false) {
@@ -142,6 +195,7 @@
     try { det = await invoke('get_meeting', { id }); } catch (e) { toast('erro: ' + e, 'err'); return; }
     UI.swap(d, () => {
       d.replaceChildren();
+      d.classList.remove('filtering');
       if (!det) { d.appendChild(placeholder('reunião não encontrada')); return; }
       const m = det.meeting;
 
@@ -183,29 +237,103 @@
       actions.append(bOpen, bDel);
       d.appendChild(actions);
 
+      // Barra de busca da reunião (fixa no topo enquanto o transcript rola).
+      const bar = el('div', 'dsearch');
+      const box = el('div', 'search');
+      const input = el('input', 'field'); input.type = 'search'; input.id = 'msearch'; input.autocomplete = 'off';
+      input.placeholder = 'buscar nesta reunião — assuntos, nomes, decisões…';
+      const clear = el('button', 'clear', '×'); clear.title = 'limpar'; clear.setAttribute('aria-label', 'limpar busca na reunião');
+      box.append(input, clear);
+      const count = el('span', 'count num');
+      const prev = el('button', 'btn btn-ghost btn-icon', '↑'); prev.title = 'anterior (Shift+Enter)'; prev.setAttribute('aria-label', 'ocorrência anterior');
+      const next = el('button', 'btn btn-ghost btn-icon', '↓'); next.title = 'próxima (Enter)'; next.setAttribute('aria-label', 'próxima ocorrência');
+      const filter = el('button', 'btn btn-sm filter', 'Só trechos'); filter.setAttribute('aria-pressed', 'false'); filter.title = 'mostrar só os trechos que contêm o termo';
+      const hint = el('kbd', '', 'Ctrl+F');
+      bar.append(box, count, prev, next, filter, hint);
+      d.appendChild(bar);
+
+      let sumbox = null;
       if (det.summary) {
-        d.appendChild(el('h3', 'eyebrow', 'Resumo (IA)'));
-        d.appendChild(el('div', 'summary', det.summary));
+        sumbox = el('div', 'sumbox');
+        sumbox.appendChild(el('h3', 'eyebrow', 'Resumo (IA)'));
+        const sum = el('div', 'summary'); sum.dataset.raw = det.summary; sum.textContent = det.summary;
+        sumbox.appendChild(sum);
+        d.appendChild(sumbox);
       }
       d.appendChild(el('h3', 'eyebrow', 'Transcript'));
-      let last = null, group = null, n = 0;
+      // Falas consecutivas do mesmo falante viram um bloco só.
+      const groups = [];
       for (const s of det.segments) {
-        if (s.speaker !== last) {
-          group = el('div', 'seg');
-          if (n < 14) { group.classList.add('reveal'); group.style.setProperty('--i', String(n)); }
-          n++;
-          group.appendChild(el('div', 'ts', fmtClock(s.start_secs)));
-          group.appendChild(el('div', 'sp ' + spClass(s.speaker), s.speaker));
-          group.appendChild(el('div', 'tx', s.text));
-          d.appendChild(group);
-          last = s.speaker;
-        } else {
-          group.lastElementChild.textContent += ' ' + s.text;
-        }
+        const g = groups[groups.length - 1];
+        if (g && g.speaker === s.speaker) g.text += ' ' + s.text;
+        else groups.push({ speaker: s.speaker, start: s.start_secs, text: s.text });
       }
+      groups.forEach((g, n) => {
+        const seg = el('div', 'seg');
+        if (n < 14) { seg.classList.add('reveal'); seg.style.setProperty('--i', String(n)); }
+        seg.appendChild(el('div', 'ts', fmtClock(g.start)));
+        seg.appendChild(el('div', 'sp ' + spClass(g.speaker), g.speaker));
+        const tx = el('div', 'tx', g.text); tx.dataset.raw = g.text;
+        seg.appendChild(tx);
+        d.appendChild(seg);
+      });
       if (!det.segments.length) d.appendChild(placeholder('sem transcript'));
+      const note = el('p', 'filtered-note'); note.hidden = true; d.appendChild(note);
+
+      // ---- lógica da busca na reunião
+      let marks = [], cur = -1, filtering = false;
+      const setCur = (i) => {
+        if (!marks.length) return;
+        if (cur >= 0 && marks[cur]) marks[cur].classList.remove('cur');
+        cur = (i + marks.length) % marks.length;
+        marks[cur].classList.add('cur');
+        marks[cur].scrollIntoView({ block: 'center', behavior: UI.reduce() ? 'auto' : 'smooth' });
+        count.textContent = (cur + 1) + ' de ' + marks.length;
+      };
+      const apply = () => {
+        const q = input.value.trim();
+        meetingQuery[id] = q;
+        box.classList.toggle('has-text', !!q);
+        marks = []; cur = -1;
+        let hitSegs = 0;
+        d.querySelectorAll('.seg').forEach(seg => {
+          const n = paint(seg.querySelector('.tx'), q);
+          seg.classList.toggle('hit', n > 0);
+          if (n) hitSegs++;
+        });
+        if (sumbox) { const n = paint(sumbox.querySelector('.summary'), q); sumbox.classList.toggle('hit', n > 0); }
+        marks = [...d.querySelectorAll('mark')];
+        d.classList.toggle('filtering', filtering && !!q);
+        prev.disabled = next.disabled = marks.length < 2;
+        filter.disabled = !q;
+        count.classList.toggle('none', !!q && !marks.length);
+        if (!q) { count.textContent = ''; note.hidden = true; return; }
+        if (!marks.length) { count.textContent = 'nada aqui'; note.hidden = true; return; }
+        setCur(0);
+        note.hidden = !(filtering);
+        note.textContent = plural(hitSegs, 'trecho contém', 'trechos contêm') + ' "' + q + '" — clique em "Só trechos" de novo para ver a reunião inteira.';
+      };
+      let t = null;
+      input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(apply, 150); });
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); setCur(cur + (ev.shiftKey ? -1 : 1)); }
+        else if (ev.key === 'Escape') { ev.stopPropagation(); if (input.value) { input.value = ''; apply(); } else input.blur(); }
+      });
+      clear.addEventListener('click', () => { input.value = ''; apply(); input.focus(); });
+      prev.addEventListener('click', () => setCur(cur - 1));
+      next.addEventListener('click', () => setCur(cur + 1));
+      filter.addEventListener('click', () => { filtering = !filtering; filter.setAttribute('aria-pressed', String(filtering)); apply(); });
+
+      // Termo lembrado desta reunião; senão, o da busca geral — se ele estiver
+      // no transcript, já aparece destacado (foi por ele que a reunião apareceu).
+      const initial = meetingQuery[id] !== undefined ? meetingQuery[id] : $('search').value.trim();
+      if (initial) {
+        input.value = initial;
+        apply();
+        if (!marks.length && meetingQuery[id] === undefined) { input.value = ''; apply(); }
+      }
     });
-    d.scrollTop = 0;
+    if (!(meetingQuery[id] || $('search').value.trim())) d.scrollTop = 0;
   }
 
   // ------------------------------------------------------------- ditados
@@ -217,7 +345,7 @@
     try { rows = await invoke('list_dictations', { query: q || null }); }
     catch (e) { toast('erro: ' + e, 'err'); return; }
     $('count').textContent = rows.length ? plural(rows.length, 'ditado', 'ditados') : '';
-    const signature = rows.map(r => r.id).join('|');
+    const signature = rows.map(r => r.id).join('|') + '|' + q;
     if (list.dataset.sig === signature) return;
     list.dataset.sig = signature;
     list.replaceChildren();
@@ -226,7 +354,8 @@
     for (const r of rows) {
       const row = el('div', 'dict');
       row.appendChild(el('div', 'at', r.at));
-      row.appendChild(el('div', 'tx', r.text));
+      const tx = el('div', 'tx'); tx.dataset.raw = r.text; paint(tx, q.trim());
+      row.appendChild(tx);
       const bCopy = el('button', 'btn btn-sm btn-ghost', 'copiar');
       bCopy.addEventListener('click', async () => {
         try { await navigator.clipboard.writeText(r.text); UI.flash(bCopy, 'copiado ✓'); }
@@ -264,8 +393,14 @@
   $('openfolder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => toast('erro: ' + e, 'err')));
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(true); });
   document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape' && document.activeElement !== $('search')) window.__TAURI__.window.getCurrentWindow().close();
-    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'f') { ev.preventDefault(); $('search').focus(); $('search').select(); }
+    const inField = ['INPUT', 'TEXTAREA'].includes(document.activeElement && document.activeElement.tagName);
+    if (ev.key === 'Escape' && !inField) window.__TAURI__.window.getCurrentWindow().close();
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'f') {
+      ev.preventDefault();
+      // Com uma reunião aberta, Ctrl+F busca dentro dela; senão, na lista.
+      const target = $('msearch') || $('search');
+      target.focus(); target.select();
+    }
   });
 
   // Aberta pelo Início com uma reunião escolhida: seleciona ao carregar e

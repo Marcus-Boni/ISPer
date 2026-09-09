@@ -90,6 +90,8 @@ struct AppState {
     /// Itens do menu da bandeja cujo texto muda em tempo de execução.
     meeting_item: Mutex<Option<MenuItem<tauri::Wry>>>,
     hint_item: Mutex<Option<MenuItem<tauri::Wry>>>,
+    /// HWND do indicador (0 fora do Windows) — p/ reafirmar o topo sem passar pelo tao.
+    overlay_hwnd: isize,
 }
 
 fn main() {
@@ -148,6 +150,7 @@ fn main() {
         ])
         .setup(|app| {
             let cfg = config::load();
+            let overlay = app.get_webview_window("overlay").expect("janela overlay");
             app.manage(AppState {
                 engine: Mutex::new(None),
                 engine_status: Mutex::new(EngineStatus::Loading),
@@ -160,10 +163,10 @@ fn main() {
                 pending_meeting: Mutex::new(None),
                 meeting_item: Mutex::new(None),
                 hint_item: Mutex::new(None),
+                overlay_hwnd: overlay_hwnd(&overlay),
             });
 
             // Overlay: nunca focável; tamanho (mini/normal) e posição lembrados.
-            let overlay = app.get_webview_window("overlay").expect("janela overlay");
             overlay.set_focusable(false)?;
             if cfg.overlay_mini {
                 let _ = overlay.set_size(tauri::LogicalSize::new(OVERLAY_MINI.0, OVERLAY_MINI.1));
@@ -273,6 +276,23 @@ fn main() {
 
             // O modelo (~0,5 GB) carrega em background p/ não travar o startup.
             load_engine_in_background(app.handle().clone());
+
+            // Enquanto o indicador estiver visível, reafirma o topo a cada 1,5 s:
+            // um SetWindowPos barato que devolve a prioridade sobre qualquer
+            // janela "sempre no topo" ativada depois dele (Teams, players…).
+            {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(Duration::from_millis(1500));
+                    let visible = handle
+                        .get_webview_window("overlay")
+                        .and_then(|o| o.is_visible().ok())
+                        .unwrap_or(false);
+                    if visible {
+                        assert_topmost(&handle);
+                    }
+                });
+            }
 
             // Pipeline: toda gravação de ditado concluída chega aqui.
             let events = app.state::<AppState>().audio.events();
@@ -388,9 +408,7 @@ fn on_pressed(app: &AppHandle) {
             };
             drop(phase);
             let _ = app.emit("isper-state", json!({"state": "recording"}));
-            if let Some(overlay) = app.get_webview_window("overlay") {
-                let _ = overlay.show();
-            }
+            show_overlay(app);
             state.audio.start();
         }
         Phase::Recording { started, handsfree } => {
@@ -504,9 +522,7 @@ fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
         set_meeting_text(app, "Iniciar gravação de reunião");
         notify_status(app);
         let _ = app.emit("isper-state", json!({"state": "meeting-processing"}));
-        if let Some(overlay) = app.get_webview_window("overlay") {
-            let _ = overlay.show();
-        }
+        show_overlay(app);
         let app = app.clone();
         std::thread::spawn(move || {
             match finish_meeting(&app, handle) {
@@ -555,9 +571,7 @@ fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             set_meeting_text(app, "Encerrar e transcrever a reunião");
             notify_status(app);
             let _ = app.emit("isper-state", payload);
-            if let Some(overlay) = app.get_webview_window("overlay") {
-                let _ = overlay.show();
-            }
+            show_overlay(app);
             Ok(())
         }
         Err(e) => {
@@ -567,9 +581,7 @@ fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
                 "isper-state",
                 json!({"state": "error", "message": e.to_string()}),
             );
-            if let Some(overlay) = app.get_webview_window("overlay") {
-                let _ = overlay.show();
-            }
+            show_overlay(app);
             let app2 = app.clone();
             std::thread::spawn(move || {
                 std::thread::sleep(Duration::from_millis(2500));
@@ -1074,9 +1086,7 @@ fn open_library(app: &AppHandle) {
 /// Mostra o indicador flutuante (útil depois de "ocultar" durante a reunião).
 fn show_indicator(app: &AppHandle) {
     let meeting_active = app.state::<AppState>().meeting.lock().unwrap().is_some();
-    if let Some(overlay) = app.get_webview_window("overlay") {
-        let _ = overlay.show();
-    }
+    show_overlay(app);
     if meeting_active {
         let _ = app.emit("isper-state", json!({"state": "meeting"}));
     } else {
@@ -1175,6 +1185,64 @@ fn delete_dictation(id: i64) -> Result<(), String> {
 }
 
 // ------------------------------------------------------------ indicador
+
+/// HWND do indicador, capturado uma vez no setup (a janela vive até o fim do app).
+fn overlay_hwnd(overlay: &tauri::WebviewWindow) -> isize {
+    #[cfg(windows)]
+    {
+        overlay.hwnd().map(|h| h.0 as isize).unwrap_or(0)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = overlay;
+        0
+    }
+}
+
+/// Reafirma o indicador no topo da faixa "sempre no topo" do Windows. O
+/// `alwaysOnTop` da config só liga a flag: qualquer outra janela topmost
+/// ativada depois (Teams em chamada, players, outros overlays) passa na frente,
+/// e a nossa — que nunca é ativada — não voltaria sozinha. O tao ignora
+/// `set_always_on_top(true)` com a flag já ligada, daí o SetWindowPos direto:
+/// sem ativar, sem mover, sem redimensionar.
+fn assert_topmost(app: &AppHandle) {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        };
+        let hwnd = app.state::<AppState>().overlay_hwnd;
+        if hwnd != 0 {
+            // SAFETY: o HWND pertence a uma janela que só é destruída ao sair do
+            // app; SetWindowPos pode ser chamado de qualquer thread.
+            unsafe {
+                SetWindowPos(
+                    hwnd as _,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                );
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        if let Some(overlay) = app.get_webview_window("overlay") {
+            let _ = overlay.set_always_on_top(true);
+        }
+    }
+}
+
+/// Mostra o indicador e garante que ele fica por cima de tudo.
+fn show_overlay(app: &AppHandle) {
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        let _ = overlay.show();
+    }
+    assert_topmost(app);
+}
 
 #[derive(serde::Serialize)]
 struct OverlayPrefs {
