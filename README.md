@@ -8,9 +8,20 @@ notetaker de reuniões do Teams. Roadmap completo em [ROADMAP.md](ROADMAP.md).
 ```
 crates/isper-core/   # motor: captura (cpal) → resample (rubato) → Whisper (whisper-rs)
 crates/isper-cli/    # laboratório da Fase 1: transcrição no terminal
+crates/isper-models/ # catálogo e download de modelos (SHA-256 do Hugging Face)
+crates/isper-llm/    # providers de IA (Groq, Gemini, Claude) e resumo pós-reunião
+crates/isper-diarize/# quem falou o quê (sherpa-onnx: pyannote + 3D-Speaker)
+apps/isper-app/      # app Tauri 2: src-tauri (Rust) + ui (HTML/CSS/JS sem build step)
+  ui/assets/         # design system: base.css (tokens, componentes, movimento),
+                     # ui.js (toast, count-up, confirmação inline…) e fontes OFL locais
 models/              # modelos ggml (gitignored — baixar, ver abaixo)
 fixtures/            # WAVs de teste gerados com TTS do Windows (voz pt-BR Maria)
 ```
+
+A interface é vanilla e offline: as fontes (Fraunces e Hanken Grotesk, licença
+OFL) vão dentro do app — nada é baixado em tempo de execução. Animações usam só
+`transform`/`opacity` e respeitam `prefers-reduced-motion` do Windows
+("Efeitos de animação" desligados → interface estática).
 
 ## Pré-requisitos de build (Windows)
 

@@ -1,54 +1,67 @@
 <!doctype html>
-<html>
+<html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <title>ISPer</title>
+<link rel="stylesheet" href="assets/base.css">
 <style>
-  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
-  * { box-sizing: border-box; user-select: none; }
-  /* A sombra precisa caber DENTRO da janela (que é transparente e recorta
-     tudo): margem de 8px embaixo para um deslocamento de 2px + desfoque 6px. */
+  /* Indicador flutuante: janela transparente, sem foco, arrastável. */
+  html, body { background: transparent !important; overflow: hidden; height: 100%; }
+  * { user-select: none; }
+  /* A sombra precisa caber DENTRO da janela (transparente, recorta tudo):
+     margem de 8px embaixo para deslocamento 2px + desfoque 6px. */
   #pill {
     position: absolute; inset: 4px 6px 8px 6px;
-    display: flex; align-items: center; gap: 12px;
-    padding: 0 12px 0 18px;
-    background: rgba(22, 19, 17, .95);
+    display: flex; align-items: center; gap: 12px; padding: 0 12px 0 18px;
+    background: rgba(22, 19, 17, .94);
     border: 1px solid rgba(255, 255, 255, .09);
-    border-radius: 999px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
-    font-family: "Segoe UI", system-ui, sans-serif;
-    color: #ece7e1;
-    cursor: grab;
+    border-radius: var(--r-pill);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .04);
+    color: var(--ink); cursor: grab;
+    transition: border-color var(--dur-3), box-shadow var(--dur-3);
   }
   #pill:active { cursor: grabbing; }
-  #dot { width: 12px; height: 12px; border-radius: 50%; background: #6f6862; flex: none; transition: background .2s; }
-  #pill.recording #dot { background: #f07e72; animation: pulse 1.3s ease-in-out infinite; }
-  #pill.transcribing #dot { background: #e8c15a; animation: pulse .5s ease-in-out infinite; }
-  #pill.done #dot { background: #84c297; animation: none; }
-  #pill.error #dot { background: #f07e72; animation: none; }
-  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.75); } }
+  #pill.recording { border-color: rgba(240, 126, 114, .38); box-shadow: 0 2px 6px rgba(0, 0, 0, .45), 0 0 0 1px rgba(240, 126, 114, .14); }
+  #pill.transcribing { border-color: rgba(232, 193, 90, .3); }
+  #pill.done { border-color: rgba(132, 194, 151, .4); }
+  #pill.error { border-color: rgba(240, 126, 114, .55); }
+
+  #dot { width: 12px; height: 12px; }
+  #pill.recording #dot { background: var(--accent); animation: pulse 1.3s ease-in-out infinite; }
+  #pill.transcribing #dot { background: var(--warn); animation: pulse .6s ease-in-out infinite; }
+  #pill.done #dot { background: var(--good); animation: ring-burst var(--dur-4) var(--ease-out) both; }
+  #pill.error #dot { background: var(--accent); animation: none; }
+
   canvas { flex: 1; height: 46px; min-width: 0; }
   #status {
-    font-size: 13px; color: #a79e96; white-space: nowrap;
+    font-size: 13px; color: var(--muted); white-space: nowrap;
     max-width: 46%; overflow: hidden; text-overflow: ellipsis; flex: none;
+    transition: color var(--dur-3);
   }
-  #pill.done #status { color: #84c297; }
-  #pill.error #status { color: #f07e72; }
+  #pill.done #status { color: var(--good); }
+  #pill.error #status { color: var(--accent); }
   #timer {
-    display: none; flex: none;
-    font: 600 13px/1 Consolas, "Cascadia Mono", monospace;
-    color: #ece7e1; letter-spacing: .04em; font-variant-numeric: tabular-nums;
+    display: none; flex: none; font: 600 13px/1 var(--font-mono);
+    color: var(--ink); letter-spacing: .04em; font-variant-numeric: tabular-nums;
   }
   #pill.meeting #timer { display: block; }
-  .ctl { display: flex; gap: 4px; flex: none; opacity: 0; transition: opacity .15s; }
-  #pill:hover .ctl { opacity: 1; }
+
+  .ctl {
+    display: flex; gap: 4px; flex: none; opacity: 0; transform: translateX(6px);
+    transition: opacity var(--dur-2), transform var(--dur-3) var(--ease-out);
+  }
+  #pill:hover .ctl, #pill:focus-within .ctl { opacity: 1; transform: none; }
   .ctl button {
     width: 22px; height: 22px; border-radius: 50%; padding: 0;
-    border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06);
-    color: #a79e96; font: 14px/1 "Segoe UI", sans-serif; cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .06);
+    color: var(--muted); font: 14px/1 var(--font-body); cursor: pointer;
     display: grid; place-items: center;
+    transition: background var(--dur-2), color var(--dur-2), transform var(--dur-1);
   }
-  .ctl button:hover { color: #ece7e1; background: rgba(255,255,255,.14); }
+  .ctl button:hover { color: var(--ink); background: rgba(255, 255, 255, .14); }
+  .ctl button:active { transform: scale(.88); }
+  .ctl button:disabled { opacity: .5; }
+
   /* Modo mini: só o ponto (+ cronômetro em reunião). */
   body.mini #pill { gap: 10px; padding: 0 10px 0 14px; }
   body.mini canvas, body.mini #status { display: none; }
@@ -56,16 +69,17 @@
 </style>
 </head>
 <body>
-<div id="pill" data-tauri-drag-region>
-  <div id="dot" data-tauri-drag-region></div>
+<div id="pill" data-tauri-drag-region role="status" aria-live="polite">
+  <div id="dot" class="dot" data-tauri-drag-region></div>
   <canvas id="wave" data-tauri-drag-region></canvas>
   <div id="status" data-tauri-drag-region>pronto</div>
   <div id="timer" data-tauri-drag-region>00:00</div>
   <div class="ctl">
-    <button id="mini" title="modo mini / normal">–</button>
-    <button id="hide" title="ocultar (volta em Bandeja → Mostrar indicador)">×</button>
+    <button id="mini" title="modo mini / normal" aria-label="alternar modo mini">–</button>
+    <button id="hide" title="ocultar (volta em Bandeja → Mostrar indicador)" aria-label="ocultar indicador">×</button>
   </div>
 </div>
+<script src="assets/ui.js"></script>
 <script>
   const { listen } = window.__TAURI__.event;
   const { invoke } = window.__TAURI__.core;
@@ -76,18 +90,20 @@
   const ctx = canvas.getContext('2d');
 
   const N = 48;
-  let bars = new Array(N).fill(0);
+  let bars = new Array(N).fill(0);   // alvo (nível do mic)
+  let shown = new Array(N).fill(0);  // desenhado (interpola até o alvo)
   let state = 'idle';
 
   const truncate = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
-  const fmt = (s) => { s = Math.max(0, Math.floor(s)); const m = Math.floor(s / 60); return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+  const replay = (node, cls) => { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); };
+  const setStatus = (text) => { if (statusEl.textContent !== text) { statusEl.textContent = text; replay(statusEl, 'swap'); } };
 
   // Cronômetro da reunião (só a UI conta o tempo; começa no primeiro "meeting").
   let meetingStartedAt = null, timerHandle = null;
   function startTimer() {
     if (!meetingStartedAt) meetingStartedAt = Date.now();
     if (timerHandle) return;
-    timerHandle = setInterval(() => { $('timer').textContent = fmt((Date.now() - meetingStartedAt) / 1000); }, 500);
+    timerHandle = setInterval(() => { $('timer').textContent = UI.fmtClock((Date.now() - meetingStartedAt) / 1000); }, 500);
   }
   function stopTimer() {
     clearInterval(timerHandle); timerHandle = null; meetingStartedAt = null;
@@ -102,23 +118,27 @@
     'meeting-summary': 'transcribing meeting',
     'meeting-done': 'done'
   };
+  const RESTING = new Set(['idle', 'done', 'error']);
   function setState(s, msg) {
+    const wakingUp = RESTING.has(state) && !RESTING.has(s);
     state = s;
     pill.className = CLASS_MAP[s] || s;
+    if (wakingUp) replay(pill, 'pop');          // o backend acabou de mostrar o indicador
+    if (s === 'error') replay(pill, 'shake');
     if (s === 'meeting') startTimer();
     else if (s === 'meeting-done' || s === 'idle' || s === 'error') stopTimer();
 
-    if (s === 'recording') { bars.fill(0); statusEl.textContent = 'gravando… solte para colar'; blip(880, .05); }
-    else if (s === 'recording-handsfree') statusEl.textContent = 'mãos-livres… 1 s de silêncio cola';
-    else if (s === 'meeting') statusEl.textContent = msg ? 'reunião — ' + msg : 'gravando reunião — Eu + Participantes';
-    else if (s === 'meeting-processing') statusEl.textContent = 'transcrevendo a reunião…';
-    else if (s === 'meeting-diarize') statusEl.textContent = 'identificando quem falou…';
-    else if (s === 'meeting-summary') statusEl.textContent = 'resumindo com IA…';
-    else if (s === 'meeting-done') { statusEl.textContent = 'reunião salva e aberta ✓'; blip(1320, .07); }
-    else if (s === 'transcribing') statusEl.textContent = 'transcrevendo…';
-    else if (s === 'done') { statusEl.textContent = msg ? '“' + truncate(msg, 40) + '”' : 'colado'; blip(1320, .07); }
-    else if (s === 'error') statusEl.textContent = msg || 'erro';
-    else statusEl.textContent = 'pronto';
+    if (s === 'recording') { bars.fill(0); setStatus('gravando… solte para colar'); blip(880, .05); }
+    else if (s === 'recording-handsfree') setStatus('mãos-livres… 1 s de silêncio cola');
+    else if (s === 'meeting') setStatus(msg ? 'reunião — ' + msg : 'gravando reunião — Eu + Participantes');
+    else if (s === 'meeting-processing') setStatus('transcrevendo a reunião…');
+    else if (s === 'meeting-diarize') setStatus('identificando quem falou…');
+    else if (s === 'meeting-summary') setStatus('resumindo com IA…');
+    else if (s === 'meeting-done') { setStatus('reunião salva e aberta ✓'); blip(1320, .07); }
+    else if (s === 'transcribing') setStatus('transcrevendo…');
+    else if (s === 'done') { setStatus(msg ? '“' + truncate(msg, 40) + '”' : 'colado'); blip(1320, .07); }
+    else if (s === 'error') setStatus(msg || 'erro');
+    else setStatus('pronto');
   }
 
   listen('isper-state', e => setState(e.payload.state, e.payload.text || e.payload.message));
@@ -170,6 +190,7 @@
   }
   addEventListener('resize', sizeCanvas);
 
+  // Waveform: barras interpolam até o nível alvo — movimento contínuo, sem saltos.
   function draw() {
     if (canvas.clientWidth && (!canvas.width || canvas.width !== canvas.clientWidth * devicePixelRatio)) sizeCanvas();
     const w = canvas.width, h = canvas.height;
@@ -178,9 +199,12 @@
       const bw = w / N;
       const rec = state.startsWith('recording');
       for (let i = 0; i < N; i++) {
-        const v = rec ? bars[i] : bars[i] * 0.3;
+        const target = rec ? bars[i] : bars[i] * 0.3;
+        shown[i] += (target - shown[i]) * 0.35;
+        const v = shown[i];
         const bh = Math.max(3 * devicePixelRatio, v * h * 0.92);
-        ctx.fillStyle = rec ? 'rgba(240,126,114,.95)' : 'rgba(167,158,150,.45)';
+        const alpha = rec ? 0.55 + v * 0.45 : 0.45;
+        ctx.fillStyle = rec ? 'rgba(240,126,114,' + alpha.toFixed(2) + ')' : 'rgba(167,158,150,' + alpha + ')';
         ctx.beginPath();
         ctx.roundRect(i * bw + 1, (h - bh) / 2, Math.max(1, bw - 3), bh, 2);
         ctx.fill();

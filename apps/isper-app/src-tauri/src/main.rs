@@ -287,7 +287,7 @@ fn main() {
                     match outcome {
                         Ok(text) => {
                             let _ = handle
-                                .emit_to("overlay", "isper-state", json!({"state": "done", "text": text}));
+                                .emit("isper-state", json!({"state": "done", "text": text}));
                         }
                         Err(e) => {
                             tracing::warn!("ditado falhou: {e}");
@@ -387,7 +387,7 @@ fn on_pressed(app: &AppHandle) {
                 handsfree: false,
             };
             drop(phase);
-            let _ = app.emit_to("overlay", "isper-state", json!({"state": "recording"}));
+            let _ = app.emit("isper-state", json!({"state": "recording"}));
             if let Some(overlay) = app.get_webview_window("overlay") {
                 let _ = overlay.show();
             }
@@ -422,7 +422,7 @@ fn on_released(app: &AppHandle) {
             };
             drop(phase);
             state.audio.set_vad(true);
-            let _ = app.emit_to("overlay", "isper-state", json!({"state": "recording-handsfree"}));
+            let _ = app.emit("isper-state", json!({"state": "recording-handsfree"}));
         } else {
             *phase = Phase::Processing;
             drop(phase);
@@ -435,7 +435,7 @@ fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<String> {
     if raw.duration_secs() < 0.4 {
         anyhow::bail!("segure o atalho enquanto fala");
     }
-    let _ = app.emit_to("overlay", "isper-state", json!({"state": "transcribing"}));
+    let _ = app.emit("isper-state", json!({"state": "transcribing"}));
 
     let state = app.state::<AppState>();
     let engine = {
@@ -477,7 +477,7 @@ fn maybe_restore_overlay(app: &AppHandle) {
         return;
     }
     if state.meeting.lock().unwrap().is_some() {
-        let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting"}));
+        let _ = app.emit("isper-state", json!({"state": "meeting"}));
     } else if let Some(overlay) = app.get_webview_window("overlay") {
         let _ = overlay.hide();
     }
@@ -503,7 +503,7 @@ fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
         *state.meeting_started.lock().unwrap() = None;
         set_meeting_text(app, "Iniciar gravação de reunião");
         notify_status(app);
-        let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting-processing"}));
+        let _ = app.emit("isper-state", json!({"state": "meeting-processing"}));
         if let Some(overlay) = app.get_webview_window("overlay") {
             let _ = overlay.show();
         }
@@ -512,7 +512,7 @@ fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             match finish_meeting(&app, handle) {
                 Ok(path) => {
                     tracing::info!("reunião salva em {path}");
-                    let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting-done"}));
+                    let _ = app.emit("isper-state", json!({"state": "meeting-done"}));
                 }
                 Err(e) => {
                     tracing::warn!("reunião falhou: {e}");
@@ -554,7 +554,7 @@ fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             *state.meeting_started.lock().unwrap() = Some(Instant::now());
             set_meeting_text(app, "Encerrar e transcrever a reunião");
             notify_status(app);
-            let _ = app.emit_to("overlay", "isper-state", payload);
+            let _ = app.emit("isper-state", payload);
             if let Some(overlay) = app.get_webview_window("overlay") {
                 let _ = overlay.show();
             }
@@ -607,7 +607,7 @@ fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<Stri
 
     // Fase 4: quem falou o quê — só se os modelos de diarização existirem.
     if isper_diarize::models_installed() && !result.others_audio_16k.is_empty() {
-        let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting-diarize"}));
+        let _ = app.emit("isper-state", json!({"state": "meeting-diarize"}));
         match isper_diarize::diarize(&result.others_audio_16k) {
             Ok(turns) => {
                 let t: Vec<(f32, f32, usize)> =
@@ -640,7 +640,7 @@ fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<Stri
     let settings = isper_llm::load_settings();
     match isper_llm::provider_from_settings(&settings) {
         Ok(provider) => {
-            let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting-summary"}));
+            let _ = app.emit("isper-state", json!({"state": "meeting-summary"}));
             match isper_llm::summarize_meeting(provider.as_ref(), &md) {
                 Ok(summary) => {
                     let block = format!(
@@ -1078,9 +1078,9 @@ fn show_indicator(app: &AppHandle) {
         let _ = overlay.show();
     }
     if meeting_active {
-        let _ = app.emit_to("overlay", "isper-state", json!({"state": "meeting"}));
+        let _ = app.emit("isper-state", json!({"state": "meeting"}));
     } else {
-        let _ = app.emit_to("overlay", "isper-state", json!({"state": "idle"}));
+        let _ = app.emit("isper-state", json!({"state": "idle"}));
         let app = app.clone();
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(2500));

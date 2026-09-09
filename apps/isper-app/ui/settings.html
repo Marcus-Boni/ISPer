@@ -1,74 +1,48 @@
 <!doctype html>
-<html>
+<html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <title>ISPer — Configurações</title>
+<link rel="stylesheet" href="assets/base.css">
 <style>
-  :root {
-    --bg: #161311; --card: #1e1a18; --ink: #ece7e1; --muted: #a79e96;
-    --line: #372f2b; --accent: #f07e72; --good: #84c297; --field: #26211e;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px;
-    padding: 20px; user-select: none;
-  }
-  h1 { font-size: 17px; margin: 0 0 4px; }
+  body { padding: 20px 20px 84px; user-select: none; }
+  h1 { font-family: var(--font-display); font-size: 24px; font-weight: 500; letter-spacing: -.015em; margin: 0 0 2px; }
   .sub { color: var(--muted); font-size: 12px; margin: 0 0 16px; }
-  .card {
-    background: var(--card); border: 1px solid var(--line);
-    border-radius: 12px; padding: 16px; margin-bottom: 14px;
-  }
-  .card h2 { font-size: 13px; margin: 0 0 12px; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
-  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
-  label:first-of-type { margin-top: 0; }
-  select, input[type=text], input[type=password], textarea {
-    width: 100%; background: var(--field); color: var(--ink);
-    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
-    font: inherit; outline: none;
-  }
-  select:focus, input:focus, textarea:focus { border-color: var(--accent); }
-  textarea { height: 84px; resize: vertical; }
+  .card { margin-bottom: 14px; }
+  .card h2 { font-size: 11px; margin: 0 0 12px; color: var(--accent); text-transform: uppercase; letter-spacing: .14em; font-weight: 600; }
   .row { display: flex; gap: 8px; align-items: center; }
   .row > * { flex: 1; }
   .row > button { flex: 0 0 auto; }
-  button {
-    background: var(--accent); color: #1b0f0d; border: none; border-radius: 8px;
-    padding: 9px 16px; font: inherit; font-weight: 600; cursor: pointer;
-  }
-  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
-  button:disabled { opacity: .5; cursor: default; }
-  .check { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-  .check input { width: auto; }
-  .check span { font-size: 13px; }
-  .mrow { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
-  .mrow:first-child { border-top: none; }
-  .mname { font-size: 13px; }
-  .mnote { font-size: 11.5px; color: var(--muted); }
-  .mprog { height: 4px; background: var(--field); border-radius: 2px; overflow: hidden; margin-top: 6px; display: none; }
-  .mprog > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
-  .tag { font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-left: 6px; }
-  .tag.ok { color: var(--good); border-color: var(--good); }
-  code { font-family: Consolas, monospace; font-size: 11.5px; }
-  #status {
-    min-height: 20px; font-size: 12.5px; color: var(--muted);
-    white-space: pre-wrap; margin-top: 10px;
-  }
+  .stack { display: grid; gap: 10px; margin-top: 12px; }
+  .mrow { display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .mrow:first-child { border-top: none; padding-top: 2px; }
+  .mname { font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .mnote { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .mprog { display: none; align-items: center; gap: 10px; margin-top: 8px; }
+  .mprog.on { display: flex; }
+  .mprog .progress { flex: 1; }
+  .mprog .pct { font: 11px var(--font-mono); color: var(--muted); min-width: 34px; text-align: right; }
+  #status { min-height: 20px; font-size: 12.5px; color: var(--muted); white-space: pre-wrap; transition: color var(--dur-3); }
   #status.ok { color: var(--good); }
   #status.err { color: var(--accent); }
-  .hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
-  .footer { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+  #status.swap { animation: swap-in var(--dur-2) var(--ease-out) both; }
+  .footer {
+    position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center;
+    padding: 12px 20px; background: rgba(30, 26, 24, .88); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line);
+  }
+  .footer #status { flex: 1; }
+  code { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); }
 </style>
 </head>
-<body>
-<h1>Configurações</h1>
-<p class="sub">Atalho ativo agora: <b id="active">…</b></p>
+<body class="atmos">
+<h1 class="reveal" style="--i:0">Configurações</h1>
+<p class="sub reveal" style="--i:0">Atalho ativo agora: <b id="active">…</b></p>
 
-<div class="card">
+<div class="card reveal" style="--i:1">
   <h2>Ditado</h2>
-  <label for="shortcut">Atalho global</label>
-  <select id="shortcut">
+  <label class="lbl" for="shortcut" style="margin-top:0">Atalho global</label>
+  <select id="shortcut" class="field">
     <option value="">(automático — primeiro livre)</option>
     <option value="ctrl+alt+space">Ctrl+Alt+Espaço</option>
     <option value="ctrl+shift+space">Ctrl+Shift+Espaço</option>
@@ -76,92 +50,89 @@
     <option value="ctrl+alt+i">Ctrl+Alt+I</option>
     <option value="f9">F9</option>
   </select>
-  <label for="lang">Idioma da fala</label>
-  <select id="lang">
+  <label class="lbl" for="lang">Idioma da fala</label>
+  <select id="lang" class="field">
     <option value="pt">Português</option>
     <option value="en">Inglês</option>
     <option value="auto">Detectar automaticamente</option>
   </select>
-  <label for="dict">Dicionário pessoal (um termo por linha)</label>
-  <textarea id="dict" placeholder="OptSolv&#10;ISPer&#10;nomes próprios, siglas, jargões…"></textarea>
+  <label class="lbl" for="dict">Dicionário pessoal (um termo por linha)</label>
+  <textarea id="dict" class="field" placeholder="OptSolv&#10;ISPer&#10;nomes próprios, siglas, jargões…"></textarea>
   <p class="hint">Esses termos são mostrados ao Whisper antes de cada transcrição — ele passa a grafá-los corretamente.</p>
 </div>
 
-<div class="card">
+<div class="card reveal" style="--i:2">
   <h2>Modelos Whisper</h2>
-  <p class="hint" id="gpuhint"></p>
+  <p class="hint" id="gpuhint" style="margin:0 0 8px"></p>
   <div id="modelslist"></div>
   <p class="hint">Baixados do Hugging Face com verificação SHA-256 para <code>%LOCALAPPDATA%\ISPer\models</code>. Marque o que quer usar e clique em Salvar — a troca é a quente.</p>
 </div>
 
-<div class="card">
+<div class="card reveal" style="--i:3">
   <h2>Reuniões</h2>
-  <label for="source">Áudio dos participantes</label>
-  <select id="source">
+  <label class="lbl" for="source" style="margin-top:0">Áudio dos participantes</label>
+  <select id="source" class="field">
     <option value="system">Todo o sistema (padrão)</option>
     <option value="teams">Só o Microsoft Teams</option>
   </select>
-  <p class="hint">"Só o Teams" usa o process loopback do Windows — ignora notificações, músicas e outros apps. Se o Teams não estiver aberto na hora, o ISPer cai para o sistema e avisa no pill.</p>
-  <label>Quem falou o quê (diarização)</label>
+  <p class="hint">"Só o Teams" usa o process loopback do Windows — ignora notificações, músicas e outros apps. Se o Teams não estiver aberto na hora, o ISPer cai para o sistema e avisa no indicador.</p>
+  <label class="lbl">Quem falou o quê (diarização)</label>
   <div class="row">
     <span class="hint" id="diarstate" style="margin:0">…</span>
-    <button class="ghost" id="diardl">Baixar modelos (~45 MB)</button>
+    <button class="btn" id="diardl">Baixar modelos (~45 MB)</button>
   </div>
-  <div class="mprog" id="diarprog"><div></div></div>
+  <div class="mprog" id="diarprog"><div class="progress"><i></i></div><span class="pct">0%</span></div>
   <p class="hint">Com os modelos instalados, "Participantes" vira "Participante 1", "Participante 2"… — pyannote + 3D-Speaker via sherpa-onnx, 100% local, ao encerrar a reunião.</p>
 </div>
 
-<div class="card">
+<div class="card reveal" style="--i:4">
   <h2>Inteligência (resumo de reuniões)</h2>
-  <label for="provider">Provider</label>
-  <select id="provider">
+  <label class="lbl" for="provider" style="margin-top:0">Provider</label>
+  <select id="provider" class="field">
     <option value="none">Desligado</option>
     <option value="groq">Groq (free tier)</option>
     <option value="gemini">Gemini (free tier)</option>
     <option value="claude">Claude API</option>
   </select>
-  <label for="model">Modelo (vazio = padrão do provider)</label>
+  <label class="lbl" for="model">Modelo (vazio = padrão do provider)</label>
   <div class="row">
-    <input type="text" id="model" list="models" placeholder="ex.: openai/gpt-oss-120b">
-    <button class="ghost" id="listmodels">Listar modelos</button>
+    <input type="text" id="model" class="field" list="models" placeholder="ex.: openai/gpt-oss-120b">
+    <button class="btn" id="listmodels">Listar modelos</button>
   </div>
   <datalist id="models"></datalist>
   <p class="hint">Os catálogos mudam (e variam por conta): "Listar modelos" consulta a API com a sua chave e preenche as opções do campo.</p>
-  <label for="key">Chave de API <span id="keystate"></span></label>
+  <label class="lbl" for="key">Chave de API <span id="keystate" class="chip chip-ok" hidden>guardada ✓</span></label>
   <div class="row">
-    <input type="password" id="key" placeholder="cole a chave e clique em Guardar">
-    <button class="ghost" id="savekey">Guardar chave</button>
+    <input type="password" id="key" class="field" placeholder="cole a chave e clique em Guardar" autocomplete="off">
+    <button class="btn" id="savekey">Guardar chave</button>
   </div>
   <p class="hint">A chave vai para o Credential Manager do Windows — nunca para arquivo. Só o texto do transcript é enviado à API; áudio, nunca.</p>
   <div class="row" style="margin-top:10px">
-    <button class="ghost" id="test">Testar conexão</button>
+    <button class="btn" id="test" style="flex:0 0 auto">Testar conexão</button>
   </div>
 </div>
 
-<div class="card">
+<div class="card reveal" style="--i:5">
   <h2>Sistema</h2>
-  <div class="check">
-    <input type="checkbox" id="autostart">
-    <span>Iniciar o ISPer junto com o Windows</span>
-  </div>
-  <div class="check">
-    <input type="checkbox" id="showhome">
-    <span>Mostrar a tela Início ao abrir o ISPer</span>
+  <div class="stack" style="margin-top:0">
+    <label class="switch"><input type="checkbox" id="autostart"><span class="track"><span class="thumb"></span></span>Iniciar o ISPer junto com o Windows</label>
+    <label class="switch"><input type="checkbox" id="showhome"><span class="track"><span class="thumb"></span></span>Mostrar a tela Início ao abrir o ISPer</label>
   </div>
   <p class="hint">No início com o Windows o ISPer nasce quieto na bandeja; a tela Início também abre com um clique no ícone da bandeja.</p>
 </div>
 
 <div class="footer">
-  <button id="save">Salvar</button>
-  <div id="status"></div>
+  <button class="btn btn-primary" id="save">Salvar</button>
+  <div id="status" role="status" aria-live="polite"></div>
 </div>
 
+<script src="assets/ui.js"></script>
 <script>
   const { invoke } = window.__TAURI__.core;
   const { listen } = window.__TAURI__.event;
   const $ = (id) => document.getElementById(id);
-  const status = (msg, cls = '') => { $('status').textContent = msg; $('status').className = cls; };
-  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  const { el, toast } = UI;
+  const status = (msg, cls = '') => { const s = $('status'); s.textContent = msg; s.className = cls; s.classList.remove('swap'); void s.offsetWidth; s.classList.add('swap'); };
   let selectedModel = null;
 
   async function load() {
@@ -174,8 +145,9 @@
       $('source').value = s.meeting_source || 'system';
       $('provider').value = s.llm_provider || 'none';
       $('model').value = s.llm_model || '';
-      $('keystate').textContent = s.llm_key_present ? '(guardada ✓)' : '';
+      $('keystate').hidden = !s.llm_key_present;
       $('showhome').checked = s.show_home_on_launch !== false;
+      $('autostart').checked = !!s.autostart;
       $('gpuhint').textContent = s.has_gpu
         ? 'Build com CUDA (GPU NVIDIA): os modelos Large rodam em tempo real.'
         : 'Build sem CUDA: prefira o Small ou o Medium.';
@@ -186,83 +158,90 @@
     }
   }
 
-  async function renderModels() {
+  async function renderModels(animate = true) {
     const list = $('modelslist');
-    list.replaceChildren();
     let models = [];
     try { models = await invoke('models_status'); } catch (e) { status('erro ao listar modelos: ' + e, 'err'); return; }
+    list.replaceChildren();
     if (!models.some(m => m.installed)) status('nenhum modelo instalado — baixe um em "Modelos Whisper" para o ISPer funcionar', 'err');
     for (const m of models) {
       const row = el('div', 'mrow');
       row.dataset.file = m.file;
-      const radio = el('input');
+      const radio = el('input', 'radio');
       radio.type = 'radio'; radio.name = 'model'; radio.value = m.file;
-      radio.disabled = !m.installed; radio.title = 'usar este modelo';
+      radio.disabled = !m.installed; radio.title = m.installed ? 'usar este modelo' : 'baixe para poder escolher';
       radio.checked = selectedModel ? selectedModel === m.file : m.active;
       radio.addEventListener('change', () => { selectedModel = m.file; });
       const info = el('div');
-      const name = el('div', 'mname', m.label + ' · ' + m.approx_mb + ' MB');
-      name.appendChild(el('span', 'tag' + (m.installed ? ' ok' : ''), m.installed ? (m.active ? 'em uso' : 'instalado') : 'não baixado'));
+      const name = el('div', 'mname');
+      name.append(m.label + ' · ' + m.approx_mb + ' MB');
+      name.appendChild(el('span', 'chip' + (m.installed ? (m.active ? ' chip-accent' : ' chip-ok') : ''), m.installed ? (m.active ? 'em uso' : 'instalado') : 'não baixado'));
       info.appendChild(name);
       info.appendChild(el('div', 'mnote', m.note + (m.needs_gpu ? ' · pede GPU' : '')));
-      const prog = el('div', 'mprog'); prog.appendChild(el('div'));
+      const prog = el('div', 'mprog'); const bar = el('div', 'progress'); bar.appendChild(el('i')); prog.append(bar, el('span', 'pct', '0%'));
       info.appendChild(prog);
-      const btn = el('button', 'ghost', m.installed ? 'Remover' : 'Baixar');
-      btn.addEventListener('click', () => m.installed ? removeModel(m.file) : downloadModel(m.file, btn, prog));
+      const btn = el('button', 'btn btn-sm' + (m.installed ? ' btn-ghost' : ''), m.installed ? 'Remover' : 'Baixar');
+      if (m.installed) btn.addEventListener('click', () => UI.confirmInline(btn, () => removeModel(m.file), { label: 'Remover mesmo?' }));
+      else btn.addEventListener('click', () => downloadModel(m.file, btn, prog));
       row.append(radio, info, btn);
       list.appendChild(row);
     }
+    if (animate) UI.stagger(list.children, 6);
   }
 
   async function downloadModel(file, btn, prog) {
-    btn.disabled = true; btn.textContent = 'Baixando…'; prog.style.display = 'block';
-    status('baixando ' + file + '…');
+    UI.busy(btn, true, 'Baixando…'); prog.classList.add('on');
+    status('baixando ' + file + '… (SHA-256 conferido ao final)');
     try {
       await invoke('download_model', { file });
       status(file + ' baixado e verificado ✓', 'ok');
+      toast('modelo pronto — já pode marcar e salvar', 'ok');
     } catch (e) {
       status('download falhou: ' + e, 'err');
+      UI.busy(btn, false);
     }
-    await renderModels();
+    await renderModels(false);
   }
 
   async function removeModel(file) {
     try { await invoke('delete_model', { file }); status(file + ' removido', 'ok'); }
     catch (e) { status('erro: ' + e, 'err'); }
-    await renderModels();
+    await renderModels(false);
   }
 
   listen('isper-model-progress', (e) => {
     const { file, done, total } = e.payload;
-    let bar;
-    if (file === 'diarize') {
-      $('diarprog').style.display = 'block';
-      bar = $('diarprog').firstElementChild;
-    } else {
-      const row = document.querySelector('.mrow[data-file="' + file + '"]');
-      bar = row && row.querySelector('.mprog > div');
-    }
-    if (bar && total > 0) bar.style.width = Math.round(done * 100 / total) + '%';
+    let box;
+    if (file === 'diarize') box = $('diarprog');
+    else { const row = document.querySelector('.mrow[data-file="' + file + '"]'); box = row && row.querySelector('.mprog'); }
+    if (!box || !(total > 0)) return;
+    box.classList.add('on');
+    const pct = Math.round(done * 100 / total);
+    box.querySelector('.progress > i').style.width = pct + '%';
+    box.querySelector('.pct').textContent = pct + '%';
   });
 
   async function refreshDiarize() {
     try {
       const ok = await invoke('diarize_status');
       $('diarstate').textContent = ok ? 'modelos instalados ✓ — falantes identificados ao encerrar' : 'não instalado — rótulo genérico "Participantes"';
-      $('diardl').style.display = ok ? 'none' : '';
+      $('diarstate').style.color = ok ? 'var(--good)' : '';
+      $('diardl').hidden = ok;
     } catch (_) {}
   }
   $('diardl').addEventListener('click', async () => {
-    $('diardl').disabled = true; $('diardl').textContent = 'Baixando…';
-    try { await invoke('download_diarize_models'); status('modelos de diarização instalados ✓', 'ok'); }
-    catch (e) { status('download falhou: ' + e, 'err'); $('diardl').disabled = false; $('diardl').textContent = 'Baixar modelos (~45 MB)'; }
+    UI.busy($('diardl'), true, 'Baixando…');
+    try { await invoke('download_diarize_models'); status('modelos de diarização instalados ✓', 'ok'); toast('diarização pronta', 'ok'); }
+    catch (e) { status('download falhou: ' + e, 'err'); }
+    UI.busy($('diardl'), false);
+    $('diarprog').classList.remove('on');
     await refreshDiarize();
   });
   refreshDiarize();
 
   $('save').addEventListener('click', async () => {
-    $('save').disabled = true;
-    status('salvando…');
+    const b = $('save');
+    UI.busy(b, true, 'Salvando…');
     try {
       const checked = document.querySelector('input[name=model]:checked');
       const label = await invoke('apply_settings', { patch: {
@@ -277,24 +256,30 @@
         show_home_on_launch: $('showhome').checked,
       }});
       $('active').textContent = label;
+      UI.busy(b, false);
+      UI.flash(b, 'Salvo ✓');
       status('salvo — atalho ativo: ' + label, 'ok');
-      setTimeout(renderModels, 1500);
+      setTimeout(() => renderModels(false), 1500);
     } catch (e) {
+      UI.busy(b, false);
       status('erro: ' + e, 'err');
-    } finally {
-      $('save').disabled = false;
     }
   });
 
   $('savekey').addEventListener('click', async () => {
     const provider = $('provider').value;
     if (provider === 'none') { status('escolha um provider antes de guardar a chave', 'err'); return; }
+    const b = $('savekey');
+    UI.busy(b, true);
     try {
       await invoke('set_llm_key', { provider, key: $('key').value });
       $('key').value = '';
-      $('keystate').textContent = '(guardada ✓)';
+      $('keystate').hidden = false;
+      UI.busy(b, false);
+      UI.flash(b, 'Guardada ✓');
       status('chave guardada no Credential Manager', 'ok');
     } catch (e) {
+      UI.busy(b, false);
       status('erro ao guardar chave: ' + e, 'err');
     }
   });
@@ -302,8 +287,8 @@
   $('listmodels').addEventListener('click', async () => {
     const provider = $('provider').value;
     if (provider === 'none') { status('escolha um provider primeiro', 'err'); return; }
-    $('listmodels').disabled = true;
-    status('consultando modelos…');
+    const b = $('listmodels');
+    UI.busy(b, true, 'Consultando…');
     try {
       const models = await invoke('list_llm_models', { provider, model: null });
       const dl = $('models');
@@ -314,27 +299,31 @@
     } catch (e) {
       status('não consegui listar: ' + e, 'err');
     } finally {
-      $('listmodels').disabled = false;
+      UI.busy(b, false);
     }
   });
 
   $('test').addEventListener('click', async () => {
-    $('test').disabled = true;
-    status('testando…');
+    const b = $('test');
+    UI.busy(b, true, 'Testando…');
     try {
       const reply = await invoke('test_llm');
+      UI.busy(b, false);
+      UI.flash(b, 'Conectado ✓');
       status(reply, 'ok');
     } catch (e) {
+      UI.busy(b, false);
+      UI.flash(b, 'Falhou', 'err');
       status('teste falhou: ' + e, 'err');
-    } finally {
-      $('test').disabled = false;
     }
   });
 
-  // O autostart vem no get_settings; marca depois do load.
-  load().then(async () => {
-    try { const s = await invoke('get_settings'); $('autostart').checked = !!s.autostart; } catch (_) {}
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') window.__TAURI__.window.getCurrentWindow().close();
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); $('save').click(); }
   });
+
+  load();
 </script>
 </body>
 </html>
