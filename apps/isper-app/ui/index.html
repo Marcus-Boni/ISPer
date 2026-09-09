@@ -112,6 +112,7 @@
 
   const CLASS_MAP = {
     'recording-handsfree': 'recording handsfree',
+    'polishing': 'transcribing',
     'meeting': 'recording meeting',
     'meeting-processing': 'transcribing meeting',
     'meeting-diarize': 'transcribing meeting',
@@ -136,12 +137,20 @@
     else if (s === 'meeting-summary') setStatus('resumindo com IA…');
     else if (s === 'meeting-done') { setStatus('reunião salva e aberta ✓'); blip(1320, .07); }
     else if (s === 'transcribing') setStatus('transcrevendo…');
+    else if (s === 'polishing') setStatus('polindo com IA…');
     else if (s === 'done') { setStatus(msg ? '“' + truncate(msg, 40) + '”' : 'colado'); blip(1320, .07); }
     else if (s === 'error') setStatus(msg || 'erro');
     else setStatus('pronto');
   }
 
   listen('isper-state', e => setState(e.payload.state, e.payload.text || e.payload.message));
+  // Transcrição ao vivo: a última fala aparece no lugar do status da reunião.
+  listen('isper-live', e => {
+    if (state !== 'meeting') return;
+    const p = e.payload || {};
+    const who = p.speaker === 'Eu' ? 'Eu: ' : '';
+    setStatus(who + truncate(String(p.text || '').trim(), 70));
+  });
   listen('isper-level', e => {
     bars.push(Math.min(1, e.payload * 14));
     if (bars.length > N) bars.shift();

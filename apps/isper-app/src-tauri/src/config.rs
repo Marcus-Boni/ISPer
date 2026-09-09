@@ -34,6 +34,19 @@ pub struct AppConfig {
     /// Abrir a tela Início quando o usuário abre o ISPer (nunca no autostart).
     #[serde(default = "default_true")]
     pub show_home_on_launch: bool,
+    /// Microfone do ditado e do canal "Eu" da reunião (`None` = padrão do sistema).
+    #[serde(default)]
+    pub input_device: Option<String>,
+    /// Atalho global que inicia/encerra a gravação de reunião.
+    #[serde(default = "default_meeting_shortcut")]
+    pub meeting_shortcut: Option<String>,
+    /// Polimento do ditado por IA antes de colar (só o texto sai da máquina;
+    /// usa o provider já configurado; qualquer falha cola o original).
+    #[serde(default)]
+    pub polish: bool,
+    /// `clean` (só limpeza) · `formal` · `casual`.
+    #[serde(default = "default_polish_style")]
+    pub polish_style: String,
 }
 
 impl Default for AppConfig {
@@ -47,8 +60,20 @@ impl Default for AppConfig {
             overlay_pos: None,
             overlay_mini: false,
             show_home_on_launch: true,
+            input_device: None,
+            meeting_shortcut: default_meeting_shortcut(),
+            polish: false,
+            polish_style: default_polish_style(),
         }
     }
+}
+
+fn default_meeting_shortcut() -> Option<String> {
+    Some("ctrl+alt+m".into())
+}
+
+fn default_polish_style() -> String {
+    "clean".into()
 }
 
 fn default_lang() -> String {

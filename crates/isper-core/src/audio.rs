@@ -76,9 +76,49 @@ pub fn record(duration: Duration) -> Result<RawAudio> {
 pub(crate) fn open_input_stream(
     tx: crossbeam_channel::Sender<Vec<f32>>,
 ) -> Result<(cpal::Stream, u32, u16)> {
+    open_input_stream_on(None, tx)
+}
+
+/// Nomes dos dispositivos de entrada disponíveis (tela de Configurações).
+/// O padrão do sistema é representado por `None` no resto do código.
+pub fn list_input_devices() -> Vec<String> {
     let host = cpal::default_host();
-    let device = host
-        .default_input_device()
+    let mut names: Vec<String> = host
+        .input_devices()
+        .map(|devices| {
+            devices
+                .filter_map(|d| d.description().ok().map(|x| x.name().to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    names.sort();
+    names.dedup();
+    names
+}
+
+/// Como [`open_input_stream`], mas num microfone específico (pelo nome que
+/// [`list_input_devices`] devolve). Se ele não existir mais — fone
+/// desconectado, por exemplo — cai para o padrão do sistema com aviso, em vez
+/// de falhar a gravação.
+pub(crate) fn open_input_stream_on(
+    device_name: Option<&str>,
+    tx: crossbeam_channel::Sender<Vec<f32>>,
+) -> Result<(cpal::Stream, u32, u16)> {
+    let host = cpal::default_host();
+    let wanted = device_name.map(str::trim).filter(|n| !n.is_empty());
+    let chosen = wanted.and_then(|name| {
+        host.input_devices().ok().and_then(|mut devices| {
+            devices.find(|d| d.description().map(|x| x.name() == name).unwrap_or(false))
+        })
+    });
+    if wanted.is_some() && chosen.is_none() {
+        tracing::warn!(
+            "microfone '{}' não encontrado — usando o padrão do sistema",
+            wanted.unwrap_or_default()
+        );
+    }
+    let device = chosen
+        .or_else(|| host.default_input_device())
         .ok_or(IsperError::NoInputDevice)?;
     let config = device
         .default_input_config()

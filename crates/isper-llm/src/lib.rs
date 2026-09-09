@@ -9,15 +9,17 @@
 //! - **Provider trocável**: o trait [`LlmProvider`] abstrai a API — Claude,
 //!   Groq e Gemini implementados; trocar é editar uma linha de configuração.
 
+mod polish;
 mod providers;
 mod settings;
 mod summary;
 
+pub use polish::{polish_dictation, POLISH_STYLES};
 pub use providers::{provider_from_settings, LlmProvider};
 pub use settings::{
     delete_api_key, get_api_key, load_settings, save_settings, set_api_key, LlmSettings,
 };
-pub use summary::summarize_meeting;
+pub use summary::{summarize_meeting, summarize_meeting_titled, MeetingSummary};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LlmError {

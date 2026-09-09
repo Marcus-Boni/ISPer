@@ -31,6 +31,8 @@ enum Command {
     Start,
     Stop,
     SetVad(bool),
+    /// Microfone a usar nas próximas gravações (`None` = padrão do sistema).
+    SetDevice(Option<String>),
 }
 
 pub enum RecorderEvent {
@@ -60,6 +62,12 @@ impl AudioHandle {
     /// Liga/desliga o auto-stop por silêncio (modo mãos-livres).
     pub fn set_vad(&self, on: bool) {
         let _ = self.cmd_tx.send(Command::SetVad(on));
+    }
+
+    /// Escolhe o microfone das próximas gravações (`None` = padrão do sistema).
+    /// Vale a partir do próximo `start()`; uma gravação em andamento não muda.
+    pub fn set_device(&self, name: Option<String>) {
+        let _ = self.cmd_tx.send(Command::SetDevice(name));
     }
 
     /// Canal de gravações concluídas — consuma numa thread própria.
@@ -175,6 +183,7 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
     let mut channels = 0u16;
     let mut vad = Vad::new();
     let mut started = Instant::now();
+    let mut device: Option<String> = None;
 
     loop {
         if let Some(rx) = data_rx.clone() {
@@ -185,6 +194,7 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
                         finish(&mut stream, &mut data_rx, &mut samples, sample_rate, channels, &event_tx);
                     }
                     Ok(Command::SetVad(on)) => vad.enabled = on,
+                    Ok(Command::SetDevice(name)) => device = name,
                     Ok(Command::Start) => {} // já gravando — ignora
                     Err(_) => return,        // app encerrou
                 },
@@ -203,9 +213,10 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
         } else {
             // Parado: só espera comando.
             match cmd_rx.recv() {
+                Ok(Command::SetDevice(name)) => device = name,
                 Ok(Command::Start) => {
                     let (tx, rx) = unbounded();
-                    match audio::open_input_stream(tx) {
+                    match audio::open_input_stream_on(device.as_deref(), tx) {
                         Ok((s, rate, ch)) => {
                             if let Err(e) = s.play() {
                                 let _ = event_tx

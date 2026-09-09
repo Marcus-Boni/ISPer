@@ -37,19 +37,26 @@
 </head>
 <body class="atmos">
 <h1 class="reveal" style="--i:0">Configurações</h1>
-<p class="sub reveal" style="--i:0">Atalho ativo agora: <b id="active">…</b></p>
+<p class="sub reveal" style="--i:0">Atalhos ativos agora: ditado <b id="active">…</b> · reunião <b id="mactive">…</b></p>
 
 <div class="card reveal" style="--i:1">
   <h2>Ditado</h2>
-  <label class="lbl" for="shortcut" style="margin-top:0">Atalho global</label>
-  <select id="shortcut" class="field">
-    <option value="">(automático — primeiro livre)</option>
-    <option value="ctrl+alt+space">Ctrl+Alt+Espaço</option>
-    <option value="ctrl+shift+space">Ctrl+Shift+Espaço</option>
-    <option value="ctrl+alt+d">Ctrl+Alt+D</option>
-    <option value="ctrl+alt+i">Ctrl+Alt+I</option>
-    <option value="f9">F9</option>
-  </select>
+  <label class="lbl" for="shortcut" style="margin-top:0">Atalho global do ditado</label>
+  <div class="row">
+    <select id="shortcut" class="field">
+      <option value="">(automático — primeiro livre)</option>
+      <option value="ctrl+alt+space">Ctrl+Alt+Espaço</option>
+      <option value="ctrl+shift+space">Ctrl+Shift+Espaço</option>
+      <option value="ctrl+alt+d">Ctrl+Alt+D</option>
+      <option value="ctrl+alt+i">Ctrl+Alt+I</option>
+      <option value="f9">F9</option>
+    </select>
+    <button class="btn" id="cap-shortcut" title="pressione a combinação que quiser">Gravar atalho</button>
+  </div>
+  <p class="hint">"Gravar atalho": clique e pressione a combinação (ex.: Ctrl+Shift+K). Letras, números, F1–F12 e Espaço, com pelo menos um modificador; F-keys podem ir sozinhas. Se a combinação estiver ocupada por outro programa, o ISPer avisa e usa a próxima livre.</p>
+  <label class="lbl" for="mic">Microfone</label>
+  <select id="mic" class="field"><option value="">(padrão do sistema)</option></select>
+  <p class="hint">Vale para o ditado e para o canal "Eu" das reuniões. Se o aparelho escolhido não estiver conectado na hora, o ISPer usa o padrão e avisa no log.</p>
   <label class="lbl" for="lang">Idioma da fala</label>
   <select id="lang" class="field">
     <option value="pt">Português</option>
@@ -70,7 +77,17 @@
 
 <div class="card reveal" style="--i:3">
   <h2>Reuniões</h2>
-  <label class="lbl" for="source" style="margin-top:0">Áudio dos participantes</label>
+  <label class="lbl" for="mshortcut" style="margin-top:0">Atalho global para iniciar/encerrar a gravação</label>
+  <div class="row">
+    <select id="mshortcut" class="field">
+      <option value="">(automático — Ctrl+Alt+M ou o próximo livre)</option>
+      <option value="ctrl+alt+m">Ctrl+Alt+M</option>
+      <option value="ctrl+shift+m">Ctrl+Shift+M</option>
+      <option value="ctrl+alt+r">Ctrl+Alt+R</option>
+    </select>
+    <button class="btn" id="cap-mshortcut" title="pressione a combinação que quiser">Gravar atalho</button>
+  </div>
+  <label class="lbl" for="source">Áudio dos participantes</label>
   <select id="source" class="field">
     <option value="system">Todo o sistema (padrão)</option>
     <option value="teams">Só o Microsoft Teams</option>
@@ -110,6 +127,16 @@
   <div class="row" style="margin-top:10px">
     <button class="btn" id="test" style="flex:0 0 auto">Testar conexão</button>
   </div>
+  <label class="lbl">Polimento do ditado</label>
+  <div class="stack" style="margin-top:4px">
+    <label class="switch"><input type="checkbox" id="polish"><span class="track"><span class="thumb"></span></span>Polir os ditados com IA antes de colar</label>
+    <select id="pstyle" class="field">
+      <option value="clean">Só limpeza — tira hesitações e arruma pontuação, sem mudar o tom</option>
+      <option value="formal">Formal — frases completas, tom profissional</option>
+      <option value="casual">Casual — tom natural, como uma mensagem para colegas</option>
+    </select>
+  </div>
+  <p class="hint">Usa o provider acima; só o texto do ditado é enviado. Acrescenta cerca de um segundo antes de colar. Se a API falhar ou não houver chave, o texto original é colado normalmente — o histórico guarda os dois.</p>
 </div>
 
 <div class="card reveal" style="--i:5">
@@ -135,11 +162,68 @@
   const status = (msg, cls = '') => { const s = $('status'); s.textContent = msg; s.className = cls; s.classList.remove('swap'); void s.offsetWidth; s.classList.add('swap'); };
   let selectedModel = null;
 
+  // Um combo salvo que não está entre as opções fixas ganha uma <option> própria.
+  const pretty = (combo) => combo.split('+').map(p => ({ ctrl: 'Ctrl', alt: 'Alt', shift: 'Shift', super: 'Win', space: 'Espaço' })[p] || p.toUpperCase()).join('+');
+  function setCombo(select, combo) {
+    if (!combo) { select.value = ''; return; }
+    if (![...select.options].some(o => o.value === combo)) {
+      const o = document.createElement('option'); o.value = combo; o.textContent = pretty(combo) + ' (personalizado)';
+      select.appendChild(o);
+    }
+    select.value = combo;
+  }
+  // "Gravar atalho": lê a próxima combinação de teclas e coloca no select.
+  function captureInto(select, btn) {
+    const prev = btn.textContent;
+    btn.textContent = 'Pressione a combinação…'; btn.classList.add('is-armed');
+    const done = (combo) => {
+      document.removeEventListener('keydown', onKey, true);
+      btn.textContent = prev; btn.classList.remove('is-armed');
+      if (combo) { setCombo(select, combo); status('atalho capturado: ' + pretty(combo) + ' — clique em Salvar para aplicar', 'ok'); }
+    };
+    const onKey = (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      if (ev.key === 'Escape') { done(null); return; }
+      const mods = [];
+      if (ev.ctrlKey) mods.push('ctrl');
+      if (ev.altKey) mods.push('alt');
+      if (ev.shiftKey) mods.push('shift');
+      if (ev.metaKey) mods.push('super');
+      let key = null;
+      if (/^[a-zA-Z]$/.test(ev.key)) key = ev.key.toLowerCase();
+      else if (/^[0-9]$/.test(ev.key)) key = ev.key;
+      else if (/^F([1-9]|1[0-2])$/.test(ev.key)) key = ev.key.toLowerCase();
+      else if (ev.key === ' ' || ev.code === 'Space') key = 'space';
+      if (!key) return;                          // só modificador ou tecla não suportada: continua ouvindo
+      if (!mods.length && !key.startsWith('f')) { status('use pelo menos um modificador (Ctrl, Alt, Shift) com essa tecla', 'err'); return; }
+      done([...mods, key].join('+'));
+    };
+    document.addEventListener('keydown', onKey, true);
+  }
+  $('cap-shortcut').addEventListener('click', () => captureInto($('shortcut'), $('cap-shortcut')));
+  $('cap-mshortcut').addEventListener('click', () => captureInto($('mshortcut'), $('cap-mshortcut')));
+
+  async function loadMics(selected) {
+    const sel = $('mic');
+    let devices = [];
+    try { devices = await invoke('list_input_devices'); } catch (_) {}
+    sel.replaceChildren();
+    const def = document.createElement('option'); def.value = ''; def.textContent = '(padrão do sistema)'; sel.appendChild(def);
+    for (const d of devices) { const o = document.createElement('option'); o.value = d; o.textContent = d; sel.appendChild(o); }
+    if (selected && !devices.includes(selected)) { const o = document.createElement('option'); o.value = selected; o.textContent = selected + ' (não conectado)'; sel.appendChild(o); }
+    sel.value = selected || '';
+  }
+
   async function load() {
     try {
       const s = await invoke('get_settings');
       $('active').textContent = s.active_shortcut;
-      $('shortcut').value = s.shortcut || '';
+      $('mactive').textContent = s.active_meeting_shortcut || '(nenhum)';
+      setCombo($('shortcut'), s.shortcut || '');
+      setCombo($('mshortcut'), s.meeting_shortcut || '');
+      await loadMics(s.input_device || '');
+      $('polish').checked = !!s.polish;
+      $('pstyle').value = s.polish_style || 'clean';
       $('lang').value = s.lang || 'pt';
       $('dict').value = s.dictionary || '';
       $('source').value = s.meeting_source || 'system';
@@ -254,11 +338,16 @@
         llm_model: $('model').value || null,
         autostart: $('autostart').checked,
         show_home_on_launch: $('showhome').checked,
+        input_device: $('mic').value || null,
+        meeting_shortcut: $('mshortcut').value || null,
+        polish: $('polish').checked,
+        polish_style: $('pstyle').value,
       }});
       $('active').textContent = label;
       UI.busy(b, false);
       UI.flash(b, 'Salvo ✓');
-      status('salvo — atalho ativo: ' + label, 'ok');
+      status('salvo — atalho de ditado ativo: ' + label, 'ok');
+      try { const s = await invoke('get_settings'); $('mactive').textContent = s.active_meeting_shortcut || '(nenhum)'; } catch (_) {}
       setTimeout(() => renderModels(false), 1500);
     } catch (e) {
       UI.busy(b, false);

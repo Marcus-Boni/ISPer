@@ -48,12 +48,15 @@
   .dhead h2:hover { background: var(--panel); box-shadow: 0 0 0 6px var(--panel); }
   .dhead input { flex: 1; font: 500 26px var(--font-display); letter-spacing: -.015em; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--accent); background: var(--bg-2); color: var(--ink); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
   .meta { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
-  .actions { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .actions { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .actions .sep { color: var(--muted-2); font-size: 12px; margin-left: 6px; }
   h3.eyebrow { margin: 24px 0 10px; }
   .summary { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; white-space: pre-wrap; line-height: 1.6; }
-  .seg { display: grid; grid-template-columns: 52px 130px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); line-height: 1.5; transition: background var(--dur-2); }
+  .seg { display: grid; grid-template-columns: 52px 140px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); line-height: 1.5; transition: background var(--dur-2); }
   .seg .ts { color: var(--muted-2); font: 12px var(--font-mono); padding-top: 2px; transition: color var(--dur-2); }
-  .seg .sp { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seg .sp { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; border-radius: 4px; padding: 0 4px; margin: 0 -4px; transition: background var(--dur-2); }
+  .seg .sp:hover { background: var(--panel-2); }
+  .seg .sp input { width: 100%; font: 600 13.5px var(--font-body); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--accent); background: var(--bg-2); color: var(--ink); outline: none; }
   .sp.eu { color: var(--accent); } .sp.p1 { color: var(--p1); } .sp.p2 { color: var(--p2); } .sp.p3 { color: var(--p3); } .sp.p4 { color: var(--p4); } .sp.p5 { color: var(--p5); } .sp.px { color: var(--muted); }
 
   /* Busca dentro da reunião: barra fixa no topo do painel + destaques. */
@@ -79,6 +82,7 @@
   .dict:hover { background: var(--panel); }
   .dict .at { color: var(--muted-2); font: 12px var(--font-mono); padding-top: 3px; }
   .dict .tx { line-height: 1.5; }
+  .dict .tx .chip { margin-left: 8px; cursor: help; }
 </style>
 </head>
 <body class="atmos">
@@ -106,16 +110,30 @@
   const { listen } = window.__TAURI__.event;
   const $ = (id) => document.getElementById(id);
   const { el, toast, fmtClock, plural } = UI;
-  function spClass(sp) {
-    if (sp === 'Eu') return 'eu';
-    const m = sp.match(/^Participante (\d+)/);
-    return m ? 'p' + Math.min(5, Number(m[1])) : 'px';
+  // Mesmas regras do núcleo (meeting.rs): um parágrafo só continua se for o
+  // mesmo falante, com pausa < 4 s e sem passar de 60 s.
+  const GROUP_MAX_SECS = 60, GROUP_GAP_SECS = 4;
+  function groupSpeech(segments) {
+    const groups = [];
+    for (const s of segments) {
+      const text = (s.text || '').trim();
+      if (!text) continue;
+      const g = groups[groups.length - 1];
+      if (g && g.speaker === s.speaker && s.start_secs - g.end_secs < GROUP_GAP_SECS && s.end_secs - g.start_secs <= GROUP_MAX_SECS) {
+        g.text += ' ' + text; g.end_secs = Math.max(g.end_secs, s.end_secs);
+      } else groups.push({ speaker: s.speaker, start_secs: s.start_secs, end_secs: s.end_secs, text });
+    }
+    return groups;
   }
   function placeholder(text) {
     const p = el('div', 'placeholder');
     const art = el('div', 'empty-art'); art.append(el('i'), el('i'), el('i'));
     p.append(art, el('span', '', text));
     return p;
+  }
+  async function copyText(text, btn, label) {
+    try { await navigator.clipboard.writeText(text); UI.flash(btn, label || 'copiado ✓'); }
+    catch (_) { toast('não consegui copiar', 'err'); }
   }
 
   let tab = 'meetings';
@@ -189,15 +207,26 @@
     if (animate) UI.stagger(list.children, 10);
   }
 
-  async function showMeeting(id) {
+  async function showMeeting(id, opts = {}) {
     const d = $('detail');
     let det;
     try { det = await invoke('get_meeting', { id }); } catch (e) { toast('erro: ' + e, 'err'); return; }
+    const keepScroll = opts.keepScroll ? d.scrollTop : null;
     UI.swap(d, () => {
       d.replaceChildren();
       d.classList.remove('filtering');
       if (!det) { d.appendChild(placeholder('reunião não encontrada')); return; }
       const m = det.meeting;
+      const groups = groupSpeech(det.segments);
+      // Cores por ordem de aparição — nomes personalizados continuam coloridos.
+      const order = [];
+      const spClass = (sp) => {
+        if (sp === 'Eu') return 'eu';
+        let i = order.indexOf(sp);
+        if (i < 0) { order.push(sp); i = order.length - 1; }
+        return 'p' + (Math.min(i, 4) + 1);
+      };
+      const transcriptText = () => groups.map(g => '[' + fmtClock(g.start_secs) + '] ' + g.speaker + ': ' + g.text).join('\n');
 
       const head = el('div', 'dhead');
       const h2 = el('h2', '', m.title);
@@ -210,23 +239,44 @@
           if (done) return; done = true;
           const t = input.value.trim();
           if (t && t !== m.title) {
-            try { await invoke('rename_meeting', { id, title: t }); toast('renomeada', 'ok'); }
+            try { await invoke('rename_meeting', { id, title: t }); toast('renomeada — o .md acompanhou', 'ok'); }
             catch (e) { toast('erro: ' + e, 'err'); }
           }
-          await loadMeetings(true); showMeeting(id);
+          await loadMeetings(true); showMeeting(id, { keepScroll: true });
         };
-        input.addEventListener('keydown', ev => { if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') { done = true; showMeeting(id); } });
+        input.addEventListener('keydown', ev => { if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') { done = true; showMeeting(id, { keepScroll: true }); } });
         input.addEventListener('blur', commit);
       });
       head.appendChild(h2);
       d.appendChild(head);
-      d.appendChild(el('div', 'meta', m.started_at + ' · ' + fmtClock(m.duration_secs) + ' · ' + m.segments + ' segmentos · ' + plural(m.participants, 'participante', 'participantes')));
+      d.appendChild(el('div', 'meta', m.started_at + ' · ' + fmtClock(m.duration_secs) + ' · ' + m.segments + ' segmentos · ' + plural(m.participants, 'participante', 'participantes') + ' · clique num nome de falante para renomeá-lo'));
 
       const actions = el('div', 'actions');
       const bOpen = el('button', 'btn', 'Abrir .md'); bOpen.disabled = !m.md_path;
       bOpen.addEventListener('click', () => invoke('open_meeting_file', { id }).catch(e => toast('erro: ' + e, 'err')));
+      actions.appendChild(bOpen);
+      if (det.summary) {
+        const bSum = el('button', 'btn btn-ghost', 'Copiar resumo');
+        bSum.addEventListener('click', () => copyText(det.summary, bSum, 'resumo copiado ✓'));
+        actions.appendChild(bSum);
+      }
+      const bTx = el('button', 'btn btn-ghost', 'Copiar transcript');
+      bTx.addEventListener('click', () => copyText(transcriptText(), bTx, 'transcript copiado ✓'));
+      actions.appendChild(bTx);
+      actions.appendChild(el('span', 'sep', 'Exportar:'));
+      for (const fmt of ['srt', 'docx']) {
+        const b = el('button', 'btn btn-ghost btn-sm', fmt.toUpperCase());
+        b.title = fmt === 'srt' ? 'legendas com horário (SRT), ao lado do .md' : 'documento Word (DOCX), ao lado do .md';
+        b.addEventListener('click', async () => {
+          UI.busy(b, true);
+          try { const path = await invoke('export_meeting', { id, format: fmt }); UI.busy(b, false); UI.flash(b, 'salvo ✓'); toast('exportado e aberto: ' + path, 'ok', 4000); }
+          catch (e) { UI.busy(b, false); toast('erro ao exportar: ' + e, 'err'); }
+        });
+        actions.appendChild(b);
+      }
       const bDel = el('button', 'btn btn-danger', 'Excluir do histórico');
       bDel.title = 'o arquivo .md continua na pasta';
+      bDel.style.marginLeft = 'auto';
       bDel.addEventListener('click', () => UI.confirmInline(bDel, async () => {
         try { await invoke('delete_meeting', { id }); selected = null; toast('excluída do histórico — o arquivo .md continua na pasta', 'ok'); }
         catch (e) { toast('erro: ' + e, 'err'); }
@@ -234,7 +284,7 @@
         $('list').dataset.sig = '';
         loadMeetings(true);
       }, { label: 'Excluir mesmo?' }));
-      actions.append(bOpen, bDel);
+      actions.appendChild(bDel);
       d.appendChild(actions);
 
       // Barra de busca da reunião (fixa no topo enquanto o transcript rola).
@@ -261,18 +311,36 @@
         d.appendChild(sumbox);
       }
       d.appendChild(el('h3', 'eyebrow', 'Transcript'));
-      // Falas consecutivas do mesmo falante viram um bloco só.
-      const groups = [];
-      for (const s of det.segments) {
-        const g = groups[groups.length - 1];
-        if (g && g.speaker === s.speaker) g.text += ' ' + s.text;
-        else groups.push({ speaker: s.speaker, start: s.start_secs, text: s.text });
-      }
+
+      // Renomear falante: clique no nome → input; Enter aplica em toda a reunião.
+      const renameSpeaker = (spEl, from) => {
+        const input = el('input'); input.value = from; input.setAttribute('aria-label', 'novo nome do falante');
+        spEl.replaceChildren(input); input.focus(); input.select();
+        let done = false;
+        const restore = () => { spEl.textContent = from; };
+        const commit = async () => {
+          if (done) return; done = true;
+          const to = input.value.trim();
+          if (!to || to === from) { restore(); return; }
+          try {
+            const n = await invoke('rename_speaker', { id, from, to });
+            toast(plural(n, 'fala renomeada', 'falas renomeadas') + ' para "' + to + '" — o .md acompanhou', 'ok');
+            await loadMeetings(true);
+            showMeeting(id, { keepScroll: true });
+          } catch (e) { toast('erro: ' + e, 'err'); restore(); }
+        };
+        input.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') { done = true; restore(); } });
+        input.addEventListener('blur', commit);
+      };
+
       groups.forEach((g, n) => {
         const seg = el('div', 'seg');
         if (n < 14) { seg.classList.add('reveal'); seg.style.setProperty('--i', String(n)); }
-        seg.appendChild(el('div', 'ts', fmtClock(g.start)));
-        seg.appendChild(el('div', 'sp ' + spClass(g.speaker), g.speaker));
+        seg.appendChild(el('div', 'ts', fmtClock(g.start_secs)));
+        const sp = el('div', 'sp ' + spClass(g.speaker), g.speaker);
+        sp.title = 'clique para renomear "' + g.speaker + '" em toda a reunião';
+        sp.addEventListener('click', () => { if (!sp.querySelector('input')) renameSpeaker(sp, g.speaker); });
+        seg.appendChild(sp);
         const tx = el('div', 'tx', g.text); tx.dataset.raw = g.text;
         seg.appendChild(tx);
         d.appendChild(seg);
@@ -333,7 +401,8 @@
         if (!marks.length && meetingQuery[id] === undefined) { input.value = ''; apply(); }
       }
     });
-    if (!(meetingQuery[id] || $('search').value.trim())) d.scrollTop = 0;
+    if (keepScroll != null) d.scrollTop = keepScroll;
+    else if (!(meetingQuery[id] || $('search').value.trim())) d.scrollTop = 0;
   }
 
   // ------------------------------------------------------------- ditados
@@ -349,18 +418,16 @@
     if (list.dataset.sig === signature) return;
     list.dataset.sig = signature;
     list.replaceChildren();
-    $('detail').replaceChildren(placeholder(rows.length ? '"copiar" reutiliza um texto ditado; "×" remove do histórico.' : 'Seus ditados aparecem aqui.'));
+    $('detail').replaceChildren(placeholder(rows.length ? '"copiar" reutiliza um texto ditado; "×" remove do histórico. O selo "IA" marca ditados polidos — passe o mouse para ver o original.' : 'Seus ditados aparecem aqui.'));
     if (!rows.length) { list.appendChild(placeholder(q ? 'nada encontrado' : 'nenhum ditado ainda')); return; }
     for (const r of rows) {
       const row = el('div', 'dict');
       row.appendChild(el('div', 'at', r.at));
       const tx = el('div', 'tx'); tx.dataset.raw = r.text; paint(tx, q.trim());
+      if (r.raw_text) { const c = el('span', 'chip chip-info', 'IA'); c.title = 'Original do Whisper: ' + r.raw_text; tx.appendChild(c); }
       row.appendChild(tx);
       const bCopy = el('button', 'btn btn-sm btn-ghost', 'copiar');
-      bCopy.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(r.text); UI.flash(bCopy, 'copiado ✓'); }
-        catch (_) { toast('não consegui copiar', 'err'); }
-      });
+      bCopy.addEventListener('click', () => copyText(r.text, bCopy));
       const bDel = el('button', 'btn btn-sm btn-danger', '×'); bDel.title = 'remover do histórico';
       bDel.addEventListener('click', () => UI.confirmInline(bDel, async () => {
         try { await invoke('delete_dictation', { id: r.id }); $('list').dataset.sig = ''; loadDictations(true); }

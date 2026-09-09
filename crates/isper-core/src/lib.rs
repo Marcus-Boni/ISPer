@@ -6,6 +6,7 @@
 
 pub mod audio;
 pub mod engine;
+pub mod export;
 pub mod loopback;
 pub mod meeting;
 pub mod recorder;

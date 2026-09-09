@@ -135,18 +135,44 @@ Requer `models/ggml-small.bin` (ou a env `ISPER_MODEL` apontando para outro
 modelo ggml).
 
 Na bandeja, **"Configurações…"** abre a tela com: atalho global (trocado na
-hora, sem reiniciar), idioma, **dicionário pessoal** (termos que o Whisper
-deve grafar certo — viram o `initial_prompt`), provider de IA com chave e
-teste de conexão, e iniciar com o Windows. Cada ditado também fica no
-histórico (`%APPDATA%\ISPer\isper.db`, tabela `dictations`).
+hora, sem reiniciar — escolha na lista ou clique em **"Gravar atalho"** e
+pressione a combinação que quiser), **microfone** (vale para o ditado e para
+o canal "Eu" das reuniões; se desconectar, cai para o padrão), idioma,
+**dicionário pessoal** (termos que o Whisper deve grafar certo — viram o
+`initial_prompt`), provider de IA com chave e teste de conexão, e iniciar
+com o Windows. Cada ditado também fica no histórico (`%APPDATA%\ISPer\isper.db`,
+tabela `dictations`).
+
+**Polimento por IA (opcional)**: em Configurações → Inteligência, "Polir os
+ditados com IA antes de colar" tira hesitações ("é", "hã", "tipo"),
+repetições e arruma pontuação usando o provider configurado — estilo "só
+limpeza", formal ou casual. Só o texto do ditado é enviado; custa cerca de um
+segundo; se a API falhar ou não houver chave, o original é colado
+normalmente, e o histórico guarda os dois (selo "IA" na Biblioteca).
 
 ### Notetaker de reuniões (Fase 4)
 
-No app: bandeja → **"Iniciar gravação de reunião"**. O pill mostra o estado;
-o mesmo menu encerra ("Encerrar e transcrever a reunião") — o transcript
-abre sozinho e fica salvo em `Documentos\ISPer\Reunioes\*.md` + SQLite em
-`%APPDATA%\ISPer\isper.db`. Mic = "Eu"; áudio do sistema (loopback) =
-"Participantes". Avise os participantes (LGPD).
+No app: bandeja → **"Iniciar gravação de reunião"**, o botão da tela Início
+ou o **atalho global de reunião** (Ctrl+Alt+M por padrão; configurável). O
+ícone da bandeja ganha um **ponto vermelho** enquanto grava. O pill mostra o
+estado; o mesmo caminho encerra ("Encerrar e transcrever a reunião") — o
+transcript abre sozinho e fica salvo em `Documentos\ISPer\Reunioes\*.md` +
+SQLite em `%APPDATA%\ISPer\isper.db`. Mic = "Eu"; áudio do sistema
+(loopback) = "Participantes". Avise os participantes (LGPD).
+
+**Ao vivo**: cada bloco de ~20 s é transcrito durante a reunião — as falas
+aparecem no card de reunião da tela Início conforme chegam, e a última fala
+passa pelo indicador flutuante. Tudo local; nenhum áudio ou texto sai da
+máquina nessa etapa.
+
+**Título automático**: com um provider de IA configurado, o resumo pós-reunião
+vem junto com um título curto do assunto ("Planejamento PCP da semana 37" em
+vez de "Reunião — data"); o `.md` é regravado inteiro com título e resumo.
+
+**Parágrafos legíveis**: falas consecutivas do mesmo falante são agrupadas
+só enquanto a pausa entre elas for menor que 4 s e o parágrafo não passar de
+60 s — cada parágrafo mantém o horário. Vale para o `.md`, o DOCX e a
+Biblioteca.
 
 **Biblioteca**: bandeja → "Biblioteca de reuniões…" (ou o botão na tela
 Início) lista todas as
@@ -166,6 +192,15 @@ reunião" (ou Ctrl+F) destaca cada ocorrência no resumo e no transcript — sem
 diferenciar maiúsculas nem acentos —, com contador, Enter/Shift+Enter para
 navegar e "Só trechos" para ver apenas as falas que contêm o termo. Se a
 reunião apareceu por causa da busca geral, o termo já vem destacado.
+
+**Nomear participantes**: clique no nome de um falante no transcript
+("Participante 1") e digite o nome real — vale para toda a reunião, o `.md`
+é regravado e a cor do falante se mantém. (Reconhecer a mesma voz em reuniões
+futuras fica para depois.)
+
+**Copiar e exportar**: botões "Copiar resumo" e "Copiar transcript" (texto
+puro com horários), e **Exportar SRT** (legendas) ou **DOCX** (Word) — o
+arquivo é gravado ao lado do `.md` e mostrado no Explorer.
 
 **Só o Teams**: em Configurações → Reuniões, escolha "Só o Microsoft Teams" —
 o ISPer usa o *process loopback* do Windows e ignora notificações, músicas e

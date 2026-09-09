@@ -14,22 +14,24 @@
 
 mod config;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde_json::json;
+use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
-use tauri_plugin_global_shortcut::ShortcutState;
+use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 
 use config::AppConfig;
 use isper_core::loopback::LoopbackSource;
-use isper_core::meeting::{self, MeetingHandle, MeetingOptions};
+use isper_core::meeting::{self, MeetingHandle, MeetingOptions, MeetingSegment, SegmentRef};
 use isper_core::recorder::{self, RecorderEvent};
-use isper_core::store::MeetingStore;
+use isper_core::store::{MeetingDetail, MeetingStore};
 use isper_core::{RawAudio, WhisperEngine};
 
 /// Candidatos a atalho, em ordem de preferência, usados quando o usuário não
@@ -41,6 +43,13 @@ const SHORTCUT_CANDIDATES: [(&str, &str); 4] = [
     ("ctrl+alt+d", "Ctrl+Alt+D"),
     ("ctrl+alt+i", "Ctrl+Alt+I"),
 ];
+/// Candidatos ao atalho de reunião (iniciar/encerrar a gravação).
+const MEETING_SHORTCUT_CANDIDATES: [&str; 3] = ["ctrl+alt+m", "ctrl+shift+m", "ctrl+alt+r"];
+/// Toques do atalho de reunião mais próximos que isso são ignorados (auto-repeat
+/// da tecla e duplo aperto nervoso não podem iniciar e encerrar em sequência).
+const MEETING_HOTKEY_DEBOUNCE: Duration = Duration::from_millis(1200);
+/// Últimas falas guardadas para a transcrição ao vivo (o Início pede ao abrir).
+const LIVE_KEEP: usize = 400;
 /// Soltar antes disso = toque rápido → vira modo mãos-livres.
 const TAP_THRESHOLD: Duration = Duration::from_millis(350);
 /// Tamanhos lógicos do indicador flutuante: normal e mini (ponto + cronômetro).
@@ -92,6 +101,25 @@ struct AppState {
     hint_item: Mutex<Option<MenuItem<tauri::Wry>>>,
     /// HWND do indicador (0 fora do Windows) — p/ reafirmar o topo sem passar pelo tao.
     overlay_hwnd: isize,
+    /// Atalhos registrados no momento — o handler precisa saber qual disparou.
+    dictation_shortcut: Mutex<Option<Shortcut>>,
+    meeting_shortcut: Mutex<Option<Shortcut>>,
+    active_meeting_shortcut: Mutex<String>,
+    last_meeting_toggle: Mutex<Option<Instant>>,
+    /// Falas da reunião em andamento, na ordem em que foram transcritas.
+    live: Mutex<Vec<LiveSegment>>,
+    /// Ícone da bandeja e suas duas versões (normal / gravando).
+    tray: Mutex<Option<TrayIcon>>,
+    tray_icons: Mutex<Option<(Image<'static>, Image<'static>)>>,
+}
+
+/// Uma fala transcrita durante a reunião (evento `isper-live`).
+#[derive(Clone, serde::Serialize)]
+struct LiveSegment {
+    speaker: String,
+    start_secs: f32,
+    end_secs: f32,
+    text: String,
 }
 
 fn main() {
@@ -111,9 +139,24 @@ fn main() {
         ))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| match event.state {
-                    ShortcutState::Pressed => on_pressed(app),
-                    ShortcutState::Released => on_released(app),
+                .with_handler(|app, shortcut, event| {
+                    let is_meeting = app
+                        .state::<AppState>()
+                        .meeting_shortcut
+                        .lock()
+                        .unwrap()
+                        .as_ref()
+                        == Some(shortcut);
+                    if is_meeting {
+                        if event.state == ShortcutState::Pressed {
+                            on_meeting_hotkey(app);
+                        }
+                        return;
+                    }
+                    match event.state {
+                        ShortcutState::Pressed => on_pressed(app),
+                        ShortcutState::Released => on_released(app),
+                    }
                 })
                 .build(),
         )
@@ -140,6 +183,10 @@ fn main() {
             overlay_set_mini,
             overlay_hide,
             overlay_moved,
+            list_input_devices,
+            live_transcript,
+            rename_speaker,
+            export_meeting,
             home_status,
             toggle_meeting_cmd,
             open_library_window,
@@ -164,7 +211,15 @@ fn main() {
                 meeting_item: Mutex::new(None),
                 hint_item: Mutex::new(None),
                 overlay_hwnd: overlay_hwnd(&overlay),
+                dictation_shortcut: Mutex::new(None),
+                meeting_shortcut: Mutex::new(None),
+                active_meeting_shortcut: Mutex::new(String::new()),
+                last_meeting_toggle: Mutex::new(None),
+                live: Mutex::new(Vec::new()),
+                tray: Mutex::new(None),
+                tray_icons: Mutex::new(None),
             });
+            app.state::<AppState>().audio.set_device(cfg.input_device.clone());
 
             // Overlay: nunca focável; tamanho (mini/normal) e posição lembrados.
             overlay.set_focusable(false)?;
@@ -185,9 +240,8 @@ fn main() {
                 }
             }
 
-            // Atalho global: o preferido das configurações, senão o primeiro livre.
-            let label = register_best_shortcut(app.handle(), cfg.shortcut.as_deref());
-            *app.state::<AppState>().active_shortcut.lock().unwrap() = label.clone();
+            // Atalhos globais: os preferidos das configurações, senão os primeiros livres.
+            let (label, _meeting_label) = register_shortcuts(app.handle(), &cfg);
 
             // Ícone na bandeja: clique esquerdo abre o Início; direito, o menu.
             let hint = MenuItem::with_id(app, "hint", hint_text(&label), false, None::<&str>)?;
@@ -200,7 +254,7 @@ fn main() {
             let meeting_item = MenuItem::with_id(
                 app,
                 "meeting",
-                "Iniciar gravação de reunião",
+                meeting_item_text(app.handle(), false),
                 true,
                 None::<&str>,
             )?;
@@ -229,8 +283,11 @@ fn main() {
                 *state.meeting_item.lock().unwrap() = Some(meeting_item);
                 *state.hint_item.lock().unwrap() = Some(hint);
             }
-            TrayIconBuilder::new()
-                .icon(app.default_window_icon().expect("ícone do app").clone())
+            // Duas versões do ícone: a normal e a com o ponto vermelho de gravação.
+            let base_icon = app.default_window_icon().expect("ícone do app").clone().to_owned();
+            let rec_icon = recording_icon(&base_icon);
+            let tray = TrayIconBuilder::new()
+                .icon(base_icon.clone())
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .tooltip("ISPer — ditado e reuniões, 100% local")
@@ -256,6 +313,11 @@ fn main() {
                     }
                 })
                 .build(app)?;
+            {
+                let state = app.state::<AppState>();
+                *state.tray.lock().unwrap() = Some(tray);
+                *state.tray_icons.lock().unwrap() = Some((base_icon, rec_icon));
+            }
 
             // Autostart ligado numa versão anterior não passava a flag — reaplica
             // o registro para que o próximo login também nasça quieto na bandeja.
@@ -348,43 +410,179 @@ fn main() {
 
 // ------------------------------------------------------------- atalho
 
-/// Registra o primeiro atalho livre: o preferido (das configurações) tem
-/// prioridade; os candidatos padrão são o fallback. Devolve o rótulo ativo.
-fn register_best_shortcut(app: &AppHandle, preferred: Option<&str>) -> String {
+/// Rótulo legível de um combo ("ctrl+alt+space" → "Ctrl+Alt+Espaço").
+fn pretty_label(combo: &str) -> String {
+    if let Some((_, l)) = SHORTCUT_CANDIDATES.iter().find(|(c, _)| *c == combo) {
+        return l.to_string();
+    }
+    combo
+        .split('+')
+        .map(|part| match part.trim().to_lowercase().as_str() {
+            "ctrl" | "control" => "Ctrl".to_string(),
+            "alt" => "Alt".to_string(),
+            "shift" => "Shift".to_string(),
+            "super" | "win" | "meta" => "Win".to_string(),
+            "space" => "Espaço".to_string(),
+            other => {
+                let mut c = other.chars();
+                match c.next() {
+                    Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                    None => String::new(),
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("+")
+}
+
+/// Tenta registrar, na ordem, o primeiro combo livre de `candidates` que não
+/// esteja em `taken`. Devolve o `Shortcut` e o combo registrado.
+fn register_first_free(
+    shortcuts: &tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>,
+    candidates: &[String],
+    taken: Option<&Shortcut>,
+) -> Option<(Shortcut, String)> {
+    for combo in candidates {
+        let parsed = match Shortcut::from_str(combo) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!("atalho '{combo}' inválido: {e}");
+                continue;
+            }
+        };
+        if taken == Some(&parsed) {
+            continue; // já é o atalho de ditado
+        }
+        match shortcuts.register(parsed) {
+            Ok(()) => {
+                tracing::info!("atalho registrado: {}", pretty_label(combo));
+                return Some((parsed, combo.clone()));
+            }
+            Err(e) => tracing::warn!("atalho {} indisponível: {e}", pretty_label(combo)),
+        }
+    }
+    None
+}
+
+/// (Re)registra os dois atalhos globais — ditado e reunião — a partir da
+/// configuração: o preferido de cada um tem prioridade; os candidatos padrão
+/// são o fallback. Guarda os `Shortcut`s no estado (o handler compara com
+/// eles) e devolve os rótulos ativos (ditado, reunião).
+fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, String) {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
     let shortcuts = app.global_shortcut();
     let _ = shortcuts.unregister_all();
+    let state = app.state::<AppState>();
 
-    let mut tried: Vec<(String, String)> = Vec::new();
-    if let Some(p) = preferred {
-        let p = p.trim().to_lowercase();
-        if !p.is_empty() {
-            let label = SHORTCUT_CANDIDATES
-                .iter()
-                .find(|(combo, _)| *combo == p)
-                .map(|(_, l)| l.to_string())
-                .unwrap_or_else(|| p.clone());
-            tried.push((p, label));
-        }
-    }
-    for (combo, label) in SHORTCUT_CANDIDATES {
-        tried.push((combo.to_string(), label.to_string()));
-    }
-
-    for (combo, label) in tried {
-        match shortcuts.register(combo.as_str()) {
-            Ok(()) => {
-                tracing::info!("atalho registrado: {label}");
-                return label;
+    // Preferido primeiro, depois os padrões — sem repetir (o preferido costuma
+    // ser um deles, e cada tentativa repetida vira um aviso no log).
+    let candidates = |preferred: Option<&str>, defaults: &[&str]| -> Vec<String> {
+        let mut list: Vec<String> = Vec::new();
+        for c in preferred.into_iter().chain(defaults.iter().copied()) {
+            let c = c.trim().to_lowercase();
+            if !c.is_empty() && !list.contains(&c) {
+                list.push(c);
             }
-            Err(e) => tracing::warn!("atalho {label} indisponível: {e}"),
         }
-    }
-    "(nenhum atalho livre!)".into()
+        list
+    };
+    let dictation_defaults: Vec<&str> = SHORTCUT_CANDIDATES.iter().map(|(c, _)| *c).collect();
+    let dictation = candidates(cfg.shortcut.as_deref(), &dictation_defaults);
+    let (dict_sc, dict_label) = match register_first_free(&shortcuts, &dictation, None) {
+        Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
+        None => (None, "(nenhum atalho livre!)".to_string()),
+    };
+
+    let meeting = candidates(cfg.meeting_shortcut.as_deref(), &MEETING_SHORTCUT_CANDIDATES);
+    let (meet_sc, meet_label) = match register_first_free(&shortcuts, &meeting, dict_sc.as_ref()) {
+        Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
+        None => (None, "(nenhum)".to_string()),
+    };
+
+    *state.dictation_shortcut.lock().unwrap() = dict_sc;
+    *state.meeting_shortcut.lock().unwrap() = meet_sc;
+    *state.active_shortcut.lock().unwrap() = dict_label.clone();
+    *state.active_meeting_shortcut.lock().unwrap() = meet_label.clone();
+    (dict_label, meet_label)
 }
 
 fn hint_text(label: &str) -> String {
     format!("Segure {label} para ditar (toque rápido = mãos-livres)")
+}
+
+/// Texto do item de reunião na bandeja, com o atalho ativo.
+fn meeting_item_text(app: &AppHandle, recording: bool) -> String {
+    let state = app.state::<AppState>();
+    let label = state.active_meeting_shortcut.lock().unwrap().clone();
+    let base = if recording {
+        "Encerrar e transcrever a reunião"
+    } else {
+        "Iniciar gravação de reunião"
+    };
+    if label.is_empty() || label.starts_with('(') {
+        base.to_string()
+    } else {
+        format!("{base} ({label})")
+    }
+}
+
+/// Atalho de reunião: alterna a gravação, com debounce contra auto-repeat.
+/// Roda fora da thread principal — abrir os dispositivos leva um instante.
+fn on_meeting_hotkey(app: &AppHandle) {
+    {
+        let state = app.state::<AppState>();
+        let mut last = state.last_meeting_toggle.lock().unwrap();
+        if last.is_some_and(|t| t.elapsed() < MEETING_HOTKEY_DEBOUNCE) {
+            return;
+        }
+        *last = Some(Instant::now());
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let _ = toggle_meeting(&app);
+    });
+}
+
+/// Ícone da bandeja com um ponto vermelho no canto (estado "gravando"),
+/// desenhado sobre o ícone normal — sem arquivo extra.
+fn recording_icon(base: &Image<'static>) -> Image<'static> {
+    let (w, h) = (base.width() as i32, base.height() as i32);
+    let mut rgba = base.rgba().to_vec();
+    let r = (w.min(h) as f32 * 0.30).max(2.0);
+    let (cx, cy) = (w as f32 - r - 1.0, h as f32 - r - 1.0);
+    for y in 0..h {
+        for x in 0..w {
+            let d = ((x as f32 + 0.5 - cx).powi(2) + (y as f32 + 0.5 - cy).powi(2)).sqrt();
+            let i = ((y * w + x) * 4) as usize;
+            if i + 3 >= rgba.len() {
+                continue;
+            }
+            if d <= r + 1.0 {
+                // borda escura fina para contraste em qualquer tema
+                rgba[i..i + 4].copy_from_slice(&[27, 15, 13, 255]);
+            }
+            if d <= r - 0.6 {
+                rgba[i..i + 4].copy_from_slice(&[240, 88, 72, 255]);
+            }
+        }
+    }
+    Image::new_owned(rgba, w as u32, h as u32)
+}
+
+/// Troca o ícone e o tooltip da bandeja conforme a gravação de reunião.
+fn set_tray_recording(app: &AppHandle, recording: bool) {
+    let state = app.state::<AppState>();
+    let icons = state.tray_icons.lock().unwrap();
+    let tray = state.tray.lock().unwrap();
+    if let (Some((normal, rec)), Some(tray)) = (icons.as_ref(), tray.as_ref()) {
+        let icon = if recording { rec } else { normal };
+        let _ = tray.set_icon(Some(icon.clone()));
+        let _ = tray.set_tooltip(Some(if recording {
+            "ISPer — gravando reunião"
+        } else {
+            "ISPer — ditado e reuniões, 100% local"
+        }));
+    }
 }
 
 fn set_hint(app: &AppHandle, label: &str) {
@@ -470,19 +668,60 @@ fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<String> {
     let audio_secs = raw.duration_secs();
     let samples = raw.into_whisper_input()?;
     let t = engine.transcribe(&samples, &lang, prompt.as_deref())?;
-    let text = t.text.trim().to_string();
-    if text.is_empty() {
+    let raw_text = t.text.trim().to_string();
+    if raw_text.is_empty() {
         anyhow::bail!("não entendi — tente de novo");
     }
-    tracing::info!(audio_secs, infer_secs = t.infer_secs, "transcrito: {text}");
+    tracing::info!(audio_secs, infer_secs = t.infer_secs, "transcrito: {raw_text}");
+
+    // Polimento opcional por IA (só o texto viaja). Qualquer falha cola o original.
+    let text = polish_if_enabled(app, &raw_text);
     paste_text(&text)?;
 
     // Histórico de ditados (Fase 3) — falha aqui não pode travar o fluxo.
     if let Ok(store) = open_store() {
         let at = chrono::Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
-        let _ = store.save_dictation(&at, &text, audio_secs, t.infer_secs);
+        let raw = (text != raw_text).then_some(raw_text.as_str());
+        let _ = store.save_dictation(&at, &text, raw, audio_secs, t.infer_secs);
     }
     Ok(text)
+}
+
+/// Passa o ditado pelo provider de IA quando o polimento está ligado.
+fn polish_if_enabled(app: &AppHandle, raw_text: &str) -> String {
+    let (enabled, style) = {
+        let state = app.state::<AppState>();
+        let cfg = state.config.lock().unwrap();
+        (cfg.polish, cfg.polish_style.clone())
+    };
+    if !enabled {
+        return raw_text.to_string();
+    }
+    let settings = isper_llm::load_settings();
+    match isper_llm::provider_from_settings(&settings) {
+        Ok(provider) => {
+            let _ = app.emit("isper-state", json!({"state": "polishing"}));
+            let started = Instant::now();
+            match isper_llm::polish_dictation(provider.as_ref(), raw_text, &style) {
+                Ok(polished) => {
+                    tracing::info!(secs = started.elapsed().as_secs_f32(), "ditado polido via {}", provider.name());
+                    polished
+                }
+                Err(e) => {
+                    tracing::warn!("polimento falhou (colando o original): {e}");
+                    raw_text.to_string()
+                }
+            }
+        }
+        Err(isper_llm::LlmError::NotConfigured) => {
+            tracing::info!("polimento ligado sem provider de IA — colando o original");
+            raw_text.to_string()
+        }
+        Err(e) => {
+            tracing::warn!("polimento indisponível ({e}) — colando o original");
+            raw_text.to_string()
+        }
+    }
 }
 
 // ------------------------------------------------------------ reuniões
@@ -519,7 +758,8 @@ fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
     if let Some(handle) = slot.take() {
         drop(slot);
         *state.meeting_started.lock().unwrap() = None;
-        set_meeting_text(app, "Iniciar gravação de reunião");
+        set_meeting_text(app, &meeting_item_text(app, false));
+        set_tray_recording(app, false);
         notify_status(app);
         let _ = app.emit("isper-state", json!({"state": "meeting-processing"}));
         show_overlay(app);
@@ -549,12 +789,36 @@ fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
     drop(slot);
 
     let engine = { state.engine.lock().unwrap().clone() };
+    state.live.lock().unwrap().clear();
+    // Cada fala transcrita durante a reunião vira um evento `isper-live` (Início
+    // e indicador) e fica guardada para quem abrir a janela no meio.
+    let live_app = app.clone();
+    let on_segment: meeting::SegmentSink = Arc::new(move |seg: &MeetingSegment| {
+        let item = LiveSegment {
+            speaker: seg.speaker.label(),
+            start_secs: seg.start_secs,
+            end_secs: seg.end_secs,
+            text: seg.text.clone(),
+        };
+        {
+            let state = live_app.state::<AppState>();
+            let mut live = state.live.lock().unwrap();
+            live.push(item.clone());
+            if live.len() > LIVE_KEEP {
+                let excess = live.len() - LIVE_KEEP;
+                live.drain(..excess);
+            }
+        }
+        let _ = live_app.emit("isper-live", &item);
+    });
     let opts = {
         let cfg = state.config.lock().unwrap();
         MeetingOptions {
             lang: cfg.lang.clone(),
             initial_prompt: cfg.initial_prompt(),
             source: LoopbackSource::parse(&cfg.meeting_source),
+            input_device: cfg.input_device.clone(),
+            on_segment: Some(on_segment),
         }
     };
     let started = engine
@@ -568,7 +832,8 @@ fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             }
             *state.meeting.lock().unwrap() = Some(handle);
             *state.meeting_started.lock().unwrap() = Some(Instant::now());
-            set_meeting_text(app, "Encerrar e transcrever a reunião");
+            set_meeting_text(app, &meeting_item_text(app, true));
+            set_tray_recording(app, true);
             notify_status(app);
             let _ = app.emit("isper-state", payload);
             show_overlay(app);
@@ -632,7 +897,7 @@ fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<Stri
     }
     let now = chrono::Local::now();
     let started_at = now.format("%d/%m/%Y %H:%M").to_string();
-    let title = format!("Reunião — {started_at}");
+    let mut title = format!("Reunião — {started_at}");
     let md = meeting::to_markdown(&title, &started_at, &result);
 
     // O transcript é salvo ANTES do resumo: se a API falhar, nada se perde.
@@ -648,25 +913,43 @@ fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<Stri
         Some(&md_path.to_string_lossy()),
     )?;
 
-    // Fase 5: resumo por IA de nuvem — só o TEXTO do transcript sai da máquina.
+    // Fase 5: título + resumo por IA de nuvem, numa chamada — só o TEXTO do
+    // transcript sai da máquina. Com resposta, o Markdown é regravado inteiro
+    // (título novo + resumo) a partir da mesma fonte que a Biblioteca usa.
     let settings = isper_llm::load_settings();
     match isper_llm::provider_from_settings(&settings) {
         Ok(provider) => {
             let _ = app.emit("isper-state", json!({"state": "meeting-summary"}));
-            match isper_llm::summarize_meeting(provider.as_ref(), &md) {
+            match isper_llm::summarize_meeting_titled(provider.as_ref(), &md) {
                 Ok(summary) => {
-                    let block = format!(
-                        "\n\n---\n\n{}\n\n> Resumo gerado via {} ({}) — revise antes de usar.\n",
-                        summary.trim(),
-                        provider.name(),
-                        provider.model()
-                    );
-                    use std::io::Write;
-                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open(&md_path) {
-                        let _ = f.write_all(block.as_bytes());
+                    if let Some(t) = summary.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+                        title = t.to_string();
+                        let _ = store.rename_meeting(meeting_id, &title);
                     }
-                    let _ = store.set_summary(meeting_id, summary.trim());
-                    tracing::info!("resumo gerado via {}", provider.name());
+                    let _ = store.set_summary(meeting_id, summary.body.trim());
+                    let labels: Vec<String> = result.segments.iter().map(|s| s.speaker.label()).collect();
+                    let refs: Vec<SegmentRef<'_>> = result
+                        .segments
+                        .iter()
+                        .zip(&labels)
+                        .map(|(s, l)| SegmentRef { speaker: l, start_secs: s.start_secs, end_secs: s.end_secs, text: &s.text })
+                        .collect();
+                    let full = meeting::render_markdown(
+                        &title,
+                        &started_at,
+                        result.duration_secs,
+                        &refs,
+                        Some(&format!(
+                            "{}\n\n_Resumo gerado via {} ({})._",
+                            summary.body.trim(),
+                            provider.name(),
+                            provider.model()
+                        )),
+                    );
+                    if let Err(e) = std::fs::write(&md_path, full) {
+                        tracing::warn!("não consegui regravar o Markdown com o resumo: {e}");
+                    }
+                    tracing::info!("resumo e título gerados via {}", provider.name());
                 }
                 Err(e) => tracing::warn!("resumo falhou (transcript preservado): {e}"),
             }
@@ -745,6 +1028,11 @@ struct SettingsDto {
     llm_key_present: bool,
     autostart: bool,
     show_home_on_launch: bool,
+    input_device: Option<String>,
+    meeting_shortcut: Option<String>,
+    active_meeting_shortcut: String,
+    polish: bool,
+    polish_style: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -759,6 +1047,14 @@ struct SettingsPatch {
     autostart: bool,
     #[serde(default = "default_true")]
     show_home_on_launch: bool,
+    #[serde(default)]
+    input_device: Option<String>,
+    #[serde(default)]
+    meeting_shortcut: Option<String>,
+    #[serde(default)]
+    polish: bool,
+    #[serde(default)]
+    polish_style: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -931,6 +1227,7 @@ fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
     let state = app.state::<AppState>();
     let cfg = state.config.lock().unwrap().clone();
     let active_shortcut = state.active_shortcut.lock().unwrap().clone();
+    let active_meeting_shortcut = state.active_meeting_shortcut.lock().unwrap().clone();
     let llm = isper_llm::load_settings();
     let llm_key_present = if llm.provider.is_empty() {
         false
@@ -956,6 +1253,11 @@ fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         llm_key_present,
         autostart: app.autolaunch().is_enabled().unwrap_or(false),
         show_home_on_launch: cfg.show_home_on_launch,
+        input_device: cfg.input_device,
+        meeting_shortcut: cfg.meeting_shortcut,
+        active_meeting_shortcut,
+        polish: cfg.polish,
+        polish_style: cfg.polish_style,
     })
 }
 
@@ -987,19 +1289,28 @@ fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<String, String
         overlay_pos: previous.overlay_pos,
         overlay_mini: previous.overlay_mini,
         show_home_on_launch: patch.show_home_on_launch,
+        input_device: patch.input_device.filter(|d| !d.trim().is_empty()),
+        meeting_shortcut: patch.meeting_shortcut.filter(|s| !s.trim().is_empty()),
+        polish: patch.polish,
+        polish_style: {
+            let s = patch.polish_style.unwrap_or_default().trim().to_lowercase();
+            if isper_llm::POLISH_STYLES.contains(&s.as_str()) { s } else { "clean".into() }
+        },
     };
     config::save(&cfg).map_err(|e| e.to_string())?;
     *state.config.lock().unwrap() = cfg.clone();
+    state.audio.set_device(cfg.input_device.clone());
 
     // Troca de modelo a quente: o antigo continua servindo até o novo carregar.
     if cfg.model != previous_model {
         load_engine_in_background(app.clone());
     }
 
-    // Reaplica o atalho na hora — sem reiniciar o app.
-    let label = register_best_shortcut(&app, cfg.shortcut.as_deref());
-    *state.active_shortcut.lock().unwrap() = label.clone();
+    // Reaplica os atalhos na hora — sem reiniciar o app.
+    let (label, _meeting_label) = register_shortcuts(&app, &cfg);
     set_hint(&app, &label);
+    let recording = state.meeting.lock().unwrap().is_some();
+    set_meeting_text(&app, &meeting_item_text(&app, recording));
 
     // Provider de IA (a chave é gravada separadamente, via set_llm_key).
     let provider = if patch.llm_provider == "none" {
@@ -1118,14 +1429,121 @@ fn get_meeting(id: i64) -> Result<Option<isper_core::store::MeetingDetail>, Stri
 }
 
 #[tauri::command]
-fn rename_meeting(id: i64, title: String) -> Result<(), String> {
+fn rename_meeting(app: AppHandle, id: i64, title: String) -> Result<(), String> {
     if title.trim().is_empty() {
         return Err("título vazio".into());
     }
-    open_store()
+    let store = open_store().map_err(|e| e.to_string())?;
+    store.rename_meeting(id, &title).map_err(|e| e.to_string())?;
+    rewrite_markdown(&store, id);
+    notify_status(&app);
+    Ok(())
+}
+
+/// Renomeia um falante nesta reunião ("Participante 1" → "Tatiana") em todos
+/// os segmentos, e regrava o `.md` para acompanhar.
+#[tauri::command]
+fn rename_speaker(app: AppHandle, id: i64, from: String, to: String) -> Result<usize, String> {
+    let to = to.trim();
+    if to.is_empty() {
+        return Err("nome vazio".into());
+    }
+    if to.chars().count() > 40 {
+        return Err("nome longo demais (máx. 40 caracteres)".into());
+    }
+    let store = open_store().map_err(|e| e.to_string())?;
+    let n = store.rename_speaker(id, &from, to).map_err(|e| e.to_string())?;
+    rewrite_markdown(&store, id);
+    notify_status(&app);
+    Ok(n)
+}
+
+/// Segmentos do banco como referências para os renderizadores do core.
+fn segment_refs(detail: &MeetingDetail) -> Vec<SegmentRef<'_>> {
+    detail
+        .segments
+        .iter()
+        .map(|s| SegmentRef {
+            speaker: &s.speaker,
+            start_secs: s.start_secs,
+            end_secs: s.end_secs,
+            text: &s.text,
+        })
+        .collect()
+}
+
+/// Regrava o Markdown da reunião a partir do banco (fonte única): título,
+/// falantes e resumo sempre iguais aos da Biblioteca. Falha só vai ao log —
+/// o banco já está certo.
+fn rewrite_markdown(store: &MeetingStore, id: i64) {
+    let Ok(Some(detail)) = store.get_meeting(id) else {
+        return;
+    };
+    let Some(path) = detail.meeting.md_path.as_deref() else {
+        return;
+    };
+    let md = meeting::render_markdown(
+        &detail.meeting.title,
+        &detail.meeting.started_at,
+        detail.meeting.duration_secs,
+        &segment_refs(&detail),
+        detail.summary.as_deref(),
+    );
+    if let Err(e) = std::fs::write(path, md) {
+        tracing::warn!("não consegui regravar {path}: {e}");
+    }
+}
+
+/// Exporta a reunião ao lado do `.md` (SRT, DOCX ou MD) e abre o arquivo.
+/// Devolve o caminho gravado.
+#[tauri::command]
+fn export_meeting(id: i64, format: String) -> Result<String, String> {
+    let store = open_store().map_err(|e| e.to_string())?;
+    let detail = store
+        .get_meeting(id)
         .map_err(|e| e.to_string())?
-        .rename_meeting(id, &title)
-        .map_err(|e| e.to_string())
+        .ok_or("reunião não encontrada")?;
+    let refs = segment_refs(&detail);
+    let m = &detail.meeting;
+    let (ext, bytes): (&str, Vec<u8>) = match format.to_lowercase().as_str() {
+        "srt" => ("srt", isper_core::export::to_srt(&refs).into_bytes()),
+        "docx" => (
+            "docx",
+            isper_core::export::to_docx(&m.title, &m.started_at, m.duration_secs, &refs, detail.summary.as_deref()),
+        ),
+        "md" => (
+            "md",
+            meeting::render_markdown(&m.title, &m.started_at, m.duration_secs, &refs, detail.summary.as_deref())
+                .into_bytes(),
+        ),
+        other => return Err(format!("formato desconhecido: {other}")),
+    };
+    let base = match m.md_path.as_deref().map(Path::new) {
+        Some(p) if p.parent().is_some() => p.with_extension(""),
+        _ => meetings_dir().map_err(|e| e.to_string())?.join(format!("reuniao-{id}")),
+    };
+    let out = base.with_extension(ext);
+    std::fs::write(&out, bytes).map_err(|e| e.to_string())?;
+    // Revela o arquivo no Explorer em vez de abri-lo: SRT/DOCX podem não ter
+    // programa associado, e o diálogo "com qual app?" no meio do fluxo irrita.
+    let _ = std::process::Command::new("explorer")
+        .arg(format!("/select,{}", out.to_string_lossy()))
+        .spawn();
+    Ok(out.display().to_string())
+}
+
+/// Microfones disponíveis (a tela de Configurações lista; vazio = só o padrão).
+#[tauri::command]
+fn list_input_devices() -> Vec<String> {
+    isper_core::audio::list_input_devices()
+}
+
+/// Falas já transcritas da reunião em andamento (para quem abre o Início no meio).
+#[tauri::command]
+fn live_transcript(app: AppHandle) -> Vec<LiveSegment> {
+    let state = app.state::<AppState>();
+    let live = state.live.lock().unwrap().clone();
+    live
 }
 
 /// Remove do histórico; o arquivo .md continua na pasta (decisão do usuário).
@@ -1343,6 +1761,10 @@ struct HomeStatus {
     meetings_dir: String,
     stats: isper_core::store::Stats,
     recent: Vec<isper_core::store::MeetingRow>,
+    meeting_shortcut: String,
+    polish: bool,
+    polish_style: String,
+    input_device: Option<String>,
 }
 
 /// Fotografia de tudo que a tela Início mostra — uma chamada, sem estado no
@@ -1353,6 +1775,7 @@ fn home_status(app: AppHandle) -> HomeStatus {
     let cfg = state.config.lock().unwrap().clone();
     let engine = state.engine_status.lock().unwrap().clone();
     let shortcut = state.active_shortcut.lock().unwrap().clone();
+    let meeting_shortcut = state.active_meeting_shortcut.lock().unwrap().clone();
     let meeting_active = state.meeting.lock().unwrap().is_some();
     let meeting_elapsed_secs = state
         .meeting_started
@@ -1406,6 +1829,10 @@ fn home_status(app: AppHandle) -> HomeStatus {
             .unwrap_or_default(),
         stats,
         recent,
+        meeting_shortcut,
+        polish: cfg.polish,
+        polish_style: cfg.polish_style,
+        input_device: cfg.input_device,
     }
 }
 

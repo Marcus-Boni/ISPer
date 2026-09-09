@@ -199,6 +199,8 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
             lang: cli.lang.clone(),
             initial_prompt: None,
             source,
+            input_device: None,
+            on_segment: None,
         },
     )
     .context("falha ao abrir captura da reunião")?;

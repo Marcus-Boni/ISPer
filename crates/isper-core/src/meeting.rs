@@ -16,13 +16,77 @@ use crate::audio::RawAudio;
 use crate::loopback::LoopbackSource;
 use crate::{audio, loopback, IsperError, Result, WhisperEngine};
 
+/// Recebe cada fala assim que o bloco dela é transcrito — é a transcrição
+/// "ao vivo": chega com o atraso de um bloco (~20 s) + a inferência.
+pub type SegmentSink = Arc<dyn Fn(&MeetingSegment) + Send + Sync>;
+
 /// Opções de uma gravação de reunião.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MeetingOptions {
     pub lang: String,
     pub initial_prompt: Option<String>,
     /// De onde vem o áudio dos "Participantes" (sistema inteiro ou só um app).
     pub source: LoopbackSource,
+    /// Microfone do canal "Eu" (`None` = padrão do sistema).
+    pub input_device: Option<String>,
+    /// Chamado a cada segmento transcrito durante a gravação.
+    pub on_segment: Option<SegmentSink>,
+}
+
+/// Regras de agrupamento de falas em parágrafos (Markdown, DOCX e Biblioteca
+/// usam as mesmas): o mesmo falante continua no parágrafo só enquanto a pausa
+/// entre falas for menor que `GROUP_GAP_SECS` e o parágrafo não passar de
+/// `GROUP_MAX_SECS` — sem isso, uma hora de "Participantes" vira uma parede
+/// de texto sem horário.
+pub const GROUP_MAX_SECS: f32 = 60.0;
+pub const GROUP_GAP_SECS: f32 = 4.0;
+
+/// Visão emprestada de um segmento — serve tanto ao resultado recém-gravado
+/// quanto ao que já está no banco.
+#[derive(Debug, Clone, Copy)]
+pub struct SegmentRef<'a> {
+    pub speaker: &'a str,
+    pub start_secs: f32,
+    pub end_secs: f32,
+    pub text: &'a str,
+}
+
+/// Um parágrafo: falas consecutivas do mesmo falante, dentro das regras acima.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpeechGroup {
+    pub speaker: String,
+    pub start_secs: f32,
+    pub end_secs: f32,
+    pub text: String,
+}
+
+pub fn group_speech<'a>(segments: impl IntoIterator<Item = SegmentRef<'a>>) -> Vec<SpeechGroup> {
+    let mut groups: Vec<SpeechGroup> = Vec::new();
+    for s in segments {
+        let text = s.text.trim();
+        if text.is_empty() {
+            continue;
+        }
+        let continues = groups.last().is_some_and(|g| {
+            g.speaker == s.speaker
+                && s.start_secs - g.end_secs < GROUP_GAP_SECS
+                && s.end_secs - g.start_secs <= GROUP_MAX_SECS
+        });
+        match groups.last_mut() {
+            Some(g) if continues => {
+                g.text.push(' ');
+                g.text.push_str(text);
+                g.end_secs = g.end_secs.max(s.end_secs);
+            }
+            _ => groups.push(SpeechGroup {
+                speaker: s.speaker.to_string(),
+                start_secs: s.start_secs,
+                end_secs: s.end_secs,
+                text: text.to_string(),
+            }),
+        }
+    }
+    groups
 }
 
 /// Tamanho alvo de cada bloco de transcrição.
@@ -185,6 +249,8 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
         lang,
         initial_prompt,
         source,
+        input_device,
+        on_segment,
     } = opts;
 
     // Abre os canais EM SEQUÊNCIA (loopback primeiro, mic depois): quando mic e
@@ -198,8 +264,9 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
         let job_tx = job_tx.clone();
         let ready_tx = ready_tx.clone();
         let source = source.clone();
+        let device = input_device.clone();
         std::thread::spawn(move || {
-            capture_channel(speaker, source, started, stop_rx, job_tx, ready_tx)
+            capture_channel(speaker, source, device, started, stop_rx, job_tx, ready_tx)
         });
         match ready_rx.recv_timeout(Duration::from_secs(8)) {
             Ok(Ok(None)) => {}
@@ -222,7 +289,7 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
     drop(job_tx);
 
     std::thread::spawn(move || {
-        let result = transcribe_worker(engine, lang, initial_prompt, job_rx, started);
+        let result = transcribe_worker(engine, lang, initial_prompt, on_segment, job_rx, started);
         let _ = done_tx.send(result);
     });
 
@@ -238,6 +305,7 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
 fn capture_channel(
     speaker: Speaker,
     source: LoopbackSource,
+    input_device: Option<String>,
     started: Instant,
     stop_rx: Receiver<()>,
     job_tx: Sender<Job>,
@@ -249,7 +317,8 @@ fn capture_channel(
         // "Eu": microfone via cpal, como no ditado.
         Speaker::Me => {
             let (data_tx, data_rx) = unbounded();
-            let (stream, sample_rate, channels) = match audio::open_input_stream(data_tx) {
+            let (stream, sample_rate, channels) =
+                match audio::open_input_stream_on(input_device.as_deref(), data_tx) {
                 Ok(v) => v,
                 Err(e) => {
                     let _ = ready_tx.send(Err(e));
@@ -421,6 +490,7 @@ fn transcribe_worker(
     engine: Arc<WhisperEngine>,
     lang: String,
     initial_prompt: Option<String>,
+    on_segment: Option<SegmentSink>,
     job_rx: Receiver<Job>,
     started: Instant,
 ) -> Result<MeetingResult> {
@@ -461,12 +531,16 @@ fn transcribe_worker(
                     if seg.text.is_empty() {
                         continue;
                     }
-                    segments.push(MeetingSegment {
+                    let seg = MeetingSegment {
                         speaker,
                         start_secs: offset + seg.start_secs,
                         end_secs: offset + seg.end_secs,
                         text: seg.text,
-                    });
+                    };
+                    if let Some(sink) = &on_segment {
+                        sink(&seg);
+                    }
+                    segments.push(seg);
                 }
             }
             Err(e) => tracing::warn!("bloco falhou: {e}"),
@@ -481,35 +555,115 @@ fn transcribe_worker(
     })
 }
 
-/// Gera o Markdown da reunião, agrupando falas consecutivas do mesmo falante.
+/// Gera o Markdown da reunião recém-gravada (sem resumo — ele é anexado
+/// depois, se houver provider de IA).
 pub fn to_markdown(title: &str, started_at: &str, result: &MeetingResult) -> String {
+    let labels: Vec<String> = result.segments.iter().map(|s| s.speaker.label()).collect();
+    let refs: Vec<SegmentRef<'_>> = result
+        .segments
+        .iter()
+        .zip(&labels)
+        .map(|(s, label)| SegmentRef {
+            speaker: label,
+            start_secs: s.start_secs,
+            end_secs: s.end_secs,
+            text: &s.text,
+        })
+        .collect();
+    render_markdown(title, started_at, result.duration_secs, &refs, None)
+}
+
+/// Markdown completo a partir de segmentos quaisquer (recém-gravados ou do
+/// banco): cabeçalho, um parágrafo por grupo de falas e, se houver, o resumo.
+/// É a fonte única do formato — renomear falante ou título regrava o arquivo
+/// por aqui.
+pub fn render_markdown(
+    title: &str,
+    started_at: &str,
+    duration_secs: f32,
+    segments: &[SegmentRef<'_>],
+    summary: Option<&str>,
+) -> String {
     let mut out = String::new();
     out.push_str(&format!("# {title}\n\n"));
     out.push_str(&format!(
         "> Transcrito 100% localmente pelo ISPer em {started_at} · duração {}.\n",
-        fmt_ts(result.duration_secs)
+        fmt_ts(duration_secs)
     ));
     out.push_str("> Lembrete (LGPD): avise os participantes de que a reunião foi transcrita.\n");
-
-    let mut last: Option<Speaker> = None;
-    for seg in &result.segments {
-        if last != Some(seg.speaker) {
-            out.push_str(&format!(
-                "\n**[{}] {}:** ",
-                fmt_ts(seg.start_secs),
-                seg.speaker.label()
-            ));
-            last = Some(seg.speaker);
-        } else {
-            out.push(' ');
-        }
-        out.push_str(&seg.text);
+    for g in group_speech(segments.iter().copied()) {
+        out.push_str(&format!(
+            "\n**[{}] {}:** {}\n",
+            fmt_ts(g.start_secs),
+            g.speaker,
+            g.text
+        ));
     }
-    out.push('\n');
+    if let Some(summary) = summary.map(str::trim).filter(|s| !s.is_empty()) {
+        out.push_str("\n---\n\n");
+        out.push_str(summary);
+        out.push_str("\n\n> Resumo gerado por IA — revise antes de usar.\n");
+    }
     out
 }
 
-fn fmt_ts(secs: f32) -> String {
+/// `mm:ss`, ou `h:mm:ss` a partir de uma hora.
+pub fn fmt_ts(secs: f32) -> String {
     let s = secs.max(0.0) as u32;
-    format!("{:02}:{:02}", s / 60, s % 60)
+    if s >= 3600 {
+        format!("{}:{:02}:{:02}", s / 3600, (s / 60) % 60, s % 60)
+    } else {
+        format!("{:02}:{:02}", s / 60, s % 60)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn seg(speaker: &'static str, start: f32, end: f32, text: &'static str) -> SegmentRef<'static> {
+        SegmentRef { speaker, start_secs: start, end_secs: end, text }
+    }
+
+    #[test]
+    fn agrupa_mesmo_falante_com_pausa_curta() {
+        let g = group_speech([seg("Eu", 0.0, 2.0, "Oi,"), seg("Eu", 2.5, 4.0, "tudo bem?")]);
+        assert_eq!(g.len(), 1);
+        assert_eq!(g[0].text, "Oi, tudo bem?");
+        assert_eq!(g[0].end_secs, 4.0);
+    }
+
+    #[test]
+    fn separa_por_falante_pausa_longa_e_paragrafo_grande() {
+        let g = group_speech([
+            seg("Eu", 0.0, 2.0, "a"),
+            seg("Participantes", 2.0, 3.0, "b"), // outro falante
+            seg("Participantes", 8.0, 9.0, "c"), // pausa de 5 s > GROUP_GAP_SECS
+            seg("Participantes", 9.5, 70.0, "d"), // passaria de 60 s no grupo
+        ]);
+        assert_eq!(g.len(), 4);
+        assert_eq!(g[3].start_secs, 9.5);
+    }
+
+    #[test]
+    fn ignora_texto_vazio_e_formata_tempo() {
+        assert!(group_speech([seg("Eu", 0.0, 1.0, "   ")]).is_empty());
+        assert_eq!(fmt_ts(65.0), "01:05");
+        assert_eq!(fmt_ts(4587.0), "1:16:27");
+    }
+
+    #[test]
+    fn markdown_tem_paragrafos_e_resumo() {
+        let md = render_markdown(
+            "Reunião X",
+            "09/09/2026 10:00",
+            125.0,
+            &[seg("Eu", 0.0, 1.0, "Olá."), seg("Participante 1", 5.0, 6.0, "Oi.")],
+            Some("## Resumo\nCurto."),
+        );
+        assert!(md.starts_with("# Reunião X\n"));
+        assert!(md.contains("**[00:00] Eu:** Olá.\n"));
+        assert!(md.contains("**[00:05] Participante 1:** Oi.\n"));
+        assert!(md.contains("---\n\n## Resumo\nCurto.\n\n> Resumo gerado por IA"));
+    }
 }

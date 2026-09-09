@@ -49,6 +49,8 @@ pub struct DictationRow {
     pub at: String,
     pub text: String,
     pub audio_secs: Option<f32>,
+    /// Texto como saiu do Whisper, quando o polimento por IA o alterou.
+    pub raw_text: Option<String>,
 }
 
 /// Totais para a tela Início (uma consulta por tabela, sem carregar linhas).
@@ -127,6 +129,7 @@ impl MeetingStore {
         // Migrações leves: colunas novas em bancos antigos (erro = já existe).
         let _ = conn.execute("ALTER TABLE meetings ADD COLUMN summary TEXT", []);
         let _ = conn.execute("ALTER TABLE meetings ADD COLUMN md_path TEXT", []);
+        let _ = conn.execute("ALTER TABLE dictations ADD COLUMN raw_text TEXT", []);
         Ok(Self { conn })
     }
 
@@ -172,6 +175,16 @@ impl MeetingStore {
         Ok(())
     }
 
+    /// Renomeia um falante em todos os segmentos da reunião ("Participante 1"
+    /// → "Tatiana"). Devolve quantos segmentos mudaram.
+    pub fn rename_speaker(&self, meeting_id: i64, from: &str, to: &str) -> Result<usize> {
+        let n = self.conn.execute(
+            "UPDATE segments SET speaker = ?3 WHERE meeting_id = ?1 AND speaker = ?2",
+            params![meeting_id, from, to.trim()],
+        )?;
+        Ok(n)
+    }
+
     /// Remove a reunião do histórico. O arquivo Markdown NÃO é apagado —
     /// apagar arquivos do usuário é decisão dele, fora daqui.
     pub fn delete_meeting(&self, meeting_id: i64) -> Result<()> {
@@ -183,10 +196,18 @@ impl MeetingStore {
     }
 
     /// Histórico de ditados (Fase 3): cada texto colado fica pesquisável.
-    pub fn save_dictation(&self, at: &str, text: &str, audio_secs: f32, infer_secs: f32) -> Result<()> {
+    /// `raw_text` é o original do Whisper quando o polimento por IA o mudou.
+    pub fn save_dictation(
+        &self,
+        at: &str,
+        text: &str,
+        raw_text: Option<&str>,
+        audio_secs: f32,
+        infer_secs: f32,
+    ) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO dictations (at, text, audio_secs, infer_secs) VALUES (?1, ?2, ?3, ?4)",
-            params![at, text, audio_secs, infer_secs],
+            "INSERT INTO dictations (at, text, raw_text, audio_secs, infer_secs) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![at, text, raw_text, audio_secs, infer_secs],
         )?;
         Ok(())
     }
@@ -311,12 +332,13 @@ impl MeetingStore {
                 at: r.get(1)?,
                 text: r.get(2)?,
                 audio_secs: r.get::<_, Option<f64>>(3)?.map(|v| v as f32),
+                raw_text: r.get(4)?,
             })
         };
         let rows = match q.map(str::trim).filter(|s| !s.is_empty()) {
             Some(q) => {
                 let mut stmt = self.conn.prepare(
-                    "SELECT id, at, text, audio_secs FROM dictations
+                    "SELECT id, at, text, audio_secs, raw_text FROM dictations
                      WHERE text LIKE ?1 ESCAPE '\\' ORDER BY id DESC LIMIT ?2",
                 )?;
                 stmt.query_map(params![like_pattern(q), limit], map)?
@@ -324,7 +346,7 @@ impl MeetingStore {
             }
             None => {
                 let mut stmt = self.conn.prepare(
-                    "SELECT id, at, text, audio_secs FROM dictations ORDER BY id DESC LIMIT ?1",
+                    "SELECT id, at, text, audio_secs, raw_text FROM dictations ORDER BY id DESC LIMIT ?1",
                 )?;
                 stmt.query_map(params![limit], map)?
                     .collect::<rusqlite::Result<Vec<_>>>()?

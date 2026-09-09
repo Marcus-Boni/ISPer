@@ -10,6 +10,7 @@ cuda = ["whisper-rs/cuda"]
 [dependencies]
 cpal = "0.18.2"
 crossbeam-channel = "0.5.16"
+crc32fast = "1"
 hound = "3.5.1"
 rubato = "0.16"
 rusqlite = { version = "0.40.2", features = ["bundled"] }

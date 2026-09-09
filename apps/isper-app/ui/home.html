@@ -57,6 +57,19 @@
   .badge.ok { color: var(--good); border-color: rgba(132, 194, 151, .45); }
 
   footer label { color: var(--muted); }
+
+  /* Transcrição ao vivo (dentro do card de reunião, só enquanto grava). */
+  .live { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .live .head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .live .head .eyebrow { margin: 0; flex: 1; }
+  .live .head .hint { margin: 0; font-size: 11px; }
+  .live-list { display: grid; gap: 6px; max-height: 168px; overflow-y: auto; padding-right: 4px; }
+  .live-row { display: grid; grid-template-columns: 40px 1fr; gap: 8px; font-size: 12.5px; line-height: 1.4; animation: swap-in var(--dur-3) var(--ease-out) both; }
+  .live-row .ts { color: var(--muted-2); font: 11px var(--font-mono); padding-top: 2px; }
+  .live-row .sp { font-weight: 600; margin-right: 6px; color: var(--p1); }
+  .live-row.eu .sp { color: var(--accent); }
+  .live-row .tx { color: var(--ink-2); }
+  .live-wait { color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
   @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
@@ -90,9 +103,11 @@
       <dl class="specs">
         <dt>Modelo</dt><dd id="s-model">…</dd>
         <dt>Idioma</dt><dd id="s-lang">…</dd>
+        <dt>Microfone</dt><dd id="s-mic">…</dd>
         <dt>Dicionário</dt><dd id="s-dict">…</dd>
+        <dt>Polimento IA</dt><dd id="s-polish">…</dd>
       </dl>
-      <button class="btn btn-link" id="l-dictate">Ajustar atalho, idioma e dicionário →</button>
+      <button class="btn btn-link" id="l-dictate">Ajustar atalho, idioma, microfone e dicionário →</button>
     </div>
 
     <div class="card reveal" style="--i:1">
@@ -104,11 +119,16 @@
         <span class="timer" id="m-timer"></span>
       </div>
       <dl class="specs">
+        <dt>Atalho</dt><dd id="s-mshortcut">…</dd>
         <dt>Áudio</dt><dd id="s-source">…</dd>
         <dt>Falantes</dt><dd id="s-diar">…</dd>
         <dt>Resumo por IA</dt><dd id="s-llm">…</dd>
       </dl>
       <p class="desc" style="margin:0;font-size:12px">Avise os participantes de que a reunião está sendo transcrita (LGPD).</p>
+      <div class="live" id="live" hidden>
+        <div class="head"><p class="eyebrow">Ao vivo</p><p class="hint">cada bloco de ~20 s aparece assim que é transcrito</p></div>
+        <div class="live-list" id="live-list"></div>
+      </div>
     </div>
   </section>
 
@@ -177,6 +197,7 @@
     const e = st.engine;
     if (dictation === 'recording') setState('dictating', 'bad pulse', 'ditando… solte para colar');
     else if (dictation === 'transcribing') setState('dictating', 'warn pulse', 'transcrevendo…');
+    else if (dictation === 'polishing') setState('dictating', 'warn pulse', 'polindo com IA…');
     else if (dictation === 'done') setState('done', 'ok burst', 'colado ✓');
     else if (st.meeting_active) setState('meeting', 'bad pulse', 'gravando reunião' + (meetingStart ? ' · ' + fmtClock((Date.now() - meetingStart) / 1000) : ''));
     else if (e.kind === 'ready') setState('ready', 'ok', 'pronto para ditar');
@@ -195,26 +216,82 @@
     else if (e.kind === 'missing') { model.append('nenhum instalado'); model.appendChild(el('span', 'chip chip-warn', 'ação necessária')); }
     else model.textContent = 'falhou: ' + e.message;
     $('s-lang').textContent = LANG[st.lang] || st.lang;
+    $('s-mic').textContent = st.input_device || 'padrão do sistema';
     $('s-dict').textContent = st.dictionary_terms
       ? plural(st.dictionary_terms, 'termo', 'termos') + ' que o Whisper deve grafar certo'
       : 'vazio — adicione nomes e siglas que o Whisper costuma errar';
+    const pol = $('s-polish');
+    pol.replaceChildren();
+    if (st.polish) {
+      const STYLE = { clean: 'só limpeza', formal: 'tom formal', casual: 'tom casual' };
+      pol.append('ligado · ' + (STYLE[st.polish_style] || st.polish_style));
+      pol.appendChild(el('span', 'chip ' + (st.llm_provider && st.llm_key_present ? 'chip-ok' : 'chip-warn'), st.llm_provider && st.llm_key_present ? 'via ' + (PROVIDER[st.llm_provider] || st.llm_provider) : 'sem provider — cola o original'));
+    } else {
+      pol.append('desligado');
+      pol.appendChild(el('span', 'chip', 'opcional'));
+    }
+  }
+
+  // ---- transcrição ao vivo
+  const LIVE_MAX_ROWS = 60;
+  function liveRow(seg) {
+    const row = el('div', 'live-row' + (seg.speaker === 'Eu' ? ' eu' : ''));
+    row.appendChild(el('span', 'ts num', fmtClock(seg.start_secs)));
+    const body = el('span');
+    body.appendChild(el('span', 'sp', seg.speaker + ':'));
+    body.appendChild(el('span', 'tx', seg.text));
+    row.appendChild(body);
+    return row;
+  }
+  function liveAppend(seg) {
+    const list = $('live-list');
+    const wait = list.querySelector('.live-wait');
+    if (wait) wait.remove();
+    list.appendChild(liveRow(seg));
+    while (list.children.length > LIVE_MAX_ROWS) list.firstElementChild.remove();
+    list.scrollTop = list.scrollHeight;
+  }
+  async function liveFill() {
+    const list = $('live-list');
+    let rows = [];
+    try { rows = await invoke('live_transcript'); } catch (_) { return; }
+    list.replaceChildren();
+    if (!rows.length) {
+      const w = el('div', 'live-wait');
+      w.appendChild(el('span', 'dot warn pulse'));
+      w.appendChild(el('span', '', 'ouvindo… a primeira fala aparece em até ~30 s'));
+      list.appendChild(w);
+      return;
+    }
+    rows.slice(-LIVE_MAX_ROWS).forEach(r => list.appendChild(liveRow(r)));
+    list.scrollTop = list.scrollHeight;
   }
 
   function renderMeeting(st) {
     const b = $('b-meeting');
     const ready = st.engine.kind === 'ready';
+    const live = $('live');
     if (st.meeting_active) {
       meetingStart = Date.now() - (st.meeting_elapsed_secs || 0) * 1000;
       b.textContent = 'Encerrar e transcrever'; b.className = 'btn btn-stop';
       $('m-lead').textContent = 'Reunião em gravação.';
-      $('m-desc').textContent = 'Pode fechar esta janela — o indicador flutuante continua na tela e a bandeja também encerra. Ao encerrar, a transcrição (e o resumo, se ativo) leva alguns segundos.';
+      $('m-desc').textContent = 'Pode fechar esta janela — o indicador flutuante continua na tela e a bandeja ou o atalho também encerram. Ao encerrar, a transcrição (e o resumo, se ativo) leva alguns segundos.';
+      if (live.hidden) { live.hidden = false; liveFill(); }
     } else {
       meetingStart = null;
       $('m-timer').textContent = '';
       b.textContent = 'Iniciar gravação de reunião'; b.className = 'btn btn-primary';
       $('m-lead').textContent = 'Grave, transcreva e resuma.';
       $('m-desc').textContent = 'Seu microfone vira "Eu"; o áudio dos participantes vem do próprio Windows. Ao encerrar, o transcript vai para a Biblioteca e para um arquivo .md.';
+      live.hidden = true;
+      $('live-list').replaceChildren();
     }
+    const ms = $('s-mshortcut');
+    ms.replaceChildren();
+    if (st.meeting_shortcut && !st.meeting_shortcut.startsWith('(')) {
+      st.meeting_shortcut.split('+').forEach((k, i) => { if (i) ms.append(' + '); const kb = el('kbd', '', k.trim()); kb.style.cssText = 'font:600 11px var(--font-body);padding:2px 6px;border:1px solid var(--line-2);border-radius:5px;background:var(--panel-2)'; ms.appendChild(kb); });
+      ms.append(' inicia e encerra');
+    } else ms.textContent = 'nenhum atalho livre — só pela bandeja ou por aqui';
     b.disabled = busyMeeting || (!st.meeting_active && !ready);
     b.title = (!st.meeting_active && !ready) ? 'disponível assim que o modelo carregar' : '';
     tick();
@@ -395,12 +472,16 @@
     clearTimeout(dictationTimer);
     if (s === 'recording' || s === 'recording-handsfree') { dictation = 'recording'; pressKeys(true); }
     else if (s === 'transcribing') { dictation = 'transcribing'; pressKeys(false); }
+    else if (s === 'polishing') { dictation = 'polishing'; pressKeys(false); }
     else if (s === 'done') { dictation = 'done'; pressKeys(false); dictationTimer = setTimeout(() => { dictation = null; refresh(); }, 1600); }
     else if (s === 'error') { dictation = null; pressKeys(false); if (e.payload.message) toast(e.payload.message, 'err'); }
     else if (s === 'idle') { dictation = null; pressKeys(false); }
     else { pressKeys(false); }  // estados de reunião: o isper-status já dispara o refresh
     if (current) renderStatePill(current);
   });
+
+  // Falas da reunião chegando (bloco a bloco) — só enquanto o painel existe.
+  listen('isper-live', (e) => { if (!$('live').hidden) liveAppend(e.payload); });
 
   // Estado sempre atual: evento do backend + voltar para a janela.
   listen('isper-status', refresh);
