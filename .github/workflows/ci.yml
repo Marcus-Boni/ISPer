@@ -5,6 +5,11 @@
 # `--no-default-features` (sem CUDA) e com DLLs do CUDA vazias no lugar das
 # reais, porque o build script do Tauri exige que os `bundle.resources`
 # existam. Nada aqui baixa modelos.
+#
+# O `isper-diarize` não entra no `cargo test`: ele não tem testes, e ligar o
+# binário de teste exige as import libs do sherpa-onnx pré-compilado
+# (`cargs.lib`/`sherpa-onnx-c-api.lib`), que o runner não tinha (LNK1181).
+# O `cargo check` do app (que depende dele) compila o crate sem ligar.
 name: CI
 
 on:
@@ -27,7 +32,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -41,8 +46,8 @@ jobs:
       - name: Formatação
         run: cargo fmt --all -- --check
 
-      - name: Testes (núcleo, IA, modelos, diarização)
-        run: cargo test --release -p isper-core -p isper-llm -p isper-models -p isper-diarize
+      - name: Testes (núcleo, IA, modelos)
+        run: cargo test --release -p isper-core -p isper-llm -p isper-models
 
       - name: DLLs do CUDA de mentira (o bundler exige que existam)
         shell: pwsh
