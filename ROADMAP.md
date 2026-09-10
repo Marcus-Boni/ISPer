@@ -7,6 +7,23 @@
 
 ---
 
+## Estado atual — 10/09/2026 · v0.12.2
+
+| Fase | Estado | Resumo |
+|---|---|---|
+| F0 Fundamentos | ✅ | ambiente pronto; só ficam 2 itens de estudo pessoal |
+| F1 Núcleo no terminal | ✅ | |
+| F2 MVP de ditado | ✅ | validado no caso de uso real |
+| F3 Polimento premium | ✅ | |
+| F4 Notetaker Teams | ✅ | validado em reunião real (07/09); detecção de chamada entregue em 10/09 (validar numa chamada real) |
+| F5 Inteligência | ✅ | resumo, título, polimento, insights ao vivo e busca semântica (Gemini ou Ollama local) — 10/09 |
+| F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
+| F7 Maturidade de engenharia | 🟡 | 7.1 em andamento (6 de 11); 7.5 com 2 itens entregues; 7.2, 7.3, 7.4 e 7.6 não começadas |
+
+**63 itens entregues · 33 em aberto** (2 deles de estudo pessoal). Ordem sugerida: fechar 7.1 → 7.2 → 7.3 → 7.4 → 7.5 → 7.6.
+
+---
+
 ## 0. Hardware disponível (detectado)
 
 | Recurso | Valor | Implicação |
@@ -85,7 +102,7 @@ Ordem de aceleração: **CUDA (RTX 4050) → Vulkan → CPU quantizado**. Com CU
 Ambiente pronto + conceitos essenciais.
 
 - [x] Instalar `rustup` (Rust 1.98) + VS Build Tools 2022 + CMake 4.4.3 portátil + libclang via pip (ver README p/ detalhes)
-- [ ] CUDA Toolkit (p/ feature `cuda` do whisper-rs) — adiado para a Fase 3, começamos em CPU
+- [x] CUDA Toolkit (p/ feature `cuda` do whisper-rs) — feito na Fase 3 (26/08): CUDA 13.3 + `large-v3-turbo` na RTX 4050
 - [ ] Rust Book caps. 1–10 + `rustlings` (ownership, borrowing, `Result`, traits, channels) — *estudo seu, no seu ritmo*
 - [ ] Conceitos de ASR: PCM, sample rate, mel spectrogram, arquitetura encoder-decoder do Whisper — *estudo seu*
 - [x] `git init`, workspace cargo, `.gitignore` (target/, models/)
@@ -150,8 +167,8 @@ A jogada: **não precisa de bot nem API paga** — captura-se o áudio que sai d
 - [x] Separação básica de falantes: canal do mic = "Eu", loopback = "Participantes", intercalados por timestamp
 - [x] Diarização real (01/09): crate `isper-diarize` (sherpa-onnx via `sherpa-rs` com binários pré-compilados; pyannote segmentation 3.0 + 3D-Speaker ERes2Net, ~45 MB baixados pelo gerenciador). Roda ao encerrar sobre o áudio concatenado dos participantes; o core guarda o mapa bloco→relógio para casar os turnos com os segmentos do Whisper → "Participante 1, 2, 3…". Número de falantes descoberto por agrupamento (threshold padrão 0.3, ajustável via `ISPER_DIARIZE_THRESHOLD`; `isper-cli diarize <wav>` calibra offline). Validado na fixture Maria→Zira→Maria: a 0.2 separou as duas vozes corretamente; rótulos renumerados por ordem de aparição. Calibração final com vozes reais pendente
 - [x] Biblioteca de reuniões: SQLite (`%APPDATA%\ISPer\isper.db`) + exportar Markdown (`Documentos\ISPer\Reunioes\`)
-- [ ] Detectar reunião ativa (janela do Teams aberta + áudio fluindo) → notificação "Gravar transcrição?"
-- [ ] Validar numa reunião real do Teams (ou vídeo do YouTube) — *seu teste!*
+- [x] Detectar reunião ativa → "Gravar transcrição?" (10/09): em vez de olhar janelas, o ISPer sonda as **sessões de áudio do WASAPI** — em chamada, o Teams (ou um filho WebView2) mantém o microfone aberto. `isper_core::calls` (`probe` + `CallTracker` com histerese: ~8 s para começar, ~24 s para terminar; só reprodução exige o dobro). Aviso por toast (clicar grava), banner no Início e indicador; fim da chamada com gravação ligada pergunta se encerra. Modos: avisar (padrão) · gravar automaticamente (e encerrar sozinho) · desligado
+- [x] Validado em reunião real do Teams (07/09) — a rodada de 07/09 (instância única, Biblioteca, indicador) e a diarização em segundo plano saíram dessa primeira reunião
 
 ⚠️ **LGPD/etiqueta:** avise os participantes de que a reunião está sendo transcrita (o Markdown gerado já traz o lembrete).
 
@@ -161,10 +178,10 @@ A jogada: **não precisa de bot nem API paga** — captura-se o áudio que sai d
 
 - [x] Camada de provider abstraída (trait `LlmProvider` no crate `isper-llm`) — **Claude API** (padrão `claude-opus-5`, com fallback de recusa server-side), **Groq** (free tier, `llama-3.3-70b-versatile`) e **Gemini** (free tier, `gemini-2.5-flash`); HTTP cru via `ureq` (Rust não tem SDK oficial da Anthropic); modelo configurável por provider
 - [x] Resumo pós-reunião, pontos principais, action items e decisões — anexado ao Markdown da reunião e gravado na coluna `summary` do SQLite, tanto no app quanto na CLI; se a API falhar, o transcript já está salvo
-- [ ] Insights em tempo real: janela deslizante do transcript → prompt periódico ("o que ficou pendente?", "prometi algo?")
-- [ ] Busca semântica no histórico de reuniões (embeddings leves — decidir provider na hora)
+- [x] Insights em tempo real (10/09): a cada 3/5/10 min, os últimos ~15 min do transcript vão ao provider com quatro perguntas — pendências, compromissos de "Eu", decisões, perguntas em aberto — e a resposta anterior é consolidada (`isper_llm::insights`, prompt testado com `LlmProvider` falso). Painel no card de reunião do Início com "Atualizar agora"; rodadas sem fala nova são puladas; opt-in (custa API)
+- [x] Busca semântica no histórico (10/09) — **provider decidido**: os providers de chat não servem (Anthropic e Groq não têm embeddings), então ficam **Gemini** (`gemini-embedding-001`, free tier, reutiliza a chave) ou **endpoint compatível com OpenAI**, que cobre o **Ollama local** (`nomic-embed-text`/`bge-m3`, 100% na máquina, sem chave). Vetores normalizados no SQLite (`embeddings`, com o modelo que os gerou), trechos de ~700 caracteres por parágrafo (`isper_core::embed`), cosseno por força bruta; botão "Semântica" na Biblioteca abre a reunião rolada no trecho; indexação automática ao salvar + "Indexar tudo"
 - [x] Privacidade: só o **texto** do transcript vai à API — áudio nunca sai da máquina; chave no **Credential Manager do Windows** (crate `keyring`; env `ISPER_<PROVIDER>_API_KEY` como fallback); a chave da Gemini vai em header, nunca na URL
-- [ ] Validar com sua chave: `isper-cli llm use groq` → `llm set-key groq` → `llm test` — *seu teste!*
+- [x] Validado com chave real (01/09): lista de modelos ao vivo por provider e erro claro de modelo indisponível; resumos, títulos e polimento por IA em uso desde então
 
 ---
 
@@ -183,7 +200,7 @@ qualidade de transcrição, legendas, momentos marcados e distribuição (v0.11.
 - [x] v0.11.1: instalador corrigido — faltavam as DLLs do sherpa-onnx (`sherpa-onnx-c-api`, `onnxruntime`, `cargs`) e o app instalado pela 0.11.0 não abria; descoberto ao instalar pelo setup.exe e validar a primeira atualização automática
 - [x] v0.12.0: variante CPU do instalador (gerada localmente pelo `release.ps1`; o runner do GitHub não tem CUDA nem consegue ligar o sherpa-onnx pré-compilado), runtime do Visual C++ dentro dos instaladores, pânicos no log, testes ponta a ponta em `tools/e2e`, `CHANGELOG.md` e workflow `release.yml` validando a tag
 - [x] v0.12.1/v0.12.2: pastas do usuário pela API do Windows (não pelas variáveis de ambiente) e dados locais em `%LOCALAPPDATA%\com.isper.desktop`, fora da pasta padrão de instalação do Tauri (`%LOCALAPPDATA%\ISPer`), com migração automática
-- [ ] Assinatura de código (certificado Authenticode ou Azure Trusted Signing) para o instalador não disparar o SmartScreen — depende de comprar/assinar o serviço
+- [ ] Assinatura de código (certificado Authenticode ou Azure Trusted Signing) para o instalador não disparar o SmartScreen — depende de comprar/assinar o serviço — *rastreado em 7.3*
 
 ## Fase 7 — Maturidade de engenharia (a partir de 10/09/2026)
 
@@ -198,13 +215,17 @@ A ordem é impacto ÷ esforço.
 - [x] Dependabot para Cargo e GitHub Actions (PRs semanais agrupados)
 - [x] gitleaks no CI — nenhum segredo no histórico
 - [x] CSP real no Tauri (`default-src 'self'`) no lugar de `null`; violações entram em `window.__isperErrors` e o smoke test falha se houver alguma
-- [ ] Remover os `style="…"` inline dos HTML (29 em `settings.html`, 7 em `home.html`, mais dois `style.cssText`) e fechar `style-src-attr` — hoje `'unsafe-inline'` só para atributos, porque o Tauri injeta hashes em `style-src` e isso desliga o `'unsafe-inline'` da diretiva
+- [x] Remover os `style="…"` inline dos HTML e fechar `style-src-attr` (10/09): 36 atributos e dois `style.cssText` viraram classes utilitárias em `base.css` (classe dobrada em vez de `!important`); a entrada escalonada usa `data-i` → `--i` via CSSOM. Qualquer atributo que voltar aparece como violação de CSP no smoke test
 - [ ] Versão numa só fonte (o Tauri lê o `Cargo.toml`; remover do `tauri.conf.json` e a validação do release.yml vira desnecessária)
 - [ ] Edição Rust unificada (app em 2021 → 2024 com `cargo fix --edition`, em árvore limpa)
+- [ ] Higiene do repositório: `loopdump.wav` (7,7 MB, captura de teste da F4) está versionado na raiz — mover para `fixtures/` ou remover do histórico; `isper.db` da raiz é lixo local (já ignorado)
+- [ ] `rust-toolchain.toml` (canal fixo), `rustfmt.toml` e `.editorconfig` — mesmo resultado na sua máquina, no CI e em quem clonar
+- [ ] Proteção da branch `main`: CI verde obrigatório antes do merge e PRs para tudo (o Dependabot já abriu 5 PRs em 10/09; o do `ureq` 2 → 3 quebra o CI e precisa de migração manual)
 
 ### 7.2 Testes que provam robustez
 
 - [ ] `LlmProvider` falso para testar resumo, título e polimento sem rede
+- [ ] Testes no crate do app e na CLI (hoje 0 e 0; os 39 testes estão em core, llm e models): extrair a lógica pura (config, `paths`, migração de pastas, `home_status`) para funções testáveis; auditar os 113 `unwrap()` do workspace (`expect` com contexto ou `?`)
 - [ ] Testes de propriedade (`proptest`): `like_pattern`, `quiet_cut`, VAD por energia
 - [ ] Testes *golden* das exportações (Markdown, DOCX, SRT)
 - [ ] Cobertura com `cargo-llvm-cov` publicada como tendência (não como gate)
@@ -232,11 +253,13 @@ A ordem é impacto ÷ esforço.
 - [ ] `desfazer` em toast no lugar de `confirm()` para exclusões; tema claro/escuro seguindo o sistema
 - [ ] i18n desde já (dicionário JSON, pt-BR primeiro) e README em inglês
 - [ ] Acessibilidade: navegação completa por teclado e teste com NVDA
-- [ ] Detecção de reunião ativa → "Gravar transcrição?"
+- [x] Detecção de reunião ativa → "Gravar transcrição?" (10/09; detalhes na Fase 4)
+- [x] Indicador flutuante fixo em repouso (10/09): "Indicador" no Início e na bandeja alternam mostrar/ocultar; antes o preview sumia em 2,5 s. Configurações redimensionável; Ditados em largura inteira
 
 ### 7.6 Distribuição e documentação
 
 - [ ] `winget install ISPer` (manifesto no winget-pkgs) e zip portátil
+- [ ] Vitrine do repositório no GitHub: descrição em inglês revisada, *topics* (rust, tauri, whisper, speech-to-text, windows, meeting-notes), README em inglês com GIF de demonstração, imagem de *social preview*
 - [ ] Site de docs (mdBook no GitHub Pages): guia, FAQ, troubleshooting, arquitetura
 - [ ] ADRs em `docs/adr/` (Rust+Tauri, LLM em nuvem, keepalive do loopback, diarização pós-hoc)
 - [ ] `cargo doc` com `#![deny(missing_docs)]` no core; feature flags para o experimental (legendas ao vivo, comandos de voz)
@@ -256,4 +279,4 @@ Whisper (MIT) · whisper.cpp (MIT) · whisper-rs (Unlicense) · Tauri (MIT/Apach
 
 ---
 
-**Próximo passo:** Fase 7.2 — testes que provam robustez (soak test de 2 h, áudio dos participantes em disco, casos de áudio).
+**Próximo passo:** fechar a 7.1 (versão única, edição 2024, higiene do repo, toolchain fixo, branch protegida) e entrar na 7.2 — testes que provam robustez (soak test de 2 h, áudio dos participantes em disco, casos de áudio, testes no app). Validar a detecção de chamada e os insights ao vivo numa reunião real do Teams.

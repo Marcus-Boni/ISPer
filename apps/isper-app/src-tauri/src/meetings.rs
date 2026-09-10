@@ -5,7 +5,7 @@ use isper_core::loopback::LoopbackSource;
 use isper_core::meeting::{self, MeetingHandle, MeetingOptions, MeetingSegment, SegmentRef};
 
 /// Depois de um ditado ou reunião: se houver reunião ativa, o overlay volta
-/// a mostrar o estado dela; senão, esconde.
+/// a mostrar o estado dela; se estiver fixo, volta ao repouso; senão, esconde.
 pub(crate) fn maybe_restore_overlay(app: &AppHandle) {
     let state = app.state::<AppState>();
     if !matches!(*state.phase.lock().unwrap(), Phase::Idle) {
@@ -13,6 +13,9 @@ pub(crate) fn maybe_restore_overlay(app: &AppHandle) {
     }
     if state.meeting.lock().unwrap().is_some() {
         let _ = app.emit("isper-state", json!({"state": "meeting"}));
+    } else if overlay_pinned(app) {
+        let _ = app.emit("isper-state", json!({"state": "idle"}));
+        show_overlay(app);
     } else if let Some(overlay) = app.get_webview_window("overlay") {
         let _ = overlay.hide();
     }
@@ -28,6 +31,8 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
     if let Some(handle) = slot.take() {
         drop(slot);
         *state.meeting_started.lock().unwrap() = None;
+        stop_insights_loop(app);
+        on_meeting_stopped(app);
         set_meeting_text(app, &meeting_item_text(app, false));
         set_tray_recording(app, false);
         notify_status(app);
@@ -109,6 +114,8 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             notify_status(app);
             let _ = app.emit("isper-state", payload);
             show_overlay(app);
+            // Insights ao vivo (se ligados): rodadas periódicas sobre o transcript.
+            reset_insights(app);
             Ok(())
         }
         Err(e) => {
@@ -227,6 +234,10 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
         }
         Err(e) => tracing::warn!("resumo indisponível: {e}"),
     }
+
+    // Busca semântica: transcript + resumo viram vetores em segundo plano
+    // (só com provider de embeddings configurado).
+    index_meeting_background(app, meeting_id);
 
     // O que fazer com a reunião pronta: notificar (padrão), abrir o .md ou nada.
     let after = app

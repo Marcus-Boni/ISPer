@@ -389,6 +389,8 @@ fn run_llm(cmd: &LlmCmd) -> anyhow::Result<()> {
             let settings = isper_llm::LlmSettings {
                 provider: provider.to_lowercase(),
                 model: model.clone(),
+                // Preserva a busca semântica configurada pelo app.
+                embeddings: isper_llm::load_settings().embeddings,
             };
             isper_llm::save_settings(&settings)?;
             println!(

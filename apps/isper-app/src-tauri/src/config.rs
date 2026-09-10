@@ -64,6 +64,21 @@ pub struct AppConfig {
     /// instalar é sempre um clique do usuário).
     #[serde(default = "default_true")]
     pub auto_update_check: bool,
+    /// Chamada do Teams detectada: `notify` (avisa e pergunta se grava) ·
+    /// `auto` (começa a gravar sozinho) · `off`.
+    #[serde(default = "default_call_detect")]
+    pub call_detect: String,
+    /// Insights ao vivo durante a reunião (pendências, compromissos, decisões)
+    /// — opt-in: custa chamadas de API a cada rodada.
+    #[serde(default)]
+    pub live_insights: bool,
+    /// Intervalo entre rodadas de insights, em minutos.
+    #[serde(default = "default_insights_interval")]
+    pub insights_interval_min: u32,
+    /// Indicador flutuante fixo na tela mesmo em repouso (botão "Indicador"
+    /// do Início / bandeja); "ocultar" desfixa.
+    #[serde(default)]
+    pub overlay_pinned: bool,
 }
 
 impl Default for AppConfig {
@@ -86,8 +101,20 @@ impl Default for AppConfig {
             mark_shortcut: default_mark_shortcut(),
             overlay_captions: false,
             auto_update_check: true,
+            call_detect: default_call_detect(),
+            live_insights: false,
+            insights_interval_min: default_insights_interval(),
+            overlay_pinned: false,
         }
     }
+}
+
+fn default_call_detect() -> String {
+    "notify".into()
+}
+
+fn default_insights_interval() -> u32 {
+    5
 }
 
 fn default_meeting_shortcut() -> Option<String> {

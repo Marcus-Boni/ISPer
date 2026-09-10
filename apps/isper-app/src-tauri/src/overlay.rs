@@ -1,4 +1,4 @@
-//! Indicador flutuante: sempre no topo (SetWindowPos), mostrar/ocultar, mini e posição lembrada.
+//! Indicador flutuante: sempre no topo (SetWindowPos), mostrar/ocultar/fixar, modos e posição lembrada.
 
 use crate::prelude::*;
 
@@ -60,19 +60,72 @@ pub(crate) fn show_overlay(app: &AppHandle) {
     assert_topmost(app);
 }
 
-/// Mostra o indicador flutuante (útil depois de "ocultar" durante a reunião).
+/// O indicador está na tela agora?
+pub(crate) fn overlay_visible(app: &AppHandle) -> bool {
+    app.get_webview_window("overlay")
+        .and_then(|o| o.is_visible().ok())
+        .unwrap_or(false)
+}
+
+/// Indicador fixo em repouso (o usuário pediu para ele ficar na tela).
+pub(crate) fn overlay_pinned(app: &AppHandle) -> bool {
+    app.state::<AppState>()
+        .config
+        .lock()
+        .unwrap()
+        .overlay_pinned
+}
+
+fn set_pinned(app: &AppHandle, pinned: bool) {
+    let cfg = {
+        let state = app.state::<AppState>();
+        let mut c = state.config.lock().unwrap();
+        if c.overlay_pinned == pinned {
+            return;
+        }
+        c.overlay_pinned = pinned;
+        c.clone()
+    };
+    if let Err(e) = config::save(&cfg) {
+        tracing::warn!("não consegui gravar a preferência do indicador: {e}");
+    }
+}
+
+/// Mostra o indicador e, fora de reunião, o deixa FIXO na tela até "ocultar".
+/// Antes ele aparecia por 2,5 s e sumia — ninguém conseguia olhar.
 pub(crate) fn show_indicator(app: &AppHandle) {
     let meeting_active = app.state::<AppState>().meeting.lock().unwrap().is_some();
     show_overlay(app);
     if meeting_active {
         let _ = app.emit("isper-state", json!({"state": "meeting"}));
     } else {
+        set_pinned(app, true);
         let _ = app.emit("isper-state", json!({"state": "idle"}));
-        let app = app.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(2500));
-            maybe_restore_overlay(&app);
-        });
+    }
+    set_indicator_text(app, true);
+    notify_status(app);
+}
+
+/// Oculta o indicador (a gravação continua) e desfixa; volta pela bandeja,
+/// pelo botão do Início ou no próximo ditado/reunião.
+pub(crate) fn hide_indicator(app: &AppHandle) {
+    set_pinned(app, false);
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        let _ = overlay.hide();
+    }
+    set_indicator_text(app, false);
+    notify_status(app);
+}
+
+/// Botão "Indicador" do Início e item da bandeja: alterna visível/oculto.
+/// Devolve o estado novo (visível?).
+pub(crate) fn toggle_indicator(app: &AppHandle) -> bool {
+    if overlay_visible(app) {
+        hide_indicator(app);
+        false
+    } else {
+        show_indicator(app);
+        true
     }
 }
 
@@ -80,16 +133,25 @@ pub(crate) fn show_indicator(app: &AppHandle) {
 pub(crate) struct OverlayPrefs {
     mini: bool,
     meeting_active: bool,
+    pinned: bool,
+    /// Rótulo do atalho de ditado (o indicador em repouso mostra "pronto · <atalho>").
+    shortcut: String,
 }
 
 #[tauri::command]
 pub(crate) fn overlay_prefs(app: AppHandle) -> OverlayPrefs {
     let state = app.state::<AppState>();
-    let mini = state.config.lock().unwrap().overlay_mini;
+    let (mini, pinned) = {
+        let cfg = state.config.lock().unwrap();
+        (cfg.overlay_mini, cfg.overlay_pinned)
+    };
     let meeting_active = state.meeting.lock().unwrap().is_some();
+    let shortcut = state.active_shortcut.lock().unwrap().clone();
     OverlayPrefs {
         mini,
         meeting_active,
+        pinned,
+        shortcut,
     }
 }
 
@@ -131,12 +193,10 @@ pub(crate) fn overlay_set_mode(app: AppHandle, mode: String) -> Result<(), Strin
     Ok(())
 }
 
-/// Esconde o indicador (a gravação continua; volta pela bandeja).
+/// Botão × do indicador: esconde (a gravação continua) e desfixa.
 #[tauri::command]
 pub(crate) fn overlay_hide(app: AppHandle) {
-    if let Some(overlay) = app.get_webview_window("overlay") {
-        let _ = overlay.hide();
-    }
+    hide_indicator(&app);
 }
 
 /// Lembra onde o usuário deixou o indicador (pixels físicos).
@@ -154,4 +214,10 @@ pub(crate) fn overlay_moved(app: AppHandle, x: i32, y: i32) -> Result<(), String
 #[tauri::command]
 pub(crate) fn show_indicator_cmd(app: AppHandle) {
     show_indicator(&app);
+}
+
+/// Alterna o indicador (botão do Início); devolve se ficou visível.
+#[tauri::command]
+pub(crate) fn overlay_toggle_pin(app: AppHandle) -> bool {
+    toggle_indicator(&app)
 }

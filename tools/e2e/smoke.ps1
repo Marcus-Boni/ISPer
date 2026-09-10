@@ -50,6 +50,24 @@ Start-Sleep -Seconds 1
 $back = (EvJson 'http://tauri.localhost/' 'JSON.stringify({ cls: document.body.className })').cls
 Check (($original -eq 'normal' -and $back -eq '') -or $back -eq $original) "indicador de volta ao modo original"
 
+# Novidades de 10/09: deteccao de chamada, insights e busca semantica respondem;
+# o indicador alterna mostrar/ocultar e o estado original e restaurado ao fim.
+Check (($st.PSObject.Properties.Name -contains 'call_detect') -and ($null -ne $st.insights)) "home_status traz call_detect='$($st.call_detect)' e insights (enabled=$($st.insights.enabled), configured=$($st.insights.configured))"
+$emb = Invoke-Isper 'embeddings_status'
+Check (($null -ne $emb) -and ($emb.PSObject.Properties.Name -contains 'configured')) "busca semantica responde (configured=$($emb.configured), provider='$($emb.provider)')"
+$wasPinned = [bool]$st.overlay_pinned
+$t1 = Invoke-Isper 'overlay_toggle_pin'
+Start-Sleep -Milliseconds 800
+Check ((Invoke-Isper 'home_status').overlay_visible -eq $t1) "indicador alternado pelo botao do Inicio (visivel=$t1)"
+$t2 = Invoke-Isper 'overlay_toggle_pin'
+Start-Sleep -Milliseconds 800
+Check (((Invoke-Isper 'home_status').overlay_visible -eq $t2) -and ($t2 -ne $t1)) "indicador alternado de volta (visivel=$t2)"
+if ($wasPinned) { Invoke-Isper 'show_indicator_cmd' | Out-Null } else { Invoke-Isper 'overlay_hide' | Out-Null }
+Start-Sleep -Milliseconds 500
+Check ([bool](Invoke-Isper 'home_status').overlay_pinned -eq $wasPinned) "preferencia do indicador restaurada (fixo=$wasPinned)"
+$errs = Get-JsErrors 'home.html'
+Check (@($errs).Count -eq 0) "Inicio segue sem erros de JS apos as novidades$(Format-JsErrors $errs)"
+
 $upd = Invoke-Isper 'check_update'
 $updText = if ($null -eq $upd) { 'na ultima versao' } elseif ($upd.__error) { "erro amigavel: $($upd.__error)" } else { "versao nova $($upd.version)" }
 Check ($null -eq $upd -or $upd.__error -or $upd.version) "atualizador respondeu ($updText)"

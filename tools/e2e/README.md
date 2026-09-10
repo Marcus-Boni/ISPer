@@ -21,7 +21,7 @@ atalhos globais, áudio e o atualizador.
 
 | Script | O que cobre | Duração |
 |---|---|---|
-| `smoke.ps1` | Início, Biblioteca, Configurações e indicador abrem sem erros de JS; modos do indicador; resposta do atualizador | ~40 s |
+| `smoke.ps1` | Início, Biblioteca, Configurações e indicador abrem sem erros de JS (inclusive violações de CSP); modos do indicador; indicador fixo alterna e volta ao estado original; `home_status` traz detecção de chamada e insights; busca semântica e atualizador respondem | ~45 s |
 | `meeting.ps1` | Reunião com a fixture de duas vozes: ao vivo, legendas, momentos (comando com debounce + atalho global), encerrar, banco, Markdown, DOCX, Biblioteca, limpeza | ~2 min |
 | `updater-local.ps1` | Atualizador completo contra uma release falsa assinada com a sua chave e servida em localhost: checagem, banner, download com assinatura, download adulterado recusado, recusa durante reunião (nada é instalado) | ~6 min |
 

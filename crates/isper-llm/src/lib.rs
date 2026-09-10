@@ -9,11 +9,15 @@
 //! - **Provider trocável**: o trait [`LlmProvider`] abstrai a API — Claude,
 //!   Groq e Gemini implementados; trocar é editar uma linha de configuração.
 
+pub mod embeddings;
+mod insights;
 mod polish;
 mod providers;
 mod settings;
 mod summary;
 
+pub use embeddings::{Embedder, EmbeddingSettings, embedder_from_settings};
+pub use insights::{InsightsInput, live_insights};
 pub use polish::{POLISH_STYLES, polish_dictation};
 pub use providers::{LlmProvider, provider_from_settings};
 pub use settings::{

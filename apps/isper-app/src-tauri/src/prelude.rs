@@ -8,11 +8,14 @@ pub(crate) use std::time::{Duration, Instant};
 pub(crate) use serde_json::json;
 pub(crate) use tauri::{AppHandle, Emitter, Manager};
 
+pub(crate) use crate::calls::*;
 pub(crate) use crate::dictation::*;
 pub(crate) use crate::home::*;
+pub(crate) use crate::insights::*;
 pub(crate) use crate::library::*;
 pub(crate) use crate::meetings::*;
 pub(crate) use crate::overlay::*;
+pub(crate) use crate::search::*;
 pub(crate) use crate::settings::*;
 pub(crate) use crate::shortcuts::*;
 pub(crate) use crate::state::*;

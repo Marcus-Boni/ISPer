@@ -11,6 +11,39 @@ workflow `release.yml` recusa uma tag que não bata com os dois.
 ## [Unreleased]
 
 ### Adicionado
+- **Detecção de chamada do Teams → "Gravar transcrição?"** (fecha o último
+  item da Fase 4). O ISPer sonda as sessões de áudio do Windows a cada 4 s:
+  em chamada, o Teams (ou um filho WebView2 dele) mantém o microfone aberto.
+  Com histerese (~8 s para começar, ~24 s para terminar), ao detectar a
+  chamada avisa por três canais — toast do Windows (clicar grava), banner na
+  tela Início e aviso no indicador — e, quando a chamada termina com a
+  gravação ligada, pergunta se encerra. Modos em Configurações → Reuniões:
+  avisar (padrão), gravar automaticamente (e encerrar sozinho) ou não detectar.
+  `isper_core::calls` (sondagem + `CallTracker` testado) e `calls.rs` no app.
+- **Insights ao vivo** (Fase 5): durante a reunião, a cada 3/5/10 min os
+  últimos ~15 min de transcrição vão ao provider de IA com as perguntas que
+  importam enquanto ainda dá tempo — pendências, compromissos de "Eu",
+  decisões, perguntas em aberto — e a resposta anterior é consolidada em vez de
+  recomeçar. Painel no card de reunião do Início, com "Atualizar agora"
+  (funciona como rodada avulsa mesmo com o recurso desligado). Rodadas sem
+  fala nova são puladas. Opt-in em Configurações → Inteligência.
+  `isper_llm::insights` (prompt testado com um `LlmProvider` falso).
+- **Busca semântica** (Fase 5): reuniões e ditados viram vetores (embeddings)
+  guardados no SQLite ao lado do texto (tabela `embeddings`, com o modelo que
+  os gerou); a Biblioteca ganha o botão "Semântica", que acha pelo sentido
+  ("quando falamos do orçamento?") e abre a reunião já rolada no trecho.
+  Decisão de provider: **Gemini** (`gemini-embedding-001`, free tier, reutiliza
+  a chave do Gemini) ou **qualquer endpoint compatível com OpenAI** — o que
+  inclui o **Ollama local** (`nomic-embed-text`, `bge-m3`), 100% na máquina e
+  sem chave. Cada reunião salva e cada ditado colado é indexado em segundo
+  plano; "Indexar tudo" cobre o histórico e descarta vetores de modelos antigos.
+  `isper_core::embed` (recorte em trechos, cosseno), `isper_llm::embeddings`,
+  `search.rs` no app.
+- **Indicador flutuante fixo**: o botão "Indicador" do Início e o item da
+  bandeja agora alternam mostrar/ocultar, e em repouso o indicador fica na
+  tela até você ocultá-lo (× nele, botão ou bandeja), mostrando "pronto ·
+  atalho". Antes ele aparecia por 2,5 s e sumia.
+- Janela de Configurações redimensionável (mínimo 480×520), como a Biblioteca.
 - Fase 7 (maturidade de engenharia) no ROADMAP. Primeiro item entregue:
   `cargo clippy --workspace --all-targets -- -D warnings` no CI com
   `[workspace.lints]` compartilhado por todos os crates, `cargo deny`
@@ -19,6 +52,16 @@ workflow `release.yml` recusa uma tag que não bata com os dois.
   gitleaks no CI.
 
 ### Alterado
+- Início: o botão de gravar reunião ganhou respiro antes da lista de atalhos e
+  os chips ("GPU · CUDA", "chave guardada"…) deixaram de colar no texto.
+- Biblioteca: a aba Ditados ocupa a janela inteira (o painel de detalhe não
+  tinha o que mostrar e a coluna de 340 px espremia o texto com barra
+  horizontal); as linhas se reorganizam em janelas estreitas.
+- CSP fechada para atributos de estilo: `style-src-attr` saiu da política e
+  nenhum HTML usa mais `style="…"` (36 atributos e dois `style.cssText`
+  virarem classes; a entrada escalonada usa `data-i`). Item 7.1 do ROADMAP.
+- `MeetingStore::save_dictation` devolve o id da linha; `LlmSettings` ganha a
+  seção `[embeddings]` (a CLI `llm use` a preserva).
 - CSP real nas janelas do app (`default-src 'self'` + origens do IPC/asset do
   Tauri) no lugar de `csp: null`; scripts e estilos inline continuam
   funcionando porque o Tauri injeta os hashes no empacotamento. Violações

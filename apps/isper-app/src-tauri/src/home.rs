@@ -35,6 +35,21 @@ pub(crate) struct HomeStatus {
     /// Reunião com diarização em andamento (depois de salva).
     diarizing_meeting: Option<i64>,
     voice_commands: bool,
+    /// Chamada do Teams em andamento (banner "Gravar transcrição?").
+    call: Option<CallInfo>,
+    /// A chamada terminou com a gravação ainda ligada (banner "encerrar?").
+    call_ended: bool,
+    /// O usuário dispensou o aviso desta chamada ("agora não" / "continuar gravando").
+    call_dismissed: bool,
+    /// `notify` · `auto` · `off`.
+    call_detect: String,
+    /// Indicador flutuante: na tela agora / fixo em repouso.
+    overlay_visible: bool,
+    overlay_pinned: bool,
+    /// Insights ao vivo (painel do card de reunião).
+    insights: InsightsDto,
+    /// Busca semântica configurada (a Biblioteca mostra o modo "Semântica").
+    semantic_search: bool,
 }
 
 /// Fotografia de tudo que a tela Início mostra — uma chamada, sem estado no
@@ -55,6 +70,7 @@ pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
         .lock()
         .unwrap()
         .map(|t| t.elapsed().as_secs());
+    let (call, call_ended, call_dismissed) = call_info(&app);
 
     let llm = isper_llm::load_settings();
     let (llm_provider, llm_model, llm_key_present) = if llm.provider.is_empty() {
@@ -114,5 +130,13 @@ pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
         input_device: cfg.input_device,
         diarizing_meeting,
         voice_commands: cfg.voice_commands,
+        call,
+        call_ended,
+        call_dismissed,
+        call_detect: cfg.call_detect,
+        overlay_visible: overlay_visible(&app),
+        overlay_pinned: cfg.overlay_pinned,
+        insights: insights_dto(&app),
+        semantic_search: llm.embeddings.is_configured(),
     }
 }

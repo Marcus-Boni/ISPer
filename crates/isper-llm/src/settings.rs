@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::embeddings::EmbeddingSettings;
 use crate::{LlmError, Result};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -15,6 +16,9 @@ pub struct LlmSettings {
     /// Modelo específico; `None` usa o padrão do provider.
     #[serde(default)]
     pub model: Option<String>,
+    /// Busca semântica (seção `[embeddings]`); ausente = desligada.
+    #[serde(default)]
+    pub embeddings: EmbeddingSettings,
 }
 
 /// `%APPDATA%\ISPer\llm.toml` — pela API de pastas conhecidas do Windows, com

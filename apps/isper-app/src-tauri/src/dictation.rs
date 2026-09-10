@@ -119,7 +119,11 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<S
     if let Ok(store) = open_store() {
         let at = chrono::Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
         let raw = (text != raw_text).then_some(raw_text.as_str());
-        let _ = store.save_dictation(&at, &text, raw, audio_secs, t.infer_secs);
+        match store.save_dictation(&at, &text, raw, audio_secs, t.infer_secs) {
+            // Busca semântica: o ditado vira vetor em segundo plano (se configurada).
+            Ok(id) => index_dictation_background(app, id, text.clone()),
+            Err(e) => tracing::warn!("não consegui guardar o ditado no histórico: {e}"),
+        }
     }
     Ok(Some(text))
 }

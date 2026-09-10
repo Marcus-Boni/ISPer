@@ -39,6 +39,23 @@ pub(crate) fn set_meeting_text(app: &AppHandle, text: &str) {
     }
 }
 
+/// Texto do item da bandeja que alterna o indicador flutuante.
+pub(crate) fn indicator_item_text(visible: bool) -> &'static str {
+    if visible {
+        "Ocultar indicador flutuante"
+    } else {
+        "Mostrar indicador flutuante"
+    }
+}
+
+pub(crate) fn set_indicator_text(app: &AppHandle, visible: bool) {
+    let state = app.state::<AppState>();
+    let guard = state.indicator_item.lock().unwrap();
+    if let Some(item) = guard.as_ref() {
+        let _ = item.set_text(indicator_item_text(visible));
+    }
+}
+
 /// Ícone da bandeja com um ponto vermelho no canto (estado "gravando"),
 /// desenhado sobre o ícone normal — sem arquivo extra.
 pub(crate) fn recording_icon(base: &Image<'static>) -> Image<'static> {

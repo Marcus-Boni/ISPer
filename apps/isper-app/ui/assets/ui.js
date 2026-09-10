@@ -22,6 +22,10 @@
   document.addEventListener('securitypolicyviolation', (e) =>
     window.__isperErrors.push('csp: ' + e.violatedDirective + ' bloqueou ' + (e.blockedURI || 'inline') + ' em ' + e.sourceFile + ':' + e.lineNumber));
 
+  // Entrada escalonada declarada no HTML: `data-i="2"` vira `--i: 2` via CSSOM
+  // (a CSP não permite style="--i:2" no atributo).
+  document.querySelectorAll('[data-i]').forEach((n) => n.style.setProperty('--i', n.dataset.i));
+
   // ----------------------------------------------------------------- toast
   let host = null;
   function toast(msg, kind = 'info', ms = 2800) {

@@ -38,8 +38,8 @@ pub(crate) fn build_settings(app: &AppHandle) -> tauri::Result<tauri::WebviewWin
         tauri::WebviewUrl::App("settings.html".into()),
     )
     .title("ISPer — Configurações")
-    .inner_size(560.0, 700.0)
-    .resizable(false)
+    .inner_size(600.0, 760.0)
+    .min_inner_size(480.0, 520.0)
     .build()
 }
 

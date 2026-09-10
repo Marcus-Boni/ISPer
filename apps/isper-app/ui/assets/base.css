@@ -173,6 +173,28 @@ body.atmos::after {
 .chip-warn { color: var(--warn); border-color: rgba(232, 193, 90, .45); background: var(--warn-soft); }
 .chip-accent { color: var(--accent); border-color: rgba(240, 126, 114, .45); background: var(--accent-soft); }
 .chip-info { color: var(--info); border-color: rgba(124, 196, 240, .45); }
+/* Chip logo depois de um texto na mesma linha (valores das listas de specs,
+   rótulos de campo): respira em vez de colar na última palavra. */
+dd > .chip, label.lbl > .chip, .hint > .chip { margin-left: 6px; }
+.badge.warn { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); border-color: rgba(232, 193, 90, .45); }
+
+/* ---------------------------------------------------------- utilitários */
+/* Os HTML não usam style="…" (a CSP bloqueia atributos de estilo); estes
+   utilitários cobrem os ajustes pontuais. Classe dobrada = especificidade
+   suficiente para vencer regras como `label.lbl` sem !important. */
+.mt0.mt0 { margin-top: 0; }
+.m0.m0 { margin: 0; }
+.mt4.mt4 { margin-top: 4px; }
+.mt8.mt8 { margin-top: 8px; }
+.mt10.mt10 { margin-top: 10px; }
+.mb8.mb8 { margin-bottom: 8px; }
+.flex-none.flex-none { flex: 0 0 auto; }
+.ml-auto.ml-auto { margin-left: auto; }
+.w60 { width: 60%; }
+.text-warn { color: var(--warn); }
+.text-good { color: var(--good); }
+.pre-notes { white-space: pre-wrap; margin-top: 8px; max-height: 140px; overflow-y: auto; }
+kbd.key-sm { font: 600 11px var(--font-body); padding: 2px 6px; border: 1px solid var(--line-2); border-radius: 5px; background: var(--panel-2); }
 
 /* --------------------------------------------------------------- cards */
 .card {

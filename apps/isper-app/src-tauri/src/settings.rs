@@ -30,6 +30,15 @@ pub(crate) struct SettingsDto {
     voice_commands: bool,
     auto_update_check: bool,
     version: String,
+    /// `notify` · `auto` · `off`.
+    call_detect: String,
+    live_insights: bool,
+    insights_interval_min: u32,
+    /// Busca semântica: provider (`none` = desligada), modelo, base URL e chave.
+    emb_provider: String,
+    emb_model: Option<String>,
+    emb_base_url: Option<String>,
+    emb_key_present: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -60,6 +69,18 @@ pub(crate) struct SettingsPatch {
     voice_commands: bool,
     #[serde(default = "default_true")]
     auto_update_check: bool,
+    #[serde(default)]
+    call_detect: Option<String>,
+    #[serde(default)]
+    live_insights: bool,
+    #[serde(default)]
+    insights_interval_min: Option<u32>,
+    #[serde(default)]
+    emb_provider: Option<String>,
+    #[serde(default)]
+    emb_model: Option<String>,
+    #[serde(default)]
+    emb_base_url: Option<String>,
 }
 
 pub(crate) fn default_true() -> bool {
@@ -240,6 +261,16 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
             .map(|k| k.is_some())
             .unwrap_or(false)
     };
+    let emb = llm.embeddings.clone();
+    let emb_provider = emb.provider.trim().to_lowercase();
+    let emb_key_present = match emb_provider.as_str() {
+        "gemini" | "google" => isper_llm::get_api_key("gemini").ok().flatten().is_some(),
+        "openai" | "ollama" => isper_llm::get_api_key(isper_llm::embeddings::OPENAI_COMPAT_KEY)
+            .ok()
+            .flatten()
+            .is_some(),
+        _ => false,
+    };
     Ok(SettingsDto {
         shortcut: cfg.shortcut,
         active_shortcut,
@@ -268,6 +299,17 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         voice_commands: cfg.voice_commands,
         auto_update_check: cfg.auto_update_check,
         version: env!("CARGO_PKG_VERSION").to_string(),
+        call_detect: cfg.call_detect,
+        live_insights: cfg.live_insights,
+        insights_interval_min: cfg.insights_interval_min,
+        emb_provider: if emb.is_configured() {
+            emb_provider
+        } else {
+            "none".into()
+        },
+        emb_model: emb.model,
+        emb_base_url: emb.base_url,
+        emb_key_present,
     })
 }
 
@@ -334,6 +376,20 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
             }
         },
         voice_commands: patch.voice_commands,
+        call_detect: {
+            let s = patch.call_detect.unwrap_or_default().trim().to_lowercase();
+            if CALL_DETECT_MODES.contains(&s.as_str()) {
+                s
+            } else {
+                "notify".into()
+            }
+        },
+        live_insights: patch.live_insights,
+        insights_interval_min: patch
+            .insights_interval_min
+            .filter(|m| INSIGHTS_INTERVALS.contains(m))
+            .unwrap_or(5),
+        overlay_pinned: previous.overlay_pinned,
     };
     config::save(&cfg).map_err(|e| e.to_string())?;
     *state.config.lock().unwrap() = cfg.clone();
@@ -357,8 +413,29 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         patch.llm_provider.trim().to_lowercase()
     };
     let model = patch.llm_model.filter(|m| !m.trim().is_empty());
-    isper_llm::save_settings(&isper_llm::LlmSettings { provider, model })
-        .map_err(|e| e.to_string())?;
+    // Busca semântica: provider próprio (Gemini ou endpoint compatível com OpenAI).
+    let emb_provider = patch.emb_provider.unwrap_or_default().trim().to_lowercase();
+    let embeddings = isper_llm::EmbeddingSettings {
+        provider: if emb_provider == "none" {
+            String::new()
+        } else {
+            emb_provider
+        },
+        model: patch
+            .emb_model
+            .map(|m| m.trim().to_string())
+            .filter(|m| !m.is_empty()),
+        base_url: patch
+            .emb_base_url
+            .map(|u| u.trim().trim_end_matches('/').to_string())
+            .filter(|u| !u.is_empty()),
+    };
+    isper_llm::save_settings(&isper_llm::LlmSettings {
+        provider,
+        model,
+        embeddings,
+    })
+    .map_err(|e| e.to_string())?;
 
     let autolaunch = app.autolaunch();
     let _ = if patch.autostart {
@@ -409,6 +486,7 @@ pub(crate) async fn list_llm_models(
         let settings = isper_llm::LlmSettings {
             provider: provider.trim().to_lowercase(),
             model,
+            embeddings: Default::default(),
         };
         let p = isper_llm::provider_from_settings(&settings).map_err(|e| e.to_string())?;
         p.list_models().map_err(|e| e.to_string())

@@ -114,6 +114,14 @@ pub(crate) struct AppState {
     pub(crate) tray_icons: Mutex<Option<(Image<'static>, Image<'static>)>>,
     /// Versão nova encontrada pela última checagem (banner do Início).
     pub(crate) update_available: Mutex<Option<UpdateInfo>>,
+    /// Chamada do Teams em andamento / recém-encerrada (detecção).
+    pub(crate) call: Mutex<CallState>,
+    /// Insights ao vivo da reunião atual (loop, último resultado, erro).
+    pub(crate) insights: Mutex<InsightsState>,
+    /// Indexação semântica completa em andamento (progresso).
+    pub(crate) indexing: Mutex<Option<IndexProgress>>,
+    /// Item "Mostrar/Ocultar indicador" da bandeja (o texto acompanha o estado).
+    pub(crate) indicator_item: Mutex<Option<MenuItem<tauri::Wry>>>,
 }
 
 /// Uma fala transcrita durante a reunião (evento `isper-live`).

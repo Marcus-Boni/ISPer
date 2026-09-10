@@ -14,7 +14,8 @@ crates/isper-diarize/# quem falou o quê (sherpa-onnx: pyannote + 3D-Speaker)
 apps/isper-app/      # app Tauri 2: src-tauri (Rust) + ui (HTML/CSS/JS sem build step)
   src-tauri/src/     # main.rs (bootstrap) + módulos por responsabilidade: state,
                      # shortcuts, tray, dictation, meetings, views, overlay,
-                     # settings, library, home, notify, updater, config (prelude reexporta)
+                     # settings, library, home, notify, updater, config, calls (chamada
+                     # do Teams), insights (IA ao vivo), search (busca semântica)
   ui/assets/         # design system: base.css (tokens, componentes, movimento),
                      # ui.js (toast, count-up, confirmação inline…) e fontes OFL locais
 scripts/release.ps1  # instaladores GPU e CPU assinados + latest*.json e, com -Publish, a release
@@ -213,14 +214,19 @@ Biblioteca.
 Início) lista todas as
 reuniões com busca no título, resumo e transcript; cada uma abre com resumo,
 transcript por falante, renomear, abrir o `.md` e excluir do histórico (o
-arquivo fica). A aba Ditados mostra o histórico do que você ditou.
+arquivo fica). A aba Ditados mostra o histórico do que você ditou, em largura
+inteira. Com a busca semântica configurada (abaixo), o botão **Semântica**
+acha reuniões e ditados pelo sentido e abre a reunião já no trecho.
 
 **Indicador flutuante**: arraste-o para onde quiser (a posição é lembrada);
 passe o mouse para ver `–` (modo mini: só o ponto + cronômetro da reunião) e
-`×` (ocultar — volta em bandeja → "Mostrar indicador flutuante"). Enquanto
-visível ele fica **acima de qualquer janela**, inclusive de outras "sempre no
-topo" (Teams em chamada, players): o ISPer reafirma essa prioridade ao
-mostrá-lo e a cada 1,5 s, sem roubar o foco do que você está usando.
+`×` (ocultar). O botão **Indicador** da tela Início e o item da bandeja
+alternam mostrar/ocultar: em repouso ele fica **fixo na tela** ("pronto ·
+atalho") até você ocultá-lo, e volta sozinho no próximo ditado ou reunião.
+Enquanto visível ele fica **acima de qualquer janela**, inclusive de outras
+"sempre no topo" (Teams em chamada, players): o ISPer reafirma essa
+prioridade ao mostrá-lo e a cada 1,5 s, sem roubar o foco do que você está
+usando.
 
 **Legendas ao vivo**: o botão **CC** do indicador (ou o interruptor
 "Legendas no indicador" na tela Início, durante a reunião) troca o indicador
@@ -254,6 +260,17 @@ arquivo é gravado ao lado do `.md` e mostrado no Explorer.
 **Só o Teams**: em Configurações → Reuniões, escolha "Só o Microsoft Teams" —
 o ISPer usa o *process loopback* do Windows e ignora notificações, músicas e
 outros apps (se o Teams não estiver aberto, cai para o sistema e avisa).
+
+**Chamada detectada → "Gravar transcrição?"**: o ISPer percebe quando o Teams
+entra em chamada pelas **sessões de áudio do Windows** (em chamada, o Teams
+mantém o microfone aberto — sem bot, sem API do Teams, sem olhar janelas) e
+avisa por notificação (clicar grava), por um banner na tela Início e pelo
+indicador; quando a chamada termina com a gravação ligada, pergunta se
+encerra. Em Configurações → Reuniões → "Chamadas do Teams" você escolhe
+avisar (padrão), **gravar automaticamente** (e encerrar sozinho quando a
+chamada acabar) ou não detectar. A sondagem roda a cada 4 s com histerese
+(~8 s para começar, ~24 s para terminar), então o teste de microfone e sons
+de notificação não disparam nada.
 
 **Quem falou o quê**: Configurações → Reuniões → "Baixar modelos (~45 MB)"
 instala pyannote + 3D-Speaker (via sherpa-onnx, 100% local). A reunião é
@@ -311,6 +328,27 @@ por conta — liste os que a SUA chave enxerga com `llm models` (ou o botão
 Windows** — nunca em arquivo. Privacidade: só o TEXTO do transcript é
 enviado; o áudio nunca sai da máquina. Sem provider configurado, tudo
 funciona normalmente — apenas sem resumo.
+
+**Insights ao vivo** (Configurações → Inteligência, opt-in): durante a
+reunião, a cada 3, 5 ou 10 minutos os últimos ~15 min de transcrição vão ao
+provider com quatro perguntas — o que ficou pendente, o que "Eu" prometeu, o
+que foi decidido, o que ninguém respondeu — e a resposta anterior é
+consolidada em vez de recomeçar. O painel "Insights ao vivo" no card de
+reunião do Início mostra o resultado e tem "Atualizar agora" (que também
+serve como rodada avulsa com o recurso desligado). Rodadas sem fala nova são
+puladas para não gastar API.
+
+**Busca semântica** (Configurações → Inteligência): reuniões e ditados viram
+vetores (embeddings) guardados no SQLite ao lado do texto, e a Biblioteca
+ganha o botão **Semântica** — "quando falamos do orçamento?" acha o trecho
+mesmo sem a palavra exata. Provider à sua escolha: **Gemini**
+(`gemini-embedding-001`, free tier; reutiliza a chave do Gemini) ou qualquer
+endpoint **compatível com OpenAI** — inclusive um **Ollama local**
+(`ollama pull nomic-embed-text` ou `bge-m3`; base `http://localhost:11434/v1`,
+sem chave, nada sai da máquina). Cada reunião salva e cada ditado colado é
+indexado em segundo plano; "Indexar tudo" cobre o histórico anterior e
+refaz o índice quando o modelo muda. Os vetores de um modelo nunca se
+comparam com os de outro.
 
 ### CLI (Fase 1)
 

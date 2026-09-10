@@ -5,6 +5,8 @@
 //! da UI é o que permite testá-lo sozinho e evoluir o projeto sem reescrever.
 
 pub mod audio;
+pub mod calls;
+pub mod embed;
 pub mod engine;
 pub mod export;
 pub mod loopback;

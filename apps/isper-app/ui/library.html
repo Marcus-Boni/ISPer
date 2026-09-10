@@ -20,9 +20,17 @@
   .search.has-text .clear { opacity: 1; pointer-events: auto; transform: translateY(-50%); }
   .search .clear:hover { color: var(--ink); }
   .count { font-size: 12px; color: var(--muted); min-width: 70px; text-align: right; }
+  /* Busca semântica (só aparece com provider de embeddings configurado). */
+  #semantic[aria-pressed="true"] { background: var(--warn-soft); color: var(--warn); border-color: rgba(232, 193, 90, .5); }
+  #semantic svg { width: 14px; height: 14px; }
 
   main { display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
-  #list { border-right: 1px solid var(--line); overflow-y: auto; background: rgba(30, 26, 24, .5); }
+  #list { border-right: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; background: rgba(30, 26, 24, .5); }
+  /* Ditados: lista de largura inteira — o painel de detalhe não tem o que
+     mostrar, e a coluna de 340 px espremia o texto com barra horizontal. */
+  main.dictations { grid-template-columns: 1fr; }
+  main.dictations #detail { display: none; }
+  main.dictations #list { border-right: none; background: transparent; }
   .item {
     position: relative; padding: 12px 16px 12px 18px; border-bottom: 1px solid var(--line); cursor: pointer;
     transition: background var(--dur-2);
@@ -37,8 +45,10 @@
   .item .t { font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur-2); }
   .item.on .t { color: var(--accent-2); }
   .item .m { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .item .snip { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; margin-top: 6px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .badge { font-size: 11px; padding: 1px 7px; border-radius: var(--r-pill); border: 1px solid var(--line); color: var(--muted); }
   .badge.ok { color: var(--good); border-color: rgba(132, 194, 151, .45); }
+  .badge.score { color: var(--warn); border-color: rgba(232, 193, 90, .45); font-variant-numeric: tabular-nums; }
 
   #detail { overflow-y: auto; padding: 24px 30px; position: relative; }
   .placeholder { color: var(--muted); padding: 60px 20px; text-align: center; display: grid; gap: 10px; justify-items: center; }
@@ -88,11 +98,18 @@
   .seg.target { animation: target-flash 1.6s ease-out both; }
   @keyframes target-flash { 0% { background: rgba(232, 193, 90, .35); } 100% { background: transparent; } }
 
-  .dict { display: grid; grid-template-columns: 150px 1fr auto auto; gap: 12px; align-items: start; padding: 10px 16px; border-bottom: 1px solid var(--line); transition: background var(--dur-2); }
+  /* Ditados: hora · texto · ações, numa linha que usa a largura inteira. */
+  .dict-note { color: var(--muted); font-size: 12.5px; padding: 12px 22px 10px; border-bottom: 1px solid var(--line); line-height: 1.5; }
+  .dict { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto auto; gap: 12px; align-items: start; padding: 10px 22px; border-bottom: 1px solid var(--line); transition: background var(--dur-2); }
   .dict:hover { background: var(--panel); }
-  .dict .at { color: var(--muted-2); font: 12px var(--font-mono); padding-top: 3px; }
-  .dict .tx { line-height: 1.5; }
+  .dict .at { color: var(--muted-2); font: 12px var(--font-mono); padding-top: 3px; white-space: nowrap; }
+  .dict .tx { line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
   .dict .tx .chip { margin-left: 8px; cursor: help; }
+  .dict .tx .badge { margin-left: 8px; }
+  @media (max-width: 620px) {
+    .dict { grid-template-columns: minmax(0, 1fr) auto auto; }
+    .dict .at { grid-column: 1 / -1; padding-top: 0; }
+  }
 </style>
 </head>
 <body class="atmos">
@@ -107,10 +124,14 @@
     <input id="search" class="field" type="search" placeholder="buscar no título, resumo e transcript…" autocomplete="off">
     <button class="clear" id="clear" title="limpar" aria-label="limpar busca">×</button>
   </div>
+  <button class="btn btn-ghost btn-sm" id="semantic" aria-pressed="false" hidden title="busca pelo sentido (embeddings): 'quando falamos do orçamento?' acha o trecho mesmo sem a palavra exata">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/><path d="M5 7h4M7 5v4" opacity=".7"/></svg>
+    Semântica
+  </button>
   <span class="count num" id="count"></span>
   <button class="btn btn-ghost" id="openfolder">Abrir pasta</button>
 </header>
-<main>
+<main id="main">
   <div id="list"></div>
   <div id="detail"></div>
 </main>
@@ -145,9 +166,12 @@
     try { await navigator.clipboard.writeText(text); UI.flash(btn, label || 'copiado ✓'); }
     catch (_) { toast('não consegui copiar', 'err'); }
   }
+  const pct = (score) => Math.round(Math.max(0, Math.min(1, score)) * 100) + '%';
 
   let tab = 'meetings';
   let selected = null;
+  let semantic = false;          // busca pelo sentido ligada (botão "Semântica")
+  let semanticAvailable = false; // provider de embeddings configurado
   const meetingQuery = {};   // id → último termo buscado dentro da reunião
 
   // --------------------------------------------- busca com destaque (texto)
@@ -184,37 +208,65 @@
     return ranges.length;
   }
 
+  // A busca semântica só faz sentido com pergunta de verdade (≥ 3 caracteres).
+  const semanticActive = () => semantic && semanticAvailable && $('search').value.trim().length >= 3;
+
   // ------------------------------------------------------------ reuniões
+  function meetingItem(r, extra) {
+    const it = el('div', 'item' + (selected === r.id ? ' on' : ''));
+    it.tabIndex = 0;
+    it.appendChild(el('div', 't', r.title));
+    const m = el('div', 'm');
+    m.appendChild(el('span', '', r.started_at));
+    m.appendChild(el('span', 'num', fmtClock(r.duration_secs)));
+    if (extra && extra.score != null) { const s = el('span', 'badge score', pct(extra.score)); s.title = 'similaridade entre a sua pergunta e o melhor trecho'; m.appendChild(s); }
+    if (r.participants != null) m.appendChild(el('span', 'badge', plural(r.participants, 'participante', 'participantes')));
+    if (r.has_summary) m.appendChild(el('span', 'badge ok', 'resumo IA'));
+    if (r.moments) { const b = el('span', 'badge warn', '★ ' + r.moments); b.title = plural(r.moments, 'momento marcado', 'momentos marcados'); m.appendChild(b); }
+    it.appendChild(m);
+    if (extra && extra.snippet) {
+      const snip = el('div', 'snip');
+      if (extra.start_secs != null) snip.appendChild(el('span', 'num', '[' + fmtClock(extra.start_secs) + '] '));
+      snip.append(extra.snippet);
+      it.appendChild(snip);
+    }
+    return it;
+  }
+
   async function loadMeetings(silent = false) {
     const q = $('search').value;
     const list = $('list');
     if (!silent && !list.children.length) UI.skeleton(list, 5);
-    let rows = [];
-    try { rows = await invoke('list_meetings', { query: q || null }); }
+    let rows = [], hits = null;
+    try {
+      if (semanticActive()) {
+        hits = await invoke('semantic_search', { kind: 'meeting', query: q, limit: 30 });
+        rows = hits.map(h => ({ id: h.id, title: h.title, started_at: h.started_at, duration_secs: h.duration_secs, participants: null, has_summary: false, moments: 0 }));
+      } else rows = await invoke('list_meetings', { query: q || null });
+    }
     catch (e) { toast('erro: ' + e, 'err'); return; }
     $('count').textContent = rows.length ? plural(rows.length, 'reunião', 'reuniões') : '';
-    const signature = rows.map(r => r.id + ':' + r.title + ':' + r.has_summary + ':' + (selected === r.id)).join('|');
+    const signature = (hits ? 'sem|' : 'lit|') + rows.map(r => r.id + ':' + r.title + ':' + r.has_summary + ':' + (selected === r.id)).join('|') + '|' + q;
     if (list.dataset.sig === signature) return;
     list.dataset.sig = signature;
     const animate = !silent;
     list.replaceChildren();
-    if (!rows.length) { list.appendChild(placeholder(q ? 'nada encontrado para "' + q + '"' : 'nenhuma reunião ainda — grave uma pela tela Início ou pela bandeja')); return; }
-    for (const r of rows) {
-      const it = el('div', 'item' + (selected === r.id ? ' on' : ''));
-      it.tabIndex = 0;
-      it.appendChild(el('div', 't', r.title));
-      const m = el('div', 'm');
-      m.appendChild(el('span', '', r.started_at));
-      m.appendChild(el('span', 'num', fmtClock(r.duration_secs)));
-      m.appendChild(el('span', 'badge', plural(r.participants, 'participante', 'participantes')));
-      if (r.has_summary) m.appendChild(el('span', 'badge ok', 'resumo IA'));
-      if (r.moments) { const b = el('span', 'badge', '★ ' + r.moments); b.style.color = 'var(--warn)'; b.style.borderColor = 'rgba(232,193,90,.45)'; b.title = plural(r.moments, 'momento marcado', 'momentos marcados'); m.appendChild(b); }
-      it.appendChild(m);
-      const pick = () => { if (selected === r.id) return; selected = r.id; list.querySelectorAll('.item').forEach(x => x.classList.toggle('on', x === it)); list.dataset.sig = ''; showMeeting(r.id); };
+    if (!rows.length) { list.appendChild(placeholder(q ? (hits ? 'nada parecido com "' + q + '" — indexe o histórico em Configurações → Inteligência' : 'nada encontrado para "' + q + '"') : 'nenhuma reunião ainda — grave uma pela tela Início ou pela bandeja')); return; }
+    rows.forEach((r, i) => {
+      const hit = hits ? hits[i] : null;
+      const it = meetingItem(r, hit);
+      const pick = () => {
+        const at = hit && hit.start_secs != null ? hit.start_secs : null;
+        if (selected === r.id && at == null) return;
+        selected = r.id;
+        list.querySelectorAll('.item').forEach(x => x.classList.toggle('on', x === it));
+        list.dataset.sig = '';
+        showMeeting(r.id, { at, semantic: !!hit });
+      };
       it.addEventListener('click', pick);
       it.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); } });
       list.appendChild(it);
-    }
+    });
     if (animate) UI.stagger(list.children, 10);
   }
 
@@ -223,6 +275,7 @@
     let det;
     try { det = await invoke('get_meeting', { id }); } catch (e) { toast('erro: ' + e, 'err'); return; }
     const keepScroll = opts.keepScroll ? d.scrollTop : null;
+    let jumpTo = null;   // elemento do trecho pedido pela busca semântica
     UI.swap(d, () => {
       d.replaceChildren();
       d.classList.remove('filtering');
@@ -285,9 +338,8 @@
         });
         actions.appendChild(b);
       }
-      const bDel = el('button', 'btn btn-danger', 'Excluir do histórico');
+      const bDel = el('button', 'btn btn-danger ml-auto', 'Excluir do histórico');
       bDel.title = 'o arquivo .md continua na pasta';
-      bDel.style.marginLeft = 'auto';
       bDel.addEventListener('click', () => UI.confirmInline(bDel, async () => {
         try { await invoke('delete_meeting', { id }); selected = null; toast('excluída do histórico — o arquivo .md continua na pasta', 'ok'); }
         catch (e) { toast('erro: ' + e, 'err'); }
@@ -325,6 +377,11 @@
       const moments = det.moments || [];
       const groupAt = (t) => { let best = null; for (const g of groups) { if (g.start_secs <= t + 0.5) best = g; else break; } return best || groups[0]; };
       const segEls = new Map(); // group → elemento .seg (preenchido abaixo)
+      const flashTo = (target) => {
+        if (!target) return;
+        target.scrollIntoView({ block: 'center', behavior: UI.reduce() ? 'auto' : 'smooth' });
+        target.classList.remove('target'); void target.offsetWidth; target.classList.add('target');
+      };
       if (moments.length) {
         d.appendChild(el('h3', 'eyebrow', 'Momentos marcados'));
         const box = el('div', 'moments');
@@ -334,12 +391,7 @@
           chip.appendChild(el('span', '', '★ ' + fmtClock(at)));
           if (g) chip.appendChild(el('span', 'ex', g.text));
           chip.title = 'ir para este trecho';
-          chip.addEventListener('click', () => {
-            const target = g && segEls.get(g);
-            if (!target) return;
-            target.scrollIntoView({ block: 'center', behavior: UI.reduce() ? 'auto' : 'smooth' });
-            target.classList.remove('target'); void target.offsetWidth; target.classList.add('target');
-          });
+          chip.addEventListener('click', () => flashTo(g && segEls.get(g)));
           box.appendChild(chip);
         }
         d.appendChild(box);
@@ -383,6 +435,8 @@
       });
       if (!det.segments.length) d.appendChild(placeholder('sem transcript'));
       const note = el('p', 'filtered-note'); note.hidden = true; d.appendChild(note);
+      // Busca semântica: o trecho que casou é a parada da rolagem.
+      if (opts.at != null) { const g = groupAt(opts.at); jumpTo = g && segEls.get(g); }
 
       // ---- lógica da busca na reunião
       let marks = [], cur = -1, filtering = false;
@@ -430,48 +484,58 @@
 
       // Termo lembrado desta reunião; senão, o da busca geral — se ele estiver
       // no transcript, já aparece destacado (foi por ele que a reunião apareceu).
-      const initial = meetingQuery[id] !== undefined ? meetingQuery[id] : $('search').value.trim();
+      // Na busca semântica a pergunta raramente aparece literal: não a pré-preenche.
+      const initial = meetingQuery[id] !== undefined ? meetingQuery[id] : (opts.semantic ? '' : $('search').value.trim());
       if (initial) {
         input.value = initial;
         apply();
         if (!marks.length && meetingQuery[id] === undefined) { input.value = ''; apply(); }
       }
     });
-    if (keepScroll != null) d.scrollTop = keepScroll;
+    if (jumpTo) requestAnimationFrame(() => { jumpTo.scrollIntoView({ block: 'center', behavior: UI.reduce() ? 'auto' : 'smooth' }); jumpTo.classList.add('target'); });
+    else if (keepScroll != null) d.scrollTop = keepScroll;
     else if (!(meetingQuery[id] || $('search').value.trim())) d.scrollTop = 0;
   }
 
   // ------------------------------------------------------------- ditados
+  function dictationRow(r, q, extra) {
+    const row = el('div', 'dict');
+    row.appendChild(el('div', 'at', r.at));
+    const tx = el('div', 'tx'); tx.dataset.raw = r.text; paint(tx, q);
+    if (extra && extra.score != null) { const s = el('span', 'badge score', pct(extra.score)); s.title = 'similaridade com a sua pergunta'; tx.appendChild(s); }
+    if (r.raw_text) { const c = el('span', 'chip chip-info', 'IA'); c.title = 'Original do Whisper: ' + r.raw_text; tx.appendChild(c); }
+    row.appendChild(tx);
+    const bCopy = el('button', 'btn btn-sm btn-ghost', 'copiar');
+    bCopy.addEventListener('click', () => copyText(r.text, bCopy));
+    const bDel = el('button', 'btn btn-sm btn-danger', '×'); bDel.title = 'remover do histórico';
+    bDel.addEventListener('click', () => UI.confirmInline(bDel, async () => {
+      try { await invoke('delete_dictation', { id: r.id }); $('list').dataset.sig = ''; loadDictations(true); }
+      catch (e) { toast('erro: ' + e, 'err'); }
+    }, { label: 'remover?' }));
+    row.append(bCopy, bDel);
+    return row;
+  }
+
   async function loadDictations(silent = false) {
     const q = $('search').value;
     const list = $('list');
     if (!silent && !list.children.length) UI.skeleton(list, 6);
-    let rows = [];
-    try { rows = await invoke('list_dictations', { query: q || null }); }
+    let rows = [], hits = null;
+    try {
+      if (semanticActive()) {
+        hits = await invoke('semantic_search', { kind: 'dictation', query: q, limit: 50 });
+        rows = hits.map(h => ({ id: h.id, at: h.at, text: h.text, raw_text: null }));
+      } else rows = await invoke('list_dictations', { query: q || null });
+    }
     catch (e) { toast('erro: ' + e, 'err'); return; }
     $('count').textContent = rows.length ? plural(rows.length, 'ditado', 'ditados') : '';
-    const signature = rows.map(r => r.id).join('|') + '|' + q;
+    const signature = (hits ? 'sem|' : 'lit|') + rows.map(r => r.id).join('|') + '|' + q;
     if (list.dataset.sig === signature) return;
     list.dataset.sig = signature;
     list.replaceChildren();
-    $('detail').replaceChildren(placeholder(rows.length ? '"copiar" reutiliza um texto ditado; "×" remove do histórico. O selo "IA" marca ditados polidos — passe o mouse para ver o original.' : 'Seus ditados aparecem aqui.'));
-    if (!rows.length) { list.appendChild(placeholder(q ? 'nada encontrado' : 'nenhum ditado ainda')); return; }
-    for (const r of rows) {
-      const row = el('div', 'dict');
-      row.appendChild(el('div', 'at', r.at));
-      const tx = el('div', 'tx'); tx.dataset.raw = r.text; paint(tx, q.trim());
-      if (r.raw_text) { const c = el('span', 'chip chip-info', 'IA'); c.title = 'Original do Whisper: ' + r.raw_text; tx.appendChild(c); }
-      row.appendChild(tx);
-      const bCopy = el('button', 'btn btn-sm btn-ghost', 'copiar');
-      bCopy.addEventListener('click', () => copyText(r.text, bCopy));
-      const bDel = el('button', 'btn btn-sm btn-danger', '×'); bDel.title = 'remover do histórico';
-      bDel.addEventListener('click', () => UI.confirmInline(bDel, async () => {
-        try { await invoke('delete_dictation', { id: r.id }); $('list').dataset.sig = ''; loadDictations(true); }
-        catch (e) { toast('erro: ' + e, 'err'); }
-      }, { label: 'remover?' }));
-      row.append(bCopy, bDel);
-      list.appendChild(row);
-    }
+    if (!rows.length) { list.appendChild(placeholder(q ? (hits ? 'nada parecido com "' + q + '" — indexe o histórico em Configurações → Inteligência' : 'nada encontrado') : 'nenhum ditado ainda')); return; }
+    list.appendChild(el('div', 'dict-note', '"copiar" reutiliza um texto ditado; "×" remove do histórico. O selo "IA" marca ditados polidos — passe o mouse para ver o original.'));
+    rows.forEach((r, i) => list.appendChild(dictationRow(r, hits ? '' : q.trim(), hits ? hits[i] : null)));
     if (!silent) UI.stagger(list.children, 10);
   }
 
@@ -480,6 +544,7 @@
   const tabsCtl = UI.tabs($('tabs'), (name) => setTab(name));
   function setTab(t) {
     tab = t;
+    $('main').classList.toggle('dictations', t === 'dictations');
     $('search').placeholder = t === 'meetings' ? 'buscar no título, resumo e transcript…' : 'buscar nos ditados…';
     $('list').dataset.sig = '';
     $('list').replaceChildren();
@@ -489,10 +554,26 @@
   let searchTimer = null;
   $('search').addEventListener('input', () => {
     $('searchbox').classList.toggle('has-text', !!$('search').value);
-    clearTimeout(searchTimer); searchTimer = setTimeout(() => { $('list').dataset.sig = ''; refresh(true); }, 200);
+    clearTimeout(searchTimer); searchTimer = setTimeout(() => { $('list').dataset.sig = ''; refresh(true); }, semantic ? 450 : 200);
   });
   $('clear').addEventListener('click', () => { $('search').value = ''; $('searchbox').classList.remove('has-text'); $('list').dataset.sig = ''; refresh(true); $('search').focus(); });
   $('search').addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && $('search').value) { ev.stopPropagation(); $('clear').click(); } });
+  $('semantic').addEventListener('click', () => {
+    semantic = !semantic;
+    $('semantic').setAttribute('aria-pressed', String(semantic));
+    $('search').placeholder = semantic ? 'pergunte pelo sentido — "quando decidimos o prazo do MRP?"' : (tab === 'meetings' ? 'buscar no título, resumo e transcript…' : 'buscar nos ditados…');
+    $('list').dataset.sig = '';
+    refresh(true);
+    $('search').focus();
+  });
+  async function checkSemantic() {
+    try {
+      const s = await invoke('embeddings_status');
+      semanticAvailable = !!(s.configured && (s.key_present || s.provider === 'openai' || s.provider === 'ollama'));
+    } catch (_) { semanticAvailable = false; }
+    $('semantic').hidden = !semanticAvailable;
+    if (!semanticAvailable && semantic) { semantic = false; $('semantic').setAttribute('aria-pressed', 'false'); }
+  }
   $('openfolder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => toast('erro: ' + e, 'err')));
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(true); });
   document.addEventListener('keydown', (ev) => {
@@ -519,11 +600,12 @@
     showMeeting(id);
   }
   listen('isper-library-select', selectPending);
-  // Reunião nova salva, ditado colado etc. — a lista se mantém atual.
-  listen('isper-status', () => refresh(true));
+  // Reunião nova salva, ditado colado, índice atualizado etc. — a lista se mantém atual.
+  listen('isper-status', () => { checkSemantic(); refresh(true); });
   listen('isper-state', (e) => { if (e.payload.state === 'done' && tab === 'dictations') setTimeout(() => refresh(true), 300); });
 
   $('detail').replaceChildren(placeholder('Selecione uma reunião à esquerda.'));
+  checkSemantic();
   refresh();
   selectPending();
 </script>

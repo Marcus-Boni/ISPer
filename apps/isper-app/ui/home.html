@@ -14,18 +14,25 @@
   .state.done { color: var(--good); }
   #statetext { transition: opacity var(--dur-2); }
   #statetext.swap { animation: swap-in var(--dur-2) var(--ease-out) both; }
+  /* Botão do indicador: fica "ligado" enquanto ele está na tela. */
+  #b-indicator.on { color: var(--accent); border-color: rgba(240, 126, 114, .45); background: var(--accent-soft); }
+  #b-indicator.on svg circle:first-child { fill: var(--accent); }
 
   /* ---- conteúdo ---- */
   main { overflow-y: auto; padding: 20px 22px; display: grid; gap: 14px; align-content: start; }
   .hero { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .lead { font-family: var(--font-display); font-weight: 500; font-size: 22px; letter-spacing: -.012em; margin: 0 0 6px; line-height: 1.15; }
   .desc { color: var(--muted); line-height: 1.5; margin: 0 0 12px; }
+  .desc-sm { margin: 0; font-size: 12px; }
   .keys { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 2px 0 14px; }
   .plus { color: var(--muted-2); }
   .specs { display: grid; grid-template-columns: max-content 1fr; gap: 7px 14px; font-size: 12.5px; margin: 0 0 12px; }
   .specs dt { color: var(--muted); }
   .specs dd { margin: 0; overflow-wrap: anywhere; }
   .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  /* Botão de gravar: respira antes da lista de atalhos (a sombra do botão
+     primário desce 8 px e comia a margem antiga). */
+  .actions-row { margin: 4px 0 20px; }
   .timer { font: 600 15px var(--font-mono); color: var(--accent); font-variant-numeric: tabular-nums; }
 
   .todo .item { display: grid; grid-template-columns: 26px 1fr auto; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
@@ -59,10 +66,10 @@
   footer label { color: var(--muted); }
 
   /* Transcrição ao vivo (dentro do card de reunião, só enquanto grava). */
-  .live { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
-  .live .head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
-  .live .head .eyebrow { margin: 0; flex: 1; }
-  .live .head .hint { margin: 0; font-size: 11px; }
+  .live, .insights { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .live .head, .insights .head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .live .head .eyebrow, .insights .head .eyebrow { margin: 0; flex: 1; }
+  .live .head .hint, .insights .head .hint { margin: 0; font-size: 11px; }
   .live-list { display: grid; gap: 6px; max-height: 168px; overflow-y: auto; padding-right: 4px; }
   .live-row { display: grid; grid-template-columns: 40px 1fr; gap: 8px; font-size: 12.5px; line-height: 1.4; animation: swap-in var(--dur-3) var(--ease-out) both; }
   .live-row .ts { color: var(--muted-2); font: 11px var(--font-mono); padding-top: 2px; }
@@ -70,14 +77,32 @@
   .live-row.eu .sp { color: var(--accent); }
   .live-row .tx { color: var(--ink-2); }
   .live-wait { color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
-  /* Banner de versão nova (aparece só quando a checagem encontrou uma). */
-  .update { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-color: rgba(240, 126, 114, .45); background: linear-gradient(90deg, var(--accent-soft), transparent 70%); }
+
+  /* Insights ao vivo: quatro seções curtas, atualizadas a cada N minutos. */
+  .ins-body { font-size: 12.5px; line-height: 1.5; max-height: 260px; overflow-y: auto; padding-right: 4px; }
+  .ins-body h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--accent); margin: 10px 0 4px; font-weight: 600; }
+  .ins-body h4:first-child { margin-top: 0; }
+  .ins-body ul { margin: 0; padding-left: 16px; }
+  .ins-body li { margin: 2px 0; color: var(--ink-2); }
+  .ins-body li.task::marker { content: "☐ "; }
+  .ins-body li.done::marker { content: "☑ "; }
+  .ins-body p { margin: 2px 0; color: var(--ink-2); }
+  .ins-body .none { color: var(--muted-2); }
+  .ins-body.swap { animation: swap-in var(--dur-3) var(--ease-out) both; }
+  .ins-empty { color: var(--muted); font-size: 12.5px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .ins-error { color: var(--accent); font-size: 12px; margin-top: 6px; }
+
+  /* Banners: versão nova e chamada do Teams detectada. */
+  .update, .callbanner { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; }
+  .update { border-color: rgba(240, 126, 114, .45); background: linear-gradient(90deg, var(--accent-soft), transparent 70%); }
   .update .dot-new { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); flex: none; }
-  .update .text { font-size: 13px; }
-  .update .text b { font-weight: 600; }
+  .update .text, .callbanner .text { font-size: 13px; }
+  .update .text b, .callbanner .text b { font-weight: 600; }
   .update .text .hint { margin: 0 0 0 8px; font-size: 12px; }
   .update .progress { flex-basis: 100%; }
   .update .notes { flex-basis: 100%; margin: 0; white-space: pre-wrap; font: 12.5px/1.5 var(--font-sans); color: var(--ink-2); max-height: 160px; overflow-y: auto; border-top: 1px solid var(--line); padding-top: 8px; }
+  .callbanner { border-color: rgba(232, 193, 90, .45); background: linear-gradient(90deg, var(--warn-soft), transparent 70%); }
+  .callbanner .text .hint { margin: 0 0 0 8px; font-size: 12px; }
   @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
@@ -87,7 +112,7 @@
   <span class="ver" id="ver">…</span>
   <div class="state" id="state" role="status" aria-live="polite"><span class="dot" id="statedot"></span><span id="statetext">carregando…</span></div>
   <div class="spacer"></div>
-  <button class="btn btn-ghost" id="b-indicator" title="Mostrar o indicador flutuante">
+  <button class="btn btn-ghost" id="b-indicator" aria-pressed="false" title="Mostrar o indicador flutuante (fica na tela até você ocultar)">
     <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".45"/></svg>
     Indicador
   </button>
@@ -112,8 +137,17 @@
     <div class="progress" id="upd-progress" hidden><div class="bar"></div></div>
     <pre class="notes" id="upd-body" hidden></pre>
   </section>
+
+  <section class="card callbanner" id="callbanner" hidden role="status" aria-live="polite">
+    <span class="dot warn pulse" aria-hidden="true"></span>
+    <div class="text"><b id="call-title"></b><span class="hint" id="call-meta"></span></div>
+    <div class="spacer"></div>
+    <button class="btn btn-ghost btn-sm" id="call-later">Agora não</button>
+    <button class="btn btn-primary btn-sm" id="call-record">Gravar transcrição</button>
+  </section>
+
   <section class="hero">
-    <div class="card reveal" style="--i:0">
+    <div class="card reveal" data-i="0">
       <p class="eyebrow">Ditado em qualquer app</p>
       <div class="keys" id="keys" aria-label="atalho global"></div>
       <p class="lead">Segure para falar, solte para colar.</p>
@@ -129,11 +163,11 @@
       <button class="btn btn-link" id="l-dictate">Ajustar atalho, idioma, microfone e dicionário →</button>
     </div>
 
-    <div class="card reveal" style="--i:1">
+    <div class="card reveal" data-i="1">
       <p class="eyebrow">Reuniões</p>
       <p class="lead" id="m-lead">Grave, transcreva e resuma.</p>
       <p class="desc" id="m-desc">Seu microfone vira "Eu"; o áudio dos participantes vem do próprio Windows. Ao encerrar, o transcript vai para a Biblioteca e para um arquivo .md.</p>
-      <div class="row" style="margin-bottom:14px">
+      <div class="row actions-row">
         <button class="btn btn-primary" id="b-meeting">Iniciar gravação de reunião</button>
         <span class="timer" id="m-timer"></span>
         <button class="btn btn-sm" id="b-mark" title="registra o instante para o resumo e a Biblioteca" hidden>★ Marcar momento</button>
@@ -145,23 +179,33 @@
         <dt>Áudio</dt><dd id="s-source">…</dd>
         <dt>Falantes</dt><dd id="s-diar">…</dd>
         <dt>Resumo por IA</dt><dd id="s-llm">…</dd>
+        <dt>Chamadas do Teams</dt><dd id="s-call">…</dd>
       </dl>
-      <p class="desc" style="margin:0;font-size:12px">Avise os participantes de que a reunião está sendo transcrita (LGPD).</p>
+      <p class="desc desc-sm">Avise os participantes de que a reunião está sendo transcrita (LGPD).</p>
       <div class="live" id="live" hidden>
         <div class="head"><p class="eyebrow">Ao vivo</p><p class="hint">cada bloco de ~20 s aparece assim que é transcrito</p></div>
         <div class="live-list" id="live-list"></div>
       </div>
+      <div class="insights" id="insights" hidden>
+        <div class="head">
+          <p class="eyebrow">Insights ao vivo</p>
+          <span class="hint" id="ins-meta"></span>
+          <button class="btn btn-sm btn-ghost" id="ins-now" title="pede uma rodada agora — só o texto do transcript viaja ao provider">Atualizar agora</button>
+        </div>
+        <div class="ins-body" id="ins-body"></div>
+        <div class="ins-error" id="ins-error" hidden></div>
+      </div>
     </div>
   </section>
 
-  <section class="card todo reveal" id="todo" style="--i:2" hidden>
+  <section class="card todo reveal" id="todo" data-i="2" hidden>
     <p class="eyebrow" id="todo-title">Para aproveitar tudo</p>
     <div id="todo-list"></div>
   </section>
 
-  <section class="stats reveal" id="stats" style="--i:3" aria-label="totais"></section>
+  <section class="stats reveal" id="stats" data-i="3" aria-label="totais"></section>
 
-  <section class="card recent reveal" style="--i:4">
+  <section class="card recent reveal" data-i="4">
     <div class="head">
       <p class="eyebrow">Reuniões recentes</p>
       <button class="btn btn-link" id="l-all">Ver todas na Biblioteca →</button>
@@ -186,8 +230,10 @@
   const LANG = { pt: 'Português', en: 'Inglês', auto: 'Detecção automática' };
   const SOURCE = { system: 'Todo o sistema', teams: 'Só o Microsoft Teams' };
   const PROVIDER = { groq: 'Groq', gemini: 'Gemini', claude: 'Claude' };
+  const CALL_DETECT = { notify: 'avisa quando uma chamada começa', auto: 'grava automaticamente', off: 'detecção desligada' };
 
   let meetingStart = null;   // ms; null = sem reunião
+  let callSince = null;      // ms; null = sem chamada em andamento (banner)
   let busyMeeting = false;   // clique em andamento no botão de reunião
   let current = null;        // último HomeStatus recebido
   let dictation = null;      // 'recording' | 'transcribing' | 'done' | null — feedback ao vivo do ditado
@@ -284,8 +330,7 @@
     const row = el('div', 'live-row');
     row.appendChild(el('span', 'ts num', fmtClock(atSecs)));
     const body = el('span');
-    const star = el('span', 'sp', '★ momento marcado'); star.style.color = 'var(--warn)';
-    body.appendChild(star);
+    body.appendChild(el('span', 'sp text-warn', '★ momento marcado'));
     row.appendChild(body);
     list.appendChild(row);
     list.scrollTop = list.scrollHeight;
@@ -305,6 +350,114 @@
     rows.slice(-LIVE_MAX_ROWS).forEach(r => list.appendChild(liveRow(r)));
     list.scrollTop = list.scrollHeight;
   }
+
+  // ---- insights ao vivo: Markdown compacto (## seção, - bullet) → DOM, sem HTML solto.
+  function inline(text, node) {
+    // **negrito** vira <b>; o resto é texto puro.
+    const parts = text.split('**');
+    parts.forEach((p, i) => { if (!p) return; if (i % 2) node.appendChild(el('b', '', p)); else node.append(p); });
+  }
+  function renderMarkdownLite(md, box) {
+    box.replaceChildren();
+    let ul = null;
+    for (const raw of md.split('\n')) {
+      const line = raw.trim();
+      if (!line) continue;
+      const h = line.match(/^#{1,4}\s+(.*)$/);
+      if (h) { ul = null; box.appendChild(el('h4', '', h[1].replace(/\*\*/g, ''))); continue; }
+      const b = line.match(/^[-*•]\s+(.*)$/);
+      if (b) {
+        if (!ul) { ul = el('ul'); box.appendChild(ul); }
+        let text = b[1]; let cls = '';
+        const task = text.match(/^\[( |x|X)\]\s*(.*)$/);
+        if (task) { cls = task[1] === ' ' ? 'task' : 'done'; text = task[2]; }
+        if (/^nenhum[a]?\.?$/i.test(text)) cls += ' none';
+        const li = el('li', cls.trim()); inline(text, li); ul.appendChild(li);
+        continue;
+      }
+      ul = null;
+      const p = el('p', /^nenhum[a]?\.?$/i.test(line) ? 'none' : ''); inline(line, p); box.appendChild(p);
+    }
+  }
+  let insightsSig = '';
+  function renderInsights(ins, meetingActive) {
+    const box = $('insights');
+    if (!meetingActive) { box.hidden = true; insightsSig = ''; return; }
+    box.hidden = false;
+    const body = $('ins-body'), meta = $('ins-meta'), err = $('ins-error'), now = $('ins-now');
+    now.disabled = ins.running || !ins.configured;
+    err.hidden = !ins.error;
+    err.textContent = ins.error || '';
+    if (!ins.configured) {
+      meta.textContent = '';
+      body.replaceChildren();
+      const e = el('div', 'ins-empty');
+      e.append('Conecte um provider de IA para receber pendências, compromissos e decisões durante a reunião.');
+      const b = el('button', 'btn btn-sm', 'Configurar IA'); b.addEventListener('click', openSettings); e.appendChild(b);
+      body.appendChild(e);
+      insightsSig = '';
+      return;
+    }
+    const nextIn = ins.next_in_secs != null ? (ins.next_in_secs < 60 ? 'menos de 1 min' : Math.round(ins.next_in_secs / 60) + ' min') : null;
+    if (ins.running) meta.textContent = 'gerando…';
+    else if (ins.last) meta.textContent = 'atualizado às ' + ins.last.updated_at + (ins.enabled && nextIn ? ' · próximo em ' + nextIn : '') + ' · via ' + (PROVIDER[ins.last.provider] || ins.last.provider);
+    else if (ins.enabled) meta.textContent = 'primeira rodada em ' + (nextIn || (ins.interval_min + ' min'));
+    else meta.textContent = 'desligados nas Configurações — "Atualizar agora" faz uma rodada avulsa';
+    if (ins.last) {
+      const sig = ins.last.updated_at + '|' + ins.last.text;
+      if (sig !== insightsSig) { insightsSig = sig; renderMarkdownLite(ins.last.text, body); body.classList.remove('swap'); void body.offsetWidth; body.classList.add('swap'); }
+    } else if (insightsSig !== 'empty') {
+      insightsSig = 'empty';
+      body.replaceChildren();
+      const e = el('div', 'ins-empty');
+      e.appendChild(el('span', 'dot warn pulse'));
+      e.append(ins.enabled ? 'a cada ' + ins.interval_min + ' min o ISPer pergunta à IA o que ficou pendente, o que você prometeu e o que foi decidido.' : 'pendências, compromissos e decisões enquanto a reunião acontece.');
+      body.appendChild(e);
+    }
+  }
+  $('ins-now').addEventListener('click', async () => {
+    const b = $('ins-now');
+    UI.busy(b, true, 'Gerando…');
+    try { await invoke('insights_now'); } catch (e) { toast(String(e), 'err'); }
+    UI.busy(b, false);
+  });
+  listen('isper-insights', (e) => { if (current) { current.insights = e.payload; renderInsights(e.payload, current.meeting_active); } });
+
+  // ---- chamada do Teams detectada
+  function renderCall(st) {
+    const box = $('callbanner');
+    const started = st.call && !st.call.dismissed && !st.meeting_active;
+    const ended = st.call_ended && st.meeting_active && !st.call_dismissed;
+    if (!started && !ended) { box.hidden = true; callSince = null; return; }
+    box.hidden = false;
+    if (started) {
+      callSince = Date.now() - (st.call.since_secs || 0) * 1000;
+      $('call-title').textContent = 'Chamada do Teams em andamento';
+      $('call-meta').textContent = 'há ' + fmtClock(st.call.since_secs || 0) + ' · gravar a transcrição?';
+      $('call-record').textContent = 'Gravar transcrição';
+      $('call-later').textContent = 'Agora não';
+    } else {
+      callSince = null;
+      $('call-title').textContent = 'A chamada do Teams terminou';
+      $('call-meta').textContent = 'a gravação continua — encerrar e transcrever?';
+      $('call-record').textContent = 'Encerrar e transcrever';
+      $('call-later').textContent = 'Continuar gravando';
+    }
+    const call = $('s-call');
+    call.replaceChildren();
+    call.append(CALL_DETECT[st.call_detect] || st.call_detect);
+  }
+  $('call-later').addEventListener('click', () => invoke('dismiss_call_prompt').catch(e => toast('erro: ' + e, 'err')));
+  $('call-record').addEventListener('click', async () => {
+    const b = $('call-record');
+    const stopping = current && current.meeting_active;
+    UI.busy(b, true, stopping ? 'Encerrando…' : 'Abrindo áudio…');
+    try {
+      if (stopping) { await invoke('toggle_meeting_cmd'); toast('transcrevendo — a notificação avisa quando a reunião estiver salva', 'ok'); }
+      else { await invoke('record_call_cmd'); toast('gravando a chamada — o indicador flutuante mostra o andamento', 'ok'); }
+    } catch (e) { toast(String(e), 'err'); }
+    finally { UI.busy(b, false); refresh(); }
+  });
 
   function renderMeeting(st) {
     const b = $('b-meeting');
@@ -328,7 +481,7 @@
     const keycaps = (dd, label, suffix, fallback) => {
       dd.replaceChildren();
       if (label && !label.startsWith('(')) {
-        label.split('+').forEach((k, i) => { if (i) dd.append(' + '); const kb = el('kbd', '', k.trim()); kb.style.cssText = 'font:600 11px var(--font-body);padding:2px 6px;border:1px solid var(--line-2);border-radius:5px;background:var(--panel-2)'; dd.appendChild(kb); });
+        label.split('+').forEach((k, i) => { if (i) dd.append(' + '); dd.appendChild(el('kbd', 'key-sm', k.trim())); });
         dd.append(' ' + suffix);
       } else dd.textContent = fallback;
     };
@@ -359,7 +512,28 @@
       llm.append('desligado');
       llm.appendChild(el('span', 'chip', 'opcional'));
     }
+
+    const call = $('s-call');
+    call.replaceChildren();
+    call.append(CALL_DETECT[st.call_detect] || st.call_detect);
+    if (st.call) call.appendChild(el('span', 'chip chip-warn', 'em chamada agora'));
+    else if (st.call_detect !== 'off') call.appendChild(el('span', 'chip chip-ok', 'Teams'));
+    renderInsights(st.insights, st.meeting_active);
   }
+
+  function renderIndicator(st) {
+    const b = $('b-indicator');
+    b.classList.toggle('on', !!st.overlay_visible);
+    b.setAttribute('aria-pressed', st.overlay_visible ? 'true' : 'false');
+    b.title = st.overlay_visible ? 'Ocultar o indicador flutuante' : 'Mostrar o indicador flutuante (fica na tela até você ocultar)';
+  }
+  $('b-indicator').addEventListener('click', async () => {
+    try {
+      const visible = await invoke('overlay_toggle_pin');
+      toast(visible ? 'indicador na tela — fica até você ocultar (× nele, aqui ou na bandeja)' : 'indicador oculto — ele volta sozinho no próximo ditado ou reunião', 'ok');
+    } catch (e) { toast('erro: ' + e, 'err'); }
+    refresh();
+  });
 
   function renderTodo(st) {
     const e = st.engine, items = [];
@@ -371,6 +545,7 @@
     if (!st.llm_provider) items.push({ t: 'Resumos automáticos (opcional)', d: 'Conecte Groq, Gemini ou Claude para receber resumo, decisões e action items ao fim de cada reunião. Só o texto do transcript é enviado — áudio, nunca.', a: 'Configurar IA', f: openSettings });
     else if (!st.llm_key_present) items.push({ must: true, t: 'Falta a chave do provider de IA', d: 'O resumo está ligado (' + (PROVIDER[st.llm_provider] || st.llm_provider) + '), mas não há chave guardada — as reuniões ficam sem resumo.', a: 'Guardar chave', f: openSettings });
     if (!st.diarize_installed) items.push({ t: 'Quem falou o quê (opcional)', d: 'Baixe os modelos de diarização (~45 MB) e "Participantes" vira "Participante 1", "Participante 2"… — 100% local.', a: 'Baixar nas Configurações', f: openSettings });
+    if (st.llm_provider && st.llm_key_present && !st.semantic_search && st.stats.meetings > 0) items.push({ t: 'Busca semântica (opcional)', d: 'Encontre reuniões e ditados pelo sentido, não só pela palavra exata — com Gemini (grátis) ou um Ollama local. Configure em Inteligência → Busca semântica.', a: 'Configurar', f: openSettings });
 
     const box = $('todo'), list = $('todo-list');
     const signature = items.map(i => i.t).join('|');
@@ -438,7 +613,7 @@
       m.appendChild(el('span', '', r.started_at));
       m.appendChild(el('span', 'num', fmtClock(r.duration_secs)));
       if (diarizing === r.id) {
-        const b = el('span', 'badge'); b.style.cssText = 'display:inline-flex;align-items:center;gap:6px;color:var(--warn);border-color:rgba(232,193,90,.45)';
+        const b = el('span', 'badge warn');
         b.appendChild(el('span', 'dot warn pulse')); b.append('identificando falantes…');
         b.title = 'a diarização roda em segundo plano na CPU — leva cerca de 40% da duração da reunião; o transcript já está disponível';
         m.appendChild(b);
@@ -499,9 +674,11 @@
     current = st;
     $('ver').textContent = 'v' + st.version;
     renderUpdate(st.update);
+    renderCall(st);
     renderStatePill(st);
     renderDictation(st);
     renderMeeting(st);
+    renderIndicator(st);
     renderTodo(st);
     renderStats(st.stats);
     renderRecent(st.recent, st.diarizing_meeting);
@@ -512,6 +689,7 @@
 
   // Cronômetro da reunião (1 Hz) — o backend só informa o instante inicial.
   function tick() {
+    if (callSince != null && !$('callbanner').hidden) $('call-meta').textContent = 'há ' + fmtClock((Date.now() - callSince) / 1000) + ' · gravar a transcrição?';
     if (meetingStart == null) return;
     const t = fmtClock((Date.now() - meetingStart) / 1000);
     $('m-timer').textContent = t;
@@ -545,7 +723,6 @@
   $('l-all').addEventListener('click', () => openLibrary());
   $('b-settings').addEventListener('click', openSettings);
   $('l-dictate').addEventListener('click', openSettings);
-  $('b-indicator').addEventListener('click', () => invoke('show_indicator_cmd').catch(e => toast('erro: ' + e, 'err')));
   $('l-folder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => toast('erro: ' + e, 'err')));
   $('showhome').addEventListener('change', (ev) => {
     const show = ev.target.checked;

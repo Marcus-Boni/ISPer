@@ -74,7 +74,7 @@ fn handle_response(result: std::result::Result<ureq::Response, ureq::Error>) -> 
     }
 }
 
-fn post_json(url: &str, headers: &[(&str, &str)], body: Value) -> Result<Value> {
+pub(crate) fn post_json(url: &str, headers: &[(&str, &str)], body: Value) -> Result<Value> {
     let mut req = agent().post(url);
     for (k, v) in headers {
         req = req.set(k, v);
@@ -92,7 +92,7 @@ fn get_json(url: &str, headers: &[(&str, &str)]) -> Result<Value> {
 
 /// Traduz o "modelo não existe / sem acesso" (que cada API expressa de um
 /// jeito) num erro único e acionável.
-fn map_model_error(err: LlmError, model: &str) -> LlmError {
+pub(crate) fn map_model_error(err: LlmError, model: &str) -> LlmError {
     match &err {
         LlmError::Http(msg)
             if msg.contains("model_not_found")

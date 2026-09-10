@@ -12,15 +12,18 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod calls;
 mod config;
 mod dictation;
 mod home;
+mod insights;
 mod library;
 mod meetings;
 mod notify;
 mod overlay;
 mod paths;
 mod prelude;
+mod search;
 mod settings;
 mod shortcuts;
 mod state;
@@ -187,9 +190,19 @@ fn main() {
             take_pending_meeting,
             open_settings_window,
             show_indicator_cmd,
+            overlay_toggle_pin,
             check_update,
             install_update,
-            set_show_home
+            set_show_home,
+            dismiss_call_prompt,
+            record_call_cmd,
+            live_insights_state,
+            insights_now,
+            embeddings_status,
+            semantic_search,
+            index_all,
+            set_embeddings_key,
+            test_embeddings
         ])
         .setup(|app| {
             let cfg = config::load();
@@ -219,6 +232,10 @@ fn main() {
                 tray: Mutex::new(None),
                 tray_icons: Mutex::new(None),
                 update_available: Mutex::new(None),
+                call: Mutex::new(CallState::default()),
+                insights: Mutex::new(InsightsState::default()),
+                indexing: Mutex::new(None),
+                indicator_item: Mutex::new(None),
             });
             app.state::<AppState>()
                 .audio
@@ -270,7 +287,7 @@ fn main() {
             let indicator_item = MenuItem::with_id(
                 app,
                 "indicator",
-                "Mostrar indicador flutuante",
+                indicator_item_text(cfg.overlay_pinned),
                 true,
                 None::<&str>,
             )?;
@@ -291,6 +308,7 @@ fn main() {
                 let state = app.state::<AppState>();
                 *state.meeting_item.lock().unwrap() = Some(meeting_item);
                 *state.hint_item.lock().unwrap() = Some(hint);
+                *state.indicator_item.lock().unwrap() = Some(indicator_item);
             }
             // Duas versões do ícone: a normal e a com o ponto vermelho de gravação.
             let base_icon = app
@@ -310,7 +328,9 @@ fn main() {
                     "meeting" => {
                         let _ = toggle_meeting(app);
                     }
-                    "indicator" => show_indicator(app),
+                    "indicator" => {
+                        toggle_indicator(app);
+                    }
                     "library" => open_library(app),
                     "settings" => open_settings(app),
                     _ => {}
@@ -354,6 +374,14 @@ fn main() {
 
             // Versão nova? Só consulta (e só se o usuário deixou); instalar é um clique.
             schedule_background_checks(app.handle());
+
+            // Chamada do Teams em andamento? → "Gravar transcrição?" (ou grava sozinho).
+            start_call_watcher(app.handle().clone());
+
+            // Indicador fixo: quem o deixou visível em repouso o encontra onde estava.
+            if cfg.overlay_pinned {
+                show_overlay(app.handle());
+            }
 
             // Enquanto o indicador estiver visível, reafirma o topo a cada 1,5 s:
             // um SetWindowPos barato que devolve a prioridade sobre qualquer

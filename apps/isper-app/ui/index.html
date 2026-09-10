@@ -35,6 +35,10 @@
   #pill.error #dot { background: var(--accent); animation: none; }
   #pill.discarded #dot { background: var(--muted); animation: none; }
   #pill.discarded #status { color: var(--muted); }
+  /* Chamada do Teams detectada: aviso passageiro, em âmbar. */
+  #pill.call { border-color: rgba(232, 193, 90, .45); }
+  #pill.call #dot { background: var(--warn); animation: pulse 1.1s ease-in-out infinite; }
+  #pill.call #status { color: var(--warn); max-width: 70%; }
 
   canvas { flex: 1; height: 46px; min-width: 0; }
   #status {
@@ -105,7 +109,7 @@
     <button id="mark" title="marcar este momento da reunião" aria-label="marcar momento">★</button>
     <button id="cap" title="legendas ao vivo (barra larga)" aria-label="alternar legendas ao vivo">CC</button>
     <button id="mini" title="modo mini / normal" aria-label="alternar modo mini">–</button>
-    <button id="hide" title="ocultar (volta em Bandeja → Mostrar indicador)" aria-label="ocultar indicador">×</button>
+    <button id="hide" title="ocultar (volta no próximo ditado, pelo Início ou pela bandeja)" aria-label="ocultar indicador">×</button>
   </div>
 </div>
 <script src="assets/ui.js"></script>
@@ -150,6 +154,8 @@
   };
   const RESTING = new Set(['idle', 'done', 'error', 'discarded']);
   let lastLive = null;   // última fala recebida (para voltar depois de um aviso)
+  let shortcutLabel = '';  // atalho de ditado (o repouso mostra "pronto · <atalho>")
+  const idleText = () => (shortcutLabel && !shortcutLabel.startsWith('(') ? 'pronto · ' + shortcutLabel : 'pronto');
   function setState(s, msg) {
     const wakingUp = RESTING.has(state) && !RESTING.has(s);
     state = s;
@@ -161,6 +167,8 @@
 
     if (s === 'recording') { bars.fill(0); setStatus('gravando… solte para colar'); blip(880, .05); }
     else if (s === 'recording-handsfree') setStatus('mãos-livres… 1 s de silêncio cola');
+    else if (s === 'call') { setStatus(msg || 'chamada do Teams — gravar?'); blip(990, .05); }
+    else if (s === 'idle') setStatus(idleText());
     else if (s === 'meeting') setStatus(msg ? 'reunião — ' + msg : 'gravando reunião — Eu + Participantes');
     else if (s === 'meeting-processing') { setStatus('transcrevendo a reunião…'); setCaptionHint('encerrando — transcrevendo o que faltava…'); }
     else if (s === 'meeting-diarize') setStatus('identificando quem falou…');
@@ -271,9 +279,12 @@
     moveTimer = setTimeout(() => { invoke('overlay_moved', { x, y }).catch(() => {}); }, 400);
   });
 
-  // Reunião já em andamento quando a página carrega (ex.: indicador reaberto).
+  // Reunião já em andamento quando a página carrega (ex.: indicador reaberto);
+  // em repouso, mostra o atalho de ditado ao lado do "pronto".
   invoke('overlay_prefs').then(p => {
+    shortcutLabel = p.shortcut || '';
     if (p.meeting_active) setState('meeting');
+    else if (state === 'idle') setStatus(idleText());
   }).catch(() => {});
 
   function sizeCanvas() {
