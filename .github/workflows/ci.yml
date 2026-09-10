@@ -49,12 +49,16 @@ jobs:
       - name: Testes (núcleo, IA, modelos)
         run: cargo test --release -p isper-core -p isper-llm -p isper-models
 
-      - name: DLLs do CUDA de mentira (o bundler exige que existam)
+      - name: DLLs do CUDA e do sherpa-onnx de mentira (o bundler exige que existam)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/cuda | Out-Null
           foreach ($dll in @('cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll')) {
             New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/cuda/$dll" | Out-Null
+          }
+          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/sherpa | Out-Null
+          foreach ($dll in @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll')) {
+            New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/sherpa/$dll" | Out-Null
           }
 
       - name: Checagem do app (sem CUDA) e da CLI

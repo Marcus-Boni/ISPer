@@ -45,6 +45,17 @@ foreach ($dll in 'cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll') {
   $p = Join-Path $tauriDir "resources\cuda\$dll"
   if (-not (Test-Path $p)) { throw "DLL do CUDA ausente: $p (copie do toolkit; ver README)" }
 }
+# DLLs de runtime do sherpa-onnx (identificacao de falantes): o exe importa a
+# sherpa-onnx-c-api.dll, que puxa onnxruntime e cargs. O build script do sherpa-rs
+# as deixa em target\release; sem elas no instalador o app instalado nem abre.
+$sherpaDlls = 'sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll'
+$sherpaDir = Join-Path $tauriDir 'resources\sherpa'
+New-Item -ItemType Directory -Force $sherpaDir | Out-Null
+foreach ($dll in $sherpaDlls) {
+  $src = Join-Path $root "target\release\$dll"
+  if (-not (Test-Path $src)) { throw "DLL do sherpa-onnx ausente: $src (rode um cargo build --release do app antes)" }
+  Copy-Item $src (Join-Path $sherpaDir $dll) -Force
+}
 $tag = "v$version"
 if ($Publish) {
   # No PowerShell 5.1 com ErrorActionPreference=Stop, qualquer linha que um exe

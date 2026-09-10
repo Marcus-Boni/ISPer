@@ -344,8 +344,9 @@ sis\`;
 com `-Publish` ele cria a release `v<versão>` no GitHub (via `gh`) e sobe os
 três: `ISPer_<versão>_x64-setup.exe` (~400 MB — as DLLs de runtime do CUDA vão
 dentro; copie `cudart64_13`, `cublas64_13` e `cublasLt64_13` de `<CUDA>ind`
-para `apps/isper-app/src-tauri/resources/cuda/`, pasta gitignored), o `.sig` e
-o `latest.json`. Antes, ele confere que `Cargo.toml` e `tauri.conf.json` têm a
+para `apps/isper-app/src-tauri/resources/cuda/`, pasta gitignored; as DLLs do
+sherpa-onnx que a identificação de falantes usa o script copia sozinho de
+`target/release` para `resources/sherpa/`), o `.sig` e o `latest.json`. Antes, ele confere que `Cargo.toml` e `tauri.conf.json` têm a
 mesma versão e para o app (o bundler reescreve o exe e as DLLs ficam travadas
 enquanto ele roda). O instalador não traz modelos: no primeiro uso a tela
 Início orienta o download.
