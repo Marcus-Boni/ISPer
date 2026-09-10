@@ -2340,7 +2340,7 @@ dependencies = [
  "anyhow",
  "arboard",
  "chrono",
- "dirs 5.0.1",
+ "dirs 6.0.0",
  "enigo",
  "isper-core",
  "isper-diarize",
@@ -2413,7 +2413,7 @@ dependencies = [
 name = "isper-llm"
 version = "0.1.0"
 dependencies = [
- "dirs 5.0.1",
+ "dirs 6.0.0",
  "keyring",
  "serde",
  "serde_json",
@@ -2427,7 +2427,7 @@ dependencies = [
 name = "isper-models"
 version = "0.1.0"
 dependencies = [
- "dirs 5.0.1",
+ "dirs 6.0.0",
  "serde_json",
  "sha2",
  "thiserror 2.0.20",
