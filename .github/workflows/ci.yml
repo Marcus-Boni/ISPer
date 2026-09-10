@@ -19,8 +19,11 @@ on:
   pull_request:
   workflow_call:
 
+# O grupo inclui o nome do workflow chamador: quando o release.yml reutiliza este
+# arquivo (workflow_call), github.workflow e "Release", e o run do push em main
+# nao e cancelado pelo run da validacao da tag (ambos apontam para o mesmo ref).
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
