@@ -1,16 +1,17 @@
 # CI do ISPer: formatação, testes e checagem do app — no Windows, sem CUDA.
 #
 # O runner windows-latest já traz MSVC, CMake e LLVM (libclang p/ bindgen);
-# o whisper.cpp é compilado em CPU. O app é só checado (`cargo check`) com
-# `--no-default-features` (sem CUDA) e com DLLs vazias no lugar dos
-# `bundle.resources` (sherpa-onnx e runtime do Visual C++), porque o build
-# script do Tauri exige que eles existam. Nada aqui baixa modelos.
+# o whisper.cpp é compilado em CPU. O app não é ligado: o clippy (que inclui o
+# `cargo check`) roda com `--no-default-features` (sem CUDA) e com DLLs vazias
+# no lugar dos `bundle.resources` (sherpa-onnx e runtime do Visual C++),
+# porque o build script do Tauri exige que eles existam. Nada aqui baixa
+# modelos.
 # `workflow_call`: o release.yml roda esta mesma bateria sobre a tag.
 #
 # O `isper-diarize` não entra no `cargo test`: ele não tem testes, e ligar o
 # binário de teste exige as import libs do sherpa-onnx pré-compilado
 # (`cargs.lib`/`sherpa-onnx-c-api.lib`), que o runner não tinha (LNK1181).
-# O `cargo check` do app (que depende dele) compila o crate sem ligar.
+# O clippy do app (que depende dele) compila o crate sem ligar.
 name: CI
 
 on:
@@ -41,7 +42,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -66,5 +67,36 @@ jobs:
             New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/vcredist/$dll" | Out-Null
           }
 
-      - name: Checagem do app (sem CUDA) e da CLI
-        run: cargo check --release -p isper-app -p isper-cli --no-default-features
+      # Clippy é `cargo check` + lints, então substitui a checagem do app e da CLI.
+      # Roda depois dos recursos de mentira porque o build script do Tauri exige
+      # os bundle.resources. Não liga binários: o isper-diarize entra sem o
+      # LNK1181 dos testes. `--all-targets` cobre testes e o loopdump; `--release`
+      # reaproveita o whisper.cpp que o `cargo test` acima já compilou.
+      - name: Clippy (avisos são erros) — app e CLI sem CUDA
+        run: cargo clippy --workspace --all-targets --release --no-default-features -- -D warnings
+
+  # Cadeia de suprimentos: vulnerabilidades (RustSec), licenças fora da lista
+  # permitida, versões duplicadas e origens desconhecidas — regras em deny.toml.
+  deny:
+    name: cargo deny (vulnerabilidades · licenças · origens)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          rust-version: stable
+
+  # Nenhum segredo (chave de API, token) pode entrar no histórico do repositório.
+  secrets:
+    name: gitleaks (segredos no histórico)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,6 +2,8 @@
 name = "isper-models"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+publish = false
 
 [dependencies]
 ureq = { version = "2", features = ["json"] }
@@ -11,3 +13,6 @@ thiserror = "2"
 tracing = "0.1"
 # Pastas conhecidas do Windows (SHGetKnownFolderPath) — ver models_dir().
 dirs = "5"
+
+[lints]
+workspace = true

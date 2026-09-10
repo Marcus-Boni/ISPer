@@ -2,6 +2,8 @@
 name = "isper-diarize"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+publish = false
 
 [dependencies]
 # Binários pré-compilados do sherpa-onnx (feature download-binaries) — sem
@@ -10,3 +12,6 @@ sherpa-rs = { version = "0.6", default-features = false, features = ["download-b
 isper-models = { path = "../isper-models" }
 thiserror = "2"
 tracing = "0.1"
+
+[lints]
+workspace = true

@@ -10,6 +10,24 @@ workflow `release.yml` recusa uma tag que não bata com os dois.
 
 ## [Unreleased]
 
+### Adicionado
+- Fase 7 (maturidade de engenharia) no ROADMAP. Primeiro item entregue:
+  `cargo clippy --workspace --all-targets -- -D warnings` no CI com
+  `[workspace.lints]` compartilhado por todos os crates, `cargo deny`
+  (vulnerabilidades, licenças permitidas, duplicatas, origens) com
+  `deny.toml`, Dependabot (Cargo + GitHub Actions, PRs semanais agrupados) e
+  gitleaks no CI.
+
+### Alterado
+- CSP real nas janelas do app (`default-src 'self'` + origens do IPC/asset do
+  Tauri) no lugar de `csp: null`; scripts e estilos inline continuam
+  funcionando porque o Tauri injeta os hashes no empacotamento. Violações
+  de CSP entram em `window.__isperErrors`, que o smoke test e2e verifica em
+  cada janela — um recurso bloqueado não falha mais em silêncio. Atributos
+  `style="…"` seguem permitidos (`style-src-attr 'unsafe-inline'`): o Tauri
+  injeta hashes em `style-src`, o que desliga o `'unsafe-inline'` dessa
+  diretiva — o smoke test pegou 29 bloqueios nas Configurações antes disto.
+
 ## [0.12.2] - 2026-09-10
 
 ### Alterado

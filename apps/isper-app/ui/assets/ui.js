@@ -17,6 +17,10 @@
   window.__isperErrors = window.__isperErrors || [];
   addEventListener('error', (e) => window.__isperErrors.push(String(e.message || e)));
   addEventListener('unhandledrejection', (e) => window.__isperErrors.push('rejection: ' + String(e.reason)));
+  // Violação de CSP não dispara 'error': sem isto, um recurso bloqueado falharia
+  // em silêncio. O smoke test (tools/e2e) lê esta lista em cada janela.
+  document.addEventListener('securitypolicyviolation', (e) =>
+    window.__isperErrors.push('csp: ' + e.violatedDirective + ' bloqueou ' + (e.blockedURI || 'inline') + ' em ' + e.sourceFile + ':' + e.lineNumber));
 
   // ----------------------------------------------------------------- toast
   let host = null;

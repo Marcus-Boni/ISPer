@@ -229,13 +229,9 @@ fn pump(
     let mut bytes: VecDeque<u8> = VecDeque::with_capacity(RATE * BYTES_PER_FRAME);
     let mut last_packet = Instant::now();
 
-    loop {
-        // Encerra tanto no sinal de stop quanto se o outro lado desligar.
-        match stop_rx.try_recv() {
-            Err(crossbeam_channel::TryRecvError::Empty) => {}
-            _ => break,
-        }
-
+    // Roda enquanto o canal de stop estiver vazio: tanto o sinal de parada
+    // quanto o outro lado desligar (Disconnected) encerram a captura.
+    while let Err(crossbeam_channel::TryRecvError::Empty) = stop_rx.try_recv() {
         // Alimenta o keepalive: preenche o espaço livre com silêncio.
         if let Ok(space) = session.render_client.get_available_space_in_frames() {
             let frames = (space as usize).min(session.silence.len() / BYTES_PER_FRAME);
@@ -285,8 +281,10 @@ fn pump(
             if take > 0 {
                 let raw: Vec<u8> = bytes.drain(..take).collect();
                 let floats: Vec<f32> = raw
-                    .chunks_exact(4)
-                    .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .map(|&b| f32::from_le_bytes(b))
                     .collect();
                 if tx.send(floats).is_err() {
                     break;

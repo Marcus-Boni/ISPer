@@ -8,7 +8,7 @@
 //!   isper-cli llm use|set-key|status|test|models
 
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -109,7 +109,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Roda só a diarização num WAV — útil para calibrar `ISPER_DIARIZE_THRESHOLD`.
-fn run_diarize(path: &PathBuf) -> anyhow::Result<()> {
+fn run_diarize(path: &Path) -> anyhow::Result<()> {
     let raw = audio::load_wav(path).with_context(|| format!("falha ao ler {}", path.display()))?;
     let secs = raw.duration_secs();
     let samples = raw.into_whisper_input()?;
@@ -277,7 +277,7 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
         meeting::to_markdown(&title, &started_at, &result, &[]),
     )?;
 
-    let db = MeetingStore::open(std::path::Path::new("isper.db"))?;
+    let db = MeetingStore::open(Path::new("isper.db"))?;
     let id = db.save(&title, &started_at, &result, Some(&md_path))?;
 
     println!("salvo: {md_path} | banco: isper.db (reuniao id {id})");
@@ -338,17 +338,18 @@ fn run_models(cmd: &ModelsCmd) -> anyhow::Result<()> {
             println!("baixando {file} (com verificação SHA-256 do Hugging Face)...");
             let mut last_pct: i64 = -1;
             let path = isper_models::download_whisper(file, &mut |done, total| {
-                if total > 0 {
-                    let pct = (done * 100 / total) as i64;
-                    if pct != last_pct && pct % 2 == 0 {
-                        last_pct = pct;
-                        print!(
-                            "\r  {pct:>3}%  {:>5} / {:>5} MB",
-                            done / 1_000_000,
-                            total / 1_000_000
-                        );
-                        let _ = std::io::stdout().flush();
-                    }
+                let Some(pct) = (done * 100).checked_div(total) else {
+                    return;
+                };
+                let pct = pct as i64;
+                if pct != last_pct && pct % 2 == 0 {
+                    last_pct = pct;
+                    print!(
+                        "\r  {pct:>3}%  {:>5} / {:>5} MB",
+                        done / 1_000_000,
+                        total / 1_000_000
+                    );
+                    let _ = std::io::stdout().flush();
                 }
             })?;
             println!("\nok: {}", path.display());
@@ -366,13 +367,14 @@ fn run_models(cmd: &ModelsCmd) -> anyhow::Result<()> {
             );
             let mut last_pct: i64 = -1;
             isper_diarize::download_models(&mut |name, done, total| {
-                if total > 0 {
-                    let pct = (done * 100 / total) as i64;
-                    if pct != last_pct && pct % 5 == 0 {
-                        last_pct = pct;
-                        print!("\r  {name}: {pct:>3}%");
-                        let _ = std::io::stdout().flush();
-                    }
+                let Some(pct) = (done * 100).checked_div(total) else {
+                    return;
+                };
+                let pct = pct as i64;
+                if pct != last_pct && pct % 5 == 0 {
+                    last_pct = pct;
+                    print!("\r  {name}: {pct:>3}%");
+                    let _ = std::io::stdout().flush();
                 }
             })?;
             println!("\nok — reuniões passam a identificar 'Participante 1, 2, 3…'");

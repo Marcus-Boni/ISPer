@@ -673,8 +673,7 @@ pub fn moment_excerpts(segments: &[SegmentRef<'_>], moments: &[f32]) -> Vec<(f32
         .map(|at| {
             let group = groups
                 .iter()
-                .filter(|g| g.start_secs <= at + 0.5)
-                .last()
+                .rfind(|g| g.start_secs <= at + 0.5)
                 .or(groups.first());
             let excerpt = match group {
                 Some(g) => {

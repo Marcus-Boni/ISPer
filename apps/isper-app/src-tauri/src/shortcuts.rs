@@ -83,7 +83,7 @@ pub(crate) fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, S
     };
     let dictation_defaults: Vec<&str> = SHORTCUT_CANDIDATES.iter().map(|(c, _)| *c).collect();
     let dictation = candidates(cfg.shortcut.as_deref(), &dictation_defaults);
-    let (dict_sc, dict_label) = match register_first_free(&shortcuts, &dictation, &[]) {
+    let (dict_sc, dict_label) = match register_first_free(shortcuts, &dictation, &[]) {
         Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
         None => (None, "(nenhum atalho livre!)".to_string()),
     };
@@ -93,14 +93,14 @@ pub(crate) fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, S
         cfg.meeting_shortcut.as_deref(),
         &MEETING_SHORTCUT_CANDIDATES,
     );
-    let (meet_sc, meet_label) = match register_first_free(&shortcuts, &meeting, &taken) {
+    let (meet_sc, meet_label) = match register_first_free(shortcuts, &meeting, &taken) {
         Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
         None => (None, "(nenhum)".to_string()),
     };
     taken.extend(meet_sc);
 
     let mark = candidates(cfg.mark_shortcut.as_deref(), &MARK_SHORTCUT_CANDIDATES);
-    let (mark_sc, mark_label) = match register_first_free(&shortcuts, &mark, &taken) {
+    let (mark_sc, mark_label) = match register_first_free(shortcuts, &mark, &taken) {
         Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
         None => (None, "(nenhum)".to_string()),
     };

@@ -2,6 +2,8 @@
 name = "isper-app"
 version = "0.12.2"
 edition = "2021"
+license = "MIT"
+publish = false
 
 [features]
 # CUDA ligado por padrão (RTX 4050). Sem GPU NVIDIA: --no-default-features.
@@ -48,3 +50,6 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_Wind
 # AppUserModelID no HKCU para o exe "solto" aparecer como ISPer, com ícone.
 tauri-winrt-notification = "0.7"
 winreg = "0.55"
+
+[lints]
+workspace = true

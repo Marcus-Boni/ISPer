@@ -21,18 +21,20 @@ $st = Invoke-Isper 'home_status'
 Check ($st.version -match '^\d+\.\d+\.\d+$') "home_status.version = $($st.version)"
 Check ($st.engine.kind -in 'ready', 'loading', 'missing') "motor: $($st.engine.kind)"
 Check (-not $st.meeting_active) "sem reuniao ativa"
-Check ((Get-JsErrors 'home.html').Count -eq 0) "Inicio sem erros de JS"
+$errs = Get-JsErrors 'home.html'
+Check (@($errs).Count -eq 0) "Inicio sem erros de JS$(Format-JsErrors $errs)"
 
 Invoke-Isper 'open_library_window' '{ meeting: null }' | Out-Null
 Start-Sleep -Seconds 4
 $lib = EvJson 'library.html' 'JSON.stringify({ items: document.querySelectorAll(".item").length, errors: window.__isperErrors || [] })'
-Check ($null -ne $lib -and @($lib.errors).Count -eq 0) "Biblioteca abriu sem erros de JS ($($lib.items) reunioes listadas)"
+Check ($null -ne $lib -and @($lib.errors).Count -eq 0) "Biblioteca abriu sem erros de JS ($($lib.items) reunioes listadas)$(Format-JsErrors $lib.errors)"
 
 Invoke-Isper 'open_settings_window' | Out-Null
 Start-Sleep -Seconds 4
 $s = Invoke-Isper 'get_settings' 'undefined' 'settings.html'
 Check ($s.version -eq $st.version) "Configuracoes: versao $($s.version) (igual ao Inicio)"
-Check ((Get-JsErrors 'settings.html').Count -eq 0) "Configuracoes sem erros de JS"
+$errs = Get-JsErrors 'settings.html'
+Check (@($errs).Count -eq 0) "Configuracoes sem erros de JS$(Format-JsErrors $errs)"
 
 # Indicador: mostra, troca para legendas, volta ao modo original.
 $original = if ($st.overlay_captions) { 'captions' } elseif ((Invoke-Isper 'overlay_prefs').mini) { 'mini' } else { 'normal' }

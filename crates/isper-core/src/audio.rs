@@ -141,7 +141,7 @@ pub(crate) fn open_input_stream_on(
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device
             .build_input_stream(
-                stream_config.clone(),
+                stream_config,
                 move |data: &[f32], _: &cpal::InputCallbackInfo| {
                     let _ = tx.send(data.to_vec());
                 },
@@ -151,7 +151,7 @@ pub(crate) fn open_input_stream_on(
             .map_err(|e| IsperError::Audio(e.to_string()))?,
         cpal::SampleFormat::I16 => device
             .build_input_stream(
-                stream_config.clone(),
+                stream_config,
                 move |data: &[i16], _: &cpal::InputCallbackInfo| {
                     let _ = tx.send(data.iter().map(|s| *s as f32 / i16::MAX as f32).collect());
                 },
@@ -161,7 +161,7 @@ pub(crate) fn open_input_stream_on(
             .map_err(|e| IsperError::Audio(e.to_string()))?,
         cpal::SampleFormat::U16 => device
             .build_input_stream(
-                stream_config.clone(),
+                stream_config,
                 move |data: &[u16], _: &cpal::InputCallbackInfo| {
                     let _ = tx.send(
                         data.iter()
@@ -252,7 +252,7 @@ pub fn resample_to_16k(mono: &[f32], from_rate: u32) -> Result<Vec<f32>> {
     let tail = &mono[pos..];
     let tail_in: Option<&[&[f32]]> = if tail.is_empty() { None } else { Some(&[tail]) };
     let chunk_out = resampler
-        .process_partial(tail_in.map(|t| t), None)
+        .process_partial(tail_in, None)
         .map_err(|e| IsperError::Resample(e.to_string()))?;
     out.extend_from_slice(&chunk_out[0]);
     Ok(out)

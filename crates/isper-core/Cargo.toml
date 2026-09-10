@@ -2,6 +2,8 @@
 name = "isper-core"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+publish = false
 
 [features]
 # Aceleração NVIDIA: `cargo build --features cuda` (requer CUDA Toolkit)
@@ -20,3 +22,6 @@ tracing = "0.1.44"
 wasapi = "0.24.0"
 whisper-rs = "0.16.0"
 sysinfo = "0.33"
+
+[lints]
+workspace = true

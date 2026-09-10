@@ -389,11 +389,11 @@ fn tidy(s: &str) -> String {
         let c = chars[i];
         if c == ' ' {
             // espaço antes de pontuação de fecho: fora
-            if let Some(&n) = chars.get(i + 1) {
-                if matches!(n, ',' | '.' | ';' | ':' | '!' | '?' | ')' | '…') {
-                    i += 1;
-                    continue;
-                }
+            if let Some(&n) = chars.get(i + 1)
+                && matches!(n, ',' | '.' | ';' | ':' | '!' | '?' | ')' | '…')
+            {
+                i += 1;
+                continue;
             }
             if out.ends_with(' ') || out.ends_with('\n') || out.is_empty() {
                 i += 1;
@@ -409,12 +409,11 @@ fn tidy(s: &str) -> String {
         if matches!(c, '.' | '!' | '?' | '\n') {
             capitalize_next = true;
             // garante espaço depois de . ! ? quando vem letra colada
-            if c != '\n' {
-                if let Some(&n) = chars.get(i + 1) {
-                    if n.is_alphanumeric() {
-                        out.push(' ');
-                    }
-                }
+            if c != '\n'
+                && let Some(&n) = chars.get(i + 1)
+                && n.is_alphanumeric()
+            {
+                out.push(' ');
             }
         } else if c == '…' || c == ')' || c == '"' {
             // mantém a maiúscula pendente de um ponto anterior

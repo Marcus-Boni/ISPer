@@ -185,6 +185,62 @@ qualidade de transcrição, legendas, momentos marcados e distribuição (v0.11.
 - [x] v0.12.1/v0.12.2: pastas do usuário pela API do Windows (não pelas variáveis de ambiente) e dados locais em `%LOCALAPPDATA%\com.isper.desktop`, fora da pasta padrão de instalação do Tauri (`%LOCALAPPDATA%\ISPer`), com migração automática
 - [ ] Assinatura de código (certificado Authenticode ou Azure Trusted Signing) para o instalador não disparar o SmartScreen — depende de comprar/assinar o serviço
 
+## Fase 7 — Maturidade de engenharia (a partir de 10/09/2026)
+
+Com F0–F6 entregues e o app em uso real, esta fase é sobre o que separa um
+projeto bom de um produto confiável — o que times grandes fazem por padrão.
+A ordem é impacto ÷ esforço.
+
+### 7.1 Qualidade automatizada (barato, alto impacto)
+
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` no CI + `[workspace.lints]` compartilhado por todos os crates
+- [x] `cargo deny` (vulnerabilidades RustSec, licenças permitidas, duplicatas, origens) com `deny.toml` versionado
+- [x] Dependabot para Cargo e GitHub Actions (PRs semanais agrupados)
+- [x] gitleaks no CI — nenhum segredo no histórico
+- [x] CSP real no Tauri (`default-src 'self'`) no lugar de `null`; violações entram em `window.__isperErrors` e o smoke test falha se houver alguma
+- [ ] Remover os `style="…"` inline dos HTML (29 em `settings.html`, 7 em `home.html`, mais dois `style.cssText`) e fechar `style-src-attr` — hoje `'unsafe-inline'` só para atributos, porque o Tauri injeta hashes em `style-src` e isso desliga o `'unsafe-inline'` da diretiva
+- [ ] Versão numa só fonte (o Tauri lê o `Cargo.toml`; remover do `tauri.conf.json` e a validação do release.yml vira desnecessária)
+- [ ] Edição Rust unificada (app em 2021 → 2024 com `cargo fix --edition`, em árvore limpa)
+
+### 7.2 Testes que provam robustez
+
+- [ ] `LlmProvider` falso para testar resumo, título e polimento sem rede
+- [ ] Testes de propriedade (`proptest`): `like_pattern`, `quiet_cut`, VAD por energia
+- [ ] Testes *golden* das exportações (Markdown, DOCX, SRT)
+- [ ] Cobertura com `cargo-llvm-cov` publicada como tendência (não como gate)
+- [ ] Soak test de 2 h de reunião — o áudio dos participantes fica em RAM (~230 MB/h em f32); mover para disco
+- [ ] Casos de áudio: fone desconectado no meio (reabrir e continuar), suspensão/hibernação, apps em modo exclusivo, DPI em vários monitores
+- [ ] e2e no CI (runner com áudio virtual, ex.: VB-Cable) ou como job *nightly*
+
+### 7.3 Segurança e confiança do binário
+
+- [ ] Assinatura Authenticode (Azure Trusted Signing) — o maior atrito de quem instala (já pendente acima)
+- [ ] SBOM (CycloneDX via `cargo cyclonedx`) publicado com cada release
+- [ ] `SECURITY.md` (como reportar vulnerabilidade), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, templates de issue e PR
+- [ ] Builds de release no CI (reprodutíveis), não na máquina local
+
+### 7.4 Dados e observabilidade responsável
+
+- [ ] Migrações de schema por `PRAGMA user_version` (em vez de `ALTER` ignorando erro) e config versionada com migração explícita
+- [ ] Política de retenção (apagar transcrições após N dias — LGPD) e backup/exportação do banco
+- [ ] Criptografia em repouso opcional (SQLCipher) para transcrições sensíveis
+- [ ] Logs em JSON com rotação; "Exportar diagnóstico" (zip com logs + config sem segredos + versões); métricas locais (latência p50/p95, taxa de erro) — telemetria remota só opt-in
+
+### 7.5 Experiência premium
+
+- [ ] Onboarding de primeira execução (testar mic → escolher modelo → atalho → IA opcional)
+- [ ] `desfazer` em toast no lugar de `confirm()` para exclusões; tema claro/escuro seguindo o sistema
+- [ ] i18n desde já (dicionário JSON, pt-BR primeiro) e README em inglês
+- [ ] Acessibilidade: navegação completa por teclado e teste com NVDA
+- [ ] Detecção de reunião ativa → "Gravar transcrição?"
+
+### 7.6 Distribuição e documentação
+
+- [ ] `winget install ISPer` (manifesto no winget-pkgs) e zip portátil
+- [ ] Site de docs (mdBook no GitHub Pages): guia, FAQ, troubleshooting, arquitetura
+- [ ] ADRs em `docs/adr/` (Rust+Tauri, LLM em nuvem, keepalive do loopback, diarização pós-hoc)
+- [ ] `cargo doc` com `#![deny(missing_docs)]` no core; feature flags para o experimental (legendas ao vivo, comandos de voz)
+
 ## Boas práticas transversais
 
 - Commits pequenos e frequentes desde o dia 1; mensagens descritivas
@@ -200,4 +256,4 @@ Whisper (MIT) · whisper.cpp (MIT) · whisper-rs (Unlicense) · Tauri (MIT/Apach
 
 ---
 
-**Próximo passo:** Fase 2 — MVP de ditado (app Tauri 2: hotkey global push-to-talk → overlay → colar no app ativo).
+**Próximo passo:** Fase 7.2 — testes que provam robustez (soak test de 2 h, áudio dos participantes em disco, casos de áudio).

@@ -77,6 +77,14 @@ function Get-JsErrors {
   @(EvJson $Window 'JSON.stringify(window.__isperErrors || [])')
 }
 
+function Format-JsErrors {
+  # Texto dos erros para a linha FALHA: um teste que esconde a causa nao ajuda ninguem.
+  param($Items)
+  $list = @($Items | Where-Object { $_ })
+  if ($list.Count -eq 0) { return '' }
+  return ' -> ' + (($list | ForEach-Object { [string]$_ }) -join ' | ')
+}
+
 function Check {
   param([bool]$Ok, [string]$What)
   $script:Checks++

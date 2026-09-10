@@ -9,6 +9,19 @@ members = [
     "apps/isper-app/src-tauri",
 ]
 
+# Lints compartilhados por todos os crates (`[lints] workspace = true` em cada
+# Cargo.toml). O CI roda `cargo clippy -- -D warnings`: aviso aqui = erro lá.
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "warn"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+# Rastros de depuração e pendências não podem chegar ao main.
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+
 # Perfil de release com otimização máxima — inferência de áudio é CPU-intensiva.
 [profile.release]
 lto = "thin"

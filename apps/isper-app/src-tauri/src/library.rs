@@ -2,12 +2,10 @@
 
 use crate::prelude::*;
 use isper_core::meeting::{self, SegmentRef};
-use isper_core::store::{MeetingDetail, MeetingStore};
+use isper_core::store::{MeetingDetail, MeetingRow, MeetingStore};
 
 #[tauri::command]
-pub(crate) fn list_meetings(
-    query: Option<String>,
-) -> Result<Vec<isper_core::store::MeetingRow>, String> {
+pub(crate) fn list_meetings(query: Option<String>) -> Result<Vec<MeetingRow>, String> {
     let store = open_store().map_err(|e| e.to_string())?;
     match query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
         Some(q) => store.search_meetings(q),
@@ -17,7 +15,7 @@ pub(crate) fn list_meetings(
 }
 
 #[tauri::command]
-pub(crate) fn get_meeting(id: i64) -> Result<Option<isper_core::store::MeetingDetail>, String> {
+pub(crate) fn get_meeting(id: i64) -> Result<Option<MeetingDetail>, String> {
     open_store()
         .map_err(|e| e.to_string())?
         .get_meeting(id)
@@ -174,7 +172,7 @@ pub(crate) fn open_meeting_file(id: i64) -> Result<(), String> {
         .meeting
         .md_path
         .ok_or("esta reunião não tem arquivo .md registrado")?;
-    if !std::path::Path::new(&path).exists() {
+    if !Path::new(&path).exists() {
         return Err(format!("arquivo não encontrado: {path}"));
     }
     std::process::Command::new("cmd")
