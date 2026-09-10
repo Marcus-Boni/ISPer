@@ -55,7 +55,9 @@ pub(crate) fn on_released(app: &AppHandle) {
     }
 }
 
-pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<String> {
+/// Transcreve, pós-processa e cola o ditado. `Ok(None)` = descartado por
+/// comando de voz ("apagar isso"), sem colar nada.
+pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<String>> {
     if raw.duration_secs() < 0.4 {
         anyhow::bail!("segure o atalho enquanto fala");
     }
@@ -86,8 +88,31 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<String> 
         "transcrito: {raw_text}"
     );
 
+    // Pós-processamento local: dicionário pessoal (grafia/acentos/caixa) e
+    // comandos de voz ("nova linha", "ponto final", "apagar isso"…).
+    let (voice_commands, dictionary) = {
+        let cfg = state.config.lock().unwrap();
+        (cfg.voice_commands, cfg.dictionary.clone())
+    };
+    let corrected = isper_core::text::apply_dictionary(&raw_text, &dictionary);
+    let cmd = if voice_commands {
+        isper_core::text::apply_voice_commands(&corrected)
+    } else {
+        isper_core::text::CommandResult {
+            text: corrected,
+            discard: false,
+        }
+    };
+    if cmd.discard {
+        tracing::info!("ditado descartado por comando de voz");
+        return Ok(None);
+    }
+    if cmd.text.trim().is_empty() {
+        anyhow::bail!("não entendi — tente de novo");
+    }
+
     // Polimento opcional por IA (só o texto viaja). Qualquer falha cola o original.
-    let text = polish_if_enabled(app, &raw_text);
+    let text = polish_if_enabled(app, &cmd.text);
     paste_text(&text)?;
 
     // Histórico de ditados (Fase 3) — falha aqui não pode travar o fluxo.
@@ -96,7 +121,7 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<String> 
         let raw = (text != raw_text).then_some(raw_text.as_str());
         let _ = store.save_dictation(&at, &text, raw, audio_secs, t.infer_secs);
     }
-    Ok(text)
+    Ok(Some(text))
 }
 
 /// Passa o ditado pelo provider de IA quando o polimento está ligado.

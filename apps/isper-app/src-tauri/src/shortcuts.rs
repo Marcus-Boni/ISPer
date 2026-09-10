@@ -31,11 +31,11 @@ pub(crate) fn pretty_label(combo: &str) -> String {
 }
 
 /// Tenta registrar, na ordem, o primeiro combo livre de `candidates` que não
-/// esteja em `taken`. Devolve o `Shortcut` e o combo registrado.
+/// esteja em `taken` (os atalhos já nossos). Devolve o `Shortcut` e o combo.
 pub(crate) fn register_first_free(
     shortcuts: &tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>,
     candidates: &[String],
-    taken: Option<&Shortcut>,
+    taken: &[Shortcut],
 ) -> Option<(Shortcut, String)> {
     for combo in candidates {
         let parsed = match Shortcut::from_str(combo) {
@@ -45,8 +45,8 @@ pub(crate) fn register_first_free(
                 continue;
             }
         };
-        if taken == Some(&parsed) {
-            continue; // já é o atalho de ditado
+        if taken.contains(&parsed) {
+            continue; // já é outro atalho do ISPer
         }
         match shortcuts.register(parsed) {
             Ok(()) => {
@@ -59,11 +59,11 @@ pub(crate) fn register_first_free(
     None
 }
 
-/// (Re)registra os dois atalhos globais — ditado e reunião — a partir da
-/// configuração: o preferido de cada um tem prioridade; os candidatos padrão
-/// são o fallback. Guarda os `Shortcut`s no estado (o handler compara com
-/// eles) e devolve os rótulos ativos (ditado, reunião).
-pub(crate) fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, String) {
+/// (Re)registra os três atalhos globais — ditado, reunião e marcar momento —
+/// a partir da configuração: o preferido de cada um tem prioridade; os
+/// candidatos padrão são o fallback. Guarda os `Shortcut`s no estado (o
+/// handler compara com eles) e devolve os rótulos ativos, nessa ordem.
+pub(crate) fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, String, String) {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
     let shortcuts = app.global_shortcut();
     let _ = shortcuts.unregister_all();
@@ -83,25 +83,35 @@ pub(crate) fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, S
     };
     let dictation_defaults: Vec<&str> = SHORTCUT_CANDIDATES.iter().map(|(c, _)| *c).collect();
     let dictation = candidates(cfg.shortcut.as_deref(), &dictation_defaults);
-    let (dict_sc, dict_label) = match register_first_free(&shortcuts, &dictation, None) {
+    let (dict_sc, dict_label) = match register_first_free(&shortcuts, &dictation, &[]) {
         Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
         None => (None, "(nenhum atalho livre!)".to_string()),
     };
+    let mut taken: Vec<Shortcut> = dict_sc.into_iter().collect();
 
     let meeting = candidates(
         cfg.meeting_shortcut.as_deref(),
         &MEETING_SHORTCUT_CANDIDATES,
     );
-    let (meet_sc, meet_label) = match register_first_free(&shortcuts, &meeting, dict_sc.as_ref()) {
+    let (meet_sc, meet_label) = match register_first_free(&shortcuts, &meeting, &taken) {
+        Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
+        None => (None, "(nenhum)".to_string()),
+    };
+    taken.extend(meet_sc);
+
+    let mark = candidates(cfg.mark_shortcut.as_deref(), &MARK_SHORTCUT_CANDIDATES);
+    let (mark_sc, mark_label) = match register_first_free(&shortcuts, &mark, &taken) {
         Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
         None => (None, "(nenhum)".to_string()),
     };
 
     *state.dictation_shortcut.lock().unwrap() = dict_sc;
     *state.meeting_shortcut.lock().unwrap() = meet_sc;
+    *state.mark_shortcut.lock().unwrap() = mark_sc;
     *state.active_shortcut.lock().unwrap() = dict_label.clone();
     *state.active_meeting_shortcut.lock().unwrap() = meet_label.clone();
-    (dict_label, meet_label)
+    *state.active_mark_shortcut.lock().unwrap() = mark_label.clone();
+    (dict_label, meet_label, mark_label)
 }
 
 /// Atalho de reunião: alterna a gravação, com debounce contra auto-repeat.

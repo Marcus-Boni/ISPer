@@ -93,6 +93,7 @@ pub(crate) fn rewrite_markdown(store: &MeetingStore, id: i64) {
         detail.meeting.duration_secs,
         &segment_refs(&detail),
         detail.summary.as_deref(),
+        &detail.moments,
     );
     if let Err(e) = std::fs::write(path, md) {
         tracing::warn!("não consegui regravar {path}: {e}");
@@ -120,6 +121,7 @@ pub(crate) fn export_meeting(id: i64, format: String) -> Result<String, String> 
                 m.duration_secs,
                 &refs,
                 detail.summary.as_deref(),
+                &detail.moments,
             ),
         ),
         "md" => (
@@ -130,6 +132,7 @@ pub(crate) fn export_meeting(id: i64, format: String) -> Result<String, String> 
                 m.duration_secs,
                 &refs,
                 detail.summary.as_deref(),
+                &detail.moments,
             )
             .into_bytes(),
         ),

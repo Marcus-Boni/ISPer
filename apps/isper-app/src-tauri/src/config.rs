@@ -51,6 +51,15 @@ pub struct AppConfig {
     /// Biblioteca) · `open` (abre o `.md` no app padrão) · `silent`.
     #[serde(default = "default_after_meeting")]
     pub after_meeting: String,
+    /// Comandos de voz no ditado ("nova linha", "ponto final", "apagar isso"…).
+    #[serde(default = "default_true")]
+    pub voice_commands: bool,
+    /// Atalho global que marca um momento durante a reunião.
+    #[serde(default = "default_mark_shortcut")]
+    pub mark_shortcut: Option<String>,
+    /// Indicador no modo "legendas ao vivo" (barra larga com as últimas falas).
+    #[serde(default)]
+    pub overlay_captions: bool,
 }
 
 impl Default for AppConfig {
@@ -69,12 +78,19 @@ impl Default for AppConfig {
             polish: false,
             polish_style: default_polish_style(),
             after_meeting: default_after_meeting(),
+            voice_commands: true,
+            mark_shortcut: default_mark_shortcut(),
+            overlay_captions: false,
         }
     }
 }
 
 fn default_meeting_shortcut() -> Option<String> {
     Some("ctrl+alt+m".into())
+}
+
+fn default_mark_shortcut() -> Option<String> {
+    Some("ctrl+alt+k".into())
 }
 
 fn default_after_meeting() -> String {

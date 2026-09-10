@@ -3,7 +3,7 @@
 //! sem compressão, escrito aqui mesmo (formato estável e pequeno; não vale
 //! uma dependência inteira de ZIP só para isso).
 
-use crate::meeting::{SegmentRef, fmt_ts, group_speech};
+use crate::meeting::{SegmentRef, fmt_ts, group_speech, moment_excerpts};
 
 /// Legendas SRT: uma entrada por segmento, com o falante na frente do texto.
 pub fn to_srt(segments: &[SegmentRef<'_>]) -> String {
@@ -46,6 +46,7 @@ pub fn to_docx(
     duration_secs: f32,
     segments: &[SegmentRef<'_>],
     summary: Option<&str>,
+    moments: &[f32],
 ) -> Vec<u8> {
     let mut body = String::new();
     body.push_str(&para(&[run(title, true, 36)]));
@@ -68,6 +69,15 @@ pub fn to_docx(
             false,
             18,
         )]));
+    }
+    if !moments.is_empty() {
+        body.push_str(&para(&[run("Momentos marcados", true, 26)]));
+        for (at, excerpt) in moment_excerpts(segments, moments) {
+            body.push_str(&para(&[
+                run(&format!("★ [{}] ", fmt_ts(at)), true, 22),
+                run(&excerpt, false, 22),
+            ]));
+        }
     }
     body.push_str(&para(&[run("Transcript", true, 26)]));
     for g in group_speech(segments.iter().copied()) {
@@ -240,12 +250,15 @@ mod tests {
             61.0,
             &[seg("Eu", 0.0, 1.0, "Olá <mundo>")],
             Some("Resumo."),
+            &[0.5],
         );
         assert_eq!(&docx[..4], &[0x50, 0x4b, 0x03, 0x04]);
         let text = String::from_utf8_lossy(&docx);
         assert!(text.contains("word/document.xml"));
         assert!(text.contains("T&iacute;tulo &amp; teste") || text.contains("Título &amp; teste"));
         assert!(text.contains("Olá &lt;mundo&gt;"));
+        assert!(text.contains("Momentos marcados"));
+        assert!(text.contains("★ [00:00] "));
         // EOCD no fim, com 3 entradas.
         let n = docx.len();
         assert_eq!(&docx[n - 22..n - 18], &[0x50, 0x4b, 0x05, 0x06]);

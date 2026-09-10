@@ -168,6 +168,21 @@ A jogada: **não precisa de bot nem API paga** — captura-se o áudio que sai d
 
 ---
 
+## Fase 6 — Acabamento premium (08 a 10/09/2026)
+
+Rodadas pedidas depois do notetaker funcionar: primeiro UX (tela Início,
+design system com microinterações, indicador sempre no topo, busca dentro da
+reunião), depois funcionalidades (v0.9.0), robustez (v0.10.0) e, por fim,
+qualidade de transcrição, legendas, momentos marcados e distribuição (v0.11.0).
+
+- [x] Tela Início central; design system (`base.css` + `ui.js`), animações com `prefers-reduced-motion`
+- [x] Indicador com prioridade acima de qualquer janela (SetWindowPos TOPMOST + keepalive); busca com destaque dentro da reunião
+- [x] v0.9.0: transcrição ao vivo, título por IA, parágrafos, diarização em segundo plano, renomear falantes, copiar/exportar (SRT/DOCX), atalho global de reunião + ícone vermelho na bandeja, polimento do ditado por IA, microfone e captura livre de atalho
+- [x] v0.10.0: notificação do Windows ao salvar (em vez de abrir o arquivo), logs em arquivo com rotação, diagnóstico, sair salvando, WAL, config atômica, áudio em i16, CI, app modularizado
+- [x] v0.11.0: filtro de alucinações do Whisper (`no_speech_prob`, frases de legenda, loops), correção por dicionário, comandos de voz no ditado ("nova linha", "ponto final", "apagar isso"…), legendas ao vivo no indicador, momentos marcados (★, Ctrl+Alt+K) no Markdown/DOCX/Biblioteca e priorizados no resumo, instalador NSIS com atualização automática assinada
+- [ ] Canal CPU (sem CUDA) publicado pelo CI para máquinas sem GPU NVIDIA
+- [ ] Assinatura de código (certificado) para o instalador não disparar o SmartScreen
+
 ## Boas práticas transversais
 
 - Commits pequenos e frequentes desde o dia 1; mensagens descritivas

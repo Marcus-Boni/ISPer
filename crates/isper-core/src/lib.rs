@@ -11,6 +11,7 @@ pub mod loopback;
 pub mod meeting;
 pub mod recorder;
 pub mod store;
+pub mod text;
 
 pub use audio::RawAudio;
 pub use engine::{Transcript, TranscriptSegment, WhisperEngine};

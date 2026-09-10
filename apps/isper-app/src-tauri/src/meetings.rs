@@ -60,6 +60,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
 
     let engine = { state.engine.lock().unwrap().clone() };
     state.live.lock().unwrap().clear();
+    state.moments.lock().unwrap().clear();
     // Cada fala transcrita durante a reunião vira um evento `isper-live` (Início
     // e indicador) e fica guardada para quem abrir a janela no meio.
     let live_app = app.clone();
@@ -89,6 +90,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             source: LoopbackSource::parse(&cfg.meeting_source),
             input_device: cfg.input_device.clone(),
             on_segment: Some(on_segment),
+            dictionary: cfg.dictionary.clone(),
         }
     };
     let started = engine
@@ -140,7 +142,14 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
     let now = chrono::Local::now();
     let started_at = now.format("%d/%m/%Y %H:%M").to_string();
     let mut title = format!("Reunião — {started_at}");
-    let md = meeting::to_markdown(&title, &started_at, &result);
+    // Momentos marcados (★) durante a gravação: seção do Markdown (o resumo
+    // por IA prioriza esses trechos), tabela no banco e chips na Biblioteca.
+    let moments: Vec<f32> = {
+        let mut taken = std::mem::take(&mut *app.state::<AppState>().moments.lock().unwrap());
+        taken.sort_by(|a, b| a.total_cmp(b));
+        taken
+    };
+    let md = meeting::to_markdown(&title, &started_at, &result, &moments);
 
     // O transcript é salvo ANTES do resumo: se a API falhar, nada se perde.
     let docs = meetings_dir()?;
@@ -154,6 +163,11 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
         &result,
         Some(&md_path.to_string_lossy()),
     )?;
+    if !moments.is_empty() {
+        if let Err(e) = store.save_moments(meeting_id, &moments) {
+            tracing::warn!("não consegui guardar os momentos marcados: {e}");
+        }
+    }
 
     // Fase 5: título + resumo por IA de nuvem, numa chamada — só o TEXTO do
     // transcript sai da máquina. Com resposta, o Markdown é regravado inteiro
@@ -198,6 +212,7 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
                             provider.name(),
                             provider.model()
                         )),
+                        &moments,
                     );
                     if let Err(e) = std::fs::write(&md_path, full) {
                         tracing::warn!("não consegui regravar o Markdown com o resumo: {e}");
@@ -398,4 +413,33 @@ pub(crate) fn live_transcript(app: AppHandle) -> Vec<LiveSegment> {
     let state = app.state::<AppState>();
     let live = state.live.lock().unwrap().clone();
     live
+}
+
+/// Marca o instante atual da reunião ("★"). Fica no estado até o fim da
+/// gravação e vira seção do Markdown/DOCX, chips na Biblioteca e prioridade
+/// no resumo por IA. Dois toques em menos de `MARK_DEBOUNCE` contam como um.
+pub(crate) fn mark_moment(app: &AppHandle) -> anyhow::Result<f32> {
+    let state = app.state::<AppState>();
+    let started = *state.meeting_started.lock().unwrap();
+    let Some(started) = started else {
+        anyhow::bail!("nenhuma reunião em andamento");
+    };
+    let at = started.elapsed().as_secs_f32();
+    {
+        let mut moments = state.moments.lock().unwrap();
+        if let Some(last) = moments.last().copied() {
+            if at - last < MARK_DEBOUNCE.as_secs_f32() {
+                return Ok(last);
+            }
+        }
+        moments.push(at);
+    }
+    tracing::info!(at_secs = at, "momento marcado");
+    let _ = app.emit("isper-moment", json!({ "at_secs": at }));
+    Ok(at)
+}
+
+#[tauri::command]
+pub(crate) fn mark_moment_cmd(app: AppHandle) -> Result<f32, String> {
+    mark_moment(&app).map_err(|e| e.to_string())
 }

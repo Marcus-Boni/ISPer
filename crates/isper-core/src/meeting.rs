@@ -31,6 +31,9 @@ pub struct MeetingOptions {
     pub input_device: Option<String>,
     /// Chamado a cada segmento transcrito durante a gravação.
     pub on_segment: Option<SegmentSink>,
+    /// Dicionário pessoal: além de virar `initial_prompt`, corrige por
+    /// semelhança o que o Whisper ainda errar ([`crate::text::apply_dictionary`]).
+    pub dictionary: Vec<String>,
 }
 
 /// Regras de agrupamento de falas em parágrafos (Markdown, DOCX e Biblioteca
@@ -261,6 +264,7 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
         source,
         input_device,
         on_segment,
+        dictionary,
     } = opts;
 
     // Abre os canais EM SEQUÊNCIA (loopback primeiro, mic depois): quando mic e
@@ -301,7 +305,15 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
     drop(job_tx);
 
     std::thread::spawn(move || {
-        let result = transcribe_worker(engine, lang, initial_prompt, on_segment, job_rx, started);
+        let result = transcribe_worker(
+            engine,
+            lang,
+            initial_prompt,
+            on_segment,
+            dictionary,
+            job_rx,
+            started,
+        );
         let _ = done_tx.send(result);
     });
 
@@ -503,6 +515,7 @@ fn transcribe_worker(
     lang: String,
     initial_prompt: Option<String>,
     on_segment: Option<SegmentSink>,
+    dictionary: Vec<String>,
     job_rx: Receiver<Job>,
     started: Instant,
 ) -> Result<MeetingResult> {
@@ -547,11 +560,16 @@ fn transcribe_worker(
                     if seg.text.is_empty() {
                         continue;
                     }
+                    let text = if dictionary.is_empty() {
+                        seg.text
+                    } else {
+                        crate::text::apply_dictionary(&seg.text, &dictionary)
+                    };
                     let seg = MeetingSegment {
                         speaker,
                         start_secs: offset + seg.start_secs,
                         end_secs: offset + seg.end_secs,
-                        text: seg.text,
+                        text,
                     };
                     if let Some(sink) = &on_segment {
                         sink(&seg);
@@ -573,7 +591,12 @@ fn transcribe_worker(
 
 /// Gera o Markdown da reunião recém-gravada (sem resumo — ele é anexado
 /// depois, se houver provider de IA).
-pub fn to_markdown(title: &str, started_at: &str, result: &MeetingResult) -> String {
+pub fn to_markdown(
+    title: &str,
+    started_at: &str,
+    result: &MeetingResult,
+    moments: &[f32],
+) -> String {
     let labels: Vec<String> = result.segments.iter().map(|s| s.speaker.label()).collect();
     let refs: Vec<SegmentRef<'_>> = result
         .segments
@@ -586,7 +609,14 @@ pub fn to_markdown(title: &str, started_at: &str, result: &MeetingResult) -> Str
             text: &s.text,
         })
         .collect();
-    render_markdown(title, started_at, result.duration_secs, &refs, None)
+    render_markdown(
+        title,
+        started_at,
+        result.duration_secs,
+        &refs,
+        None,
+        moments,
+    )
 }
 
 /// Markdown completo a partir de segmentos quaisquer (recém-gravados ou do
@@ -599,6 +629,7 @@ pub fn render_markdown(
     duration_secs: f32,
     segments: &[SegmentRef<'_>],
     summary: Option<&str>,
+    moments: &[f32],
 ) -> String {
     let mut out = String::new();
     out.push_str(&format!("# {title}\n\n"));
@@ -615,12 +646,49 @@ pub fn render_markdown(
             g.text
         ));
     }
+    if !moments.is_empty() {
+        out.push_str("\n## Momentos marcados\n\n");
+        for (at, excerpt) in moment_excerpts(segments, moments) {
+            out.push_str(&format!("- **[{}]** {}\n", fmt_ts(at), excerpt));
+        }
+    }
     if let Some(summary) = summary.map(str::trim).filter(|s| !s.is_empty()) {
         out.push_str("\n---\n\n");
         out.push_str(summary);
         out.push_str("\n\n> Resumo gerado por IA — revise antes de usar.\n");
     }
     out
+}
+
+/// Para cada momento marcado (em ordem), o parágrafo que estava em curso: o
+/// último que começa até meio segundo depois do instante — quem marca costuma
+/// reagir ao que acabou de ouvir. Texto encurtado para caber numa linha.
+pub fn moment_excerpts(segments: &[SegmentRef<'_>], moments: &[f32]) -> Vec<(f32, String)> {
+    const MAX_CHARS: usize = 160;
+    let groups = group_speech(segments.iter().copied());
+    let mut sorted: Vec<f32> = moments.to_vec();
+    sorted.sort_by(|a, b| a.total_cmp(b));
+    sorted
+        .into_iter()
+        .map(|at| {
+            let group = groups
+                .iter()
+                .filter(|g| g.start_secs <= at + 0.5)
+                .last()
+                .or(groups.first());
+            let excerpt = match group {
+                Some(g) => {
+                    let mut text: String = g.text.chars().take(MAX_CHARS).collect();
+                    if g.text.chars().count() > MAX_CHARS {
+                        text.push('…');
+                    }
+                    format!("{}: {}", g.speaker, text)
+                }
+                None => "(sem fala transcrita neste instante)".to_string(),
+            };
+            (at, excerpt)
+        })
+        .collect()
 }
 
 /// `mm:ss`, ou `h:mm:ss` a partir de uma hora.
@@ -674,6 +742,30 @@ mod tests {
     }
 
     #[test]
+    fn momentos_marcados_viram_secao_ordenada_com_trecho() {
+        let segs = [
+            seg("Eu", 0.0, 3.0, "Vamos começar pelo plano."),
+            seg(
+                "Participante 1",
+                10.0,
+                14.0,
+                "O MRP precisa de revisão de lead time.",
+            ),
+        ];
+        let md = render_markdown("R", "09/09/2026", 20.0, &segs, None, &[12.0, 1.0]);
+        assert!(md.contains(
+            "## Momentos marcados\n\n\
+             - **[00:01]** Eu: Vamos começar pelo plano.\n\
+             - **[00:12]** Participante 1: O MRP precisa de revisão de lead time.\n"
+        ));
+        // Marcado antes de qualquer fala: usa o primeiro parágrafo.
+        let early = moment_excerpts(&segs, &[0.0]);
+        assert!(early[0].1.starts_with("Eu: Vamos"));
+        // Sem momentos, sem seção.
+        assert!(!render_markdown("R", "x", 1.0, &segs, None, &[]).contains("Momentos marcados"));
+    }
+
+    #[test]
     fn markdown_tem_paragrafos_e_resumo() {
         let md = render_markdown(
             "Reunião X",
@@ -684,6 +776,7 @@ mod tests {
                 seg("Participante 1", 5.0, 6.0, "Oi."),
             ],
             Some("## Resumo\nCurto."),
+            &[],
         );
         assert!(md.starts_with("# Reunião X\n"));
         assert!(md.contains("**[00:00] Eu:** Olá.\n"));

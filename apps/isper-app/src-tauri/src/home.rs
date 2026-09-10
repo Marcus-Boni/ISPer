@@ -24,11 +24,15 @@ pub(crate) struct HomeStatus {
     stats: isper_core::store::Stats,
     recent: Vec<isper_core::store::MeetingRow>,
     meeting_shortcut: String,
+    mark_shortcut: String,
+    /// Indicador em modo legendas ao vivo (a tela Início mostra o interruptor ligado).
+    overlay_captions: bool,
     polish: bool,
     polish_style: String,
     input_device: Option<String>,
     /// Reunião com diarização em andamento (depois de salva).
     diarizing_meeting: Option<i64>,
+    voice_commands: bool,
 }
 
 /// Fotografia de tudo que a tela Início mostra — uma chamada, sem estado no
@@ -40,6 +44,7 @@ pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
     let engine = state.engine_status.lock().unwrap().clone();
     let shortcut = state.active_shortcut.lock().unwrap().clone();
     let meeting_shortcut = state.active_meeting_shortcut.lock().unwrap().clone();
+    let mark_shortcut = state.active_mark_shortcut.lock().unwrap().clone();
     let diarizing_meeting = *state.diarizing.lock().unwrap();
     let meeting_active = state.meeting.lock().unwrap().is_some();
     let meeting_elapsed_secs = state
@@ -98,9 +103,12 @@ pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
         stats,
         recent,
         meeting_shortcut,
+        mark_shortcut,
+        overlay_captions: cfg.overlay_captions,
         polish: cfg.polish,
         polish_style: cfg.polish_style,
         input_device: cfg.input_device,
         diarizing_meeting,
+        voice_commands: cfg.voice_commands,
     }
 }

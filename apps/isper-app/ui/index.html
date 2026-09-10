@@ -5,7 +5,9 @@
 <title>ISPer</title>
 <link rel="stylesheet" href="assets/base.css">
 <style>
-  /* Indicador flutuante: janela transparente, sem foco, arrastável. */
+  /* Indicador flutuante: janela transparente, sem foco, arrastável.
+     Três modos, decididos pelo TAMANHO REAL da janela (fonte única):
+     mini (< 300 px), normal, legendas (≥ 600 px). */
   html, body { background: transparent !important; overflow: hidden; height: 100%; }
   * { user-select: none; }
   /* A sombra precisa caber DENTRO da janela (transparente, recorta tudo):
@@ -31,6 +33,8 @@
   #pill.transcribing #dot { background: var(--warn); animation: pulse .6s ease-in-out infinite; }
   #pill.done #dot { background: var(--good); animation: ring-burst var(--dur-4) var(--ease-out) both; }
   #pill.error #dot { background: var(--accent); animation: none; }
+  #pill.discarded #dot { background: var(--muted); animation: none; }
+  #pill.discarded #status { color: var(--muted); }
 
   canvas { flex: 1; height: 46px; min-width: 0; }
   #status {
@@ -38,6 +42,7 @@
     max-width: 46%; overflow: hidden; text-overflow: ellipsis; flex: none;
     transition: color var(--dur-3);
   }
+  #status.flash { color: var(--warn); }
   #pill.done #status { color: var(--good); }
   #pill.error #status { color: var(--accent); }
   #timer {
@@ -61,20 +66,44 @@
   .ctl button:hover { color: var(--ink); background: rgba(255, 255, 255, .14); }
   .ctl button:active { transform: scale(.88); }
   .ctl button:disabled { opacity: .5; }
+  .ctl #mark { display: none; color: var(--warn); font-size: 13px; }
+  #pill.meeting .ctl #mark { display: grid; }
+  .ctl #cap { font-size: 11px; }
+  .ctl #cap.on { color: var(--warn); border-color: rgba(232, 193, 90, .5); }
 
   /* Modo mini: só o ponto (+ cronômetro em reunião). */
   body.mini #pill { gap: 10px; padding: 0 10px 0 14px; }
-  body.mini canvas, body.mini #status { display: none; }
+  body.mini canvas, body.mini #status, body.mini #captions { display: none; }
   body.mini .ctl { margin-left: auto; }
+  body.mini .ctl #cap { display: none; }
+
+  /* Modo legendas: barra larga com as duas últimas falas da reunião. */
+  #captions { display: none; flex: 1; min-width: 0; flex-direction: column; justify-content: center; gap: 3px; padding: 6px 0; }
+  body.captions #pill { border-radius: 18px; align-items: center; padding: 0 14px 0 18px; }
+  body.captions canvas, body.captions #status { display: none; }
+  body.captions #captions { display: flex; }
+  body.captions #timer { display: block; }
+  .cap-line { font-size: 17px; line-height: 1.3; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .cap-line.prev { font-size: 14px; color: var(--muted); -webkit-line-clamp: 1; }
+  .cap-line .sp { font-weight: 600; color: var(--p1); margin-right: 6px; }
+  .cap-line.eu .sp { color: var(--accent); }
+  .cap-line.swap { animation: swap-in var(--dur-3) var(--ease-out) both; }
+  .cap-hint { font-size: 13px; color: var(--muted); }
 </style>
 </head>
 <body>
 <div id="pill" data-tauri-drag-region role="status" aria-live="polite">
   <div id="dot" class="dot" data-tauri-drag-region></div>
   <canvas id="wave" data-tauri-drag-region></canvas>
+  <div id="captions" data-tauri-drag-region>
+    <div class="cap-line prev" id="cap-prev" data-tauri-drag-region></div>
+    <div class="cap-line" id="cap-cur" data-tauri-drag-region><span class="cap-hint">legendas ao vivo — as falas aparecem aqui durante a reunião</span></div>
+  </div>
   <div id="status" data-tauri-drag-region>pronto</div>
   <div id="timer" data-tauri-drag-region>00:00</div>
   <div class="ctl">
+    <button id="mark" title="marcar este momento da reunião" aria-label="marcar momento">★</button>
+    <button id="cap" title="legendas ao vivo (barra larga)" aria-label="alternar legendas ao vivo">CC</button>
     <button id="mini" title="modo mini / normal" aria-label="alternar modo mini">–</button>
     <button id="hide" title="ocultar (volta em Bandeja → Mostrar indicador)" aria-label="ocultar indicador">×</button>
   </div>
@@ -119,7 +148,8 @@
     'meeting-summary': 'transcribing meeting',
     'meeting-done': 'done'
   };
-  const RESTING = new Set(['idle', 'done', 'error']);
+  const RESTING = new Set(['idle', 'done', 'error', 'discarded']);
+  let lastLive = null;   // última fala recebida (para voltar depois de um aviso)
   function setState(s, msg) {
     const wakingUp = RESTING.has(state) && !RESTING.has(s);
     state = s;
@@ -127,57 +157,110 @@
     if (wakingUp) replay(pill, 'pop');          // o backend acabou de mostrar o indicador
     if (s === 'error') replay(pill, 'shake');
     if (s === 'meeting') startTimer();
-    else if (s === 'meeting-done' || s === 'idle' || s === 'error') stopTimer();
+    else if (s === 'meeting-done' || s === 'idle' || s === 'error' || s === 'discarded') { stopTimer(); lastLive = null; clearCaptions(); }
 
     if (s === 'recording') { bars.fill(0); setStatus('gravando… solte para colar'); blip(880, .05); }
     else if (s === 'recording-handsfree') setStatus('mãos-livres… 1 s de silêncio cola');
     else if (s === 'meeting') setStatus(msg ? 'reunião — ' + msg : 'gravando reunião — Eu + Participantes');
-    else if (s === 'meeting-processing') setStatus('transcrevendo a reunião…');
+    else if (s === 'meeting-processing') { setStatus('transcrevendo a reunião…'); setCaptionHint('encerrando — transcrevendo o que faltava…'); }
     else if (s === 'meeting-diarize') setStatus('identificando quem falou…');
     else if (s === 'meeting-summary') setStatus('resumindo com IA…');
-    else if (s === 'meeting-done') { setStatus('reunião salva e aberta ✓'); blip(1320, .07); }
+    else if (s === 'meeting-done') { setStatus('reunião salva ✓'); setCaptionHint('reunião salva ✓'); blip(1320, .07); }
     else if (s === 'transcribing') setStatus('transcrevendo…');
     else if (s === 'polishing') setStatus('polindo com IA…');
     else if (s === 'done') { setStatus(msg ? '“' + truncate(msg, 40) + '”' : 'colado'); blip(1320, .07); }
+    else if (s === 'discarded') setStatus('ditado descartado');
     else if (s === 'error') setStatus(msg || 'erro');
     else setStatus('pronto');
   }
 
+  // ---- legendas ao vivo
+  function captionLine(node, seg) {
+    node.replaceChildren();
+    node.classList.toggle('eu', seg.speaker === 'Eu');
+    const sp = document.createElement('span'); sp.className = 'sp'; sp.textContent = seg.speaker + ':';
+    node.appendChild(sp);
+    node.appendChild(document.createTextNode(seg.text));
+  }
+  function setCaptionHint(text) {
+    const cur = $('cap-cur');
+    cur.replaceChildren();
+    const h = document.createElement('span'); h.className = 'cap-hint'; h.textContent = text;
+    cur.appendChild(h);
+    $('cap-prev').replaceChildren();
+  }
+  function clearCaptions() { setCaptionHint('legendas ao vivo — as falas aparecem aqui durante a reunião'); }
+  let capCurSeg = null;
+  function pushCaption(seg) {
+    if (capCurSeg) captionLine($('cap-prev'), capCurSeg);
+    captionLine($('cap-cur'), seg);
+    replay($('cap-cur'), 'swap');
+    capCurSeg = seg;
+  }
+
   listen('isper-state', e => setState(e.payload.state, e.payload.text || e.payload.message));
-  // Transcrição ao vivo: a última fala aparece no lugar do status da reunião.
+  // Transcrição ao vivo: a última fala no lugar do status (modo normal) e
+  // nas duas linhas de legenda (modo legendas).
   listen('isper-live', e => {
     if (state !== 'meeting') return;
     const p = e.payload || {};
+    lastLive = p;
     const who = p.speaker === 'Eu' ? 'Eu: ' : '';
     setStatus(who + truncate(String(p.text || '').trim(), 70));
+    pushCaption({ speaker: p.speaker || 'Participantes', text: String(p.text || '').trim() });
+  });
+  // Momento marcado: confirma por 2 s e volta ao que estava.
+  let flashTimer = null;
+  listen('isper-moment', e => {
+    const at = UI.fmtClock((e.payload && e.payload.at_secs) || 0);
+    statusEl.classList.add('flash');
+    setStatus('★ momento marcado em ' + at);
+    $('cap-prev').replaceChildren();
+    const cur = $('cap-cur'); cur.replaceChildren();
+    const h = document.createElement('span'); h.className = 'cap-hint'; h.style.color = 'var(--warn)'; h.textContent = '★ momento marcado em ' + at;
+    cur.appendChild(h);
+    blip(1100, .05);
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      statusEl.classList.remove('flash');
+      if (state === 'meeting') {
+        if (lastLive) { setStatus((lastLive.speaker === 'Eu' ? 'Eu: ' : '') + truncate(String(lastLive.text || '').trim(), 70)); pushCaption({ speaker: lastLive.speaker, text: String(lastLive.text || '').trim() }); }
+        else { setStatus('gravando reunião — Eu + Participantes'); clearCaptions(); }
+      }
+    }, 2000);
   });
   listen('isper-level', e => {
     bars.push(Math.min(1, e.payload * 14));
     if (bars.length > N) bars.shift();
   });
 
-  // Controles: mini/normal e ocultar. O layout segue o TAMANHO REAL da janela
-  // (fonte única): o botão só pede ao backend para redimensionar; a classe
-  // `mini` vem do evento de resize. Assim conteúdo e janela nunca divergem —
-  // nem se o pedido falhar ou atrasar.
-  function applyMini(mini) {
+  // Controles. O layout segue o TAMANHO REAL da janela (fonte única): os
+  // botões só pedem ao backend para redimensionar; as classes vêm do resize.
+  function applyMode() {
+    const mini = innerWidth < 300, captions = innerWidth >= 600;
     document.body.classList.toggle('mini', mini);
+    document.body.classList.toggle('captions', captions);
     $('mini').textContent = mini ? '+' : '–';
     $('mini').title = mini ? 'voltar ao tamanho normal' : 'modo mini';
+    $('cap').classList.toggle('on', captions);
+    $('cap').title = captions ? 'voltar ao indicador normal' : 'legendas ao vivo (barra larga)';
   }
-  const syncMini = () => applyMini(innerWidth < 300);
-  addEventListener('resize', syncMini);
-  syncMini();
-  $('mini').addEventListener('click', async (ev) => {
-    ev.stopPropagation();
-    const mini = !document.body.classList.contains('mini');
-    $('mini').disabled = true;
-    try { await invoke('overlay_set_mini', { mini }); } catch (_) {}
-    $('mini').disabled = false;
-  });
+  addEventListener('resize', applyMode);
+  applyMode();
+  async function setMode(mode) {
+    for (const id of ['mini', 'cap']) $(id).disabled = true;
+    try { await invoke('overlay_set_mode', { mode }); } catch (_) {}
+    for (const id of ['mini', 'cap']) $(id).disabled = false;
+  }
+  $('mini').addEventListener('click', (ev) => { ev.stopPropagation(); setMode(document.body.classList.contains('mini') ? 'normal' : 'mini'); });
+  $('cap').addEventListener('click', (ev) => { ev.stopPropagation(); setMode(document.body.classList.contains('captions') ? 'normal' : 'captions'); });
   $('hide').addEventListener('click', async (ev) => {
     ev.stopPropagation();
     try { await invoke('overlay_hide'); } catch (_) {}
+  });
+  $('mark').addEventListener('click', async (ev) => {
+    ev.stopPropagation();
+    try { await invoke('mark_moment_cmd'); } catch (_) {}
   });
 
   // Posição lembrada: salva (com debounce) quando o usuário arrasta.

@@ -39,6 +39,9 @@ pub fn summarize_meeting_titled(
 \"Participantes\" (ou \"Participante N\") são as demais vozes.\n\n---\n{excerpt}\n---\n\n\
 Comece a resposta com UMA linha exatamente neste formato, sem markdown:\n\
 TÍTULO: <título curto e específico do assunto da reunião, até 60 caracteres, sem aspas>\n\n\
+Se a transcrição tiver a seção \"Momentos marcados\", são trechos que a pessoa que \
+gravou marcou como importantes durante a reunião: dê prioridade a eles no resumo, \
+nos pontos principais e nos action items.\n\n\
 Depois gere exatamente estas seções, nesta ordem:\n\n\
 ## Resumo\nUm parágrafo objetivo.\n\n\
 ## Pontos principais\nBullets curtos.\n\n\

@@ -26,6 +26,8 @@ pub struct MeetingRow {
     pub participants: i64,
     pub has_summary: bool,
     pub md_path: Option<String>,
+    /// Momentos marcados durante a reunião.
+    pub moments: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -41,6 +43,8 @@ pub struct MeetingDetail {
     pub meeting: MeetingRow,
     pub summary: Option<String>,
     pub segments: Vec<StoredSegment>,
+    /// Instantes marcados (segundos desde o início), em ordem.
+    pub moments: Vec<f32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -70,7 +74,8 @@ pub struct Stats {
 const MEETING_COLUMNS: &str = "m.id, m.title, m.started_at, m.duration_secs,
     (m.summary IS NOT NULL AND m.summary != ''), m.md_path,
     (SELECT COUNT(*) FROM segments s WHERE s.meeting_id = m.id),
-    (SELECT COUNT(DISTINCT s.speaker) FROM segments s WHERE s.meeting_id = m.id AND s.speaker != 'Eu')";
+    (SELECT COUNT(DISTINCT s.speaker) FROM segments s WHERE s.meeting_id = m.id AND s.speaker != 'Eu'),
+    (SELECT COUNT(*) FROM moments mo WHERE mo.meeting_id = m.id)";
 
 fn row_to_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<MeetingRow> {
     Ok(MeetingRow {
@@ -82,6 +87,7 @@ fn row_to_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<MeetingRow> {
         md_path: row.get(5)?,
         segments: row.get(6)?,
         participants: row.get(7)?,
+        moments: row.get(8)?,
     })
 }
 
@@ -136,6 +142,15 @@ impl MeetingStore {
         let _ = conn.execute("ALTER TABLE meetings ADD COLUMN summary TEXT", []);
         let _ = conn.execute("ALTER TABLE meetings ADD COLUMN md_path TEXT", []);
         let _ = conn.execute("ALTER TABLE dictations ADD COLUMN raw_text TEXT", []);
+        // Momentos marcados (★) durante a reunião.
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS moments (
+                id         INTEGER PRIMARY KEY,
+                meeting_id INTEGER NOT NULL REFERENCES meetings(id),
+                at_secs    REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_moments_meeting ON moments(meeting_id);",
+        )?;
         Ok(Self { conn })
     }
 
@@ -168,6 +183,20 @@ impl MeetingStore {
             ])?;
         }
         Ok(id)
+    }
+
+    /// Guarda os momentos marcados durante a reunião (segundos desde o início).
+    pub fn save_moments(&self, meeting_id: i64, moments: &[f32]) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        {
+            let mut stmt =
+                tx.prepare("INSERT INTO moments (meeting_id, at_secs) VALUES (?1, ?2)")?;
+            for at in moments {
+                stmt.execute(params![meeting_id, f64::from(*at)])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
     }
 
     /// Guarda o resumo gerado por IA (Fase 5).
@@ -219,6 +248,10 @@ impl MeetingStore {
     /// Remove a reunião do histórico. O arquivo Markdown NÃO é apagado —
     /// apagar arquivos do usuário é decisão dele, fora daqui.
     pub fn delete_meeting(&self, meeting_id: i64) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM moments WHERE meeting_id = ?1",
+            params![meeting_id],
+        )?;
         self.conn.execute(
             "DELETE FROM segments WHERE meeting_id = ?1",
             params![meeting_id],
@@ -356,10 +389,19 @@ impl MeetingStore {
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut moments_stmt = self
+            .conn
+            .prepare("SELECT at_secs FROM moments WHERE meeting_id = ?1 ORDER BY at_secs")?;
+        let moments = moments_stmt
+            .query_map(params![meeting_id], |r| {
+                r.get::<_, f64>(0).map(|v| v as f32)
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(Some(MeetingDetail {
             meeting,
             summary,
             segments,
+            moments,
         }))
     }
 
@@ -456,6 +498,25 @@ mod tests {
             store.speakers(id).unwrap(),
             vec!["Eu", "Participante 1", "Participante 2"]
         );
+    }
+
+    #[test]
+    fn momentos_sao_salvos_ordenados_e_apagados_com_a_reuniao() {
+        let store = temp_store("moments");
+        let id = store
+            .save("Reunião", "09/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        store.save_moments(id, &[12.5, 3.0]).unwrap();
+        let detail = store.get_meeting(id).unwrap().unwrap();
+        assert_eq!(detail.moments, vec![3.0, 12.5]);
+        assert_eq!(detail.meeting.moments, 2);
+        assert_eq!(store.list_meetings().unwrap()[0].moments, 2);
+        store.delete_meeting(id).unwrap();
+        let left: i64 = store
+            .conn
+            .query_row("SELECT COUNT(*) FROM moments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(left, 0);
     }
 
     #[test]

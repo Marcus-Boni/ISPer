@@ -219,6 +219,7 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
             source,
             input_device: None,
             on_segment: None,
+            dictionary: Vec::new(),
         },
     )
     .context("falha ao abrir captura da reunião")?;
@@ -271,7 +272,10 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
 
     std::fs::create_dir_all("reunioes")?;
     let md_path = format!("reunioes/reuniao-{}.md", now.format("%Y%m%d-%H%M%S"));
-    std::fs::write(&md_path, meeting::to_markdown(&title, &started_at, &result))?;
+    std::fs::write(
+        &md_path,
+        meeting::to_markdown(&title, &started_at, &result, &[]),
+    )?;
 
     let db = MeetingStore::open(std::path::Path::new("isper.db"))?;
     let id = db.save(&title, &started_at, &result, Some(&md_path))?;
@@ -287,7 +291,7 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
                 provider.name(),
                 provider.model()
             );
-            let transcript = meeting::to_markdown(&title, &started_at, &result);
+            let transcript = meeting::to_markdown(&title, &started_at, &result, &[]);
             match isper_llm::summarize_meeting(provider.as_ref(), &transcript) {
                 Ok(summary) => {
                     let block = format!(

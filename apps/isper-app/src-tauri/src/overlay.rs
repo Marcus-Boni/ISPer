@@ -93,23 +93,42 @@ pub(crate) fn overlay_prefs(app: AppHandle) -> OverlayPrefs {
     }
 }
 
-/// Alterna o indicador entre normal e mini, redimensionando a janela e
-/// lembrando a preferência.
+/// Tamanho lógico do indicador para o modo configurado.
+pub(crate) fn overlay_size(cfg: &config::AppConfig) -> (f64, f64) {
+    if cfg.overlay_captions {
+        OVERLAY_CAPTIONS
+    } else if cfg.overlay_mini {
+        OVERLAY_MINI
+    } else {
+        OVERLAY_FULL
+    }
+}
+
+/// Troca o modo do indicador — `normal`, `mini` ou `captions` (legendas ao
+/// vivo) — redimensionando a janela e lembrando a preferência. A página
+/// decide o layout pelo tamanho real, então ela e a janela nunca divergem.
 #[tauri::command]
-pub(crate) fn overlay_set_mini(app: AppHandle, mini: bool) -> Result<(), String> {
-    let (w, h) = if mini { OVERLAY_MINI } else { OVERLAY_FULL };
+pub(crate) fn overlay_set_mode(app: AppHandle, mode: String) -> Result<(), String> {
+    let mode = mode.trim().to_lowercase();
+    if !["normal", "mini", "captions"].contains(&mode.as_str()) {
+        return Err(format!("modo desconhecido: {mode}"));
+    }
+    let state = app.state::<AppState>();
+    let cfg = {
+        let mut c = state.config.lock().unwrap();
+        c.overlay_mini = mode == "mini";
+        c.overlay_captions = mode == "captions";
+        c.clone()
+    };
+    let (w, h) = overlay_size(&cfg);
     if let Some(overlay) = app.get_webview_window("overlay") {
         overlay
             .set_size(tauri::LogicalSize::new(w, h))
             .map_err(|e| e.to_string())?;
     }
-    let state = app.state::<AppState>();
-    let cfg = {
-        let mut c = state.config.lock().unwrap();
-        c.overlay_mini = mini;
-        c.clone()
-    };
-    config::save(&cfg).map_err(|e| e.to_string())
+    config::save(&cfg).map_err(|e| e.to_string())?;
+    notify_status(&app);
+    Ok(())
 }
 
 /// Esconde o indicador (a gravação continua; volta pela bandeja).

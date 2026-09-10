@@ -22,9 +22,12 @@ pub(crate) struct SettingsDto {
     input_device: Option<String>,
     meeting_shortcut: Option<String>,
     active_meeting_shortcut: String,
+    mark_shortcut: Option<String>,
+    active_mark_shortcut: String,
     polish: bool,
     polish_style: String,
     after_meeting: String,
+    voice_commands: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -44,11 +47,15 @@ pub(crate) struct SettingsPatch {
     #[serde(default)]
     meeting_shortcut: Option<String>,
     #[serde(default)]
+    mark_shortcut: Option<String>,
+    #[serde(default)]
     polish: bool,
     #[serde(default)]
     polish_style: Option<String>,
     #[serde(default)]
     after_meeting: Option<String>,
+    #[serde(default = "default_true")]
+    voice_commands: bool,
 }
 
 pub(crate) fn default_true() -> bool {
@@ -220,6 +227,7 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
     let cfg = state.config.lock().unwrap().clone();
     let active_shortcut = state.active_shortcut.lock().unwrap().clone();
     let active_meeting_shortcut = state.active_meeting_shortcut.lock().unwrap().clone();
+    let active_mark_shortcut = state.active_mark_shortcut.lock().unwrap().clone();
     let llm = isper_llm::load_settings();
     let llm_key_present = if llm.provider.is_empty() {
         false
@@ -248,9 +256,12 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         input_device: cfg.input_device,
         meeting_shortcut: cfg.meeting_shortcut,
         active_meeting_shortcut,
+        mark_shortcut: cfg.mark_shortcut,
+        active_mark_shortcut,
         polish: cfg.polish,
         polish_style: cfg.polish_style,
         after_meeting: cfg.after_meeting,
+        voice_commands: cfg.voice_commands,
     })
 }
 
@@ -289,9 +300,11 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         // Preferências do indicador não passam pela tela — preserva as atuais.
         overlay_pos: previous.overlay_pos,
         overlay_mini: previous.overlay_mini,
+        overlay_captions: previous.overlay_captions,
         show_home_on_launch: patch.show_home_on_launch,
         input_device: patch.input_device.filter(|d| !d.trim().is_empty()),
         meeting_shortcut: patch.meeting_shortcut.filter(|s| !s.trim().is_empty()),
+        mark_shortcut: patch.mark_shortcut.filter(|s| !s.trim().is_empty()),
         polish: patch.polish,
         polish_style: {
             let s = patch.polish_style.unwrap_or_default().trim().to_lowercase();
@@ -313,6 +326,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
                 "notify".into()
             }
         },
+        voice_commands: patch.voice_commands,
     };
     config::save(&cfg).map_err(|e| e.to_string())?;
     *state.config.lock().unwrap() = cfg.clone();
@@ -324,7 +338,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
     }
 
     // Reaplica os atalhos na hora — sem reiniciar o app.
-    let (label, _meeting_label) = register_shortcuts(&app, &cfg);
+    let (label, _meeting_label, _mark_label) = register_shortcuts(&app, &cfg);
     set_hint(&app, &label);
     let recording = state.meeting.lock().unwrap().is_some();
     set_meeting_text(&app, &meeting_item_text(&app, recording));

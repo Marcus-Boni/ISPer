@@ -103,13 +103,19 @@ fn main() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
-                    let is_meeting = app
-                        .state::<AppState>()
-                        .meeting_shortcut
-                        .lock()
-                        .unwrap()
-                        .as_ref()
-                        == Some(shortcut);
+                    let (is_meeting, is_mark) = {
+                        let st = app.state::<AppState>();
+                        let is_meeting =
+                            st.meeting_shortcut.lock().unwrap().as_ref() == Some(shortcut);
+                        let is_mark = st.mark_shortcut.lock().unwrap().as_ref() == Some(shortcut);
+                        (is_meeting, is_mark)
+                    };
+                    if is_mark {
+                        if event.state == ShortcutState::Pressed {
+                            let _ = mark_moment(app);
+                        }
+                        return;
+                    }
                     if is_meeting {
                         if event.state == ShortcutState::Pressed {
                             on_meeting_hotkey(app);
@@ -143,8 +149,9 @@ fn main() {
             list_dictations,
             delete_dictation,
             overlay_prefs,
-            overlay_set_mini,
+            overlay_set_mode,
             overlay_hide,
+            mark_moment_cmd,
             overlay_moved,
             list_input_devices,
             live_transcript,
@@ -181,6 +188,9 @@ fn main() {
                 meeting_shortcut: Mutex::new(None),
                 active_meeting_shortcut: Mutex::new(String::new()),
                 last_meeting_toggle: Mutex::new(None),
+                mark_shortcut: Mutex::new(None),
+                active_mark_shortcut: Mutex::new(String::new()),
+                moments: Mutex::new(Vec::new()),
                 live: Mutex::new(Vec::new()),
                 diarizing: Mutex::new(None),
                 tray: Mutex::new(None),
@@ -192,8 +202,9 @@ fn main() {
 
             // Overlay: nunca focável; tamanho (mini/normal) e posição lembrados.
             overlay.set_focusable(false)?;
-            if cfg.overlay_mini {
-                let _ = overlay.set_size(tauri::LogicalSize::new(OVERLAY_MINI.0, OVERLAY_MINI.1));
+            if cfg.overlay_mini || cfg.overlay_captions {
+                let (w, h) = overlay_size(&cfg);
+                let _ = overlay.set_size(tauri::LogicalSize::new(w, h));
             }
             match cfg.overlay_pos {
                 Some((x, y)) => overlay.set_position(tauri::PhysicalPosition::new(x, y))?,
@@ -210,7 +221,7 @@ fn main() {
             }
 
             // Atalhos globais: os preferidos das configurações, senão os primeiros livres.
-            let (label, _meeting_label) = register_shortcuts(app.handle(), &cfg);
+            let (label, _meeting_label, _mark_label) = register_shortcuts(app.handle(), &cfg);
 
             // Ícone na bandeja: clique esquerdo abre o Início; direito, o menu.
             let hint = MenuItem::with_id(app, "hint", hint_text(&label), false, None::<&str>)?;
@@ -345,9 +356,12 @@ fn main() {
                         .map_err(anyhow::Error::from)
                         .and_then(|raw| dictate(&handle, raw));
                     match outcome {
-                        Ok(text) => {
+                        Ok(Some(text)) => {
                             let _ =
                                 handle.emit("isper-state", json!({"state": "done", "text": text}));
+                        }
+                        Ok(None) => {
+                            let _ = handle.emit("isper-state", json!({"state": "discarded"}));
                         }
                         Err(e) => {
                             tracing::warn!("ditado falhou: {e}");

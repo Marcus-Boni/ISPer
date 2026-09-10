@@ -25,6 +25,12 @@ pub(crate) const SHORTCUT_CANDIDATES: [(&str, &str); 4] = [
 pub(crate) const MEETING_SHORTCUT_CANDIDATES: [&str; 3] =
     ["ctrl+alt+m", "ctrl+shift+m", "ctrl+alt+r"];
 
+/// Candidatos ao atalho "marcar momento" (durante a reunião).
+pub(crate) const MARK_SHORTCUT_CANDIDATES: [&str; 3] = ["ctrl+alt+k", "ctrl+shift+k", "ctrl+alt+j"];
+
+/// Dois toques de "marcar momento" mais próximos que isso contam como um.
+pub(crate) const MARK_DEBOUNCE: Duration = Duration::from_millis(1500);
+
 /// Toques do atalho de reunião mais próximos que isso são ignorados (auto-repeat
 /// da tecla e duplo aperto nervoso não podem iniciar e encerrar em sequência).
 pub(crate) const MEETING_HOTKEY_DEBOUNCE: Duration = Duration::from_millis(1200);
@@ -39,6 +45,9 @@ pub(crate) const TAP_THRESHOLD: Duration = Duration::from_millis(350);
 pub(crate) const OVERLAY_FULL: (f64, f64) = (460.0, 104.0);
 
 pub(crate) const OVERLAY_MINI: (f64, f64) = (150.0, 56.0);
+
+/// Modo legendas ao vivo: barra larga com as duas últimas falas.
+pub(crate) const OVERLAY_CAPTIONS: (f64, f64) = (760.0, 132.0);
 
 /// Argumento que o autostart passa ao ISPer: nesse caso ele nasce quieto na
 /// bandeja, sem abrir a tela Início.
@@ -92,6 +101,10 @@ pub(crate) struct AppState {
     pub(crate) meeting_shortcut: Mutex<Option<Shortcut>>,
     pub(crate) active_meeting_shortcut: Mutex<String>,
     pub(crate) last_meeting_toggle: Mutex<Option<Instant>>,
+    pub(crate) mark_shortcut: Mutex<Option<Shortcut>>,
+    pub(crate) active_mark_shortcut: Mutex<String>,
+    /// Momentos marcados na reunião em andamento (segundos desde o início).
+    pub(crate) moments: Mutex<Vec<f32>>,
     /// Falas da reunião em andamento, na ordem em que foram transcritas.
     pub(crate) live: Mutex<Vec<LiveSegment>>,
     /// Reunião cuja diarização está rodando em segundo plano (chip no Início).

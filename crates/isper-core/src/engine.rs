@@ -23,6 +23,9 @@ pub struct TranscriptSegment {
     pub start_secs: f32,
     pub end_secs: f32,
     pub text: String,
+    /// Probabilidade, dada pelo próprio modelo, de o trecho NÃO ser fala
+    /// (0 = fala certa, 1 = silêncio/ruído). Insumo do filtro de alucinações.
+    pub no_speech_prob: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +91,11 @@ impl WhisperEngine {
         params.set_print_progress(false);
         params.set_print_realtime(false);
         params.set_print_timestamps(false);
+        // Anti-alucinação no decoder: suprime tokens que não são fala (♪, [Music]…)
+        // e mantém o fallback do whisper.cpp (temperatura sobe quando a entropia
+        // ou o logprob médio estouram os limiares padrão).
+        params.set_suppress_blank(true);
+        params.set_suppress_nst(true);
 
         let started = Instant::now();
         state
@@ -110,7 +118,18 @@ impl WhisperEngine {
                 start_secs: seg.start_timestamp() as f32 / 100.0,
                 end_secs: seg.end_timestamp() as f32 / 100.0,
                 text: text.trim().to_string(),
+                no_speech_prob: seg.no_speech_probability(),
             });
+        }
+        // Filtro de alucinações (texto de legenda inventado, loops, símbolos,
+        // trechos que o modelo mesmo diz não serem fala).
+        let before = segments.len();
+        let segments = crate::text::filter_hallucinations(segments);
+        if segments.len() != before {
+            tracing::debug!(
+                removed = before - segments.len(),
+                "segmentos descartados pelo filtro de alucinações"
+            );
         }
 
         let text = segments

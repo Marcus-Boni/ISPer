@@ -105,6 +105,7 @@
         <dt>Idioma</dt><dd id="s-lang">…</dd>
         <dt>Microfone</dt><dd id="s-mic">…</dd>
         <dt>Dicionário</dt><dd id="s-dict">…</dd>
+        <dt>Comandos de voz</dt><dd id="s-voice">…</dd>
         <dt>Polimento IA</dt><dd id="s-polish">…</dd>
       </dl>
       <button class="btn btn-link" id="l-dictate">Ajustar atalho, idioma, microfone e dicionário →</button>
@@ -117,9 +118,12 @@
       <div class="row" style="margin-bottom:14px">
         <button class="btn btn-primary" id="b-meeting">Iniciar gravação de reunião</button>
         <span class="timer" id="m-timer"></span>
+        <button class="btn btn-sm" id="b-mark" title="registra o instante para o resumo e a Biblioteca" hidden>★ Marcar momento</button>
+        <label class="switch" id="cap-switch" title="barra larga de legendas no indicador flutuante" hidden><input type="checkbox" id="captions"><span class="track"><span class="thumb"></span></span>Legendas ao vivo</label>
       </div>
       <dl class="specs">
         <dt>Atalho</dt><dd id="s-mshortcut">…</dd>
+        <dt>Marcar momento</dt><dd id="s-markshortcut">…</dd>
         <dt>Áudio</dt><dd id="s-source">…</dd>
         <dt>Falantes</dt><dd id="s-diar">…</dd>
         <dt>Resumo por IA</dt><dd id="s-llm">…</dd>
@@ -220,6 +224,10 @@
     $('s-dict').textContent = st.dictionary_terms
       ? plural(st.dictionary_terms, 'termo', 'termos') + ' que o Whisper deve grafar certo'
       : 'vazio — adicione nomes e siglas que o Whisper costuma errar';
+    const voice = $('s-voice');
+    voice.replaceChildren();
+    if (st.voice_commands) { voice.append('ligados'); voice.appendChild(el('span', 'chip chip-ok', '"nova linha", "ponto final", "apagar isso"…')); }
+    else { voice.append('desligados'); voice.appendChild(el('span', 'chip', 'Configurações → Ditado')); }
     const pol = $('s-polish');
     pol.replaceChildren();
     if (st.polish) {
@@ -249,6 +257,19 @@
     if (wait) wait.remove();
     list.appendChild(liveRow(seg));
     while (list.children.length > LIVE_MAX_ROWS) list.firstElementChild.remove();
+    list.scrollTop = list.scrollHeight;
+  }
+  function liveMoment(atSecs) {
+    const list = $('live-list');
+    const wait = list.querySelector('.live-wait');
+    if (wait) wait.remove();
+    const row = el('div', 'live-row');
+    row.appendChild(el('span', 'ts num', fmtClock(atSecs)));
+    const body = el('span');
+    const star = el('span', 'sp', '★ momento marcado'); star.style.color = 'var(--warn)';
+    body.appendChild(star);
+    row.appendChild(body);
+    list.appendChild(row);
     list.scrollTop = list.scrollHeight;
   }
   async function liveFill() {
@@ -286,12 +307,18 @@
       live.hidden = true;
       $('live-list').replaceChildren();
     }
-    const ms = $('s-mshortcut');
-    ms.replaceChildren();
-    if (st.meeting_shortcut && !st.meeting_shortcut.startsWith('(')) {
-      st.meeting_shortcut.split('+').forEach((k, i) => { if (i) ms.append(' + '); const kb = el('kbd', '', k.trim()); kb.style.cssText = 'font:600 11px var(--font-body);padding:2px 6px;border:1px solid var(--line-2);border-radius:5px;background:var(--panel-2)'; ms.appendChild(kb); });
-      ms.append(' inicia e encerra');
-    } else ms.textContent = 'nenhum atalho livre — só pela bandeja ou por aqui';
+    const keycaps = (dd, label, suffix, fallback) => {
+      dd.replaceChildren();
+      if (label && !label.startsWith('(')) {
+        label.split('+').forEach((k, i) => { if (i) dd.append(' + '); const kb = el('kbd', '', k.trim()); kb.style.cssText = 'font:600 11px var(--font-body);padding:2px 6px;border:1px solid var(--line-2);border-radius:5px;background:var(--panel-2)'; dd.appendChild(kb); });
+        dd.append(' ' + suffix);
+      } else dd.textContent = fallback;
+    };
+    keycaps($('s-mshortcut'), st.meeting_shortcut, 'inicia e encerra', 'nenhum atalho livre — só pela bandeja ou por aqui');
+    keycaps($('s-markshortcut'), st.mark_shortcut, 'durante a reunião, ou o botão ★ aqui e no indicador', 'sem atalho livre — use o botão ★');
+    $('b-mark').hidden = !st.meeting_active;
+    $('cap-switch').hidden = !st.meeting_active;
+    $('captions').checked = !!st.overlay_captions;
     b.disabled = busyMeeting || (!st.meeting_active && !ready);
     b.title = (!st.meeting_active && !ready) ? 'disponível assim que o modelo carregar' : '';
     tick();
@@ -481,6 +508,7 @@
     else if (s === 'transcribing') { dictation = 'transcribing'; pressKeys(false); }
     else if (s === 'polishing') { dictation = 'polishing'; pressKeys(false); }
     else if (s === 'done') { dictation = 'done'; pressKeys(false); dictationTimer = setTimeout(() => { dictation = null; refresh(); }, 1600); }
+    else if (s === 'discarded') { dictation = null; pressKeys(false); toast('ditado descartado por comando de voz', 'info'); }
     else if (s === 'error') { dictation = null; pressKeys(false); if (e.payload.message) toast(e.payload.message, 'err'); }
     else if (s === 'idle') { dictation = null; pressKeys(false); }
     else { pressKeys(false); }  // estados de reunião: o isper-status já dispara o refresh
@@ -489,6 +517,13 @@
 
   // Falas da reunião chegando (bloco a bloco) — só enquanto o painel existe.
   listen('isper-live', (e) => { if (!$('live').hidden) liveAppend(e.payload); });
+  listen('isper-moment', (e) => { if (!$('live').hidden) liveMoment((e.payload && e.payload.at_secs) || 0); toast('★ momento marcado em ' + fmtClock((e.payload && e.payload.at_secs) || 0), 'ok', 1800); });
+  $('b-mark').addEventListener('click', () => invoke('mark_moment_cmd').catch(e => toast('erro: ' + e, 'err')));
+  $('captions').addEventListener('change', (ev) => {
+    invoke('overlay_set_mode', { mode: ev.target.checked ? 'captions' : 'normal' })
+      .then(() => { if (ev.target.checked) invoke('show_indicator_cmd').catch(() => {}); })
+      .catch(e => toast('erro: ' + e, 'err'));
+  });
 
   // Estado sempre atual: evento do backend + voltar para a janela.
   listen('isper-status', refresh);

@@ -146,6 +146,22 @@ o canal "Eu" das reuniões; se desconectar, cai para o padrão), idioma,
 com o Windows. Cada ditado também fica no histórico (`%APPDATA%\ISPer\isper.db`,
 tabela `dictations`).
 
+**Comandos de voz** (ligados por padrão; Configurações → Ditado): diga
+*nova linha*, *novo parágrafo*, *ponto final*, *vírgula*, *ponto de
+interrogação*, *ponto de exclamação*, *dois pontos*, *ponto e vírgula*,
+*reticências*, *abre/fecha parênteses*, *abre/fecha aspas*, *travessão* ou
+*arroba* e o ISPer insere o símbolo, arruma o espaçamento e a maiúscula
+seguinte. No fim do ditado, *apagar isso* descarta tudo (nada é colado) e
+*tudo em maiúsculas* / *tudo em minúsculas* muda a caixa. É processamento
+de texto local, casado por palavra inteira e sem diferenciar acentos.
+
+**Qualidade da transcrição**: o motor suprime tokens que não são fala e filtra
+as alucinações clássicas do Whisper — "Legendas pela comunidade", loops de uma
+palavra repetida, trechos só de símbolos e segmentos que o próprio modelo
+marca como "não é fala" (probabilidade > 0,75). O dicionário pessoal, além de
+orientar o modelo, corrige por semelhança o que ele ainda errar ("ísper" →
+"ISPer", "opt solve" → "OptSolv"), no ditado e nas reuniões.
+
 **Polimento por IA (opcional)**: em Configurações → Inteligência, "Polir os
 ditados com IA antes de colar" tira hesitações ("é", "hã", "tipo"),
 repetições e arruma pontuação usando o provider configurado — estilo "só
@@ -202,6 +218,20 @@ passe o mouse para ver `–` (modo mini: só o ponto + cronômetro da reunião) 
 visível ele fica **acima de qualquer janela**, inclusive de outras "sempre no
 topo" (Teams em chamada, players): o ISPer reafirma essa prioridade ao
 mostrá-lo e a cada 1,5 s, sem roubar o foco do que você está usando.
+
+**Legendas ao vivo**: o botão **CC** do indicador (ou o interruptor
+"Legendas no indicador" na tela Início, durante a reunião) troca o indicador
+para uma barra larga que mostra as duas últimas falas transcritas, com o
+falante — útil para acompanhar uma reunião sem ficar na tela Início. Volta ao
+normal pelo mesmo botão; a preferência é lembrada.
+
+**Momentos marcados**: durante a reunião, **Ctrl+Alt+K** (configurável), o
+botão **★** do indicador ou o "★ Marcar momento" da tela Início marcam o
+instante atual — para "isso é importante, quero voltar aqui". Os momentos
+viram a seção "Momentos marcados" do Markdown e do DOCX (com o trecho da fala
+em curso), chips clicáveis na Biblioteca que rolam até a fala destacada, e
+o resumo por IA dá prioridade a esses trechos. Dois toques em menos de 1,5 s
+contam como um.
 
 **Buscar dentro de uma reunião**: com a reunião aberta, a barra "buscar nesta
 reunião" (ou Ctrl+F) destaca cada ocorrência no resumo e no transcript — sem

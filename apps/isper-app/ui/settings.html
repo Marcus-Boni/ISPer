@@ -41,7 +41,7 @@
 </head>
 <body class="atmos">
 <h1 class="reveal" style="--i:0">Configurações</h1>
-<p class="sub reveal" style="--i:0">Atalhos ativos agora: ditado <b id="active">…</b> · reunião <b id="mactive">…</b></p>
+<p class="sub reveal" style="--i:0">Atalhos ativos agora: ditado <b id="active">…</b> · reunião <b id="mactive">…</b> · marcar momento <b id="kactive">…</b></p>
 
 <div class="card reveal" style="--i:1">
   <h2>Ditado</h2>
@@ -69,7 +69,12 @@
   </select>
   <label class="lbl" for="dict">Dicionário pessoal (um termo por linha)</label>
   <textarea id="dict" class="field" placeholder="OptSolv&#10;ISPer&#10;nomes próprios, siglas, jargões…"></textarea>
-  <p class="hint">Esses termos são mostrados ao Whisper antes de cada transcrição — ele passa a grafá-los corretamente.</p>
+  <p class="hint">Esses termos são mostrados ao Whisper antes de cada transcrição, e o que ele ainda errar por pouco ("ísper", "opt solve") é corrigido para a grafia exata do termo — no ditado e nas reuniões.</p>
+  <label class="lbl">Comandos de voz</label>
+  <div class="stack" style="margin-top:4px">
+    <label class="switch"><input type="checkbox" id="voicecmd"><span class="track"><span class="thumb"></span></span>Interpretar comandos falados no ditado</label>
+  </div>
+  <p class="hint">Diga <b>nova linha</b>, <b>novo parágrafo</b>, <b>ponto final</b>, <b>vírgula</b>, <b>ponto de interrogação</b>, <b>ponto de exclamação</b>, <b>dois pontos</b>, <b>ponto e vírgula</b>, <b>reticências</b>, <b>abre/fecha parênteses</b>, <b>abre/fecha aspas</b>, <b>travessão</b>, <b>arroba</b>. No fim do ditado: <b>apagar isso</b> descarta tudo; <b>tudo em maiúsculas</b> / <b>tudo em minúsculas</b> muda a caixa.</p>
 </div>
 
 <div class="card reveal" style="--i:2">
@@ -91,6 +96,17 @@
     </select>
     <button class="btn" id="cap-mshortcut" title="pressione a combinação que quiser">Gravar atalho</button>
   </div>
+  <label class="lbl" for="markshortcut">Atalho global para marcar um momento (durante a reunião)</label>
+  <div class="row">
+    <select id="markshortcut" class="field">
+      <option value="">(automático — Ctrl+Alt+K ou o próximo livre)</option>
+      <option value="ctrl+alt+k">Ctrl+Alt+K</option>
+      <option value="ctrl+shift+k">Ctrl+Shift+K</option>
+      <option value="ctrl+alt+j">Ctrl+Alt+J</option>
+    </select>
+    <button class="btn" id="cap-markshortcut" title="pressione a combinação que quiser">Gravar atalho</button>
+  </div>
+  <p class="hint">Um toque registra o instante ("★ momento marcado"): os momentos aparecem na Biblioteca, no Markdown e orientam o resumo por IA. Também há o botão ★ no indicador e na tela Início.</p>
   <label class="lbl" for="after">Ao salvar a reunião</label>
   <select id="after" class="field">
     <option value="notify">Notificação do Windows — clicar abre a Biblioteca (padrão)</option>
@@ -223,6 +239,7 @@
   }
   $('cap-shortcut').addEventListener('click', () => captureInto($('shortcut'), $('cap-shortcut')));
   $('cap-mshortcut').addEventListener('click', () => captureInto($('mshortcut'), $('cap-mshortcut')));
+  $('cap-markshortcut').addEventListener('click', () => captureInto($('markshortcut'), $('cap-markshortcut')));
 
   async function loadMics(selected) {
     const sel = $('mic');
@@ -240,12 +257,15 @@
       const s = await invoke('get_settings');
       $('active').textContent = s.active_shortcut;
       $('mactive').textContent = s.active_meeting_shortcut || '(nenhum)';
+      $('kactive').textContent = s.active_mark_shortcut || '(nenhum)';
       setCombo($('shortcut'), s.shortcut || '');
       setCombo($('mshortcut'), s.meeting_shortcut || '');
+      setCombo($('markshortcut'), s.mark_shortcut || '');
       await loadMics(s.input_device || '');
       $('polish').checked = !!s.polish;
       $('pstyle').value = s.polish_style || 'clean';
       $('after').value = s.after_meeting || 'notify';
+      $('voicecmd').checked = s.voice_commands !== false;
       $('lang').value = s.lang || 'pt';
       $('dict').value = s.dictionary || '';
       $('source').value = s.meeting_source || 'system';
@@ -362,15 +382,17 @@
         show_home_on_launch: $('showhome').checked,
         input_device: $('mic').value || null,
         meeting_shortcut: $('mshortcut').value || null,
+        mark_shortcut: $('markshortcut').value || null,
         polish: $('polish').checked,
         polish_style: $('pstyle').value,
         after_meeting: $('after').value,
+        voice_commands: $('voicecmd').checked,
       }});
       $('active').textContent = label;
       UI.busy(b, false);
       UI.flash(b, 'Salvo ✓');
       status('salvo — atalho de ditado ativo: ' + label, 'ok');
-      try { const s = await invoke('get_settings'); $('mactive').textContent = s.active_meeting_shortcut || '(nenhum)'; } catch (_) {}
+      try { const s = await invoke('get_settings'); $('mactive').textContent = s.active_meeting_shortcut || '(nenhum)'; $('kactive').textContent = s.active_mark_shortcut || '(nenhum)'; } catch (_) {}
       setTimeout(() => renderModels(false), 1500);
     } catch (e) {
       UI.busy(b, false);

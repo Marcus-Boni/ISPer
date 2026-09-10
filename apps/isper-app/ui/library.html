@@ -78,6 +78,16 @@
   #detail.filtering .seg:not(.hit), #detail.filtering .sumbox:not(.hit) { display: none; }
   .filtered-note { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; }
 
+  /* Momentos marcados durante a reunião */
+  .moments { display: flex; flex-wrap: wrap; gap: 8px; }
+  .moment { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: var(--r-pill); border: 1px solid rgba(232, 193, 90, .45); background: var(--warn-soft); color: var(--warn); font: 600 12px var(--font-mono); cursor: pointer; transition: transform var(--dur-1), background var(--dur-2); }
+  .moment:hover { background: rgba(232, 193, 90, .25); }
+  .moment:active { transform: scale(.96); }
+  .moment .ex { font: 12px var(--font-body); color: var(--ink-2); max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seg.star { box-shadow: inset 3px 0 0 var(--warn); padding-left: 8px; }
+  .seg.target { animation: target-flash 1.6s ease-out both; }
+  @keyframes target-flash { 0% { background: rgba(232, 193, 90, .35); } 100% { background: transparent; } }
+
   .dict { display: grid; grid-template-columns: 150px 1fr auto auto; gap: 12px; align-items: start; padding: 10px 16px; border-bottom: 1px solid var(--line); transition: background var(--dur-2); }
   .dict:hover { background: var(--panel); }
   .dict .at { color: var(--muted-2); font: 12px var(--font-mono); padding-top: 3px; }
@@ -198,6 +208,7 @@
       m.appendChild(el('span', 'num', fmtClock(r.duration_secs)));
       m.appendChild(el('span', 'badge', plural(r.participants, 'participante', 'participantes')));
       if (r.has_summary) m.appendChild(el('span', 'badge ok', 'resumo IA'));
+      if (r.moments) { const b = el('span', 'badge', '★ ' + r.moments); b.style.color = 'var(--warn)'; b.style.borderColor = 'rgba(232,193,90,.45)'; b.title = plural(r.moments, 'momento marcado', 'momentos marcados'); m.appendChild(b); }
       it.appendChild(m);
       const pick = () => { if (selected === r.id) return; selected = r.id; list.querySelectorAll('.item').forEach(x => x.classList.toggle('on', x === it)); list.dataset.sig = ''; showMeeting(r.id); };
       it.addEventListener('click', pick);
@@ -310,6 +321,29 @@
         sumbox.appendChild(sum);
         d.appendChild(sumbox);
       }
+      // Momentos marcados: chips com horário + começo da fala; clique rola até ela.
+      const moments = det.moments || [];
+      const groupAt = (t) => { let best = null; for (const g of groups) { if (g.start_secs <= t + 0.5) best = g; else break; } return best || groups[0]; };
+      const segEls = new Map(); // group → elemento .seg (preenchido abaixo)
+      if (moments.length) {
+        d.appendChild(el('h3', 'eyebrow', 'Momentos marcados'));
+        const box = el('div', 'moments');
+        for (const at of moments) {
+          const g = groupAt(at);
+          const chip = el('button', 'moment');
+          chip.appendChild(el('span', '', '★ ' + fmtClock(at)));
+          if (g) chip.appendChild(el('span', 'ex', g.text));
+          chip.title = 'ir para este trecho';
+          chip.addEventListener('click', () => {
+            const target = g && segEls.get(g);
+            if (!target) return;
+            target.scrollIntoView({ block: 'center', behavior: UI.reduce() ? 'auto' : 'smooth' });
+            target.classList.remove('target'); void target.offsetWidth; target.classList.add('target');
+          });
+          box.appendChild(chip);
+        }
+        d.appendChild(box);
+      }
       d.appendChild(el('h3', 'eyebrow', 'Transcript'));
 
       // Renomear falante: clique no nome → input; Enter aplica em toda a reunião.
@@ -333,8 +367,10 @@
         input.addEventListener('blur', commit);
       };
 
+      const starred = new Set(moments.map(groupAt).filter(Boolean));
       groups.forEach((g, n) => {
-        const seg = el('div', 'seg');
+        const seg = el('div', 'seg' + (starred.has(g) ? ' star' : ''));
+        segEls.set(g, seg);
         if (n < 14) { seg.classList.add('reveal'); seg.style.setProperty('--i', String(n)); }
         seg.appendChild(el('div', 'ts', fmtClock(g.start_secs)));
         const sp = el('div', 'sp ' + spClass(g.speaker), g.speaker);
