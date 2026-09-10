@@ -17,9 +17,14 @@
 .EXAMPLE
   .\scripts\release.ps1
   .\scripts\release.ps1 -Publish -Notes "Legendas ao vivo, momentos marcados e atualização automática."
+  .\scriptselease.ps1 -Publish -SkipBuild   # so publica o que ja foi gerado
 #>
 param(
   [switch]$Publish,
+  # Reaproveita os artefatos ja gerados em targeteleaseundle
+sis (ex.: o build
+  # passou e so a publicacao falhou).
+  [switch]$SkipBuild,
   [string]$Notes = "",
   [string]$KeyPath = "$env:USERPROFILE\.tauri\isper.key"
 )
@@ -55,6 +60,9 @@ if ($Publish) {
   "Publicando como $login"
 }
 
+if ($SkipBuild) {
+  "ISPer $version - reaproveitando os artefatos ja gerados (-SkipBuild)"
+} else {
 # --- 2) parar o app
 "ISPer $version - parando o app (as DLLs do CUDA ficam travadas enquanto ele roda)"
 Stop-Process -Name isper-app -Force -ErrorAction SilentlyContinue
@@ -73,6 +81,7 @@ try {
 finally {
   Pop-Location
   $env:TAURI_SIGNING_PRIVATE_KEY = $null
+}
 }
 
 # --- 4) latest.json
@@ -103,7 +112,11 @@ $latestPath = Join-Path $bundle 'latest.json'
 # --- 5) publicar
 if ($Publish) {
   $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  gh release create $tag $setup.FullName $sig.FullName $latestPath --title "ISPer $version" --notes $notes
+  # As notas vao por arquivo: o PowerShell 5.1 nao escapa aspas embutidas ao montar a
+  # linha de comando de um exe, e '"nova linha"' nas notas virava argumento solto.
+  $notesFile = Join-Path $bundle 'release-notes.md'
+  [System.IO.File]::WriteAllText($notesFile, $notes, (New-Object System.Text.UTF8Encoding $false))
+  gh release create $tag $setup.FullName $sig.FullName $latestPath --title "ISPer $version" --notes-file $notesFile
   $code = $LASTEXITCODE
   $ErrorActionPreference = $prev
   if ($code -ne 0) { throw "gh release create falhou (codigo $code)" }
