@@ -17,8 +17,27 @@ function Get-IsperExe {
   return Join-Path $script:E2ERoot 'target\release\isper-app.exe'
 }
 
+function Get-IsperWebViews {
+  # Processos msedgewebview2 do ISPer: os que usam a pasta de dados com.isper.desktop.
+  Get-CimInstance Win32_Process -Filter "name='msedgewebview2.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like '*com.isper.desktop*' }
+}
+
 function Stop-Isper {
+  # Fecha o app E os processos do WebView2 dele. Sem isso, os msedgewebview2 da
+  # instância anterior sobrevivem alguns segundos e a instância nova se acopla a
+  # eles — SEM a porta CDP (ECONNREFUSED em 9223, e o teste falha à toa).
   Stop-Process -Name isper-app -Force -ErrorAction SilentlyContinue
+  for ($i = 0; $i -lt 20; $i++) {
+    $alive = @(Get-Process -Name isper-app -ErrorAction SilentlyContinue).Count
+    $webviews = @(Get-IsperWebViews)
+    if ($alive -eq 0 -and $webviews.Count -eq 0) { break }
+    if ($alive -eq 0 -and $i -ge 3) {
+      # O app já saiu; o que sobrou do WebView2 não vai fechar sozinho a tempo.
+      foreach ($w in $webviews) { Stop-Process -Id $w.ProcessId -Force -ErrorAction SilentlyContinue }
+    }
+    Start-Sleep -Milliseconds 500
+  }
   Start-Sleep -Seconds 1
 }
 
