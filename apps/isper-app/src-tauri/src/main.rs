@@ -19,6 +19,7 @@ mod library;
 mod meetings;
 mod notify;
 mod overlay;
+mod paths;
 mod prelude;
 mod settings;
 mod shortcuts;
@@ -86,6 +87,13 @@ fn main() {
     let _log_guard = init_logging();
     // Pânicos vão para o log (o exe não tem stderr): mensagem, local, thread e backtrace.
     isper_core::panics::install_hook(|text| tracing::error!("{text}"));
+    let missing_env = paths::missing_env_vars();
+    if !missing_env.is_empty() {
+        tracing::warn!(
+            "variáveis de ambiente ausentes neste processo: {} — pastas resolvidas pela API do Windows",
+            missing_env.join(", ")
+        );
+    }
     tracing::info!("ISPer {} iniciando", env!("CARGO_PKG_VERSION"));
     if let Err(e) = notify::ensure_registered() {
         tracing::warn!("não consegui registrar o ISPer para notificações: {e}");

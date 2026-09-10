@@ -9,3 +9,5 @@ serde_json = "1"
 sha2 = "0.10"
 thiserror = "2"
 tracing = "0.1"
+# Pastas conhecidas do Windows (SHGetKnownFolderPath) — ver models_dir().
+dirs = "5"

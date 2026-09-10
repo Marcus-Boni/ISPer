@@ -10,6 +10,17 @@ workflow `release.yml` recusa uma tag que não bata com os dois.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-09-10
+
+### Corrigido
+- Modelos, logs, configurações e banco deixaram de depender das variáveis de
+  ambiente `LOCALAPPDATA`/`APPDATA`/`USERPROFILE`: as pastas vêm da API de
+  pastas conhecidas do Windows, com as variáveis como reserva. Uma instância
+  aberta pelo Explorer logo após a atualização para a 0.12.0 nasceu sem
+  `LOCALAPPDATA` e mostrou "nenhum modelo instalado" (e não escreveu no log)
+  com o modelo intacto no disco. O Diagnóstico e o log agora avisam quando
+  uma dessas variáveis falta.
+
 ## [0.12.0] - 2026-09-10
 
 ### Adicionado
@@ -113,6 +124,7 @@ workflow `release.yml` recusa uma tag que não bata com os dois.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/Marcus-Boni/ISPer/releases/tag/v0.11.1

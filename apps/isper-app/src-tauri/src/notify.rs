@@ -26,7 +26,8 @@ pub struct Toast<'a> {
 
 #[cfg(windows)]
 fn icon_path() -> anyhow::Result<PathBuf> {
-    let dir = PathBuf::from(std::env::var("LOCALAPPDATA")?).join("ISPer");
+    let dir = crate::paths::local_dir()
+        .ok_or_else(|| anyhow::anyhow!("pasta local do usuário indisponível"))?;
     std::fs::create_dir_all(&dir)?;
     Ok(dir.join("isper.png"))
 }

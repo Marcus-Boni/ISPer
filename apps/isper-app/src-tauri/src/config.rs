@@ -131,9 +131,7 @@ impl AppConfig {
 }
 
 pub fn path() -> Option<PathBuf> {
-    std::env::var("APPDATA")
-        .ok()
-        .map(|a| PathBuf::from(a).join("ISPer").join("config.toml"))
+    crate::paths::roaming_dir().map(|d| d.join("config.toml"))
 }
 
 pub fn load() -> AppConfig {

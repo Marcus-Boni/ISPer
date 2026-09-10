@@ -462,6 +462,8 @@ pub(crate) struct Diagnostics {
     /// (nome da DLL, encontrada?) — o motivo clássico de "o exe não abre".
     cuda_dlls: Vec<(String, bool)>,
     exe_path: String,
+    /// Variáveis de ambiente ausentes no processo (pastas então vêm da API do Windows).
+    missing_env: Vec<String>,
 }
 
 /// Raio-X para suporte: caminhos, modelo, DLLs do CUDA, dispositivos.
@@ -500,8 +502,8 @@ pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
             .map(|p| p.display().to_string())
             .unwrap_or_default(),
         diarize_installed: isper_diarize::models_installed(),
-        db_path: std::env::var("APPDATA")
-            .map(|a| format!("{a}\\ISPer\\isper.db"))
+        db_path: crate::paths::roaming_dir()
+            .map(|d| d.join("isper.db").display().to_string())
             .unwrap_or_default(),
         config_path: config::path()
             .map(|p| p.display().to_string())
@@ -515,6 +517,7 @@ pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
         input_devices: isper_core::audio::list_input_devices(),
         cuda_dlls,
         exe_path: exe.map(|p| p.display().to_string()).unwrap_or_default(),
+        missing_env: crate::paths::missing_env_vars(),
     }
 }
 

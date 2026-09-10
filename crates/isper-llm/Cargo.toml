@@ -11,3 +11,5 @@ thiserror = "2"
 keyring = { version = "3", features = ["windows-native"] }
 toml = "0.8"
 tracing = "0.1"
+# Pastas conhecidas do Windows — ver config_path().
+dirs = "5"

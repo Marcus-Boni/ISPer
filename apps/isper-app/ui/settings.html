@@ -492,6 +492,7 @@
     add('Config', d.config_path);
     add('Logs', d.logs_dir);
     add('Reuniões', d.meetings_dir);
+    if (d.missing_env && d.missing_env.length) add('Ambiente', 'sem ' + d.missing_env.join(', ') + ' no processo — pastas resolvidas pela API do Windows', 'bad');
     diagText = lines.join('\n');
   }
   $('copydiag').addEventListener('click', async () => {

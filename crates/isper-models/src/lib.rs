@@ -85,9 +85,14 @@ pub fn catalog_entry(file: &str) -> Option<&'static ModelInfo> {
 }
 
 /// Pasta dos modelos: `%LOCALAPPDATA%\ISPer\models` (criada se não existir).
+/// A base vem da API de pastas conhecidas do Windows, com a variável de
+/// ambiente como reserva: um processo pode nascer sem `LOCALAPPDATA` no
+/// ambiente, e o app não pode "perder" os modelos por isso.
 pub fn models_dir() -> Result<PathBuf> {
-    let base = std::env::var("LOCALAPPDATA").map_err(|_| ModelsError::NoAppData)?;
-    let dir = PathBuf::from(base).join("ISPer").join("models");
+    let base = dirs::data_local_dir()
+        .or_else(|| std::env::var_os("LOCALAPPDATA").map(PathBuf::from))
+        .ok_or(ModelsError::NoAppData)?;
+    let dir = base.join("ISPer").join("models");
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
 }

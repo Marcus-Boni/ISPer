@@ -126,14 +126,16 @@ pub(crate) struct LiveSegment {
 }
 
 pub(crate) fn open_store() -> anyhow::Result<MeetingStore> {
-    let dir = PathBuf::from(std::env::var("APPDATA")?).join("ISPer");
+    let dir = crate::paths::roaming_dir()
+        .ok_or_else(|| anyhow::anyhow!("pasta de dados do usuário (AppData) indisponível"))?;
     std::fs::create_dir_all(&dir)?;
     Ok(MeetingStore::open(&dir.join("isper.db"))?)
 }
 
 /// `Documentos\ISPer\Reunioes` — onde os Markdowns das reuniões moram.
 pub(crate) fn meetings_dir() -> anyhow::Result<PathBuf> {
-    let dir = PathBuf::from(std::env::var("USERPROFILE")?)
+    let dir = crate::paths::home_dir()
+        .ok_or_else(|| anyhow::anyhow!("pasta do usuário indisponível"))?
         .join("Documents")
         .join("ISPer")
         .join("Reunioes");
@@ -161,9 +163,7 @@ pub(crate) fn notify_status(app: &AppHandle) {
 
 /// `%LOCALAPPDATA%\ISPer\logs` — um arquivo por dia, 14 dias guardados.
 pub(crate) fn logs_dir() -> Option<PathBuf> {
-    let dir = PathBuf::from(std::env::var("LOCALAPPDATA").ok()?)
-        .join("ISPer")
-        .join("logs");
+    let dir = crate::paths::local_dir()?.join("logs");
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir)
 }

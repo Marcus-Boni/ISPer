@@ -17,10 +17,13 @@ pub struct LlmSettings {
     pub model: Option<String>,
 }
 
+/// `%APPDATA%\ISPer\llm.toml` — pela API de pastas conhecidas do Windows, com
+/// a variável de ambiente como reserva (um processo pode nascer sem ela).
 fn config_path() -> Result<PathBuf> {
-    let appdata =
-        std::env::var("APPDATA").map_err(|_| LlmError::Keyring("APPDATA não definido".into()))?;
-    Ok(PathBuf::from(appdata).join("ISPer").join("llm.toml"))
+    let appdata = dirs::config_dir()
+        .or_else(|| std::env::var_os("APPDATA").map(PathBuf::from))
+        .ok_or_else(|| LlmError::Keyring("APPDATA não definido".into()))?;
+    Ok(appdata.join("ISPer").join("llm.toml"))
 }
 
 /// Carrega as configurações; ausência de arquivo = padrão (não configurado).

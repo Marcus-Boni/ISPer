@@ -1,6 +1,6 @@
 [package]
 name = "isper-app"
-version = "0.12.0"
+version = "0.12.1"
 edition = "2021"
 
 [features]
@@ -18,6 +18,8 @@ tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 # Atualização automática: latest.json assinado (minisign) nas releases do GitHub.
 tauri-plugin-updater = "2"
+# Pastas conhecidas do Windows (ver paths.rs).
+dirs = "5"
 toml = "0.8"
 isper-core = { path = "../../../crates/isper-core" }
 isper-llm = { path = "../../../crates/isper-llm" }
