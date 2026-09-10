@@ -70,6 +70,14 @@
   .live-row.eu .sp { color: var(--accent); }
   .live-row .tx { color: var(--ink-2); }
   .live-wait { color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
+  /* Banner de versão nova (aparece só quando a checagem encontrou uma). */
+  .update { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-color: rgba(240, 126, 114, .45); background: linear-gradient(90deg, var(--accent-soft), transparent 70%); }
+  .update .dot-new { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); flex: none; }
+  .update .text { font-size: 13px; }
+  .update .text b { font-weight: 600; }
+  .update .text .hint { margin: 0 0 0 8px; font-size: 12px; }
+  .update .progress { flex-basis: 100%; }
+  .update .notes { flex-basis: 100%; margin: 0; white-space: pre-wrap; font: 12.5px/1.5 var(--font-sans); color: var(--ink-2); max-height: 160px; overflow-y: auto; border-top: 1px solid var(--line); padding-top: 8px; }
   @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
@@ -94,6 +102,16 @@
 </header>
 
 <main>
+  <section class="card update" id="update" hidden role="status" aria-live="polite">
+    <span class="dot-new" aria-hidden="true"></span>
+    <div class="text"><b>ISPer <span id="upd-ver"></span> disponível</b><span class="hint" id="upd-meta"></span></div>
+    <button class="btn-link" id="upd-notes" hidden>novidades</button>
+    <div class="spacer"></div>
+    <button class="btn btn-ghost btn-sm" id="upd-later" title="Esconder até a próxima abertura do ISPer">Depois</button>
+    <button class="btn btn-primary btn-sm" id="upd-install">Atualizar agora</button>
+    <div class="progress" id="upd-progress" hidden><div class="bar"></div></div>
+    <pre class="notes" id="upd-body" hidden></pre>
+  </section>
   <section class="hero">
     <div class="card reveal" style="--i:0">
       <p class="eyebrow">Ditado em qualquer app</p>
@@ -437,9 +455,50 @@
     UI.stagger(box.children);
   }
 
+  // Banner de versão nova: "Depois" esconde só nesta execução.
+  let updateDismissed = null, shownUpdate = null;
+  function renderUpdate(u) {
+    const box = $('update');
+    shownUpdate = u || null;
+    if (!u || updateDismissed === u.version) { box.hidden = true; return; }
+    $('upd-ver').textContent = u.version;
+    $('upd-meta').textContent = (u.date ? 'publicada em ' + u.date + ' · ' : '') + 'você está na ' + u.current;
+    $('upd-notes').hidden = !u.notes;
+    $('upd-body').textContent = u.notes || '';
+    box.hidden = false;
+  }
+  $('upd-notes').addEventListener('click', () => { $('upd-body').hidden = !$('upd-body').hidden; });
+  $('upd-later').addEventListener('click', () => { if (shownUpdate) updateDismissed = shownUpdate.version; $('update').hidden = true; });
+  $('upd-install').addEventListener('click', async () => {
+    const b = $('upd-install');
+    UI.busy(b, true, 'Baixando…');
+    $('upd-later').disabled = true;
+    $('upd-progress').hidden = false;
+    $('upd-progress').classList.add('indeterminate');
+    try {
+      const r = await invoke('install_update');
+      UI.busy(b, false);
+      $('upd-later').disabled = false;
+      UI.flash(b, 'pronto ✓', 'ok', 4000);
+      toast('atualização: ' + r, 'ok', 5000);
+    } catch (e) {
+      UI.busy(b, false);
+      $('upd-later').disabled = false;
+      $('upd-progress').hidden = true;
+      toast('não consegui atualizar: ' + e, 'err', 6000);
+    }
+  });
+  listen('isper-update-progress', (e) => {
+    const p = e.payload || {}, box = $('upd-progress'), bar = box.querySelector('.bar');
+    if (p.done) { box.classList.remove('indeterminate'); bar.style.width = '100%'; return; }
+    if (p.total) { box.classList.remove('indeterminate'); bar.style.width = Math.min(100, Math.round(p.downloaded / p.total * 100)) + '%'; }
+    else box.classList.add('indeterminate');
+  });
+
   function render(st) {
     current = st;
     $('ver').textContent = 'v' + st.version;
+    renderUpdate(st.update);
     renderStatePill(st);
     renderDictation(st);
     renderMeeting(st);

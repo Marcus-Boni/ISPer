@@ -25,6 +25,8 @@ pub(crate) struct HomeStatus {
     recent: Vec<isper_core::store::MeetingRow>,
     meeting_shortcut: String,
     mark_shortcut: String,
+    /// Versão nova encontrada pela checagem automática (banner).
+    update: Option<UpdateInfo>,
     /// Indicador em modo legendas ao vivo (a tela Início mostra o interruptor ligado).
     overlay_captions: bool,
     polish: bool,
@@ -45,6 +47,7 @@ pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
     let shortcut = state.active_shortcut.lock().unwrap().clone();
     let meeting_shortcut = state.active_meeting_shortcut.lock().unwrap().clone();
     let mark_shortcut = state.active_mark_shortcut.lock().unwrap().clone();
+    let update = state.update_available.lock().unwrap().clone();
     let diarizing_meeting = *state.diarizing.lock().unwrap();
     let meeting_active = state.meeting.lock().unwrap().is_some();
     let meeting_elapsed_secs = state
@@ -104,6 +107,7 @@ pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
         recent,
         meeting_shortcut,
         mark_shortcut,
+        update,
         overlay_captions: cfg.overlay_captions,
         polish: cfg.polish,
         polish_style: cfg.polish_style,

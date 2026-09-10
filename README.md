@@ -14,9 +14,10 @@ crates/isper-diarize/# quem falou o quê (sherpa-onnx: pyannote + 3D-Speaker)
 apps/isper-app/      # app Tauri 2: src-tauri (Rust) + ui (HTML/CSS/JS sem build step)
   src-tauri/src/     # main.rs (bootstrap) + módulos por responsabilidade: state,
                      # shortcuts, tray, dictation, meetings, views, overlay,
-                     # settings, library, home, notify, config (prelude reexporta)
+                     # settings, library, home, notify, updater, config (prelude reexporta)
   ui/assets/         # design system: base.css (tokens, componentes, movimento),
                      # ui.js (toast, count-up, confirmação inline…) e fontes OFL locais
+scripts/release.ps1  # gera o instalador assinado + latest.json e, com -Publish, a release
 models/              # modelos ggml (gitignored — baixar, ver abaixo)
 fixtures/            # WAVs de teste gerados com TTS do Windows (voz pt-BR Maria)
 ```
@@ -321,21 +322,59 @@ cargo run --release -p isper-cli -- file fixtures/fala-16k.wav
 
 Opções: `--model <caminho>` (padrão `models/ggml-small.bin`), `--lang <pt|en|auto>`.
 
-## Instalador (.exe / .msi)
+## Instalador e atualizações
 
-```bash
-cd apps/isper-app && npx --yes @tauri-apps/cli@latest build
+O ISPer é distribuído como instalador NSIS por usuário (sem UAC), gerado por
+[`scripts/release.ps1`](scripts/release.ps1), que também assina o pacote e
+monta o `latest.json` que os ISPers instalados consultam:
+
+```powershell
+.\scripts
+elease.ps1
 ```
 
-Gera `target/release/bundle/nsis/ISPer_<versão>_x64-setup.exe` (~398 MB;
-instalação por usuário, sem UAC) e, com `--bundles msi`, o
-`bundle/msi/ISPer_<versão>_x64_en-US.msi` (o bundler baixa NSIS/WiX do GitHub
-na primeira vez). As DLLs de runtime do CUDA (`cudart`, `cublas`, `cublasLt`
-— ~500 MB, o `cublasLt` sozinho tem 442 MB) vão empacotadas: copie-as de
-`<CUDA>\bin\x64` para `apps/isper-app/src-tauri/resources/cuda/` antes de
-gerar (a pasta é gitignored). **Feche o ISPer antes de gerar** (o bundler
-reescreve o exe). O instalador não traz modelos: no primeiro uso o app abre as
-Configurações para baixar um.
+```powershell
+.\scripts
+elease.ps1 -Publish -Notes "o que mudou nesta versão"
+```
+
+Sem `-Publish` o script só gera os arquivos em `target
+eleaseundle
+sis\`;
+com `-Publish` ele cria a release `v<versão>` no GitHub (via `gh`) e sobe os
+três: `ISPer_<versão>_x64-setup.exe` (~400 MB — as DLLs de runtime do CUDA vão
+dentro; copie `cudart64_13`, `cublas64_13` e `cublasLt64_13` de `<CUDA>ind`
+para `apps/isper-app/src-tauri/resources/cuda/`, pasta gitignored), o `.sig` e
+o `latest.json`. Antes, ele confere que `Cargo.toml` e `tauri.conf.json` têm a
+mesma versão e para o app (o bundler reescreve o exe e as DLLs ficam travadas
+enquanto ele roda). O instalador não traz modelos: no primeiro uso a tela
+Início orienta o download.
+
+**Atualização automática**: o app consulta
+`https://github.com/Marcus-Boni/ISPer/releases/latest/download/latest.json`
+45 s depois de abrir e uma vez por dia (Configurações → Sistema desliga). Se
+houver versão nova, a tela Início mostra um banner com as novidades e um toast
+silencioso avisa; "Atualizar agora" baixa o instalador, **verifica a
+assinatura minisign** com a chave pública embutida (`plugins.updater.pubkey`
+no `tauri.conf.json`) e o executa em modo passivo — o ISPer fecha e volta na
+versão nova. Nada é baixado sem um clique; durante uma reunião a atualização é
+recusada; um download que não bate com a assinatura é descartado. Em
+Configurações → Sistema há "Verificar agora" e "Baixar e instalar".
+
+**Chave de assinatura**: gerada uma vez com
+`npx @tauri-apps/cli@^2 signer generate -w %USERPROFILE%\.tauri\isper.key`.
+A privada (sem senha; para uma com senha, defina
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` antes de rodar o script) fica só nessa
+pasta (fora do repositório — `*.key` está no `.gitignore`) e a pública vai no
+`tauri.conf.json`. Quem tiver a privada
+consegue publicar atualizações que os ISPers instalados aceitam: faça backup
+dela e não a compartilhe. Se ela se perder, gere outra e publique uma versão
+com a nova pública — quem já tem o app instalado reinstala uma vez.
+
+O instalador **não** tem assinatura de código (certificado Authenticode): o
+SmartScreen avisa na primeira execução ("Mais informações → Executar assim
+mesmo"). A assinatura minisign protege a integridade das *atualizações*; não
+substitui o certificado.
 
 ## Logs e diagnóstico
 

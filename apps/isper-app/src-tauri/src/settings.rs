@@ -28,6 +28,8 @@ pub(crate) struct SettingsDto {
     polish_style: String,
     after_meeting: String,
     voice_commands: bool,
+    auto_update_check: bool,
+    version: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -56,6 +58,8 @@ pub(crate) struct SettingsPatch {
     after_meeting: Option<String>,
     #[serde(default = "default_true")]
     voice_commands: bool,
+    #[serde(default = "default_true")]
+    auto_update_check: bool,
 }
 
 pub(crate) fn default_true() -> bool {
@@ -262,6 +266,8 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         polish_style: cfg.polish_style,
         after_meeting: cfg.after_meeting,
         voice_commands: cfg.voice_commands,
+        auto_update_check: cfg.auto_update_check,
+        version: env!("CARGO_PKG_VERSION").to_string(),
     })
 }
 
@@ -301,6 +307,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         overlay_pos: previous.overlay_pos,
         overlay_mini: previous.overlay_mini,
         overlay_captions: previous.overlay_captions,
+        auto_update_check: patch.auto_update_check,
         show_home_on_launch: patch.show_home_on_launch,
         input_device: patch.input_device.filter(|d| !d.trim().is_empty()),
         meeting_shortcut: patch.meeting_shortcut.filter(|s| !s.trim().is_empty()),

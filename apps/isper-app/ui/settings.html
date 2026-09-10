@@ -174,8 +174,17 @@
   <div class="stack" style="margin-top:0">
     <label class="switch"><input type="checkbox" id="autostart"><span class="track"><span class="thumb"></span></span>Iniciar o ISPer junto com o Windows</label>
     <label class="switch"><input type="checkbox" id="showhome"><span class="track"><span class="thumb"></span></span>Mostrar a tela Início ao abrir o ISPer</label>
+    <label class="switch"><input type="checkbox" id="autoupdate"><span class="track"><span class="thumb"></span></span>Avisar quando houver versão nova (ao abrir e uma vez por dia)</label>
   </div>
   <p class="hint">No início com o Windows o ISPer nasce quieto na bandeja; a tela Início também abre com um clique no ícone da bandeja.</p>
+  <label class="lbl">Atualizações</label>
+  <div class="row">
+    <button class="btn btn-sm" id="checkupd" style="flex:0 0 auto">Verificar agora</button>
+    <button class="btn btn-sm btn-primary" id="installupd" style="flex:0 0 auto" hidden>Baixar e instalar</button>
+    <span class="hint" id="updstate" style="margin:0">Versão atual: <span id="curver">…</span>. As atualizações vêm assinadas das releases do ISPer no GitHub; o download só acontece quando você pedir.</span>
+  </div>
+  <div class="progress" id="updprogress" hidden style="margin-top:8px"><div class="bar"></div></div>
+  <pre class="hint" id="updnotes" hidden style="white-space:pre-wrap;margin-top:8px;max-height:140px;overflow-y:auto"></pre>
   <label class="lbl">Diagnóstico</label>
   <div id="diag" class="diag"><div class="skeleton sk-line" style="width:60%"></div></div>
   <div class="row" style="margin-top:10px">
@@ -273,6 +282,9 @@
       $('model').value = s.llm_model || '';
       $('keystate').hidden = !s.llm_key_present;
       $('showhome').checked = s.show_home_on_launch !== false;
+      $('autoupdate').checked = s.auto_update_check !== false;
+      $('curver').textContent = s.version || '?';
+      currentVersion = s.version || '?';
       $('autostart').checked = !!s.autostart;
       $('gpuhint').textContent = s.has_gpu
         ? 'Build com CUDA (GPU NVIDIA): os modelos Large rodam em tempo real.'
@@ -387,6 +399,7 @@
         polish_style: $('pstyle').value,
         after_meeting: $('after').value,
         voice_commands: $('voicecmd').checked,
+        auto_update_check: $('autoupdate').checked,
       }});
       $('active').textContent = label;
       UI.busy(b, false);
@@ -493,6 +506,35 @@
     catch (e) { UI.busy(b, false); status('notificação falhou: ' + e, 'err'); }
   });
   loadDiagnostics();
+
+  // ---- atualizações (Sistema)
+  let currentVersion = '?';
+  $('checkupd').addEventListener('click', async () => {
+    const b = $('checkupd');
+    UI.busy(b, true, 'Verificando…');
+    $('installupd').hidden = true; $('updnotes').hidden = true;
+    try {
+      const u = await invoke('check_update');
+      UI.busy(b, false);
+      if (!u) { UI.flash(b, 'na última versão ✓'); $('updstate').textContent = 'Você já está na última versão (' + currentVersion + ').'; return; }
+      $('updstate').textContent = 'Nova versão ' + u.version + (u.date ? ' (publicada em ' + u.date + ')' : '') + ' — você está na ' + u.current + '.';
+      $('installupd').hidden = false;
+      if (u.notes) { $('updnotes').textContent = u.notes; $('updnotes').hidden = false; }
+    } catch (e) { UI.busy(b, false); status('não consegui verificar: ' + e, 'err'); }
+  });
+  $('installupd').addEventListener('click', async () => {
+    const b = $('installupd');
+    UI.busy(b, true, 'Baixando…');
+    const box = $('updprogress'); box.hidden = false; box.classList.add('indeterminate');
+    try { const r = await invoke('install_update'); UI.busy(b, false); UI.flash(b, 'pronto ✓', 'ok', 4000); status('atualização: ' + r, 'ok'); }
+    catch (e) { UI.busy(b, false); box.hidden = true; status('não consegui atualizar: ' + e, 'err'); }
+  });
+  window.__TAURI__.event.listen('isper-update-progress', (e) => {
+    const p = e.payload || {}, box = $('updprogress'), bar = box.querySelector('.bar');
+    if (p.done) { box.classList.remove('indeterminate'); bar.style.width = '100%'; return; }
+    if (p.total) { box.classList.remove('indeterminate'); bar.style.width = Math.min(100, Math.round(p.downloaded / p.total * 100)) + '%'; }
+    else box.classList.add('indeterminate');
+  });
 
   load();
 </script>

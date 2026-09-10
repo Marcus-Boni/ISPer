@@ -112,6 +112,8 @@ pub(crate) struct AppState {
     /// Ícone da bandeja e suas duas versões (normal / gravando).
     pub(crate) tray: Mutex<Option<TrayIcon>>,
     pub(crate) tray_icons: Mutex<Option<(Image<'static>, Image<'static>)>>,
+    /// Versão nova encontrada pela última checagem (banner do Início).
+    pub(crate) update_available: Mutex<Option<UpdateInfo>>,
 }
 
 /// Uma fala transcrita durante a reunião (evento `isper-live`).

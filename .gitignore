@@ -14,3 +14,7 @@ apps/isper-app/src-tauri/resources/
 *.log
 *.db
 /reunioes
+
+# Chave privada de assinatura das atualizações (fica em %USERPROFILE%\.tauri, nunca aqui)
+*.key
+*.key.pub

@@ -24,6 +24,7 @@ mod settings;
 mod shortcuts;
 mod state;
 mod tray;
+mod updater;
 mod views;
 
 use tauri::menu::{Menu, MenuItem};
@@ -100,6 +101,7 @@ fn main() {
             MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_FLAG]),
         ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -166,6 +168,8 @@ fn main() {
             take_pending_meeting,
             open_settings_window,
             show_indicator_cmd,
+            check_update,
+            install_update,
             set_show_home
         ])
         .setup(|app| {
@@ -195,6 +199,7 @@ fn main() {
                 diarizing: Mutex::new(None),
                 tray: Mutex::new(None),
                 tray_icons: Mutex::new(None),
+                update_available: Mutex::new(None),
             });
             app.state::<AppState>()
                 .audio
@@ -327,6 +332,9 @@ fn main() {
 
             // O modelo (~0,5 GB) carrega em background p/ não travar o startup.
             load_engine_in_background(app.handle().clone());
+
+            // Versão nova? Só consulta (e só se o usuário deixou); instalar é um clique.
+            schedule_background_checks(app.handle());
 
             // Enquanto o indicador estiver visível, reafirma o topo a cada 1,5 s:
             // um SetWindowPos barato que devolve a prioridade sobre qualquer

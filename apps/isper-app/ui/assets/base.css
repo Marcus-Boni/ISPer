@@ -210,6 +210,12 @@ body.atmos::after {
 .dot.burst { animation: ring-burst var(--dur-4) var(--ease-out) both; }
 
 /* ---------------------------------------------------------- skeleton */
+/* Barra de progresso (download da atualização). `.indeterminate` quando o total é desconhecido. */
+.progress { height: 6px; background: var(--panel-2); border-radius: 999px; overflow: hidden; position: relative; }
+.progress > .bar { height: 100%; width: 0; background: var(--accent); border-radius: inherit; transition: width var(--dur-2) linear; }
+.progress.indeterminate > .bar { width: 40%; animation: progress-slide 1.2s ease-in-out infinite; }
+@keyframes progress-slide { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+
 .skeleton { position: relative; overflow: hidden; background: var(--panel-2); border-radius: 6px; }
 .skeleton::after {
   content: ""; position: absolute; inset: 0;

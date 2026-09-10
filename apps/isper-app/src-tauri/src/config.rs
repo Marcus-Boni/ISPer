@@ -60,6 +60,10 @@ pub struct AppConfig {
     /// Indicador no modo "legendas ao vivo" (barra larga com as últimas falas).
     #[serde(default)]
     pub overlay_captions: bool,
+    /// Consultar se há versão nova ao abrir e uma vez por dia (só lê um JSON;
+    /// instalar é sempre um clique do usuário).
+    #[serde(default = "default_true")]
+    pub auto_update_check: bool,
 }
 
 impl Default for AppConfig {
@@ -81,6 +85,7 @@ impl Default for AppConfig {
             voice_commands: true,
             mark_shortcut: default_mark_shortcut(),
             overlay_captions: false,
+            auto_update_check: true,
         }
     }
 }

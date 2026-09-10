@@ -17,5 +17,6 @@ pub(crate) use crate::settings::*;
 pub(crate) use crate::shortcuts::*;
 pub(crate) use crate::state::*;
 pub(crate) use crate::tray::*;
+pub(crate) use crate::updater::*;
 pub(crate) use crate::views::*;
 pub(crate) use crate::{config, notify};
