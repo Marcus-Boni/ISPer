@@ -24,7 +24,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Tag bate com Cargo.toml, tauri.conf.json e tem seção no CHANGELOG
         shell: pwsh
