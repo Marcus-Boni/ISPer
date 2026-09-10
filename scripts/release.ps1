@@ -13,17 +13,16 @@
      (https://github.com/Marcus-Boni/ISPer/releases/latest/download/latest.json).
   5. Com -Publish: `gh release create v<v>` subindo instalador, .sig e latest.json.
      Sem -Publish só gera os arquivos e mostra onde ficaram.
+  -SkipBuild reaproveita os artefatos já gerados (ex.: o build passou e só a
+  publicação falhou).
 
 .EXAMPLE
   .\scripts\release.ps1
   .\scripts\release.ps1 -Publish -Notes "Legendas ao vivo, momentos marcados e atualização automática."
-  .\scriptselease.ps1 -Publish -SkipBuild   # so publica o que ja foi gerado
+  .\scripts\release.ps1 -Publish -SkipBuild
 #>
 param(
   [switch]$Publish,
-  # Reaproveita os artefatos ja gerados em targeteleaseundle
-sis (ex.: o build
-  # passou e so a publicacao falhou).
   [switch]$SkipBuild,
   [string]$Notes = "",
   [string]$KeyPath = "$env:USERPROFILE\.tauri\isper.key"
@@ -63,25 +62,25 @@ if ($Publish) {
 if ($SkipBuild) {
   "ISPer $version - reaproveitando os artefatos ja gerados (-SkipBuild)"
 } else {
-# --- 2) parar o app
-"ISPer $version - parando o app (as DLLs do CUDA ficam travadas enquanto ele roda)"
-Stop-Process -Name isper-app -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 1
+  # --- 2) parar o app
+  "ISPer $version - parando o app (as DLLs do CUDA ficam travadas enquanto ele roda)"
+  Stop-Process -Name isper-app -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Seconds 1
 
-# --- 3) build do instalador com assinatura das atualizacoes
-$env:TAURI_SIGNING_PRIVATE_KEY = (Get-Content $KeyPath -Raw).Trim()
-# `--ci`: sem TAURI_SIGNING_PRIVATE_KEY_PASSWORD, o CLI assume senha vazia em vez de
-# perguntar no terminal (no Windows nao existe variavel de ambiente vazia). Chave com
-# senha? Defina TAURI_SIGNING_PRIVATE_KEY_PASSWORD antes de rodar o script.
-Push-Location $app
-try {
-  npx --yes @tauri-apps/cli@^2 build --bundles nsis --ci
-  if ($LASTEXITCODE -ne 0) { throw "tauri build falhou (codigo $LASTEXITCODE)" }
-}
-finally {
-  Pop-Location
-  $env:TAURI_SIGNING_PRIVATE_KEY = $null
-}
+  # --- 3) build do instalador com assinatura das atualizacoes
+  $env:TAURI_SIGNING_PRIVATE_KEY = (Get-Content $KeyPath -Raw).Trim()
+  # `--ci`: sem TAURI_SIGNING_PRIVATE_KEY_PASSWORD, o CLI assume senha vazia em vez de
+  # perguntar no terminal (no Windows nao existe variavel de ambiente vazia). Chave com
+  # senha? Defina TAURI_SIGNING_PRIVATE_KEY_PASSWORD antes de rodar o script.
+  Push-Location $app
+  try {
+    npx --yes @tauri-apps/cli@^2 build --bundles nsis --ci
+    if ($LASTEXITCODE -ne 0) { throw "tauri build falhou (codigo $LASTEXITCODE)" }
+  }
+  finally {
+    Pop-Location
+    $env:TAURI_SIGNING_PRIVATE_KEY = $null
+  }
 }
 
 # --- 4) latest.json
@@ -111,11 +110,11 @@ $latestPath = Join-Path $bundle 'latest.json'
 
 # --- 5) publicar
 if ($Publish) {
-  $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   # As notas vao por arquivo: o PowerShell 5.1 nao escapa aspas embutidas ao montar a
-  # linha de comando de um exe, e '"nova linha"' nas notas virava argumento solto.
+  # linha de comando de um exe, e aspas dentro das notas viravam argumentos soltos.
   $notesFile = Join-Path $bundle 'release-notes.md'
   [System.IO.File]::WriteAllText($notesFile, $notes, (New-Object System.Text.UTF8Encoding $false))
+  $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   gh release create $tag $setup.FullName $sig.FullName $latestPath --title "ISPer $version" --notes-file $notesFile
   $code = $LASTEXITCODE
   $ErrorActionPreference = $prev
