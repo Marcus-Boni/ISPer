@@ -7,7 +7,7 @@
 
 ---
 
-## Estado atual — 10/09/2026 · v0.12.2
+## Estado atual — 10/09/2026 · v0.13.0
 
 | Fase | Estado | Resumo |
 |---|---|---|

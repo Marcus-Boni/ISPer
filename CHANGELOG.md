@@ -10,6 +10,8 @@ workflow `release.yml` recusa uma tag que não bata com os dois.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-10
+
 ### Adicionado
 - **Detecção de chamada do Teams → "Gravar transcrição?"** (fecha o último
   item da Fase 4). O ISPer sonda as sessões de áudio do Windows a cada 4 s:
