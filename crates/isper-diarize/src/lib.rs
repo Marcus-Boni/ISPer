@@ -25,8 +25,7 @@ pub enum DiarizeError {
 pub type Result<T> = std::result::Result<T, DiarizeError>;
 
 pub const SEGMENTATION_FILE: &str = "pyannote-segmentation-3.0.onnx";
-const SEGMENTATION_URL: &str =
-    "https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx";
+const SEGMENTATION_URL: &str = "https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx";
 pub const EMBEDDING_FILE: &str = "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx";
 const EMBEDDING_URL: &str = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx";
 /// Tamanho aproximado dos dois modelos juntos, para a UI.

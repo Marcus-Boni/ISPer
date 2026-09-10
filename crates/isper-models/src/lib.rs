@@ -19,7 +19,9 @@ pub enum ModelsError {
     NotInCatalog(String),
     #[error("erro HTTP: {0}")]
     Http(String),
-    #[error("checksum inválido para {file}: esperado {expected}, obtido {got} — arquivo descartado")]
+    #[error(
+        "checksum inválido para {file}: esperado {expected}, obtido {got} — arquivo descartado"
+    )]
     Checksum {
         file: String,
         expected: String,
@@ -169,7 +171,13 @@ pub fn download_whisper(file: &str, on_progress: &mut dyn FnMut(u64, u64)) -> Re
     let (expected_sha, expected_size) = hf_expected(file)?;
     let url = format!("https://huggingface.co/{HF_REPO}/resolve/main/{file}");
     let dest = models_dir()?.join(file);
-    download_asset(&url, &dest, expected_sha.as_deref(), expected_size, on_progress)?;
+    download_asset(
+        &url,
+        &dest,
+        expected_sha.as_deref(),
+        expected_size,
+        on_progress,
+    )?;
     Ok(dest)
 }
 
@@ -219,7 +227,10 @@ pub fn download_asset(
         if !got.eq_ignore_ascii_case(expected) {
             let _ = std::fs::remove_file(&part);
             return Err(ModelsError::Checksum {
-                file: dest.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default(),
+                file: dest
+                    .file_name()
+                    .map(|f| f.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
                 expected: expected.to_string(),
                 got,
             });

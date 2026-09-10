@@ -18,8 +18,8 @@ pub struct LlmSettings {
 }
 
 fn config_path() -> Result<PathBuf> {
-    let appdata = std::env::var("APPDATA")
-        .map_err(|_| LlmError::Keyring("APPDATA não definido".into()))?;
+    let appdata =
+        std::env::var("APPDATA").map_err(|_| LlmError::Keyring("APPDATA não definido".into()))?;
     Ok(PathBuf::from(appdata).join("ISPer").join("llm.toml"))
 }
 
@@ -51,8 +51,7 @@ pub fn save_settings(settings: &LlmSettings) -> Result<()> {
 const KEYRING_SERVICE: &str = "ISPer";
 
 fn entry(provider: &str) -> Result<keyring::Entry> {
-    keyring::Entry::new(KEYRING_SERVICE, provider)
-        .map_err(|e| LlmError::Keyring(e.to_string()))
+    keyring::Entry::new(KEYRING_SERVICE, provider).map_err(|e| LlmError::Keyring(e.to_string()))
 }
 
 /// Guarda a chave no Credential Manager do Windows.

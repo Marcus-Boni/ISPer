@@ -1,7 +1,7 @@
 //! Estado compartilhado do app: constantes, `AppState`, `EngineStatus`, caminhos e o aviso `isper-status`.
 
-use crate::prelude::*;
 use crate::config::AppConfig;
+use crate::prelude::*;
 use isper_core::meeting::MeetingHandle;
 use isper_core::recorder;
 use isper_core::store::MeetingStore;
@@ -22,7 +22,8 @@ pub(crate) const SHORTCUT_CANDIDATES: [(&str, &str); 4] = [
 ];
 
 /// Candidatos ao atalho de reunião (iniciar/encerrar a gravação).
-pub(crate) const MEETING_SHORTCUT_CANDIDATES: [&str; 3] = ["ctrl+alt+m", "ctrl+shift+m", "ctrl+alt+r"];
+pub(crate) const MEETING_SHORTCUT_CANDIDATES: [&str; 3] =
+    ["ctrl+alt+m", "ctrl+shift+m", "ctrl+alt+r"];
 
 /// Toques do atalho de reunião mais próximos que isso são ignorados (auto-repeat
 /// da tecla e duplo aperto nervoso não podem iniciar e encerrar em sequência).
@@ -145,7 +146,9 @@ pub(crate) fn notify_status(app: &AppHandle) {
 
 /// `%LOCALAPPDATA%\ISPer\logs` — um arquivo por dia, 14 dias guardados.
 pub(crate) fn logs_dir() -> Option<PathBuf> {
-    let dir = PathBuf::from(std::env::var("LOCALAPPDATA").ok()?).join("ISPer").join("logs");
+    let dir = PathBuf::from(std::env::var("LOCALAPPDATA").ok()?)
+        .join("ISPer")
+        .join("logs");
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir)
 }

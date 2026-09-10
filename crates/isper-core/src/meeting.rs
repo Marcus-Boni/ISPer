@@ -10,11 +10,11 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 
 use crate::audio::RawAudio;
 use crate::loopback::LoopbackSource;
-use crate::{audio, loopback, IsperError, Result, WhisperEngine};
+use crate::{IsperError, Result, WhisperEngine, audio, loopback};
 
 /// Recebe cada fala assim que o bloco dela é transcrito — é a transcrição
 /// "ao vivo": chega com o atraso de um bloco (~20 s) + a inferência.
@@ -291,7 +291,9 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
                 for tx in &stop_txs {
                     let _ = tx.send(());
                 }
-                return Err(IsperError::Audio("timeout abrindo captura da reunião".into()));
+                return Err(IsperError::Audio(
+                    "timeout abrindo captura da reunião".into(),
+                ));
             }
         }
     }
@@ -329,12 +331,12 @@ fn capture_channel(
             let (data_tx, data_rx) = unbounded();
             let (stream, sample_rate, channels) =
                 match audio::open_input_stream_on(input_device.as_deref(), data_tx) {
-                Ok(v) => v,
-                Err(e) => {
-                    let _ = ready_tx.send(Err(e));
-                    return;
-                }
-            };
+                    Ok(v) => v,
+                    Err(e) => {
+                        let _ = ready_tx.send(Err(e));
+                        return;
+                    }
+                };
             if let Err(e) = stream.play() {
                 let _ = ready_tx.send(Err(IsperError::Audio(e.to_string())));
                 return;
@@ -636,7 +638,12 @@ mod tests {
     use super::*;
 
     fn seg(speaker: &'static str, start: f32, end: f32, text: &'static str) -> SegmentRef<'static> {
-        SegmentRef { speaker, start_secs: start, end_secs: end, text }
+        SegmentRef {
+            speaker,
+            start_secs: start,
+            end_secs: end,
+            text,
+        }
     }
 
     #[test]
@@ -651,8 +658,8 @@ mod tests {
     fn separa_por_falante_pausa_longa_e_paragrafo_grande() {
         let g = group_speech([
             seg("Eu", 0.0, 2.0, "a"),
-            seg("Participantes", 2.0, 3.0, "b"), // outro falante
-            seg("Participantes", 8.0, 9.0, "c"), // pausa de 5 s > GROUP_GAP_SECS
+            seg("Participantes", 2.0, 3.0, "b"),  // outro falante
+            seg("Participantes", 8.0, 9.0, "c"),  // pausa de 5 s > GROUP_GAP_SECS
             seg("Participantes", 9.5, 70.0, "d"), // passaria de 60 s no grupo
         ]);
         assert_eq!(g.len(), 4);
@@ -672,7 +679,10 @@ mod tests {
             "Reunião X",
             "09/09/2026 10:00",
             125.0,
-            &[seg("Eu", 0.0, 1.0, "Olá."), seg("Participante 1", 5.0, 6.0, "Oi.")],
+            &[
+                seg("Eu", 0.0, 1.0, "Olá."),
+                seg("Participante 1", 5.0, 6.0, "Oi."),
+            ],
             Some("## Resumo\nCurto."),
         );
         assert!(md.starts_with("# Reunião X\n"));

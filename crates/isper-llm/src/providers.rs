@@ -9,9 +9,9 @@
 
 use std::time::Duration;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use crate::settings::{get_api_key, LlmSettings};
+use crate::settings::{LlmSettings, get_api_key};
 use crate::{LlmError, Result};
 
 /// Um provider de LLM: recebe system + user, devolve texto.
@@ -155,8 +155,12 @@ impl LlmProvider for Claude {
             "messages": [{"role": "user", "content": user}],
             "fallbacks": "default",
         });
-        let resp = post_json("https://api.anthropic.com/v1/messages", &self.headers(), body)
-            .map_err(|e| map_model_error(e, &self.model))?;
+        let resp = post_json(
+            "https://api.anthropic.com/v1/messages",
+            &self.headers(),
+            body,
+        )
+        .map_err(|e| map_model_error(e, &self.model))?;
 
         // Sempre checar stop_reason antes de ler o conteúdo.
         if resp["stop_reason"].as_str() == Some("refusal") {
@@ -183,7 +187,10 @@ impl LlmProvider for Claude {
     }
 
     fn list_models(&self) -> Result<Vec<String>> {
-        let resp = get_json("https://api.anthropic.com/v1/models?limit=100", &self.headers())?;
+        let resp = get_json(
+            "https://api.anthropic.com/v1/models?limit=100",
+            &self.headers(),
+        )?;
         Ok(ids_from_data(&resp))
     }
 }

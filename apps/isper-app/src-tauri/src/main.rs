@@ -13,21 +13,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
-mod state;
-mod shortcuts;
-mod tray;
 mod dictation;
-mod meetings;
-mod views;
-mod overlay;
-mod settings;
-mod library;
 mod home;
+mod library;
+mod meetings;
 mod notify;
+mod overlay;
 mod prelude;
-
-
-
+mod settings;
+mod shortcuts;
+mod state;
+mod tray;
+mod views;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -46,16 +43,25 @@ pub(crate) fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGua
     use tracing_subscriber::EnvFilter;
     // `info` por padrão; `RUST_LOG=debug` (ou `isper_core=trace`) para investigar.
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let stdout = tracing_subscriber::fmt::layer().with_target(false).compact();
+    let stdout = tracing_subscriber::fmt::layer()
+        .with_target(false)
+        .compact();
     let Some(dir) = logs_dir() else {
-        tracing_subscriber::registry().with(filter).with(stdout).init();
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(stdout)
+            .init();
         return None;
     };
     // Retenção: apaga logs com mais de 14 dias.
     if let Ok(entries) = std::fs::read_dir(&dir) {
         let cutoff = std::time::SystemTime::now() - Duration::from_secs(14 * 24 * 3600);
         for e in entries.flatten() {
-            let old = e.metadata().and_then(|m| m.modified()).map(|t| t < cutoff).unwrap_or(false);
+            let old = e
+                .metadata()
+                .and_then(|m| m.modified())
+                .map(|t| t < cutoff)
+                .unwrap_or(false);
             if old && e.file_name().to_string_lossy().starts_with("isper.log") {
                 let _ = std::fs::remove_file(e.path());
             }
@@ -180,7 +186,9 @@ fn main() {
                 tray: Mutex::new(None),
                 tray_icons: Mutex::new(None),
             });
-            app.state::<AppState>().audio.set_device(cfg.input_device.clone());
+            app.state::<AppState>()
+                .audio
+                .set_device(cfg.input_device.clone());
 
             // Overlay: nunca focável; tamanho (mini/normal) e posição lembrados.
             overlay.set_focusable(false)?;
@@ -208,8 +216,13 @@ fn main() {
             let hint = MenuItem::with_id(app, "hint", hint_text(&label), false, None::<&str>)?;
             let home_item =
                 MenuItem::with_id(app, "home", "Abrir o ISPer (Início)", true, None::<&str>)?;
-            let library_item =
-                MenuItem::with_id(app, "library", "Biblioteca de reuniões…", true, None::<&str>)?;
+            let library_item = MenuItem::with_id(
+                app,
+                "library",
+                "Biblioteca de reuniões…",
+                true,
+                None::<&str>,
+            )?;
             let settings_item =
                 MenuItem::with_id(app, "settings", "Configurações…", true, None::<&str>)?;
             let meeting_item = MenuItem::with_id(
@@ -245,7 +258,11 @@ fn main() {
                 *state.hint_item.lock().unwrap() = Some(hint);
             }
             // Duas versões do ícone: a normal e a com o ponto vermelho de gravação.
-            let base_icon = app.default_window_icon().expect("ícone do app").clone().to_owned();
+            let base_icon = app
+                .default_window_icon()
+                .expect("ícone do app")
+                .clone()
+                .to_owned();
             let rec_icon = recording_icon(&base_icon);
             let tray = TrayIconBuilder::new()
                 .icon(base_icon.clone())
@@ -329,8 +346,8 @@ fn main() {
                         .and_then(|raw| dictate(&handle, raw));
                     match outcome {
                         Ok(text) => {
-                            let _ = handle
-                                .emit("isper-state", json!({"state": "done", "text": text}));
+                            let _ =
+                                handle.emit("isper-state", json!({"state": "done", "text": text}));
                         }
                         Err(e) => {
                             tracing::warn!("ditado falhou: {e}");

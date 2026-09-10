@@ -80,7 +80,11 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<String> 
     if raw_text.is_empty() {
         anyhow::bail!("não entendi — tente de novo");
     }
-    tracing::info!(audio_secs, infer_secs = t.infer_secs, "transcrito: {raw_text}");
+    tracing::info!(
+        audio_secs,
+        infer_secs = t.infer_secs,
+        "transcrito: {raw_text}"
+    );
 
     // Polimento opcional por IA (só o texto viaja). Qualquer falha cola o original.
     let text = polish_if_enabled(app, &raw_text);
@@ -112,7 +116,11 @@ pub(crate) fn polish_if_enabled(app: &AppHandle, raw_text: &str) -> String {
             let started = Instant::now();
             match isper_llm::polish_dictation(provider.as_ref(), raw_text, &style) {
                 Ok(polished) => {
-                    tracing::info!(secs = started.elapsed().as_secs_f32(), "ditado polido via {}", provider.name());
+                    tracing::info!(
+                        secs = started.elapsed().as_secs_f32(),
+                        "ditado polido via {}",
+                        provider.name()
+                    );
                     polished
                 }
                 Err(e) => {

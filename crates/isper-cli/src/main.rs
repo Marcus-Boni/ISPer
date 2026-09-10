@@ -16,10 +16,13 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 use isper_core::loopback::LoopbackSource;
 use isper_core::meeting::{self, MeetingOptions};
-use isper_core::{audio, store::MeetingStore, WhisperEngine};
+use isper_core::{WhisperEngine, audio, store::MeetingStore};
 
 #[derive(Parser)]
-#[command(name = "isper-cli", about = "ISPer — transcrição 100% local com Whisper")]
+#[command(
+    name = "isper-cli",
+    about = "ISPer — transcrição 100% local com Whisper"
+)]
 struct Cli {
     /// Caminho de um modelo ggml (padrão: o melhor instalado — ver `models list`)
     #[arg(long)]
@@ -90,7 +93,10 @@ enum LlmCmd {
 }
 
 fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt().with_target(false).compact().init();
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .compact()
+        .init();
     let cli = Cli::parse();
 
     match &cli.cmd {
@@ -110,7 +116,8 @@ fn run_diarize(path: &PathBuf) -> anyhow::Result<()> {
     println!(
         "diarizando {:.1}s (threshold {})...",
         secs,
-        std::env::var("ISPER_DIARIZE_THRESHOLD").unwrap_or_else(|_| isper_diarize::DEFAULT_THRESHOLD.to_string())
+        std::env::var("ISPER_DIARIZE_THRESHOLD")
+            .unwrap_or_else(|_| isper_diarize::DEFAULT_THRESHOLD.to_string())
     );
     let started = std::time::Instant::now();
     let turns = isper_diarize::diarize(&samples)?;
@@ -118,7 +125,12 @@ fn run_diarize(path: &PathBuf) -> anyhow::Result<()> {
     speakers.sort_unstable();
     speakers.dedup();
     for t in &turns {
-        println!("[{:>6.1}s -> {:>6.1}s] Participante {}", t.start, t.end, t.speaker + 1);
+        println!(
+            "[{:>6.1}s -> {:>6.1}s] Participante {}",
+            t.start,
+            t.end,
+            t.speaker + 1
+        );
     }
     println!(
         "{} turno(s), {} falante(s) em {:.1}s",
@@ -141,11 +153,13 @@ fn resolve_model(cli: &Cli) -> anyhow::Result<PathBuf> {
         anyhow::ensure!(p.exists(), "modelo não encontrado: {}", p.display());
         return Ok(p.clone());
     }
-    isper_models::resolve_whisper_model(None, cfg!(feature = "cuda"), &dev_dirs()).ok_or_else(|| {
-        anyhow::anyhow!(
-            "nenhum modelo instalado — baixe um com `isper-cli models download ggml-small.bin`"
-        )
-    })
+    isper_models::resolve_whisper_model(None, cfg!(feature = "cuda"), &dev_dirs()).ok_or_else(
+        || {
+            anyhow::anyhow!(
+                "nenhum modelo instalado — baixe um com `isper-cli models download ggml-small.bin`"
+            )
+        },
+    )
 }
 
 fn run_dictation(cli: &Cli) -> anyhow::Result<()> {
@@ -154,8 +168,9 @@ fn run_dictation(cli: &Cli) -> anyhow::Result<()> {
             println!("== gravando por {seconds}s... fale! ==");
             audio::record(Duration::from_secs(*seconds)).context("falha ao gravar do microfone")?
         }
-        Cmd::File { path } => audio::load_wav(path)
-            .with_context(|| format!("falha ao ler {}", path.display()))?,
+        Cmd::File { path } => {
+            audio::load_wav(path).with_context(|| format!("falha ao ler {}", path.display()))?
+        }
         Cmd::Meeting { .. } | Cmd::Diarize { .. } | Cmd::Models(_) | Cmd::Llm(_) => unreachable!(),
     };
 
@@ -174,7 +189,10 @@ fn run_dictation(cli: &Cli) -> anyhow::Result<()> {
     let t = engine.transcribe(&samples, &cli.lang, None)?;
     println!();
     for seg in &t.segments {
-        println!("[{:>6.2}s -> {:>6.2}s] {}", seg.start_secs, seg.end_secs, seg.text);
+        println!(
+            "[{:>6.2}s -> {:>6.2}s] {}",
+            seg.start_secs, seg.end_secs, seg.text
+        );
     }
     println!();
     println!(">> {}", t.text);
@@ -220,7 +238,10 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
                 let t: Vec<(f32, f32, usize)> =
                     turns.iter().map(|t| (t.start, t.end, t.speaker)).collect();
                 result.apply_speaker_turns(&t);
-                println!("  {} participante(s) identificado(s)", result.distinct_participants());
+                println!(
+                    "  {} participante(s) identificado(s)",
+                    result.distinct_participants()
+                );
             }
             Err(e) => println!("diarização falhou (rótulos genéricos mantidos): {e}"),
         }
@@ -261,7 +282,11 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
     let settings = isper_llm::load_settings();
     match isper_llm::provider_from_settings(&settings) {
         Ok(provider) => {
-            println!("gerando resumo via {} ({})...", provider.name(), provider.model());
+            println!(
+                "gerando resumo via {} ({})...",
+                provider.name(),
+                provider.model()
+            );
             let transcript = meeting::to_markdown(&title, &started_at, &result);
             match isper_llm::summarize_meeting(provider.as_ref(), &transcript) {
                 Ok(summary) => {
@@ -313,7 +338,11 @@ fn run_models(cmd: &ModelsCmd) -> anyhow::Result<()> {
                     let pct = (done * 100 / total) as i64;
                     if pct != last_pct && pct % 2 == 0 {
                         last_pct = pct;
-                        print!("\r  {pct:>3}%  {:>5} / {:>5} MB", done / 1_000_000, total / 1_000_000);
+                        print!(
+                            "\r  {pct:>3}%  {:>5} / {:>5} MB",
+                            done / 1_000_000,
+                            total / 1_000_000
+                        );
                         let _ = std::io::stdout().flush();
                     }
                 }
@@ -327,7 +356,10 @@ fn run_models(cmd: &ModelsCmd) -> anyhow::Result<()> {
             Ok(())
         }
         ModelsCmd::DownloadDiarize => {
-            println!("baixando modelos de diarização para {}...", isper_diarize::models_dir()?.display());
+            println!(
+                "baixando modelos de diarização para {}...",
+                isper_diarize::models_dir()?.display()
+            );
             let mut last_pct: i64 = -1;
             isper_diarize::download_models(&mut |name, done, total| {
                 if total > 0 {
@@ -359,7 +391,10 @@ fn run_llm(cmd: &LlmCmd) -> anyhow::Result<()> {
                 settings.model.as_deref().unwrap_or("(padrão do provider)")
             );
             if isper_llm::get_api_key(&settings.provider)?.is_none() {
-                println!("falta a chave: rode `isper-cli llm set-key {}`", settings.provider);
+                println!(
+                    "falta a chave: rode `isper-cli llm set-key {}`",
+                    settings.provider
+                );
             }
             Ok(())
         }
@@ -391,7 +426,11 @@ fn run_llm(cmd: &LlmCmd) -> anyhow::Result<()> {
                 "provider: {} | modelo: {} | chave: {}",
                 settings.provider,
                 settings.model.as_deref().unwrap_or("(padrão do provider)"),
-                if has_key { "guardada" } else { "FALTANDO (llm set-key)" }
+                if has_key {
+                    "guardada"
+                } else {
+                    "FALTANDO (llm set-key)"
+                }
             );
             Ok(())
         }
@@ -410,9 +449,17 @@ fn run_llm(cmd: &LlmCmd) -> anyhow::Result<()> {
             let settings = isper_llm::load_settings();
             let provider = isper_llm::provider_from_settings(&settings)?;
             let models = provider.list_models()?;
-            println!("modelos disponíveis em {} ({}):", provider.name(), models.len());
+            println!(
+                "modelos disponíveis em {} ({}):",
+                provider.name(),
+                models.len()
+            );
             for m in &models {
-                let mark = if m == provider.model() { "  <- atual" } else { "" };
+                let mark = if m == provider.model() {
+                    "  <- atual"
+                } else {
+                    ""
+                };
                 println!("  {m}{mark}");
             }
             println!("\nuse: isper-cli llm use {} --model <id>", provider.name());

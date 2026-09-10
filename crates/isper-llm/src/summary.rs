@@ -1,8 +1,8 @@
 //! Resumo de reuniões: transforma o transcript em título, resumo, pontos
 //! principais, action items e decisões — sempre em pt-BR, numa única chamada.
 
-use crate::providers::LlmProvider;
 use crate::Result;
+use crate::providers::LlmProvider;
 
 /// Transcripts maiores que isso são encurtados pelo MEIO (início e fim
 /// carregam abertura e encaminhamentos — o miolo é o mais comprimível).
@@ -29,7 +29,10 @@ pub fn summarize_meeting(provider: &dyn LlmProvider, transcript: &str) -> Result
 }
 
 /// Título curto + resumo estruturado, numa chamada só.
-pub fn summarize_meeting_titled(provider: &dyn LlmProvider, transcript: &str) -> Result<MeetingSummary> {
+pub fn summarize_meeting_titled(
+    provider: &dyn LlmProvider,
+    transcript: &str,
+) -> Result<MeetingSummary> {
     let excerpt = shorten_middle(transcript, MAX_TRANSCRIPT_CHARS);
     let user = format!(
         "Abaixo está a transcrição de uma reunião. \"Eu\" é a pessoa que gravou; \
@@ -73,7 +76,9 @@ fn split_title(raw: &str) -> (Option<String>, String) {
             let cut = trimmed.len() - rest.len();
             let mut value = &trimmed[cut..];
             loop {
-                let peeled = value.trim().trim_matches(['*', '"', '“', '”', '\'', '`', ':']);
+                let peeled = value
+                    .trim()
+                    .trim_matches(['*', '"', '“', '”', '\'', '`', ':']);
                 if peeled == value {
                     break;
                 }

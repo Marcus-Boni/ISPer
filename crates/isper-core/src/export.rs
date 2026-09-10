@@ -3,7 +3,7 @@
 //! sem compressão, escrito aqui mesmo (formato estável e pequeno; não vale
 //! uma dependência inteira de ZIP só para isso).
 
-use crate::meeting::{fmt_ts, group_speech, SegmentRef};
+use crate::meeting::{SegmentRef, fmt_ts, group_speech};
 
 /// Legendas SRT: uma entrada por segmento, com o falante na frente do texto.
 pub fn to_srt(segments: &[SegmentRef<'_>]) -> String {
@@ -63,12 +63,20 @@ pub fn to_docx(
             let line = line.trim_start_matches('#').trim();
             body.push_str(&para(&[run(line, false, 22)]));
         }
-        body.push_str(&para(&[run("Resumo gerado por IA — revise antes de usar.", false, 18)]));
+        body.push_str(&para(&[run(
+            "Resumo gerado por IA — revise antes de usar.",
+            false,
+            18,
+        )]));
     }
     body.push_str(&para(&[run("Transcript", true, 26)]));
     for g in group_speech(segments.iter().copied()) {
         body.push_str(&para(&[
-            run(&format!("[{}] {}: ", fmt_ts(g.start_secs), g.speaker), true, 22),
+            run(
+                &format!("[{}] {}: ", fmt_ts(g.start_secs), g.speaker),
+                true,
+                22,
+            ),
             run(&g.text, false, 22),
         ]));
     }
@@ -192,12 +200,20 @@ mod tests {
     use super::*;
 
     fn seg(speaker: &'static str, start: f32, end: f32, text: &'static str) -> SegmentRef<'static> {
-        SegmentRef { speaker, start_secs: start, end_secs: end, text }
+        SegmentRef {
+            speaker,
+            start_secs: start,
+            end_secs: end,
+            text,
+        }
     }
 
     #[test]
     fn srt_numera_e_formata_tempos() {
-        let srt = to_srt(&[seg("Eu", 0.0, 1.25, "Olá."), seg("Participantes", 3661.5, 3662.0, "Oi")]);
+        let srt = to_srt(&[
+            seg("Eu", 0.0, 1.25, "Olá."),
+            seg("Participantes", 3661.5, 3662.0, "Oi"),
+        ]);
         assert!(srt.starts_with("1\n00:00:00,000 --> 00:00:01,250\nEu: Olá.\n\n"));
         assert!(srt.contains("2\n01:01:01,500 --> 01:01:02,000\nParticipantes: Oi\n\n"));
     }
@@ -210,12 +226,21 @@ mod tests {
 
     #[test]
     fn xml_escapa_e_remove_controles() {
-        assert_eq!(xml_escape("a < b & c > \"d\" \u{1}e"), "a &lt; b &amp; c &gt; &quot;d&quot; e");
+        assert_eq!(
+            xml_escape("a < b & c > \"d\" \u{1}e"),
+            "a &lt; b &amp; c &gt; &quot;d&quot; e"
+        );
     }
 
     #[test]
     fn docx_e_um_zip_valido_com_document_xml() {
-        let docx = to_docx("Título & teste", "09/09/2026", 61.0, &[seg("Eu", 0.0, 1.0, "Olá <mundo>")], Some("Resumo."));
+        let docx = to_docx(
+            "Título & teste",
+            "09/09/2026",
+            61.0,
+            &[seg("Eu", 0.0, 1.0, "Olá <mundo>")],
+            Some("Resumo."),
+        );
         assert_eq!(&docx[..4], &[0x50, 0x4b, 0x03, 0x04]);
         let text = String::from_utf8_lossy(&docx);
         assert!(text.contains("word/document.xml"));

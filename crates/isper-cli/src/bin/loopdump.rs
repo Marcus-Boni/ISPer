@@ -7,7 +7,10 @@ use std::time::{Duration, Instant};
 use isper_core::loopback::LoopbackSource;
 
 fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt().with_target(false).compact().init();
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .compact()
+        .init();
     let secs: u64 = std::env::args()
         .nth(1)
         .and_then(|a| a.parse().ok())

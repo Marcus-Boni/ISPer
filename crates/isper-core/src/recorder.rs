@@ -16,9 +16,9 @@
 
 use std::time::{Duration, Instant};
 
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 
-use crate::{audio, IsperError, RawAudio, Result};
+use crate::{IsperError, RawAudio, Result, audio};
 
 /// Silêncio contínuo (depois de ter ouvido fala) que encerra o mãos-livres.
 const VAD_SILENCE: Duration = Duration::from_millis(1200);
@@ -219,8 +219,9 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
                     match audio::open_input_stream_on(device.as_deref(), tx) {
                         Ok((s, rate, ch)) => {
                             if let Err(e) = s.play() {
-                                let _ = event_tx
-                                    .send(RecorderEvent::Finished(Err(IsperError::Audio(e.to_string()))));
+                                let _ = event_tx.send(RecorderEvent::Finished(Err(
+                                    IsperError::Audio(e.to_string()),
+                                )));
                                 continue;
                             }
                             sample_rate = rate;

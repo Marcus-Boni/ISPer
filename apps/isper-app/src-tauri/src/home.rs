@@ -52,7 +52,10 @@ pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
     let (llm_provider, llm_model, llm_key_present) = if llm.provider.is_empty() {
         (None, None, false)
     } else {
-        let key_present = isper_llm::get_api_key(&llm.provider).ok().flatten().is_some();
+        let key_present = isper_llm::get_api_key(&llm.provider)
+            .ok()
+            .flatten()
+            .is_some();
         // Sem modelo escolhido, mostra o padrão do provider (só resolve com chave).
         let model = llm.model.clone().or_else(|| {
             isper_llm::provider_from_settings(&llm)

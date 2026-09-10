@@ -220,7 +220,12 @@ fn open(source: &LoopbackSource) -> Result<Session> {
     })
 }
 
-fn pump(mut session: Session, source: &LoopbackSource, stop_rx: Receiver<()>, tx: Sender<Vec<f32>>) {
+fn pump(
+    mut session: Session,
+    source: &LoopbackSource,
+    stop_rx: Receiver<()>,
+    tx: Sender<Vec<f32>>,
+) {
     let mut bytes: VecDeque<u8> = VecDeque::with_capacity(RATE * BYTES_PER_FRAME);
     let mut last_packet = Instant::now();
 

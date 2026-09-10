@@ -66,7 +66,11 @@ pub fn show(toast: Toast<'_>, on_click: impl FnMut() + Send + 'static) -> anyhow
             .title(toast.title)
             .text1(toast.line1)
             .duration(Duration::Short)
-            .sound(if toast.silent { None } else { Some(Sound::Default) });
+            .sound(if toast.silent {
+                None
+            } else {
+                Some(Sound::Default)
+            });
         if let Some(l2) = toast.line2 {
             t = t.text2(l2);
         }

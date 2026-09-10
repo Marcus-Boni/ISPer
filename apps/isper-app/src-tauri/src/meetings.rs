@@ -164,17 +164,28 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
             let _ = app.emit("isper-state", json!({"state": "meeting-summary"}));
             match isper_llm::summarize_meeting_titled(provider.as_ref(), &md) {
                 Ok(summary) => {
-                    if let Some(t) = summary.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+                    if let Some(t) = summary
+                        .title
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|t| !t.is_empty())
+                    {
                         title = t.to_string();
                         let _ = store.rename_meeting(meeting_id, &title);
                     }
                     let _ = store.set_summary(meeting_id, summary.body.trim());
-                    let labels: Vec<String> = result.segments.iter().map(|s| s.speaker.label()).collect();
+                    let labels: Vec<String> =
+                        result.segments.iter().map(|s| s.speaker.label()).collect();
                     let refs: Vec<SegmentRef<'_>> = result
                         .segments
                         .iter()
                         .zip(&labels)
-                        .map(|(s, l)| SegmentRef { speaker: l, start_secs: s.start_secs, end_secs: s.end_secs, text: &s.text })
+                        .map(|(s, l)| SegmentRef {
+                            speaker: l,
+                            start_secs: s.start_secs,
+                            end_secs: s.end_secs,
+                            text: &s.text,
+                        })
                         .collect();
                     let full = meeting::render_markdown(
                         &title,
@@ -203,7 +214,13 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
     }
 
     // O que fazer com a reunião pronta: notificar (padrão), abrir o .md ou nada.
-    let after = app.state::<AppState>().config.lock().unwrap().after_meeting.clone();
+    let after = app
+        .state::<AppState>()
+        .config
+        .lock()
+        .unwrap()
+        .after_meeting
+        .clone();
     let has_summary = store
         .get_meeting(meeting_id)
         .ok()
@@ -213,7 +230,14 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
     match after.as_str() {
         "open" => open_file(&md_path),
         "silent" => {}
-        _ => notify_meeting_saved(app, meeting_id, &title, result.duration_secs, has_summary, &md_path),
+        _ => notify_meeting_saved(
+            app,
+            meeting_id,
+            &title,
+            result.duration_secs,
+            has_summary,
+            &md_path,
+        ),
     }
 
     // Fase 4: quem falou o quê — em segundo plano, se os modelos existirem.
@@ -268,7 +292,11 @@ pub(crate) fn notify_meeting_saved(
 /// Roda a diarização numa thread, e ao terminar troca "Participantes" por
 /// "Participante N" no banco, regrava o `.md` e avisa as janelas. Enquanto
 /// roda, `diarizing` aponta para a reunião (o Início mostra um chip).
-pub(crate) fn diarize_in_background(app: AppHandle, meeting_id: i64, mut result: meeting::MeetingResult) {
+pub(crate) fn diarize_in_background(
+    app: AppHandle,
+    meeting_id: i64,
+    mut result: meeting::MeetingResult,
+) {
     {
         let state = app.state::<AppState>();
         *state.diarizing.lock().unwrap() = Some(meeting_id);
@@ -276,8 +304,13 @@ pub(crate) fn diarize_in_background(app: AppHandle, meeting_id: i64, mut result:
     notify_status(&app);
     std::thread::spawn(move || {
         let started = Instant::now();
-        let audio_secs = result.others_audio_16k.len() as f32 / isper_core::WHISPER_SAMPLE_RATE as f32;
-        tracing::info!(meeting_id, audio_secs, "diarização iniciada em segundo plano");
+        let audio_secs =
+            result.others_audio_16k.len() as f32 / isper_core::WHISPER_SAMPLE_RATE as f32;
+        tracing::info!(
+            meeting_id,
+            audio_secs,
+            "diarização iniciada em segundo plano"
+        );
         let audio = result.others_audio_f32();
         let outcome = isper_diarize::diarize(&audio);
         drop(audio);
@@ -286,7 +319,8 @@ pub(crate) fn diarize_in_background(app: AppHandle, meeting_id: i64, mut result:
                 let t: Vec<(f32, f32, usize)> =
                     turns.iter().map(|t| (t.start, t.end, t.speaker)).collect();
                 result.apply_speaker_turns(&t);
-                let labels: Vec<String> = result.segments.iter().map(|s| s.speaker.label()).collect();
+                let labels: Vec<String> =
+                    result.segments.iter().map(|s| s.speaker.label()).collect();
                 let pairs: Vec<(f32, &str)> = result
                     .segments
                     .iter()
@@ -309,11 +343,17 @@ pub(crate) fn diarize_in_background(app: AppHandle, meeting_id: i64, mut result:
                             secs = started.elapsed().as_secs_f32(),
                             "{participants} participante(s) identificado(s); {n} falas rotuladas"
                         );
-                        let notify_on = app.state::<AppState>().config.lock().unwrap().after_meeting == "notify";
+                        let notify_on =
+                            app.state::<AppState>().config.lock().unwrap().after_meeting
+                                == "notify";
                         if notify_on && n > 0 {
                             let line2 = format!(
                                 "{} · clique para ver quem falou o quê",
-                                if participants == 1 { "1 participante".to_string() } else { format!("{participants} participantes") }
+                                if participants == 1 {
+                                    "1 participante".to_string()
+                                } else {
+                                    format!("{participants} participantes")
+                                }
                             );
                             let app2 = app.clone();
                             let _ = notify::show(
@@ -347,11 +387,9 @@ pub(crate) fn diarize_in_background(app: AppHandle, meeting_id: i64, mut result:
 /// abrir os dispositivos de áudio leva um instante e a UI não pode congelar.
 #[tauri::command]
 pub(crate) async fn toggle_meeting_cmd(app: AppHandle) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        toggle_meeting(&app).map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || toggle_meeting(&app).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// Falas já transcritas da reunião em andamento (para quem abre o Início no meio).

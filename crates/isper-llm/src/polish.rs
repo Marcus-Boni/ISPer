@@ -1,8 +1,8 @@
 //! Polimento do ditado (opcional, nuvem): remove hesitações e arruma pontuação
 //! antes de colar — só o TEXTO viaja, e qualquer falha devolve o original.
 
-use crate::providers::LlmProvider;
 use crate::Result;
+use crate::providers::LlmProvider;
 
 /// Estilos aceitos em `polish_style`; qualquer outro valor vira `clean`.
 pub const POLISH_STYLES: [&str; 3] = ["clean", "formal", "casual"];
@@ -49,11 +49,17 @@ mod tests {
     fn mantem_original_quando_resposta_nao_serve() {
         assert_eq!(sanitize("bom dia", ""), "bom dia");
         assert_eq!(sanitize("bom dia", &"x".repeat(200)), "bom dia");
-        assert_eq!(sanitize(&"palavra ".repeat(30), "ok"), "palavra ".repeat(30));
+        assert_eq!(
+            sanitize(&"palavra ".repeat(30), "ok"),
+            "palavra ".repeat(30)
+        );
     }
 
     #[test]
     fn aceita_revisao_e_tira_aspas() {
-        assert_eq!(sanitize("é, bom dia, hã, tudo bem?", "\"Bom dia, tudo bem?\""), "Bom dia, tudo bem?");
+        assert_eq!(
+            sanitize("é, bom dia, hã, tudo bem?", "\"Bom dia, tudo bem?\""),
+            "Bom dia, tudo bem?"
+        );
     }
 }

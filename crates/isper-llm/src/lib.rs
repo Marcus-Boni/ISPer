@@ -14,12 +14,12 @@ mod providers;
 mod settings;
 mod summary;
 
-pub use polish::{polish_dictation, POLISH_STYLES};
-pub use providers::{provider_from_settings, LlmProvider};
+pub use polish::{POLISH_STYLES, polish_dictation};
+pub use providers::{LlmProvider, provider_from_settings};
 pub use settings::{
-    delete_api_key, get_api_key, load_settings, save_settings, set_api_key, LlmSettings,
+    LlmSettings, delete_api_key, get_api_key, load_settings, save_settings, set_api_key,
 };
-pub use summary::{summarize_meeting, summarize_meeting_titled, MeetingSummary};
+pub use summary::{MeetingSummary, summarize_meeting, summarize_meeting_titled};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LlmError {
@@ -29,7 +29,9 @@ pub enum LlmError {
     NoApiKey(String),
     #[error("provider desconhecido: '{0}' (opções: claude, groq, gemini)")]
     UnknownProvider(String),
-    #[error("o modelo '{0}' não existe ou sua conta não tem acesso a ele — liste os disponíveis (`isper-cli llm models` ou o botão 'Listar modelos' nas Configurações) e escolha outro")]
+    #[error(
+        "o modelo '{0}' não existe ou sua conta não tem acesso a ele — liste os disponíveis (`isper-cli llm models` ou o botão 'Listar modelos' nas Configurações) e escolha outro"
+    )]
     ModelNotFound(String),
     #[error("erro HTTP da API: {0}")]
     Http(String),

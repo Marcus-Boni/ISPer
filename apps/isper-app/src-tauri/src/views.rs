@@ -98,7 +98,10 @@ pub(crate) async fn open_settings_window(app: AppHandle) -> Result<(), String> {
 /// `async`: comandos síncronos rodam na thread principal, onde criar janela
 /// é proibido no Windows (ver `open_or_focus`).
 #[tauri::command]
-pub(crate) async fn open_library_window(app: AppHandle, meeting: Option<i64>) -> Result<(), String> {
+pub(crate) async fn open_library_window(
+    app: AppHandle,
+    meeting: Option<i64>,
+) -> Result<(), String> {
     match meeting {
         Some(id) => open_library_at(&app, id),
         None => open_library(&app),
@@ -109,5 +112,9 @@ pub(crate) async fn open_library_window(app: AppHandle, meeting: Option<i64>) ->
 /// A Biblioteca chama ao carregar e ao receber `isper-library-select`.
 #[tauri::command]
 pub(crate) fn take_pending_meeting(app: AppHandle) -> Option<i64> {
-    app.state::<AppState>().pending_meeting.lock().unwrap().take()
+    app.state::<AppState>()
+        .pending_meeting
+        .lock()
+        .unwrap()
+        .take()
 }

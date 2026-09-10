@@ -5,7 +5,9 @@ use isper_core::meeting::{self, SegmentRef};
 use isper_core::store::{MeetingDetail, MeetingStore};
 
 #[tauri::command]
-pub(crate) fn list_meetings(query: Option<String>) -> Result<Vec<isper_core::store::MeetingRow>, String> {
+pub(crate) fn list_meetings(
+    query: Option<String>,
+) -> Result<Vec<isper_core::store::MeetingRow>, String> {
     let store = open_store().map_err(|e| e.to_string())?;
     match query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
         Some(q) => store.search_meetings(q),
@@ -28,7 +30,9 @@ pub(crate) fn rename_meeting(app: AppHandle, id: i64, title: String) -> Result<(
         return Err("título vazio".into());
     }
     let store = open_store().map_err(|e| e.to_string())?;
-    store.rename_meeting(id, &title).map_err(|e| e.to_string())?;
+    store
+        .rename_meeting(id, &title)
+        .map_err(|e| e.to_string())?;
     rewrite_markdown(&store, id);
     notify_status(&app);
     Ok(())
@@ -37,7 +41,12 @@ pub(crate) fn rename_meeting(app: AppHandle, id: i64, title: String) -> Result<(
 /// Renomeia um falante nesta reunião ("Participante 1" → "Tatiana") em todos
 /// os segmentos, e regrava o `.md` para acompanhar.
 #[tauri::command]
-pub(crate) fn rename_speaker(app: AppHandle, id: i64, from: String, to: String) -> Result<usize, String> {
+pub(crate) fn rename_speaker(
+    app: AppHandle,
+    id: i64,
+    from: String,
+    to: String,
+) -> Result<usize, String> {
     let to = to.trim();
     if to.is_empty() {
         return Err("nome vazio".into());
@@ -46,7 +55,9 @@ pub(crate) fn rename_speaker(app: AppHandle, id: i64, from: String, to: String) 
         return Err("nome longo demais (máx. 40 caracteres)".into());
     }
     let store = open_store().map_err(|e| e.to_string())?;
-    let n = store.rename_speaker(id, &from, to).map_err(|e| e.to_string())?;
+    let n = store
+        .rename_speaker(id, &from, to)
+        .map_err(|e| e.to_string())?;
     rewrite_markdown(&store, id);
     notify_status(&app);
     Ok(n)
@@ -103,18 +114,32 @@ pub(crate) fn export_meeting(id: i64, format: String) -> Result<String, String> 
         "srt" => ("srt", isper_core::export::to_srt(&refs).into_bytes()),
         "docx" => (
             "docx",
-            isper_core::export::to_docx(&m.title, &m.started_at, m.duration_secs, &refs, detail.summary.as_deref()),
+            isper_core::export::to_docx(
+                &m.title,
+                &m.started_at,
+                m.duration_secs,
+                &refs,
+                detail.summary.as_deref(),
+            ),
         ),
         "md" => (
             "md",
-            meeting::render_markdown(&m.title, &m.started_at, m.duration_secs, &refs, detail.summary.as_deref())
-                .into_bytes(),
+            meeting::render_markdown(
+                &m.title,
+                &m.started_at,
+                m.duration_secs,
+                &refs,
+                detail.summary.as_deref(),
+            )
+            .into_bytes(),
         ),
         other => return Err(format!("formato desconhecido: {other}")),
     };
     let base = match m.md_path.as_deref().map(Path::new) {
         Some(p) if p.parent().is_some() => p.with_extension(""),
-        _ => meetings_dir().map_err(|e| e.to_string())?.join(format!("reuniao-{id}")),
+        _ => meetings_dir()
+            .map_err(|e| e.to_string())?
+            .join(format!("reuniao-{id}")),
     };
     let out = base.with_extension(ext);
     std::fs::write(&out, bytes).map_err(|e| e.to_string())?;
@@ -167,7 +192,9 @@ pub(crate) fn open_meetings_folder() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub(crate) fn list_dictations(query: Option<String>) -> Result<Vec<isper_core::store::DictationRow>, String> {
+pub(crate) fn list_dictations(
+    query: Option<String>,
+) -> Result<Vec<isper_core::store::DictationRow>, String> {
     open_store()
         .map_err(|e| e.to_string())?
         .list_dictations(query.as_deref(), 300)

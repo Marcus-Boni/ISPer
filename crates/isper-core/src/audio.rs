@@ -50,7 +50,9 @@ fn stream_err(e: cpal::Error) {
 pub fn record(duration: Duration) -> Result<RawAudio> {
     let (tx, rx) = crossbeam_channel::unbounded::<Vec<f32>>();
     let (stream, sample_rate, channels) = open_input_stream(tx)?;
-    stream.play().map_err(|e| IsperError::Audio(e.to_string()))?;
+    stream
+        .play()
+        .map_err(|e| IsperError::Audio(e.to_string()))?;
     std::thread::sleep(duration);
     drop(stream); // encerra a captura; o lado `tx` do canal morre junto
 
@@ -174,7 +176,7 @@ pub(crate) fn open_input_stream_on(
         other => {
             return Err(IsperError::Audio(format!(
                 "formato de amostra não suportado: {other:?}"
-            )))
+            )));
         }
     };
 
@@ -276,6 +278,10 @@ mod tests {
         let out = resample_to_16k(&mono, sr).unwrap();
         let expected = 16_000f32;
         let desvio = (out.len() as f32 - expected).abs() / expected;
-        assert!(desvio < 0.05, "esperava ~16000 amostras, veio {}", out.len());
+        assert!(
+            desvio < 0.05,
+            "esperava ~16000 amostras, veio {}",
+            out.len()
+        );
     }
 }

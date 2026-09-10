@@ -1,7 +1,7 @@
 //! Atalhos globais (ditado e reunião): registro com fallback, rótulos e o disparo do atalho de reunião.
 
-use crate::prelude::*;
 use crate::config::AppConfig;
+use crate::prelude::*;
 use std::str::FromStr;
 use tauri_plugin_global_shortcut::Shortcut;
 
@@ -88,7 +88,10 @@ pub(crate) fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, S
         None => (None, "(nenhum atalho livre!)".to_string()),
     };
 
-    let meeting = candidates(cfg.meeting_shortcut.as_deref(), &MEETING_SHORTCUT_CANDIDATES);
+    let meeting = candidates(
+        cfg.meeting_shortcut.as_deref(),
+        &MEETING_SHORTCUT_CANDIDATES,
+    );
     let (meet_sc, meet_label) = match register_first_free(&shortcuts, &meeting, dict_sc.as_ref()) {
         Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
         None => (None, "(nenhum)".to_string()),

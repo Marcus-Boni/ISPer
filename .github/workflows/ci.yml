@@ -40,7 +40,6 @@ jobs:
 
       - name: Formatação
         run: cargo fmt --all -- --check
-        continue-on-error: true # informativo até o código ser formatado por completo
 
       - name: Testes (núcleo, IA, modelos, diarização)
         run: cargo test --release -p isper-core -p isper-llm -p isper-models -p isper-diarize

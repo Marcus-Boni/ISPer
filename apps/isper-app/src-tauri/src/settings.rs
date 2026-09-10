@@ -1,7 +1,7 @@
 //! Configurações: DTOs, modelos Whisper, IA, diagnóstico e aplicação a quente.
 
-use crate::prelude::*;
 use crate::config::AppConfig;
+use crate::prelude::*;
 use isper_core::WhisperEngine;
 use tauri_plugin_autostart::ManagerExt;
 
@@ -73,9 +73,11 @@ pub(crate) fn load_engine_in_background(app: AppHandle) {
     std::thread::spawn(move || {
         set_engine_status(&app, EngineStatus::Loading);
         let preferred = app.state::<AppState>().config.lock().unwrap().model.clone();
-        let Some(path) =
-            isper_models::resolve_whisper_model(preferred.as_deref(), cfg!(feature = "cuda"), &dev_dirs())
-        else {
+        let Some(path) = isper_models::resolve_whisper_model(
+            preferred.as_deref(),
+            cfg!(feature = "cuda"),
+            &dev_dirs(),
+        ) else {
             tracing::warn!("nenhum modelo instalado");
             set_engine_status(&app, EngineStatus::Missing);
             if app.get_webview_window("home").is_none() {
@@ -94,14 +96,21 @@ pub(crate) fn load_engine_in_background(app: AppHandle) {
                 let label = isper_models::catalog_entry(&file)
                     .map(|m| m.label.to_string())
                     .unwrap_or_else(|| {
-                        file.trim_start_matches("ggml-").trim_end_matches(".bin").to_string()
+                        file.trim_start_matches("ggml-")
+                            .trim_end_matches(".bin")
+                            .to_string()
                     });
                 set_engine_status(&app, EngineStatus::Ready { file, label });
                 tracing::info!("modelo Whisper carregado");
             }
             Err(e) => {
                 tracing::error!("falha ao carregar modelo: {e}");
-                set_engine_status(&app, EngineStatus::Failed { message: e.to_string() });
+                set_engine_status(
+                    &app,
+                    EngineStatus::Failed {
+                        message: e.to_string(),
+                    },
+                );
                 let _ = app.emit_to(
                     "overlay",
                     "isper-state",
@@ -121,8 +130,9 @@ pub(crate) fn set_engine_status(app: &AppHandle, status: EngineStatus) {
 pub(crate) fn models_status(app: AppHandle) -> Vec<ModelDto> {
     let preferred = app.state::<AppState>().config.lock().unwrap().model.clone();
     let dirs = dev_dirs();
-    let active_file = isper_models::resolve_whisper_model(preferred.as_deref(), cfg!(feature = "cuda"), &dirs)
-        .and_then(|p| p.file_name().map(|f| f.to_string_lossy().into_owned()));
+    let active_file =
+        isper_models::resolve_whisper_model(preferred.as_deref(), cfg!(feature = "cuda"), &dirs)
+            .and_then(|p| p.file_name().map(|f| f.to_string_lossy().into_owned()));
     isper_models::WHISPER_CATALOG
         .iter()
         .map(|m| ModelDto {
@@ -260,13 +270,21 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         shortcut: patch.shortcut.filter(|s| !s.trim().is_empty()),
         lang: {
             let l = patch.lang.trim().to_lowercase();
-            if l.is_empty() { "pt".into() } else { l }
+            if l.is_empty() {
+                "pt".into()
+            } else {
+                l
+            }
         },
         dictionary,
         model: patch.model.filter(|m| !m.trim().is_empty()),
         meeting_source: {
             let s = patch.meeting_source.trim().to_lowercase();
-            if s.is_empty() { "system".into() } else { s }
+            if s.is_empty() {
+                "system".into()
+            } else {
+                s
+            }
         },
         // Preferências do indicador não passam pela tela — preserva as atuais.
         overlay_pos: previous.overlay_pos,
@@ -277,11 +295,23 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         polish: patch.polish,
         polish_style: {
             let s = patch.polish_style.unwrap_or_default().trim().to_lowercase();
-            if isper_llm::POLISH_STYLES.contains(&s.as_str()) { s } else { "clean".into() }
+            if isper_llm::POLISH_STYLES.contains(&s.as_str()) {
+                s
+            } else {
+                "clean".into()
+            }
         },
         after_meeting: {
-            let s = patch.after_meeting.unwrap_or_default().trim().to_lowercase();
-            if ["notify", "open", "silent"].contains(&s.as_str()) { s } else { "notify".into() }
+            let s = patch
+                .after_meeting
+                .unwrap_or_default()
+                .trim()
+                .to_lowercase();
+            if ["notify", "open", "silent"].contains(&s.as_str()) {
+                s
+            } else {
+                "notify".into()
+            }
         },
     };
     config::save(&cfg).map_err(|e| e.to_string())?;
@@ -350,7 +380,10 @@ pub(crate) async fn test_llm() -> Result<String, String> {
 /// Lista os modelos disponíveis para a chave guardada do provider indicado
 /// (o que está selecionado na tela, mesmo antes de salvar).
 #[tauri::command]
-pub(crate) async fn list_llm_models(provider: String, model: Option<String>) -> Result<Vec<String>, String> {
+pub(crate) async fn list_llm_models(
+    provider: String,
+    model: Option<String>,
+) -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let settings = isper_llm::LlmSettings {
             provider: provider.trim().to_lowercase(),
@@ -416,8 +449,12 @@ pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
     let state = app.state::<AppState>();
     let engine = state.engine_status.lock().unwrap().clone();
     let preferred = state.config.lock().unwrap().model.clone();
-    let model_path = isper_models::resolve_whisper_model(preferred.as_deref(), cfg!(feature = "cuda"), &dev_dirs())
-        .map(|p| p.display().to_string());
+    let model_path = isper_models::resolve_whisper_model(
+        preferred.as_deref(),
+        cfg!(feature = "cuda"),
+        &dev_dirs(),
+    )
+    .map(|p| p.display().to_string());
     let exe = std::env::current_exe().ok();
     let exe_dir = exe.as_ref().and_then(|p| p.parent().map(Path::to_path_buf));
     let path_dirs: Vec<PathBuf> = std::env::var_os("PATH")
@@ -426,7 +463,10 @@ pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
     let cuda_dlls = ["cudart64_13.dll", "cublas64_13.dll", "cublasLt64_13.dll"]
         .iter()
         .map(|dll| {
-            let found = exe_dir.iter().chain(path_dirs.iter()).any(|d| d.join(dll).exists());
+            let found = exe_dir
+                .iter()
+                .chain(path_dirs.iter())
+                .any(|d| d.join(dll).exists());
             (dll.to_string(), found)
         })
         .collect();
@@ -435,12 +475,22 @@ pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
         gpu_build: cfg!(feature = "cuda"),
         engine,
         model_path,
-        models_dir: isper_models::models_dir().map(|p| p.display().to_string()).unwrap_or_default(),
+        models_dir: isper_models::models_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default(),
         diarize_installed: isper_diarize::models_installed(),
-        db_path: std::env::var("APPDATA").map(|a| format!("{a}\\ISPer\\isper.db")).unwrap_or_default(),
-        config_path: config::path().map(|p| p.display().to_string()).unwrap_or_default(),
-        logs_dir: logs_dir().map(|p| p.display().to_string()).unwrap_or_default(),
-        meetings_dir: meetings_dir().map(|p| p.display().to_string()).unwrap_or_default(),
+        db_path: std::env::var("APPDATA")
+            .map(|a| format!("{a}\\ISPer\\isper.db"))
+            .unwrap_or_default(),
+        config_path: config::path()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default(),
+        logs_dir: logs_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default(),
+        meetings_dir: meetings_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default(),
         input_devices: isper_core::audio::list_input_devices(),
         cuda_dlls,
         exe_path: exe.map(|p| p.display().to_string()).unwrap_or_default(),

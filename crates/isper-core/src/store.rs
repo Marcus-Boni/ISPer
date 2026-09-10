@@ -4,11 +4,11 @@
 
 use std::path::Path;
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
-use crate::meeting::MeetingResult;
 use crate::Result;
+use crate::meeting::MeetingResult;
 
 pub struct MeetingStore {
     conn: Connection,
@@ -159,7 +159,13 @@ impl MeetingStore {
              VALUES (?1, ?2, ?3, ?4, ?5)",
         )?;
         for s in &result.segments {
-            stmt.execute(params![id, s.speaker.label(), s.start_secs, s.end_secs, s.text])?;
+            stmt.execute(params![
+                id,
+                s.speaker.label(),
+                s.start_secs,
+                s.end_secs,
+                s.text
+            ])?;
         }
         Ok(id)
     }
@@ -213,8 +219,10 @@ impl MeetingStore {
     /// Remove a reunião do histórico. O arquivo Markdown NÃO é apagado —
     /// apagar arquivos do usuário é decisão dele, fora daqui.
     pub fn delete_meeting(&self, meeting_id: i64) -> Result<()> {
-        self.conn
-            .execute("DELETE FROM segments WHERE meeting_id = ?1", params![meeting_id])?;
+        self.conn.execute(
+            "DELETE FROM segments WHERE meeting_id = ?1",
+            params![meeting_id],
+        )?;
         self.conn
             .execute("DELETE FROM meetings WHERE id = ?1", params![meeting_id])?;
         Ok(())
@@ -269,7 +277,13 @@ impl MeetingStore {
                     COALESCE(SUM(summary IS NOT NULL AND summary != ''), 0)
              FROM meetings",
             [],
-            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, f64>(1)?, r.get::<_, i64>(2)?)),
+            |r| {
+                Ok((
+                    r.get::<_, i64>(0)?,
+                    r.get::<_, f64>(1)?,
+                    r.get::<_, i64>(2)?,
+                ))
+            },
         )?;
         let (dictations, dictation_secs, dictation_words) = self.conn.query_row(
             "SELECT COUNT(*),
@@ -396,7 +410,8 @@ mod tests {
     use crate::meeting::{MeetingResult, MeetingSegment, Speaker};
 
     fn temp_store(name: &str) -> MeetingStore {
-        let path = std::env::temp_dir().join(format!("isper-store-test-{name}-{}.db", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("isper-store-test-{name}-{}.db", std::process::id()));
         let _ = std::fs::remove_file(&path);
         MeetingStore::open(&path).expect("abrir banco temporário")
     }
@@ -423,29 +438,65 @@ mod tests {
     #[test]
     fn relabel_troca_so_os_segmentos_casados() {
         let store = temp_store("relabel");
-        let id = store.save("Reunião", "09/09/2026 10:00", &sample_result(), None).unwrap();
+        let id = store
+            .save("Reunião", "09/09/2026 10:00", &sample_result(), None)
+            .unwrap();
         let n = store
-            .relabel_segments(id, &[(2.0, "Participante 1"), (4.5, "Participante 2"), (99.0, "Ninguém")])
+            .relabel_segments(
+                id,
+                &[
+                    (2.0, "Participante 1"),
+                    (4.5, "Participante 2"),
+                    (99.0, "Ninguém"),
+                ],
+            )
             .unwrap();
         assert_eq!(n, 2);
-        assert_eq!(store.speakers(id).unwrap(), vec!["Eu", "Participante 1", "Participante 2"]);
+        assert_eq!(
+            store.speakers(id).unwrap(),
+            vec!["Eu", "Participante 1", "Participante 2"]
+        );
     }
 
     #[test]
     fn rename_speaker_vale_para_a_reuniao_inteira() {
         let store = temp_store("rename");
-        let id = store.save("Reunião", "09/09/2026 10:00", &sample_result(), None).unwrap();
-        assert_eq!(store.rename_speaker(id, "Participantes", "Tatiana").unwrap(), 2);
+        let id = store
+            .save("Reunião", "09/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        assert_eq!(
+            store
+                .rename_speaker(id, "Participantes", "Tatiana")
+                .unwrap(),
+            2
+        );
         let detail = store.get_meeting(id).unwrap().unwrap();
-        assert!(detail.segments.iter().filter(|s| s.speaker == "Tatiana").count() == 2);
+        assert!(
+            detail
+                .segments
+                .iter()
+                .filter(|s| s.speaker == "Tatiana")
+                .count()
+                == 2
+        );
         assert_eq!(detail.meeting.participants, 1);
     }
 
     #[test]
     fn ditado_guarda_o_original_quando_polido() {
         let store = temp_store("dictation");
-        store.save_dictation("09/09/2026 10:00:00", "Bom dia, tudo bem?", Some("é bom dia hã tudo bem"), 2.0, 0.3).unwrap();
-        store.save_dictation("09/09/2026 10:00:05", "sem polimento", None, 1.0, 0.2).unwrap();
+        store
+            .save_dictation(
+                "09/09/2026 10:00:00",
+                "Bom dia, tudo bem?",
+                Some("é bom dia hã tudo bem"),
+                2.0,
+                0.3,
+            )
+            .unwrap();
+        store
+            .save_dictation("09/09/2026 10:00:05", "sem polimento", None, 1.0, 0.2)
+            .unwrap();
         let rows = store.list_dictations(None, 10).unwrap();
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[1].raw_text.as_deref(), Some("é bom dia hã tudo bem"));
