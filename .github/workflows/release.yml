@@ -1,0 +1,50 @@
+# Validação da release por tag. Os instaladores (GPU/CUDA e CPU) são gerados e
+# assinados localmente por scripts/release.ps1 — o toolkit CUDA e os binários
+# pré-compilados do sherpa-onnx não compilam/ligam nos runners do GitHub. Quando
+# o script cria a release (e a tag v<versão>), este workflow confere que a tag
+# bate com os manifests e com o CHANGELOG e roda a mesma bateria do CI.
+#
+# Também pode ser disparado à mão (workflow_dispatch) para validar uma versão
+# antes de lançá-la.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag a validar (ex.: v0.12.0)'
+        required: true
+        type: string
+
+jobs:
+  consistencia:
+    name: tag × manifests × CHANGELOG
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Tag bate com Cargo.toml, tauri.conf.json e tem seção no CHANGELOG
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          $tag = if ($env:EVENT_NAME -eq 'push') { $env:REF_NAME } else { $env:INPUT_TAG }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "tag '$tag' fora do padrao vMAJOR.MINOR.PATCH" }
+          $version = $tag.TrimStart('v')
+          $conf = (Get-Content apps/isper-app/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $cargo = (Select-String -Path apps/isper-app/src-tauri/Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          if ($conf -ne $version) { throw "tauri.conf.json esta em $conf, a tag e $tag" }
+          if ($cargo -ne $version) { throw "Cargo.toml esta em $cargo, a tag e $tag" }
+          $pattern = '^## \[' + [regex]::Escape($version) + '\]'
+          if (-not (Select-String -Path CHANGELOG.md -Pattern $pattern -Quiet)) { throw "CHANGELOG.md sem a secao '## [$version]'" }
+          "Tag $tag consistente: manifests em $version e CHANGELOG com a secao." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+  ci:
+    name: fmt · test · check
+    needs: consistencia
+    uses: ./.github/workflows/ci.yml

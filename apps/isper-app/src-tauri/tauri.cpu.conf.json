@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/Marcus-Boni/ISPer/releases/latest/download/latest-cpu.json"
+      ]
+    }
+  }
+}

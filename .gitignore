@@ -1,5 +1,9 @@
-# Artefatos de build do Rust
+# Artefatos de build do Rust (target-cpu: variante sem CUDA do instalador)
 /target
+/target-cpu
+
+# Instaladores e manifests gerados por scripts/release.ps1
+/dist
 
 # Modelos Whisper (grandes demais para o git — baixados sob demanda)
 /models

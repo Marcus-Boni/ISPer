@@ -17,7 +17,9 @@ apps/isper-app/      # app Tauri 2: src-tauri (Rust) + ui (HTML/CSS/JS sem build
                      # settings, library, home, notify, updater, config (prelude reexporta)
   ui/assets/         # design system: base.css (tokens, componentes, movimento),
                      # ui.js (toast, count-up, confirmação inline…) e fontes OFL locais
-scripts/release.ps1  # gera o instalador assinado + latest.json e, com -Publish, a release
+scripts/release.ps1  # instaladores GPU e CPU assinados + latest*.json e, com -Publish, a release
+tools/e2e/           # testes ponta a ponta no app real via CDP (smoke, reunião, atualizador)
+CHANGELOG.md         # mudanças por versão; a seção da versão vira as notas da release
 models/              # modelos ggml (gitignored — baixar, ver abaixo)
 fixtures/            # WAVs de teste gerados com TTS do Windows (voz pt-BR Maria)
 ```
@@ -324,60 +326,76 @@ Opções: `--model <caminho>` (padrão `models/ggml-small.bin`), `--lang <pt|en|
 
 ## Instalador e atualizações
 
-O ISPer é distribuído como instalador NSIS por usuário (sem UAC), gerado por
-[`scripts/release.ps1`](scripts/release.ps1), que também assina o pacote e
-monta o `latest.json` que os ISPers instalados consultam:
+O ISPer é distribuído em duas variantes de instalador NSIS por usuário (sem
+UAC), geradas e assinadas por [`scripts/release.ps1`](scripts/release.ps1):
+
+| Variante | Arquivo | Para quem | Atualiza por |
+|---|---|---|---|
+| GPU (CUDA) | `ISPer_<v>_x64-setup.exe` (~400 MB, DLLs do CUDA dentro) | GPU NVIDIA | `latest.json` |
+| CPU | `ISPer_<v>_x64-cpu-setup.exe` (~50 MB) | qualquer PC x64 com AVX2 | `latest-cpu.json` |
+
+As duas trazem as DLLs do sherpa-onnx (identificação de falantes) e o runtime
+do Visual C++ ao lado do exe, então uma máquina limpa instala e abre. Na CPU
+prefira o modelo Small ou Medium; o Large é lento sem GPU.
 
 ```powershell
-.\scripts
-elease.ps1
+.\scripts\release.ps1
 ```
 
 ```powershell
-.\scripts
-elease.ps1 -Publish -Notes "o que mudou nesta versão"
+.\scripts\release.ps1 -Publish
 ```
 
-Sem `-Publish` o script só gera os arquivos em `target
-eleaseundle
-sis\`;
-com `-Publish` ele cria a release `v<versão>` no GitHub (via `gh`) e sobe os
-três: `ISPer_<versão>_x64-setup.exe` (~400 MB — as DLLs de runtime do CUDA vão
-dentro; copie `cudart64_13`, `cublas64_13` e `cublasLt64_13` de `<CUDA>ind`
-para `apps/isper-app/src-tauri/resources/cuda/`, pasta gitignored; as DLLs do
-sherpa-onnx que a identificação de falantes usa o script copia sozinho de
-`target/release` para `resources/sherpa/`), o `.sig` e o `latest.json`. Antes, ele confere que `Cargo.toml` e `tauri.conf.json` têm a
-mesma versão e para o app (o bundler reescreve o exe e as DLLs ficam travadas
-enquanto ele roda). O instalador não traz modelos: no primeiro uso a tela
-Início orienta o download.
+O script confere versão (`Cargo.toml` = `tauri.conf.json`), exige a seção
+`## [versão]` no [`CHANGELOG.md`](CHANGELOG.md) (que vira as notas da release),
+árvore do git limpa e, com `-Publish`, CI verde no commit. Depois para o app,
+copia para `resources/` as DLLs do sherpa-onnx (de `target/release`) e do
+Visual C++ (do VS Build Tools), roda `tauri build` por variante (`--config
+tauri.gpu.conf.json` com as DLLs do CUDA; `--config tauri.cpu.conf.json
+--no-default-features` em `target-cpu/`), assina e deixa tudo em
+`dist\v<versão>\`. Com `-Publish`, `gh release create v<versão>` sobe os seis
+arquivos; a tag dispara o workflow
+[`release.yml`](.github/workflows/release.yml), que valida tag × manifests ×
+CHANGELOG e roda o CI de novo. As DLLs do CUDA (`cudart64_13`, `cublas64_13`,
+`cublasLt64_13`, ~500 MB) vêm de `<CUDA>\bin\x64` e ficam em
+`apps/isper-app/src-tauri/resources/cuda/` (pasta gitignored).
 
-**Atualização automática**: o app consulta
-`https://github.com/Marcus-Boni/ISPer/releases/latest/download/latest.json`
-45 s depois de abrir e uma vez por dia (Configurações → Sistema desliga). Se
-houver versão nova, a tela Início mostra um banner com as novidades e um toast
-silencioso avisa; "Atualizar agora" baixa o instalador, **verifica a
-assinatura minisign** com a chave pública embutida (`plugins.updater.pubkey`
-no `tauri.conf.json`) e o executa em modo passivo — o ISPer fecha e volta na
-versão nova. Nada é baixado sem um clique; durante uma reunião a atualização é
-recusada; um download que não bate com a assinatura é descartado. Em
-Configurações → Sistema há "Verificar agora" e "Baixar e instalar".
+**Atualização automática**: o app consulta o manifest da sua variante em
+`https://github.com/Marcus-Boni/ISPer/releases/latest/download/` 45 s depois
+de abrir e uma vez por dia (Configurações → Sistema desliga). Havendo versão
+nova, a tela Início mostra um banner com as novidades e um toast silencioso
+avisa; "Atualizar agora" baixa o instalador, **verifica a assinatura minisign**
+com a chave pública embutida (`plugins.updater.pubkey` no `tauri.conf.json`) e
+o executa em modo passivo — o ISPer fecha e volta na versão nova. Nada é
+baixado sem um clique; durante uma reunião a atualização é recusada; um
+download que não bate com a assinatura é descartado. Validado de ponta a ponta
+na passagem 0.11.0 → 0.11.1 num app instalado.
 
 **Chave de assinatura**: gerada uma vez com
 `npx @tauri-apps/cli@^2 signer generate -w %USERPROFILE%\.tauri\isper.key`.
 A privada (sem senha; para uma com senha, defina
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` antes de rodar o script) fica só nessa
 pasta (fora do repositório — `*.key` está no `.gitignore`) e a pública vai no
-`tauri.conf.json`. Quem tiver a privada
-consegue publicar atualizações que os ISPers instalados aceitam: faça backup
-dela e não a compartilhe. Se ela se perder, gere outra e publique uma versão
-com a nova pública — quem já tem o app instalado reinstala uma vez.
+`tauri.conf.json`. Quem tiver a privada consegue publicar atualizações que os
+ISPers instalados aceitam: faça backup dela e não a compartilhe. Se ela se
+perder, gere outra e publique uma versão com a nova pública — quem já tem o app
+instalado reinstala uma vez.
 
-O instalador **não** tem assinatura de código (certificado Authenticode): o
-SmartScreen avisa na primeira execução ("Mais informações → Executar assim
-mesmo"). A assinatura minisign protege a integridade das *atualizações*; não
-substitui o certificado.
+**Assinatura de código (SmartScreen)**: o instalador não tem certificado
+Authenticode, então o Windows avisa na primeira execução ("Mais informações →
+Executar assim mesmo"). A assinatura minisign protege a integridade das
+*atualizações*; não substitui o certificado. Para tirar o aviso é preciso um
+certificado de assinatura de código — o caminho mais barato hoje é o Azure
+Trusted Signing (assinatura por API, sem token físico); com ele, configure
+`bundle.windows.signCommand` no `tauri.conf.json` (ou `certificateThumbprint`
++ `timestampUrl` para um certificado no repositório de certificados do
+Windows) e o `tauri build` passa a assinar exe e instalador. A reputação no
+SmartScreen ainda leva alguns downloads para se firmar.
 
 ## Logs e diagnóstico
+
+Pânicos também vão para o log, com mensagem, arquivo:linha, thread e
+backtrace: o exe não tem stderr, então sem isso um crash sumia sem rastro.
 
 O app grava logs em `%LOCALAPPDATA%\ISPer\logs\isper.log.<data>` (um arquivo
 por dia, 14 dias guardados) além do stdout. Configurações → Sistema →
@@ -400,6 +418,16 @@ cargo test --release -p isper-llm
 O GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda
 formatação, os testes dos crates e um `cargo check` do app sem CUDA a cada
 push.
+
+**Ponta a ponta**: [`tools/e2e`](tools/e2e/README.md) sobe o app real com a
+porta de depuração do WebView2 e verifica, via CDP, janelas, reunião com a
+fixture de duas vozes (ao vivo, legendas, momentos, exportações) e o
+atualizador contra uma release falsa em localhost. Não rodam no CI (precisam
+de GPU, áudio e janelas): rode antes de lançar uma versão.
+
+```powershell
+.\tools\e2e\smoke.ps1 -Exe .\target\release\isper-app.exe
+```
 
 ## Licença
 

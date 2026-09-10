@@ -84,6 +84,8 @@ pub(crate) fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGua
 
 fn main() {
     let _log_guard = init_logging();
+    // Pânicos vão para o log (o exe não tem stderr): mensagem, local, thread e backtrace.
+    isper_core::panics::install_hook(|text| tracing::error!("{text}"));
     tracing::info!("ISPer {} iniciando", env!("CARGO_PKG_VERSION"));
     if let Err(e) = notify::ensure_registered() {
         tracing::warn!("não consegui registrar o ISPer para notificações: {e}");

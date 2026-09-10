@@ -2,9 +2,10 @@
 #
 # O runner windows-latest já traz MSVC, CMake e LLVM (libclang p/ bindgen);
 # o whisper.cpp é compilado em CPU. O app é só checado (`cargo check`) com
-# `--no-default-features` (sem CUDA) e com DLLs do CUDA vazias no lugar das
-# reais, porque o build script do Tauri exige que os `bundle.resources`
-# existam. Nada aqui baixa modelos.
+# `--no-default-features` (sem CUDA) e com DLLs vazias no lugar dos
+# `bundle.resources` (sherpa-onnx e runtime do Visual C++), porque o build
+# script do Tauri exige que eles existam. Nada aqui baixa modelos.
+# `workflow_call`: o release.yml roda esta mesma bateria sobre a tag.
 #
 # O `isper-diarize` não entra no `cargo test`: ele não tem testes, e ligar o
 # binário de teste exige as import libs do sherpa-onnx pré-compilado
@@ -16,6 +17,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -49,16 +51,16 @@ jobs:
       - name: Testes (núcleo, IA, modelos)
         run: cargo test --release -p isper-core -p isper-llm -p isper-models
 
-      - name: DLLs do CUDA e do sherpa-onnx de mentira (o bundler exige que existam)
+      - name: Recursos de mentira (o bundler exige que os bundle.resources existam)
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/cuda | Out-Null
-          foreach ($dll in @('cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll')) {
-            New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/cuda/$dll" | Out-Null
-          }
           New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/sherpa | Out-Null
           foreach ($dll in @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll')) {
             New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/sherpa/$dll" | Out-Null
+          }
+          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/vcredist | Out-Null
+          foreach ($dll in @('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+            New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/vcredist/$dll" | Out-Null
           }
 
       - name: Checagem do app (sem CUDA) e da CLI
