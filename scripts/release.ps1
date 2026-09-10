@@ -43,10 +43,16 @@ foreach ($dll in 'cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll') {
 }
 $tag = "v$version"
 if ($Publish) {
-  gh auth status *> $null
-  if ($LASTEXITCODE -ne 0) { throw "gh nao esta autenticado (gh auth login)" }
-  $exists = gh release view $tag 2>$null
-  if ($LASTEXITCODE -eq 0) { throw "a release $tag ja existe no GitHub" }
+  # No PowerShell 5.1 com ErrorActionPreference=Stop, qualquer linha que um exe
+  # escreva no stderr vira erro terminante - por isso os comandos do gh rodam
+  # com 'Continue' e sao julgados pelo que devolvem, nao pelo stderr.
+  $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  $login = gh api user --jq .login 2>$null
+  $existing = gh release list --limit 100 --json tagName --jq '.[].tagName' 2>$null
+  $ErrorActionPreference = $prev
+  if (-not $login) { throw "gh nao esta autenticado (gh auth login)" }
+  if ($existing -contains $tag) { throw "a release $tag ja existe no GitHub" }
+  "Publicando como $login"
 }
 
 # --- 2) parar o app
@@ -96,8 +102,11 @@ $latestPath = Join-Path $bundle 'latest.json'
 
 # --- 5) publicar
 if ($Publish) {
+  $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   gh release create $tag $setup.FullName $sig.FullName $latestPath --title "ISPer $version" --notes $notes
-  if ($LASTEXITCODE -ne 0) { throw "gh release create falhou" }
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $prev
+  if ($code -ne 0) { throw "gh release create falhou (codigo $code)" }
   "Release $tag publicada. Os ISPers instalados passam a ver a versao nova na proxima checagem."
 } else {
   ""
