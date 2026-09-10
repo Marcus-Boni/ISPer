@@ -84,9 +84,18 @@ pub(crate) fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGua
 }
 
 fn main() {
+    // Dados locais mudaram de pasta na 0.12.2: move antes de o log abrir.
+    let migrated = paths::migrate_legacy_local();
     let _log_guard = init_logging();
     // Pânicos vão para o log (o exe não tem stderr): mensagem, local, thread e backtrace.
     isper_core::panics::install_hook(|text| tracing::error!("{text}"));
+    if !migrated.is_empty() {
+        tracing::info!(
+            "dados locais movidos de %LOCALAPPDATA%\\ISPer para %LOCALAPPDATA%\\{}: {}",
+            isper_models::APP_ID,
+            migrated.join(", ")
+        );
+    }
     let missing_env = paths::missing_env_vars();
     if !missing_env.is_empty() {
         tracing::warn!(

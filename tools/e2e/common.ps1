@@ -84,7 +84,11 @@ function Check {
 }
 
 function Get-TodayLog {
-  Join-Path $env:LOCALAPPDATA "ISPer\logs\isper.log.$(Get-Date -Format yyyy-MM-dd)"
+  # A partir da 0.12.2 os logs ficam na pasta do identificador do app; a antiga e reserva.
+  $name = "isper.log.$(Get-Date -Format yyyy-MM-dd)"
+  $new = Join-Path $env:LOCALAPPDATA "com.isper.desktop\logs\$name"
+  if (Test-Path $new) { return $new }
+  Join-Path $env:LOCALAPPDATA "ISPer\logs\$name"
 }
 
 function Restart-IsperClean {

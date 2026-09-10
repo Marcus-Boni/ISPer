@@ -182,6 +182,7 @@ qualidade de transcrição, legendas, momentos marcados e distribuição (v0.11.
 - [x] v0.11.0: filtro de alucinações do Whisper (`no_speech_prob`, frases de legenda, loops), correção por dicionário, comandos de voz no ditado ("nova linha", "ponto final", "apagar isso"…), legendas ao vivo no indicador, momentos marcados (★, Ctrl+Alt+K) no Markdown/DOCX/Biblioteca e priorizados no resumo, instalador NSIS com atualização automática assinada
 - [x] v0.11.1: instalador corrigido — faltavam as DLLs do sherpa-onnx (`sherpa-onnx-c-api`, `onnxruntime`, `cargs`) e o app instalado pela 0.11.0 não abria; descoberto ao instalar pelo setup.exe e validar a primeira atualização automática
 - [x] v0.12.0: variante CPU do instalador (gerada localmente pelo `release.ps1`; o runner do GitHub não tem CUDA nem consegue ligar o sherpa-onnx pré-compilado), runtime do Visual C++ dentro dos instaladores, pânicos no log, testes ponta a ponta em `tools/e2e`, `CHANGELOG.md` e workflow `release.yml` validando a tag
+- [x] v0.12.1/v0.12.2: pastas do usuário pela API do Windows (não pelas variáveis de ambiente) e dados locais em `%LOCALAPPDATA%\com.isper.desktop`, fora da pasta padrão de instalação do Tauri (`%LOCALAPPDATA%\ISPer`), com migração automática
 - [ ] Assinatura de código (certificado Authenticode ou Azure Trusted Signing) para o instalador não disparar o SmartScreen — depende de comprar/assinar o serviço
 
 ## Boas práticas transversais

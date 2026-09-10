@@ -35,6 +35,21 @@ Sem `-Exe`, os scripts usam o app instalado em `%LOCALAPPDATA%\Programs\ISPer`
 se existir, senão `target\release\isper-app.exe`. Cada verificação imprime
 `OK`/`FALHA`; o código de saída é 1 se algo falhou.
 
+## Assistentes empacotados (MSIX) veem outro AppData
+
+Se os scripts rodam a partir de um assistente de desenvolvimento **empacotado**
+(o Claude Code desktop, por exemplo, é um app MSIX), tudo que eles e os
+processos filhos escrevem em `%LOCALAPPDATA%`, `%APPDATA%` e no `HKCU` vai para
+a pasta virtualizada do pacote (`%LOCALAPPDATA%\Packages\<pacote>\LocalCache`),
+não para o AppData real do usuário — inclusive os modelos copiados à mão, os
+logs, o `config.toml`, o banco e as chaves de registro que o instalador grava.
+O ISPer aberto pelo usuário (pelo menu Iniciar) enxerga o AppData real e pode
+estar "sem modelo" enquanto os testes dizem que está tudo certo. O repositório,
+`Documentos`, `%LOCALAPPDATA%\Programs` e os processos não são virtualizados.
+Para agir na visão real, lance um `.cmd` pelo `explorer.exe` (filho do Explorer,
+fora do pacote) e leia a saída num caminho não virtualizado, como uma pasta do
+repositório.
+
 ## Cuidados
 
 - **`meeting.ps1` toca áudio nos alto-falantes e o loopback captura tudo que

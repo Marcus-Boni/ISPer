@@ -95,7 +95,7 @@ Medido na RTX 4050: 10,4 s de áudio transcritos em 0,6 s (16× tempo real).
 
 O ISPer tem um **gerenciador de modelos** (crate `isper-models`): catálogo,
 download com progresso e **SHA-256 verificado contra o publicado no Hugging
-Face**, tudo em `%LOCALAPPDATA%\ISPer\models`. Sem nenhum modelo instalado, o
+Face**, tudo em `%LOCALAPPDATA%\com.isper.desktop\models`. Sem nenhum modelo instalado, o
 app abre as Configurações sozinho para você baixar um.
 
 ```bash
@@ -371,6 +371,14 @@ baixado sem um clique; durante uma reunião a atualização é recusada; um
 download que não bate com a assinatura é descartado. Validado de ponta a ponta
 na passagem 0.11.0 → 0.11.1 num app instalado.
 
+**Onde ficam as coisas**: programa em `%LOCALAPPDATA%\Programs\ISPer` (ou na
+pasta que você escolher no instalador); dados locais — modelos e logs — em
+`%LOCALAPPDATA%\com.isper.desktop`; configurações e banco em `%APPDATA%\ISPer`;
+transcrições em `Documentos\ISPer\Reunioes`. Até a 0.12.1 os dados locais
+ficavam em `%LOCALAPPDATA%\ISPer`, que é justamente a pasta padrão de
+instalação por usuário do Tauri — um instalador rodado à mão misturava programa
+e dados; o app move a pasta antiga sozinho na primeira abertura.
+
 **Chave de assinatura**: gerada uma vez com
 `npx @tauri-apps/cli@^2 signer generate -w %USERPROFILE%\.tauri\isper.key`.
 A privada (sem senha; para uma com senha, defina
@@ -397,7 +405,7 @@ SmartScreen ainda leva alguns downloads para se firmar.
 Pânicos também vão para o log, com mensagem, arquivo:linha, thread e
 backtrace: o exe não tem stderr, então sem isso um crash sumia sem rastro.
 
-O app grava logs em `%LOCALAPPDATA%\ISPer\logs\isper.log.<data>` (um arquivo
+O app grava logs em `%LOCALAPPDATA%\com.isper.desktop\logs\isper.log.<data>` (um arquivo
 por dia, 14 dias guardados) além do stdout. Configurações → Sistema →
 **Diagnóstico** lista versão, motor, modelo, DLLs do CUDA, microfones e
 caminhos, com "Copiar diagnóstico" e "Abrir pasta de logs" — é o que mandar

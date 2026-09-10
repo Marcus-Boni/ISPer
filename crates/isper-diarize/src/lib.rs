@@ -43,7 +43,7 @@ pub struct SpeakerTurn {
     pub speaker: usize,
 }
 
-/// `%LOCALAPPDATA%\ISPer\models\diarize`
+/// `%LOCALAPPDATA%\com.isper.desktop\models\diarize`
 pub fn models_dir() -> Result<PathBuf> {
     let dir = isper_models::models_dir()?.join("diarize");
     std::fs::create_dir_all(&dir).map_err(isper_models::ModelsError::Io)?;

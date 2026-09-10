@@ -10,16 +10,32 @@ workflow `release.yml` recusa uma tag que não bata com os dois.
 
 ## [Unreleased]
 
-## [0.12.1] - 2026-09-10
+## [0.12.2] - 2026-09-10
+
+### Alterado
+- Dados locais (modelos e logs) mudaram de `%LOCALAPPDATA%\ISPer` para
+  `%LOCALAPPDATA%\com.isper.desktop`, o identificador do app. A pasta antiga
+  é a pasta padrão de instalação por usuário do Tauri: quando o registro não
+  aponta para uma instalação anterior, o instalador coloca o programa dentro
+  da pasta de dados, ao lado dos modelos, e ficam duas cópias do ISPer na
+  máquina — foi o que aconteceu. O app move a pasta antiga sozinho na primeira
+  abertura e registra a mudança no log.
 
 ### Corrigido
+- Causa real do "nenhum modelo instalado" visto após a atualização para a
+  0.12.0: o modelo copiado durante o desenvolvimento ficou numa pasta
+  virtualizada do assistente de desenvolvimento (um app empacotado, que
+  redireciona as escritas em AppData), e o ISPer do usuário nunca o teve. Não
+  era defeito do app; a robustez da 0.12.1 fica.
+
+## [0.12.1] - 2026-09-10
+
+### Alterado
 - Modelos, logs, configurações e banco deixaram de depender das variáveis de
   ambiente `LOCALAPPDATA`/`APPDATA`/`USERPROFILE`: as pastas vêm da API de
-  pastas conhecidas do Windows, com as variáveis como reserva. Uma instância
-  aberta pelo Explorer logo após a atualização para a 0.12.0 nasceu sem
-  `LOCALAPPDATA` e mostrou "nenhum modelo instalado" (e não escreveu no log)
-  com o modelo intacto no disco. O Diagnóstico e o log agora avisam quando
-  uma dessas variáveis falta.
+  pastas conhecidas do Windows, com as variáveis como reserva; o Diagnóstico e
+  o log avisam quando uma delas falta. A suspeita que motivou a mudança (um
+  processo aberto sem `LOCALAPPDATA`) não se confirmou — ver 0.12.2.
 
 ## [0.12.0] - 2026-09-10
 
@@ -124,7 +140,8 @@ workflow `release.yml` recusa uma tag que não bata com os dois.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.2...HEAD
+[0.12.2]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/Marcus-Boni/ISPer/releases/tag/v0.11.1

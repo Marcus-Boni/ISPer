@@ -1,7 +1,7 @@
 //! isper-models — gerenciador de modelos e ativos do ISPer (Fase 3).
 //!
 //! - Catálogo dos modelos Whisper (ggml) com rótulo, tamanho e recomendação;
-//! - Download com progresso para `%LOCALAPPDATA%\ISPer\models` (arquivos
+//! - Download com progresso para `%LOCALAPPDATA%\com.isper.desktop\models` (arquivos
 //!   grandes ficam no LocalAppData, não no Roaming);
 //! - **Integridade**: o SHA-256 esperado vem do próprio Hugging Face (o
 //!   `lfs.oid` publicado pela API do repositório) e é conferido durante o
@@ -84,17 +84,66 @@ pub fn catalog_entry(file: &str) -> Option<&'static ModelInfo> {
     WHISPER_CATALOG.iter().find(|m| m.file == file)
 }
 
-/// Pasta dos modelos: `%LOCALAPPDATA%\ISPer\models` (criada se não existir).
-/// A base vem da API de pastas conhecidas do Windows, com a variável de
-/// ambiente como reserva: um processo pode nascer sem `LOCALAPPDATA` no
+/// Identificador do app (o mesmo `identifier` do tauri.conf.json): nomeia a
+/// pasta de dados locais, como o Tauri faz com a do WebView2.
+pub const APP_ID: &str = "com.isper.desktop";
+
+/// `%LOCALAPPDATA%` pela API de pastas conhecidas do Windows, com a variável
+/// de ambiente como reserva: um processo pode nascer sem `LOCALAPPDATA` no
 /// ambiente, e o app não pode "perder" os modelos por isso.
-pub fn models_dir() -> Result<PathBuf> {
-    let base = dirs::data_local_dir()
+pub fn local_base() -> Result<PathBuf> {
+    dirs::data_local_dir()
         .or_else(|| std::env::var_os("LOCALAPPDATA").map(PathBuf::from))
-        .ok_or(ModelsError::NoAppData)?;
-    let dir = base.join("ISPer").join("models");
+        .ok_or(ModelsError::NoAppData)
+}
+
+/// Pasta dos modelos: `%LOCALAPPDATA%\com.isper.desktop\models` (criada se não
+/// existir). Até a 0.12.1 era `%LOCALAPPDATA%\ISPer\models` — mas
+/// `%LOCALAPPDATA%\ISPer` é a pasta padrão de INSTALAÇÃO por usuário do Tauri,
+/// e um instalador rodado à mão misturava programa e dados. A pasta antiga é
+/// movida para a nova na primeira chamada.
+pub fn models_dir() -> Result<PathBuf> {
+    let base = local_base()?;
+    let dir = base.join(APP_ID).join("models");
+    migrate_dir(&base.join("ISPer").join("models"), &dir);
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
+}
+
+/// Move (renomeia) uma pasta de dados antiga para o lugar novo, se a antiga
+/// existir e a nova ainda não tiver conteúdo. Idempotente; devolve `true` se
+/// moveu. Mesmo volume, então é instantâneo mesmo com gigabytes de modelos.
+pub fn migrate_dir(old: &Path, new: &Path) -> bool {
+    if !old.is_dir() {
+        return false;
+    }
+    let new_is_empty = match std::fs::read_dir(new) {
+        Ok(mut entries) => entries.next().is_none(),
+        Err(_) => true,
+    };
+    if !new_is_empty {
+        return false;
+    }
+    if new.exists() {
+        let _ = std::fs::remove_dir(new);
+    }
+    if let Some(parent) = new.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match std::fs::rename(old, new) {
+        Ok(()) => {
+            tracing::info!("dados movidos de {} para {}", old.display(), new.display());
+            true
+        }
+        Err(e) => {
+            tracing::warn!(
+                "não consegui mover {} para {}: {e}",
+                old.display(),
+                new.display()
+            );
+            false
+        }
+    }
 }
 
 /// Caminho do modelo se estiver instalado na pasta padrão.
@@ -253,4 +302,56 @@ pub fn remove(file: &str) -> Result<()> {
         std::fs::remove_file(p)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::migrate_dir;
+
+    fn temp(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("isper-migrate-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn move_a_pasta_antiga_quando_a_nova_nao_existe() {
+        let root = temp("move");
+        let old = root.join("ISPer").join("models");
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join("m.bin"), b"x").unwrap();
+        let new = root.join("com.isper.desktop").join("models");
+        assert!(migrate_dir(&old, &new));
+        assert!(new.join("m.bin").exists());
+        assert!(!old.exists());
+        // segunda chamada: nada a fazer
+        assert!(!migrate_dir(&old, &new));
+    }
+
+    #[test]
+    fn nao_sobrescreve_pasta_nova_com_conteudo() {
+        let root = temp("keep");
+        let old = root.join("ISPer").join("models");
+        let new = root.join("com.isper.desktop").join("models");
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::create_dir_all(&new).unwrap();
+        std::fs::write(old.join("velho.bin"), b"1").unwrap();
+        std::fs::write(new.join("novo.bin"), b"2").unwrap();
+        assert!(!migrate_dir(&old, &new));
+        assert!(old.join("velho.bin").exists());
+        assert!(new.join("novo.bin").exists());
+    }
+
+    #[test]
+    fn pasta_nova_vazia_e_substituida() {
+        let root = temp("empty");
+        let old = root.join("ISPer").join("logs");
+        let new = root.join("com.isper.desktop").join("logs");
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::create_dir_all(&new).unwrap();
+        std::fs::write(old.join("a.log"), b"1").unwrap();
+        assert!(migrate_dir(&old, &new));
+        assert!(new.join("a.log").exists());
+    }
 }
