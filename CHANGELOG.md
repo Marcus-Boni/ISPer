@@ -11,6 +11,31 @@ bata com ela.
 
 ## [Unreleased]
 
+### Alterado
+- Fase 7.1 (qualidade automatizada) concluída — só engenharia, nada muda para
+  quem usa o app:
+  - **Versão numa só fonte**: o `tauri.conf.json` deixou de repetir a versão
+    (o Tauri lê do `Cargo.toml` do app); `release.ps1` e `release.yml`
+    conferem só o `Cargo.toml` e recusam um `version` que volte ao
+    `tauri.conf.json`.
+  - **Toolchain fixo**: `rust-toolchain.toml` (1.98.0 com rustfmt e clippy) —
+    a mesma versão na máquina de quem desenvolve e no CI, que passa a ler o
+    canal do arquivo; `rustfmt.toml` (estilo da edição 2024) e `.editorconfig`.
+  - **App na edição 2024** (os crates já estavam): migração mecânica, sem
+    mudança de comportamento; `let`-chains onde o clippy novo pediu.
+  - **Dependências**: sysinfo 0.39, toml 1, dirs 6, crossbeam-channel 0.5.17
+    e **ureq 3** (isper-llm e isper-models migrados: agente com timeout
+    global, erros 4xx/5xx lidos com o corpo da resposta, download em
+    streaming sem limite de tamanho). GitHub Actions: checkout v7 e
+    gitleaks-action v3. Os PRs do Dependabot correspondentes ficam
+    supersedidos.
+  - **Higiene**: `loopdump.wav` (7,7 MB, captura de teste da Fase 4) saiu do
+    versionamento — o arquivo local fica e o histórico não é reescrito.
+  - **Branch `main` protegida** por ruleset do GitHub: sem push direto, sem
+    force-push nem exclusão, histórico linear e PR obrigatório com os três
+    checks do CI verdes. Toda mudança entra por branch + PR — as do
+    mantenedor e as do Dependabot.
+
 ## [0.13.0] - 2026-09-10
 
 ### Adicionado

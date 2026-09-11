@@ -190,20 +190,26 @@ pub fn resolve_whisper_model(
 
 fn agent() -> ureq::Agent {
     // Sem timeout total: downloads de centenas de MB levam o tempo que levam.
-    ureq::builder()
-        .timeout_connect(std::time::Duration::from_secs(20))
-        .timeout_read(std::time::Duration::from_secs(60))
-        .build()
+    // Conexão e cabeçalhos têm prazo; o corpo não (no ureq 3 o prazo de corpo
+    // vale para o download inteiro, não por leitura ociosa).
+    ureq::Agent::new_with_config(
+        ureq::Agent::config_builder()
+            .timeout_connect(Some(std::time::Duration::from_secs(20)))
+            .timeout_recv_response(Some(std::time::Duration::from_secs(60)))
+            .build(),
+    )
 }
 
 /// SHA-256 e tamanho publicados pelo Hugging Face para um arquivo LFS.
 fn hf_expected(file: &str) -> Result<(Option<String>, Option<u64>)> {
     let url = format!("https://huggingface.co/api/models/{HF_REPO}/tree/main");
-    let resp: serde_json::Value = agent()
+    let mut response = agent()
         .get(&url)
         .call()
-        .map_err(|e| ModelsError::Http(e.to_string()))?
-        .into_json()
+        .map_err(|e| ModelsError::Http(e.to_string()))?;
+    let resp: serde_json::Value = response
+        .body_mut()
+        .read_json()
         .map_err(|e| ModelsError::Http(e.to_string()))?;
     let entry = resp
         .as_array()
@@ -247,19 +253,22 @@ pub fn download_asset(
     if let Some(dir) = dest.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    let resp = agent()
+    let mut resp = agent()
         .get(url)
         .call()
         .map_err(|e| ModelsError::Http(e.to_string()))?;
     let total = resp
-        .header("content-length")
+        .headers()
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok())
         .or(expected_size)
         .unwrap_or(0);
 
     let part = dest.with_extension("part");
     let mut out = std::fs::File::create(&part)?;
-    let mut reader = resp.into_reader();
+    // `as_reader` não tem limite de tamanho (os `read_to_*` do ureq têm 10 MB).
+    let mut reader = resp.body_mut().as_reader();
     let mut hasher = Sha256::new();
     let mut buf = vec![0u8; 256 * 1024];
     let mut done: u64 = 0;
@@ -353,5 +362,59 @@ mod migration_tests {
         std::fs::write(old.join("a.log"), b"1").unwrap();
         assert!(migrate_dir(&old, &new));
         assert!(new.join("a.log").exists());
+    }
+}
+
+/// Testes que falam com a rede — ignorados por padrão (o CI roda offline);
+/// rode à mão depois de mexer no HTTP: `cargo test -p isper-models -- --ignored`.
+#[cfg(test)]
+mod network_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "usa a rede (API do Hugging Face)"]
+    fn hugging_face_publica_sha_e_tamanho_do_modelo_small() {
+        let (sha, size) = hf_expected("ggml-small.bin").expect("API do Hugging Face");
+        assert_eq!(
+            sha.map(|s| s.len()),
+            Some(64),
+            "lfs.oid é um SHA-256 em hex"
+        );
+        assert!(size.unwrap_or(0) > 400_000_000, "o small tem ~488 MB");
+    }
+
+    #[test]
+    #[ignore = "usa a rede (download pequeno do GitHub)"]
+    fn download_asset_grava_confere_e_recusa_checksum_errado() {
+        let url = "https://raw.githubusercontent.com/Marcus-Boni/ISPer/main/LICENSE";
+        let dest =
+            std::env::temp_dir().join(format!("isper-download-test-{}.txt", std::process::id()));
+        let _ = std::fs::remove_file(&dest);
+        let mut last = (0u64, 0u64);
+        download_asset(url, &dest, None, None, &mut |done, total| {
+            last = (done, total)
+        })
+        .expect("download");
+        let text = std::fs::read_to_string(&dest).expect("arquivo gravado");
+        assert!(
+            text.contains("Permission is hereby granted"),
+            "texto da MIT"
+        );
+        assert_eq!(
+            last.0,
+            text.len() as u64,
+            "progresso final = tamanho do arquivo"
+        );
+        assert!(
+            !dest.with_extension("part").exists(),
+            "o .part virou o arquivo final"
+        );
+
+        // Checksum errado: nada fica no disco e o erro diz o que esperava.
+        let err = download_asset(url, &dest, Some("00"), None, &mut |_, _| {})
+            .expect_err("checksum inválido deve falhar");
+        assert!(matches!(err, ModelsError::Checksum { .. }), "{err}");
+        assert!(!dest.with_extension("part").exists());
+        let _ = std::fs::remove_file(&dest);
     }
 }
