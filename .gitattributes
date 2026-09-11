@@ -9,3 +9,9 @@
 *.bin binary
 *.dll binary
 *.exe binary
+
+# Testes golden: comparados byte a byte com a saída do código (fins de linha
+# LF inclusive) — nunca converter no checkout.
+crates/isper-core/tests/golden/** -text
+*.docx binary
+*.woff2 binary

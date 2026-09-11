@@ -1,0 +1,32 @@
+1
+00:00:00,000 --> 00:00:02,400
+Eu: Bom dia, pessoal.
+
+2
+00:00:02,900 --> 00:00:06,100
+Eu: Vamos revisar o lead time do MRP & o plano da semana.
+
+3
+00:00:07,000 --> 00:00:12,500
+Participante 1: O fornecedor A passou de 8 para 12 dias.
+
+4
+00:00:14,000 --> 00:00:19,800
+Participante 2: Então a ordem 4521 precisa ser antecipada, certo?
+
+5
+00:00:20,500 --> 00:00:24,000
+Eu: Certo — eu atualizo o parâmetro hoje.
+
+6
+00:02:10,000 --> 00:02:16,000
+Participante 1: Sugiro manter o estoque de segurança até outubro.
+
+7
+00:02:16,500 --> 00:02:18,000
+Eu: Combinado.
+
+8
+01:02:00,000 --> 01:02:05,500
+Participante 2: Eu confirmo a data com a logística <amanhã>.
+
