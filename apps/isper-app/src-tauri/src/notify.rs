@@ -36,8 +36,8 @@ fn icon_path() -> anyhow::Result<PathBuf> {
 /// idempotente; roda a cada início.
 #[cfg(windows)]
 pub fn ensure_registered() -> anyhow::Result<()> {
-    use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
+    use winreg::enums::HKEY_CURRENT_USER;
     let icon = icon_path()?;
     if !icon.exists() {
         std::fs::write(&icon, ICON_PNG)?;

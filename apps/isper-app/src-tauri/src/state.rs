@@ -2,10 +2,10 @@
 
 use crate::config::AppConfig;
 use crate::prelude::*;
+use isper_core::WhisperEngine;
 use isper_core::meeting::MeetingHandle;
 use isper_core::recorder;
 use isper_core::store::MeetingStore;
-use isper_core::WhisperEngine;
 use tauri::image::Image;
 use tauri::menu::MenuItem;
 use tauri::tray::TrayIcon;

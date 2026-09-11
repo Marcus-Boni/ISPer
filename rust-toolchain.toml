@@ -1,0 +1,12 @@
+# Toolchain fixo: a mesma versão do Rust na máquina de quem desenvolve, no CI
+# e em quem clonar — `cargo clippy -- -D warnings` não quebra de surpresa
+# quando sai um stable novo com lints novos. O rustup instala este canal
+# sozinho na primeira vez; o CI lê o `channel` daqui (ci.yml).
+#
+# Para atualizar: mude a versão, rode `cargo clippy --workspace --all-targets
+# --release -- -D warnings` e `cargo test`, corrija o que os lints novos
+# apontarem e registre no CHANGELOG.
+[toolchain]
+channel = "1.98.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

@@ -25,7 +25,7 @@ pub(crate) fn assert_topmost(app: &AppHandle) {
     #[cfg(windows)]
     {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
-            SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+            HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowPos,
         };
         let hwnd = app.state::<AppState>().overlay_hwnd;
         if hwnd != 0 {

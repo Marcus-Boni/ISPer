@@ -44,8 +44,8 @@ use crate::prelude::*;
 /// `windows_subsystem`, então sem o arquivo ninguém vê um aviso sequer.
 /// O guard devolvido precisa viver até o fim do `main` (descarrega o buffer).
 pub(crate) fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGuard> {
-    use tracing_subscriber::prelude::*;
     use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::prelude::*;
     // `info` por padrão; `RUST_LOG=debug` (ou `isper_core=trace`) para investigar.
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let stdout = tracing_subscriber::fmt::layer()
@@ -388,14 +388,16 @@ fn main() {
             // janela "sempre no topo" ativada depois dele (Teams, players…).
             {
                 let handle = app.handle().clone();
-                std::thread::spawn(move || loop {
-                    std::thread::sleep(Duration::from_millis(1500));
-                    let visible = handle
-                        .get_webview_window("overlay")
-                        .and_then(|o| o.is_visible().ok())
-                        .unwrap_or(false);
-                    if visible {
-                        assert_topmost(&handle);
+                std::thread::spawn(move || {
+                    loop {
+                        std::thread::sleep(Duration::from_millis(1500));
+                        let visible = handle
+                            .get_webview_window("overlay")
+                            .and_then(|o| o.is_visible().ok())
+                            .unwrap_or(false);
+                        if visible {
+                            assert_topmost(&handle);
+                        }
                     }
                 });
             }
