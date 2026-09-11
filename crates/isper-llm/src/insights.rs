@@ -98,32 +98,7 @@ fn tail(text: &str, max_chars: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
-
-    /// Provider falso: guarda o que recebeu e devolve o que mandarmos.
-    struct Fake {
-        reply: String,
-        seen: Mutex<Vec<(String, String)>>,
-    }
-
-    impl LlmProvider for Fake {
-        fn name(&self) -> &'static str {
-            "fake"
-        }
-        fn model(&self) -> &str {
-            "fake-1"
-        }
-        fn complete(&self, system: &str, user: &str) -> Result<String> {
-            self.seen
-                .lock()
-                .unwrap()
-                .push((system.to_string(), user.to_string()));
-            Ok(self.reply.clone())
-        }
-        fn list_models(&self) -> Result<Vec<String>> {
-            Ok(vec!["fake-1".into()])
-        }
-    }
+    use crate::testing::FakeProvider;
 
     #[test]
     fn prompt_carrega_janela_tempo_e_resposta_anterior() {
@@ -150,10 +125,7 @@ mod tests {
 
     #[test]
     fn chama_o_provider_e_limpa_a_resposta() {
-        let fake = Fake {
-            reply: "```markdown\n## Pendências\n- Nenhum.\n```".into(),
-            seen: Mutex::new(Vec::new()),
-        };
+        let fake = FakeProvider::replying("```markdown\n## Pendências\n- Nenhum.\n```");
         let out = live_insights(
             &fake,
             &InsightsInput {
@@ -165,18 +137,14 @@ mod tests {
         )
         .unwrap();
         assert_eq!(out, "## Pendências\n- Nenhum.");
-        let seen = fake.seen.lock().unwrap();
-        assert_eq!(seen.len(), 1);
-        assert!(seen[0].0.contains("EM ANDAMENTO"));
-        assert!(seen[0].1.contains("[00:01] Eu: oi"));
+        let (system, user) = fake.single_call();
+        assert!(system.contains("EM ANDAMENTO"));
+        assert!(user.contains("[00:01] Eu: oi"));
     }
 
     #[test]
     fn resposta_vazia_e_erro_e_a_longa_e_cortada() {
-        let fake = Fake {
-            reply: "   ".into(),
-            seen: Mutex::new(Vec::new()),
-        };
+        let fake = FakeProvider::replying("   ");
         assert!(
             live_insights(
                 &fake,
