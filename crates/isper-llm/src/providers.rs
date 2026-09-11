@@ -51,41 +51,56 @@ pub fn provider_from_settings(settings: &LlmSettings) -> Result<Box<dyn LlmProvi
 
 const TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_TOKENS: u32 = 4096;
+/// Quanto do corpo de um erro da API entra na mensagem (o resto só poluiria o log).
+const ERROR_BODY_CHARS: usize = 400;
 
+/// Agente HTTP (ureq 3): timeout global por chamada e 4xx/5xx tratados como
+/// resposta normal — a API explica o erro no corpo ("model_not_found"…) e é
+/// isso que queremos mostrar, não só o número.
 fn agent() -> ureq::Agent {
-    ureq::builder().timeout(TIMEOUT).build()
+    ureq::Agent::new_with_config(
+        ureq::Agent::config_builder()
+            .timeout_global(Some(TIMEOUT))
+            .http_status_as_error(false)
+            .build(),
+    )
 }
 
-fn handle_response(result: std::result::Result<ureq::Response, ureq::Error>) -> Result<Value> {
-    match result {
-        Ok(resp) => resp
-            .into_json()
-            .map_err(|e| LlmError::BadResponse(e.to_string())),
-        Err(ureq::Error::Status(code, resp)) => {
-            let text: String = resp
-                .into_string()
-                .unwrap_or_default()
-                .chars()
-                .take(400)
-                .collect();
-            Err(LlmError::Http(format!("status {code}: {text}")))
-        }
-        Err(e) => Err(LlmError::Http(e.to_string())),
+type HttpResult = std::result::Result<ureq::http::Response<ureq::Body>, ureq::Error>;
+
+fn handle_response(result: HttpResult) -> Result<Value> {
+    let mut resp = result.map_err(|e| LlmError::Http(e.to_string()))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let text: String = resp
+            .body_mut()
+            .read_to_string()
+            .unwrap_or_default()
+            .chars()
+            .take(ERROR_BODY_CHARS)
+            .collect();
+        return Err(LlmError::Http(format!(
+            "status {}: {text}",
+            status.as_u16()
+        )));
     }
+    resp.body_mut()
+        .read_json::<Value>()
+        .map_err(|e| LlmError::BadResponse(e.to_string()))
 }
 
 pub(crate) fn post_json(url: &str, headers: &[(&str, &str)], body: Value) -> Result<Value> {
     let mut req = agent().post(url);
     for (k, v) in headers {
-        req = req.set(k, v);
+        req = req.header(*k, *v);
     }
-    handle_response(req.send_json(body))
+    handle_response(req.send_json(&body))
 }
 
 fn get_json(url: &str, headers: &[(&str, &str)]) -> Result<Value> {
     let mut req = agent().get(url);
     for (k, v) in headers {
-        req = req.set(k, v);
+        req = req.header(*k, *v);
     }
     handle_response(req.call())
 }
