@@ -525,6 +525,15 @@ versão.
 .\tools\e2e\soak.ps1 -Minutes 120 -Exe .\target\release\isper-app.exe
 ```
 
+## Segurança e contribuição
+
+Achou uma vulnerabilidade? Relate em privado pelo GitHub
+(*Security → Report a vulnerability*); o que está no escopo, prazos e como o
+app se protege estão em [SECURITY.md](SECURITY.md). Para contribuir —
+ambiente, o que o CI exige, estilo e o fluxo por PR — veja
+[CONTRIBUTING.md](CONTRIBUTING.md); as regras de convivência estão no
+[Código de Conduta](CODE_OF_CONDUCT.md).
+
 ## Licença
 
 [MIT](LICENSE). Whisper (MIT) · whisper.cpp (MIT) · Tauri (MIT/Apache-2.0) —
