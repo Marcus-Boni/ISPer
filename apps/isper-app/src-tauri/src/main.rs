@@ -363,10 +363,11 @@ fn main() {
             // Vem ANTES do carregamento do modelo: sem modelo, é ela quem orienta
             // o download — as Configurações só abrem sozinhas se ela não existir.
             // (No setup a criação direta é segura; fora dele, ver `open_or_focus`.)
-            if cfg.show_home_on_launch && !autostarted {
-                if let Err(e) = build_home(app.handle()) {
-                    tracing::error!("não consegui abrir a tela Início: {e}");
-                }
+            if cfg.show_home_on_launch
+                && !autostarted
+                && let Err(e) = build_home(app.handle())
+            {
+                tracing::error!("não consegui abrir a tela Início: {e}");
             }
 
             // O modelo (~0,5 GB) carrega em background p/ não travar o startup.
