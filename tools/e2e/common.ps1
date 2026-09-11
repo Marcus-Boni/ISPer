@@ -54,6 +54,7 @@ function Start-Isper {
   [Environment]::SetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS', $null, 'Process')
   foreach ($k in $Env.Keys) { [Environment]::SetEnvironmentVariable($k, $null, 'Process') }
   if ($NoCdp) { Start-Sleep -Seconds 4; return $true }
+  $lastError = ''
   for ($i = 0; $i -lt 40; $i++) {
     Start-Sleep -Seconds 1
     try {
@@ -61,8 +62,21 @@ function Start-Isper {
         Start-Sleep -Seconds 3
         return $true
       }
-    } catch {}
+    } catch { $lastError = $_.Exception.Message }
   }
+  # Nao abriu: diz por que, em vez de so "FALHA" (processos, porta, log).
+  "  (diagnostico) ultimo erro ao consultar a porta CDP $script:CdpPort`: $lastError"
+  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -in 'isper-app.exe', 'msedgewebview2.exe' } |
+    ForEach-Object {
+      $cmd = [string]$_.CommandLine
+      if ($cmd.Length -gt 220) { $cmd = $cmd.Substring(0, 220) + '...' }
+      "  (diagnostico) $($_.Name) pid=$($_.ProcessId) ppid=$($_.ParentProcessId) $cmd"
+    }
+  $listening = @(netstat -ano 2>$null | Select-String ":$script:CdpPort ")
+  "  (diagnostico) netstat porta $script:CdpPort`: $(if ($listening.Count) { ($listening | ForEach-Object { $_.Line.Trim() }) -join ' | ' } else { 'nada escutando' })"
+  $log = Get-TodayLog
+  if (Test-Path $log) { Get-Content $log -Tail 25 | ForEach-Object { "  (log) $_" } } else { "  (diagnostico) sem log em $log" }
   return $false
 }
 

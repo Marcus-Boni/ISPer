@@ -126,6 +126,26 @@ jobs:
         shell: pwsh
         run: .\tools\e2e\smoke.ps1 -Exe .\target\release\isper-app.exe
 
+      # Quando o smoke falha, o que interessa e o que o runner tinha na hora:
+      # processos do app e do WebView2 (com a linha de comando), quem escuta a
+      # porta CDP e o fim do log do ISPer.
+      - name: Diagnostico da falha
+        if: failure()
+        shell: pwsh
+        run: |
+          "--- processos ---"
+          Get-CimInstance Win32_Process | Where-Object { $_.Name -in 'isper-app.exe', 'msedgewebview2.exe' } |
+            ForEach-Object { "$($_.Name) pid=$($_.ProcessId) ppid=$($_.ParentProcessId) $([string]$_.CommandLine)" }
+          "--- porta 9223 ---"
+          netstat -ano | Select-String ':9223' | ForEach-Object { $_.Line.Trim() }
+          "--- IPv6 / localhost ---"
+          foreach ($u in 'http://localhost:9223/json', 'http://[::1]:9223/json') {
+            try { $r = Invoke-RestMethod $u -TimeoutSec 3; "$u -> $(@($r).Count) alvos" } catch { "$u -> $($_.Exception.Message)" }
+          }
+          "--- log do ISPer ---"
+          Get-ChildItem "$env:LOCALAPPDATA\com.isper.desktop\logs" -ErrorAction SilentlyContinue |
+            ForEach-Object { "== $($_.Name) =="; Get-Content $_.FullName -Tail 80 }
+
       # O contexto `env` do Actions não enxerga as variáveis da máquina
       # (LOCALAPPDATA): o caminho do log é exportado pelo shell.
       - name: Encerra o app e localiza o log
