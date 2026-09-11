@@ -782,4 +782,71 @@ mod tests {
         assert!(md.contains("**[00:05] Participante 1:** Oi.\n"));
         assert!(md.contains("---\n\n## Resumo\nCurto.\n\n> Resumo gerado por IA"));
     }
+
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        /// O corte nunca passa do buffer; quando há espaço para procurar, cai
+        /// numa fronteira de frame dentro do último 1,5 s. Buffers curtos
+        /// (sem duas janelas de busca) são despachados inteiros.
+        #[test]
+        fn corte_fica_no_buffer_e_em_fronteira_de_frame(
+            samples in proptest::collection::vec(-1.0f32..1.0, 0..20_000),
+            rate in prop_oneof![Just(8_000u32), Just(16_000), Just(48_000)],
+            ch in 1usize..=2,
+        ) {
+            let cut = quiet_cut(&samples, rate, ch);
+            prop_assert!(cut <= samples.len());
+            let frames = samples.len() / ch;
+            let win = (rate as usize / 10).max(1);
+            let search = ((rate as usize) * 3 / 2).min(frames);
+            if search >= win * 2 {
+                prop_assert_eq!(cut % ch, 0);
+                prop_assert!(cut / ch >= frames - search);
+                prop_assert!(cut / ch <= frames);
+            } else {
+                prop_assert_eq!(cut, samples.len());
+            }
+        }
+
+        /// Um trecho de silêncio (300 ms) dentro do último 1,5 s é onde o corte
+        /// cai, qualquer que seja o ruído em volta — o bloco nunca parte uma
+        /// palavra cercada de silêncio.
+        #[test]
+        fn corte_cai_no_silencio(
+            rate in prop_oneof![Just(16_000u32), Just(48_000)],
+            ch in 1usize..=2,
+            secs in 2.0f32..6.0,
+            // Onde o silêncio começa, contado do fim (dentro do 1,5 s pesquisado).
+            from_end_ms in 400u32..1_400,
+            seed in any::<u64>(),
+        ) {
+            let frames = (secs * rate as f32) as usize;
+            let silence_len = rate as usize * 3 / 10;
+            let silence_start = frames - from_end_ms as usize * rate as usize / 1000;
+            let mut state = seed | 1;
+            let mut buf = Vec::with_capacity(frames * ch);
+            for f in 0..frames {
+                let v = if (silence_start..silence_start + silence_len).contains(&f) {
+                    0.0
+                } else {
+                    // Ruído alto (módulo entre 0,2 e 1,0), sinal por xorshift.
+                    state ^= state << 13;
+                    state ^= state >> 7;
+                    state ^= state << 17;
+                    let mag = 0.2 + (state % 800) as f32 / 1000.0;
+                    if state & 2 == 0 { mag } else { -mag }
+                };
+                buf.extend(std::iter::repeat_n(v, ch));
+            }
+            let cut_frame = quiet_cut(&buf, rate, ch) / ch;
+            prop_assert!(
+                (silence_start..=silence_start + silence_len).contains(&cut_frame),
+                "corte em {cut_frame}, silêncio em {silence_start}..{}",
+                silence_start + silence_len
+            );
+        }
+    }
 }

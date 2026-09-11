@@ -25,3 +25,6 @@ sysinfo = "0.39"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+proptest = "1.11"
