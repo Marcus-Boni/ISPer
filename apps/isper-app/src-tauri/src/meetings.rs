@@ -170,10 +170,10 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
         &result,
         Some(&md_path.to_string_lossy()),
     )?;
-    if !moments.is_empty() {
-        if let Err(e) = store.save_moments(meeting_id, &moments) {
-            tracing::warn!("não consegui guardar os momentos marcados: {e}");
-        }
+    if !moments.is_empty()
+        && let Err(e) = store.save_moments(meeting_id, &moments)
+    {
+        tracing::warn!("não consegui guardar os momentos marcados: {e}");
     }
 
     // Fase 5: título + resumo por IA de nuvem, numa chamada — só o TEXTO do
@@ -421,9 +421,10 @@ pub(crate) async fn toggle_meeting_cmd(app: AppHandle) -> Result<(), String> {
 /// Falas já transcritas da reunião em andamento (para quem abre o Início no meio).
 #[tauri::command]
 pub(crate) fn live_transcript(app: AppHandle) -> Vec<LiveSegment> {
+    // Edição 2024: os temporários da expressão final (State, MutexGuard) são
+    // soltos antes das variáveis locais — o `let` intermediário de antes saiu.
     let state = app.state::<AppState>();
-    let live = state.live.lock().unwrap().clone();
-    live
+    state.live.lock().unwrap().clone()
 }
 
 /// Marca o instante atual da reunião ("★"). Fica no estado até o fim da
@@ -438,10 +439,10 @@ pub(crate) fn mark_moment(app: &AppHandle) -> anyhow::Result<f32> {
     let at = started.elapsed().as_secs_f32();
     {
         let mut moments = state.moments.lock().unwrap();
-        if let Some(last) = moments.last().copied() {
-            if at - last < MARK_DEBOUNCE.as_secs_f32() {
-                return Ok(last);
-            }
+        if let Some(last) = moments.last().copied()
+            && at - last < MARK_DEBOUNCE.as_secs_f32()
+        {
+            return Ok(last);
         }
         moments.push(at);
     }

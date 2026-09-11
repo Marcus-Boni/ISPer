@@ -75,10 +75,10 @@ pub fn show(toast: Toast<'_>, on_click: impl FnMut() + Send + 'static) -> anyhow
         if let Some(l2) = toast.line2 {
             t = t.text2(l2);
         }
-        if let Ok(icon) = icon_path() {
-            if icon.exists() {
-                t = t.icon(&icon, IconCrop::Circular, "ISPer");
-            }
+        if let Ok(icon) = icon_path()
+            && icon.exists()
+        {
+            t = t.icon(&icon, IconCrop::Circular, "ISPer");
         }
         let cb = Arc::clone(&on_click);
         t.on_activated(move |_args| {
