@@ -22,3 +22,6 @@ apps/isper-app/src-tauri/resources/
 # Chave privada de assinatura das atualizações (fica em %USERPROFILE%\.tauri, nunca aqui)
 *.key
 *.key.pub
+
+# Captura de teste do `loopdump` (7,7 MB) — gerada localmente, nunca versionar
+/loopdump.wav
