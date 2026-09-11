@@ -8,6 +8,13 @@ $script:CdpPort = 9223
 $script:Checks = 0
 $script:Failures = 0
 
+# Os scripts sao feitos de verificacoes (Check) e seguem em frente quando uma
+# falha; um erro nao-terminante ou um exe saindo com codigo != 0 (o cdp.mjs
+# quando a janela ainda nao existe) NAO pode abortar o roteiro. O GitHub
+# Actions roda o pwsh com ErrorActionPreference=Stop: aqui voltamos ao normal.
+$ErrorActionPreference = 'Continue'
+$PSNativeCommandUseErrorActionPreference = $false
+
 function Get-IsperExe {
   # Exe a testar: o informado, senão o instalado, senão o de desenvolvimento.
   param([string]$Exe)
@@ -125,7 +132,32 @@ function EvJson {
   param([Parameter(Mandatory)][string]$Target, [Parameter(Mandatory)][string]$Expr)
   $raw = Ev $Target $Expr
   if (-not $raw) { return $null }
-  try { return (($raw | ConvertFrom-Json) | ConvertFrom-Json) } catch { return ($raw | ConvertFrom-Json) }
+  # "alvo nao encontrado", "TIMEOUT" e "EXCEPTION" nao sao JSON: viram $null
+  # (a verificacao falha, o roteiro continua) em vez de abortar o script.
+  try { return (($raw | ConvertFrom-Json -ErrorAction Stop) | ConvertFrom-Json -ErrorAction Stop) } catch {}
+  try { return ($raw | ConvertFrom-Json -ErrorAction Stop) } catch {
+    Write-Host "  (diagnostico) resposta nao-JSON de '$Target': $raw"
+    return $null
+  }
+}
+
+function Wait-IsperWindow {
+  # Espera a janela (trecho da URL, ex.: 'library.html') aparecer entre os alvos
+  # CDP — ate $Seconds. Um sleep fixo nao serve: o runner do CI abre janelas
+  # bem mais devagar que a maquina de desenvolvimento.
+  param([Parameter(Mandatory)][string]$Target, [int]$Seconds = 20)
+  for ($i = 0; $i -lt $Seconds * 2; $i++) {
+    try {
+      $targets = @(Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json" -TimeoutSec 2)
+      if ($targets | Where-Object { $_.type -eq 'page' -and $_.url -like "*$Target*" }) {
+        Start-Sleep -Milliseconds 800   # a pagina ainda esta montando o DOM
+        return $true
+      }
+    } catch {}
+    Start-Sleep -Milliseconds 500
+  }
+  Write-Host "  (diagnostico) a janela '$Target' nao apareceu em $Seconds s"
+  return $false
 }
 
 function Invoke-Isper {

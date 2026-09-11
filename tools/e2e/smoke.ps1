@@ -25,12 +25,14 @@ $errs = Get-JsErrors 'home.html'
 Check (@($errs).Count -eq 0) "Inicio sem erros de JS$(Format-JsErrors $errs)"
 
 Invoke-Isper 'open_library_window' '{ meeting: null }' | Out-Null
-Start-Sleep -Seconds 4
+Wait-IsperWindow 'library.html' | Out-Null
+Start-Sleep -Seconds 2
 $lib = EvJson 'library.html' 'JSON.stringify({ items: document.querySelectorAll(".item").length, errors: window.__isperErrors || [] })'
 Check ($null -ne $lib -and @($lib.errors).Count -eq 0) "Biblioteca abriu sem erros de JS ($($lib.items) reunioes listadas)$(Format-JsErrors $lib.errors)"
 
 Invoke-Isper 'open_settings_window' | Out-Null
-Start-Sleep -Seconds 4
+Wait-IsperWindow 'settings.html' | Out-Null
+Start-Sleep -Seconds 2
 $s = Invoke-Isper 'get_settings' 'undefined' 'settings.html'
 Check ($s.version -eq $st.version) "Configuracoes: versao $($s.version) (igual ao Inicio)"
 $errs = Get-JsErrors 'settings.html'
