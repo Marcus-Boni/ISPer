@@ -44,6 +44,69 @@ pub(crate) fn sanitize(original: &str, polished: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::LlmError;
+    use crate::testing::FakeProvider;
+
+    #[test]
+    fn polimento_manda_so_o_texto_com_o_estilo_e_limpa_a_resposta() {
+        let fake = FakeProvider::replying("\"Bom dia, tudo bem? Mando o relatório hoje.\"");
+        let out = polish_dictation(
+            &fake,
+            "é, bom dia, hã, tudo bem? então, mando o relatório hoje",
+            "formal",
+        )
+        .unwrap();
+        assert_eq!(out, "Bom dia, tudo bem? Mando o relatório hoje.");
+        let (system, user) = fake.single_call();
+        // O ditado vai cru no `user`, sem moldura — o modelo só revisa.
+        assert_eq!(
+            user,
+            "é, bom dia, hã, tudo bem? então, mando o relatório hoje"
+        );
+        assert!(system.contains("tom profissional e formal"));
+        assert!(system.contains("NÃO acrescente nem remova"));
+    }
+
+    #[test]
+    fn estilo_desconhecido_vira_neutro_e_casual_e_reconhecido() {
+        for (style, hint) in [
+            ("clean", "neutro"),
+            ("qualquer-coisa", "neutro"),
+            ("casual", "tom natural e leve"),
+        ] {
+            let fake = FakeProvider::replying("ok");
+            polish_dictation(&fake, "ok", style).unwrap();
+            assert!(fake.single_call().0.contains(hint), "estilo {style}");
+        }
+        assert!(POLISH_STYLES.contains(&"clean"));
+    }
+
+    #[test]
+    fn resposta_fora_do_padrao_devolve_o_original() {
+        let original = "anota aí: reunião com o fornecedor às três";
+        for reply in [
+            "",
+            "Claro! Aqui está o texto revisado, com as melhorias que você pediu, \
+            além de algumas sugestões extras que podem ajudar na comunicação com o fornecedor \
+            e uma explicação detalhada do que foi alterado em cada trecho.",
+            "ok",
+        ] {
+            let fake = FakeProvider::replying(reply);
+            assert_eq!(
+                polish_dictation(&fake, original, "clean").unwrap(),
+                original
+            );
+        }
+    }
+
+    #[test]
+    fn erro_do_provider_e_propagado_para_o_app_colar_o_original() {
+        let fake = FakeProvider::failing(|| LlmError::NoApiKey("groq".into()));
+        assert!(matches!(
+            polish_dictation(&fake, "bom dia", "clean"),
+            Err(LlmError::NoApiKey(p)) if p == "groq"
+        ));
+    }
 
     #[test]
     fn mantem_original_quando_resposta_nao_serve() {

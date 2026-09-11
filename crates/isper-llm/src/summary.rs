@@ -125,6 +125,81 @@ fn shorten_middle(text: &str, max_chars: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::LlmError;
+    use crate::testing::FakeProvider;
+
+    const TRANSCRIPT: &str = "# Reunião\n\n**[00:00] Eu:** Vamos revisar o lead time do MRP.\n\
+**[00:12] Participante 1:** Fechado, mando a planilha até sexta.\n\n\
+## Momentos marcados\n\n- **[00:12]** Participante 1: Fechado, mando a planilha até sexta.\n";
+
+    #[test]
+    fn resumo_com_titulo_manda_o_transcript_e_separa_o_titulo() {
+        let fake = FakeProvider::replying(
+            "TÍTULO: Revisão do lead time do MRP\n\n## Resumo\nRevisamos o lead time.\n\n\
+## Pontos principais\n- Planilha até sexta.\n\n## Action items\n- [ ] Planilha — Participante 1\n\n\
+## Decisões\nNenhuma registrada.",
+        );
+        let summary = summarize_meeting_titled(&fake, TRANSCRIPT).unwrap();
+        assert_eq!(
+            summary.title.as_deref(),
+            Some("Revisão do lead time do MRP")
+        );
+        assert!(
+            summary
+                .body
+                .starts_with("## Resumo\nRevisamos o lead time.")
+        );
+        assert!(summary.body.ends_with("Nenhuma registrada."));
+
+        let (system, user) = fake.single_call();
+        assert!(system.contains("português do Brasil"));
+        assert!(system.contains("NÃO invente"));
+        // O transcript vai inteiro (cabe no limite) e o pedido explica os
+        // falantes, o formato do título e a seção de momentos marcados.
+        assert!(user.contains(TRANSCRIPT));
+        assert!(user.contains("TÍTULO: <título curto"));
+        assert!(user.contains("\"Eu\" é a pessoa que gravou"));
+        assert!(user.contains("Momentos marcados"));
+        for section in [
+            "## Resumo",
+            "## Pontos principais",
+            "## Action items",
+            "## Decisões",
+        ] {
+            assert!(user.contains(section), "pedido sem a seção {section}");
+        }
+    }
+
+    #[test]
+    fn summarize_meeting_devolve_so_o_corpo() {
+        let fake = FakeProvider::replying("TÍTULO: Kickoff\n\n## Resumo\nCorpo.");
+        assert_eq!(
+            summarize_meeting(&fake, TRANSCRIPT).unwrap(),
+            "## Resumo\nCorpo."
+        );
+    }
+
+    #[test]
+    fn transcript_gigante_vai_encurtado_pelo_meio() {
+        let fake = FakeProvider::replying("TÍTULO: Longa\n\n## Resumo\nx");
+        let head = "INICIO-DA-REUNIAO ";
+        let tail = " FIM-DA-REUNIAO";
+        let long = format!("{head}{}{tail}", "miolo ".repeat(20_000));
+        assert!(long.chars().count() > MAX_TRANSCRIPT_CHARS);
+        summarize_meeting_titled(&fake, &long).unwrap();
+        let (_, user) = fake.single_call();
+        assert!(user.contains("[... trecho do meio omitido por tamanho ...]"));
+        assert!(user.contains(head.trim()) && user.contains(tail.trim()));
+        // O que sai da máquina fica limitado ao excerto + o pedido em si.
+        assert!(user.chars().count() < MAX_TRANSCRIPT_CHARS + 2_000);
+    }
+
+    #[test]
+    fn erro_do_provider_e_propagado_sem_inventar_resumo() {
+        let fake = FakeProvider::failing(|| LlmError::Http("status 429: rate limit".into()));
+        let err = summarize_meeting_titled(&fake, TRANSCRIPT).unwrap_err();
+        assert!(matches!(err, LlmError::Http(m) if m.contains("429")));
+    }
 
     #[test]
     fn separa_titulo_do_corpo() {

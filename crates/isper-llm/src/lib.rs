@@ -15,6 +15,8 @@ mod polish;
 mod providers;
 mod settings;
 mod summary;
+#[cfg(test)]
+pub(crate) mod testing;
 
 pub use embeddings::{Embedder, EmbeddingSettings, embedder_from_settings};
 pub use insights::{InsightsInput, live_insights};
