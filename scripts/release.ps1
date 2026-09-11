@@ -16,8 +16,15 @@
     - GPU: --config tauri.gpu.conf.json  → dist\v<v>\ISPer_<v>_x64-setup.exe (+ .sig, latest.json)
     - CPU: --config tauri.cpu.conf.json --no-default-features, em target-cpu\
            → dist\v<v>\ISPer_<v>_x64-cpu-setup.exe (+ .sig, latest-cpu.json)
+  Depois do build, scripts/release-assets.ps1 assina os instaladores para o atualizador
+  (minisign), escreve latest.json/latest-cpu.json, o SBOM CycloneDX do app (cargo cyclonedx;
+  -SkipSbom pula) e SHA256SUMS.txt - a mesma logica que o job "publish" do release.yml usa.
   Publicação (-Publish): `gh release create v<v>` com todos os arquivos de dist\v<v>. A tag criada
-  dispara o workflow release.yml, que valida tag × manifests × CHANGELOG e roda os testes.
+  dispara o workflow release.yml, que valida tag × manifests × CHANGELOG, roda os testes e
+  compila os instaladores nos runners do GitHub (anexando o que faltar na release).
+
+  Este e o caminho de RESERVA: o caminho principal e o release.yml (push da tag v<v>), que
+  compila nos runners hospedados do GitHub - exigencia da SignPath Foundation para assinar.
 
 .EXAMPLE
   .\scripts\release.ps1                       # gera as duas variantes em dist\v<versão>\
@@ -32,6 +39,7 @@ param(
   [string]$Notes = "",
   [switch]$AllowDirty,
   [switch]$SkipCiCheck,
+  [switch]$SkipSbom,
   [string]$KeyPath = "$env:USERPROFILE\.tauri\isper.key"
 )
 $ErrorActionPreference = 'Stop'
@@ -159,38 +167,15 @@ if (-not $SkipBuild) {
   "ISPer $version - reaproveitando os artefatos de $dist (-SkipBuild)"
 }
 
-# --- 4) manifests do atualizador
-function Write-Latest([string]$setup, [string]$name, [string]$path) {
-  $latest = [ordered]@{
-    version   = $version
-    notes     = $notes
-    pub_date  = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-    platforms = [ordered]@{
-      'windows-x86_64' = [ordered]@{
-        signature = (Get-Content "$setup.sig" -Raw).Trim()
-        url       = "https://github.com/Marcus-Boni/ISPer/releases/download/$tag/$name"
-      }
-    }
-  }
-  [System.IO.File]::WriteAllText($path, ($latest | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding $false))
-}
-$files = @()
-if ($wantGpu) {
-  if (-not (Test-Path $gpuSetup)) { throw "instalador GPU ausente: $gpuSetup" }
-  Write-Latest $gpuSetup (Split-Path $gpuSetup -Leaf) (Join-Path $dist 'latest.json')
-  $files += $gpuSetup, "$gpuSetup.sig", (Join-Path $dist 'latest.json')
-}
-if ($wantCpu) {
-  if (-not (Test-Path $cpuSetup)) { throw "instalador CPU ausente: $cpuSetup" }
-  Write-Latest $cpuSetup (Split-Path $cpuSetup -Leaf) (Join-Path $dist 'latest-cpu.json')
-  $files += $cpuSetup, "$cpuSetup.sig", (Join-Path $dist 'latest-cpu.json')
-}
+# --- 4) assinatura do atualizador, manifests, SBOM e somas SHA-256 - a mesma logica do job
+# "publish" do release.yml (scripts/release-assets.ps1).
+if ($wantGpu -and -not (Test-Path $gpuSetup)) { throw "instalador GPU ausente: $gpuSetup" }
+if ($wantCpu -and -not (Test-Path $cpuSetup)) { throw "instalador CPU ausente: $cpuSetup" }
+$assetArgs = @{ Dist = $dist; Version = $version; KeyPath = $KeyPath }
+if ($SkipSbom) { $assetArgs.SkipSbom = $true }
+& (Join-Path $PSScriptRoot 'release-assets.ps1') @assetArgs
 $notesFile = Join-Path $dist 'release-notes.md'
-[System.IO.File]::WriteAllText($notesFile, $notes, (New-Object System.Text.UTF8Encoding $false))
-
-""
-"Artefatos em ${dist}:"
-foreach ($f in $files) { $fi = Get-Item $f; "  {0,-38} {1,8:N1} MB" -f $fi.Name, ($fi.Length / 1MB) }
+$files = Get-ChildItem $dist -File | Where-Object { $_.Name -ne 'release-notes.md' } | Sort-Object Name | ForEach-Object { $_.FullName }
 
 # --- 5) publicar
 if ($Publish) {

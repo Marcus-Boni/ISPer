@@ -1,52 +1,396 @@
-# Validação da release por tag. Os instaladores (GPU/CUDA e CPU) são gerados e
-# assinados localmente por scripts/release.ps1 — o toolkit CUDA e os binários
-# pré-compilados do sherpa-onnx não compilam/ligam nos runners do GitHub. Quando
-# o script cria a release (e a tag v<versão>), este workflow confere que a tag
-# bate com os manifests e com o CHANGELOG e roda a mesma bateria do CI.
+# Release do ISPer no GitHub Actions: os dois instaladores (GPU/CUDA e CPU) compilados em
+# runners HOSPEDADOS do GitHub, SBOM CycloneDX, somas SHA-256, assinatura do atualizador
+# (minisign) e — quando a SignPath Foundation aprovar o projeto — assinatura Authenticode.
 #
-# Também pode ser disparado à mão (workflow_dispatch) para validar uma versão
-# antes de lançá-la.
+# Por que runners hospedados, e não um runner na máquina do mantenedor: a SignPath só assina
+# artefatos de projetos OSS cujos jobs rodaram TODOS em runners do GitHub, e um runner
+# self-hosted num repositório público executaria código de qualquer PR. O CUDA compila aqui
+# porque o toolkit é instalado no runner (Jimver/cuda-toolkit) e o whisper.cpp é gerado com
+# Ninja no ambiente do MSVC; o sherpa-onnx vem do pré-compilado que o sherpa-rs baixa.
+#
+# Gatilhos:
+#   - push da tag v<versão>: valida tag × Cargo.toml × CHANGELOG, roda o CI, compila as duas
+#     variantes, gera o SBOM e publica a release (ou, se ela já existe — fluxo local do
+#     scripts/release.ps1 —, só anexa o SBOM; nunca substitui instaladores publicados).
+#   - workflow_dispatch: ENSAIO — compila e guarda os artefatos por 30 dias; publica só se
+#     "publish" for marcado (aí a tag precisa existir e bater com o Cargo.toml).
+#
+# Segredos e variáveis do repositório (Settings → Secrets and variables → Actions):
+#   TAURI_SIGNING_PRIVATE_KEY   (segredo) chave minisign do atualizador — só o job publish a vê
+#   SIGNPATH_API_TOKEN          (segredo) token da SignPath; SIGNPATH_ORGANIZATION_ID,
+#   SIGNPATH_PROJECT_SLUG, SIGNPATH_POLICY_SLUG (variáveis) — o job de assinatura só roda
+#   quando as três variáveis existem, ou seja, depois da aprovação da Foundation.
 name: Release
 
 on:
   push:
     tags: ['v*']
+    # TEMPORARIO (ensaio do pipeline na branch de desenvolvimento) — remover antes do merge.
+    branches: ['fase-7.3-release-ci']
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag a validar (ex.: v0.12.0)'
-        required: true
-        type: string
+      publish:
+        description: 'Publicar a release no GitHub (senão, só gera e guarda os artefatos)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
 
 jobs:
   consistencia:
     name: tag × Cargo.toml × CHANGELOG
     runs-on: windows-latest
     timeout-minutes: 10
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
 
-      # A versão vive só no Cargo.toml do app (o tauri.conf.json não a repete:
-      # o Tauri lê de lá). A tag e a seção do CHANGELOG precisam bater com ela.
-      - name: Tag bate com Cargo.toml e tem seção no CHANGELOG
+      # A versão vive só no Cargo.toml do app (o tauri.conf.json não a repete: o Tauri lê de
+      # lá). Numa tag, ela tem de bater; sempre, a seção do CHANGELOG tem de existir.
+      - name: Versão, tag e seção do CHANGELOG
+        id: check
         shell: pwsh
         env:
-          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
-          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          $tag = if ($env:EVENT_NAME -eq 'push') { $env:REF_NAME } else { $env:INPUT_TAG }
-          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "tag '$tag' fora do padrao vMAJOR.MINOR.PATCH" }
-          $version = $tag.TrimStart('v')
-          $cargo = (Select-String -Path apps/isper-app/src-tauri/Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
-          if ($cargo -ne $version) { throw "Cargo.toml esta em $cargo, a tag e $tag" }
+          $version = (Select-String -Path apps/isper-app/src-tauri/Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          $tag = "v$version"
+          if ($env:REF_TYPE -eq 'tag') {
+            if ($env:REF_NAME -notmatch '^v\d+\.\d+\.\d+$') { throw "tag '$env:REF_NAME' fora do padrao vMAJOR.MINOR.PATCH" }
+            if ($env:REF_NAME -ne $tag) { throw "Cargo.toml esta em $version, a tag e $env:REF_NAME" }
+          }
           $conf = Get-Content apps/isper-app/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
           if ($null -ne $conf.version) { throw "tauri.conf.json nao deve declarar 'version' (fonte unica: Cargo.toml)" }
           $pattern = '^## \[' + [regex]::Escape($version) + '\]'
           if (-not (Select-String -Path CHANGELOG.md -Pattern $pattern -Quiet)) { throw "CHANGELOG.md sem a secao '## [$version]'" }
-          "Tag $tag consistente: Cargo.toml em $version e CHANGELOG com a secao." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "version=$version"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "tag=$tag"
+          "Versao $version consistente (tag $tag; secao no CHANGELOG)." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
 
   ci:
     name: fmt · test · check
     needs: consistencia
     uses: ./.github/workflows/ci.yml
+
+  build:
+    name: instalador ${{ matrix.variant }}
+    needs: consistencia
+    runs-on: windows-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: cpu
+            config: tauri.cpu.conf.json
+            features: '--no-default-features'
+          - variant: gpu
+            config: tauri.gpu.conf.json
+            features: ''
+    env:
+      VERSION: ${{ needs.consistencia.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Canal do Rust (rust-toolchain.toml)
+        id: toolchain
+        shell: pwsh
+        run: |
+          $m = Select-String -Path rust-toolchain.toml -Pattern '^channel\s*=\s*"([^"]+)"'
+          if (-not $m) { throw "rust-toolchain.toml sem 'channel'" }
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "channel=$($m.Matches[0].Groups[1].Value)"
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+
+      # Ver o comentário equivalente em ci.yml: a pasta do sherpa-onnx pré-compilado precisa
+      # viajar no cache junto com o target/.
+      - name: Pasta do sherpa-onnx pré-compilado
+        shell: pwsh
+        run: Add-Content -Path $env:GITHUB_ENV -Value "SHERPA_CACHE=$env:LOCALAPPDATA\sherpa-rs"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.variant }}
+          cache-directories: ${{ env.SHERPA_CACHE }}
+          cache-on-failure: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # --- só a variante GPU: toolkit CUDA, ambiente do MSVC (o nvcc precisa do cl.exe no
+      # PATH) e Ninja como gerador — assim o CMake não depende da integração do CUDA com o
+      # MSBuild. `-allow-unsupported-compiler`: o MSVC do runner pode ser mais novo do que o
+      # nvcc conhece. A arquitetura (89) e os flags /O2 vêm do .cargo/config.toml, como na
+      # máquina do mantenedor.
+      - name: CUDA Toolkit 13.3
+        if: matrix.variant == 'gpu'
+        id: cuda
+        uses: Jimver/cuda-toolkit@v0.2.36
+        with:
+          cuda: '13.3.1'
+          method: network
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
+          use-github-cache: true
+
+      - name: Ambiente do MSVC
+        if: matrix.variant == 'gpu'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Variáveis do build CUDA e DLLs de runtime para o instalador
+        if: matrix.variant == 'gpu'
+        shell: pwsh
+        env:
+          CUDA_HOME: ${{ steps.cuda.outputs.CUDA_PATH }}
+        run: |
+          foreach ($kv in @("CUDA_PATH=$env:CUDA_HOME", "CUDA_PATH_V13_3=$env:CUDA_HOME", "CUDAToolkit_ROOT=$env:CUDA_HOME", "CUDACXX=$env:CUDA_HOME\bin\nvcc.exe", "CMAKE_GENERATOR=Ninja", "CMAKE_CUDA_FLAGS=-allow-unsupported-compiler")) {
+            Add-Content -Path $env:GITHUB_ENV -Value $kv
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value "$env:CUDA_HOME\bin"
+          & "$env:CUDA_HOME\bin\nvcc.exe" --version | Select-Object -Last 2
+          cl.exe 2>&1 | Select-Object -First 1
+          "ninja $(ninja --version)"
+          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/cuda | Out-Null
+          foreach ($dll in 'cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll') {
+            $src = Get-ChildItem "$env:CUDA_HOME\bin" -Recurse -Filter $dll | Select-Object -First 1
+            if (-not $src) { throw "DLL do CUDA nao encontrada no toolkit: $dll" }
+            Copy-Item $src.FullName "apps/isper-app/src-tauri/resources/cuda/$dll" -Force
+          }
+          Get-ChildItem apps/isper-app/src-tauri/resources/cuda | Select-Object Name, Length | Format-Table -AutoSize | Out-String | Write-Output
+
+      # As DLLs que o instalador embute (bundle.resources): sherpa-onnx, do pré-compilado que
+      # o build script do sherpa-rs baixa (um `cargo build` do isper-diarize faz o download
+      # acontecer antes do tauri build), e o runtime do Visual C++, do Visual Studio do runner.
+      - name: DLLs do sherpa-onnx e do runtime do VC para o instalador
+        shell: pwsh
+        run: |
+          cargo build --release ${{ matrix.features }} -p isper-diarize
+          if ($LASTEXITCODE -ne 0) { throw "cargo build isper-diarize falhou ($LASTEXITCODE)" }
+          $libs = @(Get-ChildItem "$env:LOCALAPPDATA\sherpa-rs" -Recurse -Filter *.dll -ErrorAction SilentlyContinue)
+          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/sherpa | Out-Null
+          foreach ($dll in 'sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll') {
+            $src = $libs | Where-Object Name -eq $dll | Select-Object -First 1
+            if (-not $src) { throw "DLL do sherpa-onnx ausente no pre-compilado: $dll" }
+            Copy-Item $src.FullName "apps/isper-app/src-tauri/resources/sherpa/$dll" -Force
+          }
+          $crt = @()
+          foreach ($vsRoot in @("${env:ProgramFiles}\Microsoft Visual Studio", "${env:ProgramFiles(x86)}\Microsoft Visual Studio")) {
+            if (Test-Path $vsRoot) { $crt += Resolve-Path "$vsRoot\*\*\VC\Redist\MSVC\*\x64\Microsoft.VC14*.CRT" -ErrorAction SilentlyContinue }
+          }
+          $crt = $crt | Sort-Object { $_.Path } -Descending | Select-Object -First 1
+          if (-not $crt) { throw "runtime do Visual C++ (VC\Redist\MSVC\<versao>\x64\Microsoft.VC14x.CRT) nao encontrado no runner" }
+          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/vcredist | Out-Null
+          foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+            Copy-Item (Join-Path $crt.Path $dll) "apps/isper-app/src-tauri/resources/vcredist/$dll" -Force
+          }
+          "runtime do VC: $($crt.Path)"
+
+      # O tauri build só gera o instalador. A assinatura do atualizador (.sig) fica para o job
+      # publish — depois de uma eventual assinatura Authenticode, que muda os bytes —, por isso
+      # createUpdaterArtifacts é desligado aqui por um --config em linha.
+      - name: tauri build (${{ matrix.variant }})
+        shell: pwsh
+        working-directory: apps/isper-app
+        env:
+          FEATURES: ${{ matrix.features }}
+          CONFIG: ${{ matrix.config }}
+        run: |
+          $conf = (Resolve-Path "src-tauri/$env:CONFIG").Path
+          $npxArgs = @('--yes', '@tauri-apps/cli@^2', 'build', '--bundles', 'nsis', '--ci', '--config', $conf, '--config', '{"bundle":{"createUpdaterArtifacts":false}}')
+          if ($env:FEATURES) { $npxArgs += '--'; $npxArgs += $env:FEATURES }
+          npx @npxArgs
+          if ($LASTEXITCODE -ne 0) { throw "tauri build falhou ($LASTEXITCODE)" }
+
+      - name: Reúne o instalador
+        shell: pwsh
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          $built = Get-ChildItem target/release/bundle/nsis -Filter 'ISPer_*_x64-setup.exe' | Select-Object -First 1
+          if (-not $built) { throw "instalador nao encontrado em target/release/bundle/nsis" }
+          $name = if ($env:VARIANT -eq 'cpu') { "ISPer_${env:VERSION}_x64-cpu-setup.exe" } else { "ISPer_${env:VERSION}_x64-setup.exe" }
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item $built.FullName "out/$name"
+          "{0}  {1:N1} MB" -f $name, ((Get-Item "out/$name").Length / 1MB) | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.variant }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
+
+  # Lista de tudo que entra no binário do app (crates e versões), para quem audita ou
+  # precisa saber se uma vulnerabilidade upstream afeta o ISPer.
+  sbom:
+    name: SBOM (CycloneDX)
+    needs: consistencia
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ needs.consistencia.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Canal do Rust (rust-toolchain.toml)
+        id: toolchain
+        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: sbom
+          cache-on-failure: true
+
+      - run: cargo install cargo-cyclonedx --locked
+
+      # O cargo-cyclonedx escreve um SBOM por crate do workspace; o do app (que já traz core,
+      # llm, models e diarize como dependências) é o publicado, filtrado para o alvo Windows.
+      - name: SBOM do app
+        run: |
+          base="ISPer_${VERSION}_sbom.cdx"
+          cargo cyclonedx --format json --spec-version 1.5 --target x86_64-pc-windows-msvc \
+            --manifest-path apps/isper-app/src-tauri/Cargo.toml --override-filename "$base"
+          mkdir -p out && mv "apps/isper-app/src-tauri/$base.json" out/
+          python3 -c "import json; d=json.load(open('out/$base.json')); print('SBOM: %d componentes (CycloneDX %s)' % (len(d['components']), d['specVersion']))" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
+
+  # Assinatura Authenticode pela SignPath Foundation — só existe depois da aprovação do
+  # projeto: até lá as três variáveis do repositório não existem e o job é pulado. O
+  # instalador é reenviado como artefato deste job (a SignPath exige o id de um artefato do
+  # mesmo run) e volta assinado; o publish prefere o assinado quando ele existe.
+  sign:
+    name: assinatura Authenticode (SignPath) · ${{ matrix.variant }}
+    needs: [consistencia, build]
+    if: vars.SIGNPATH_ORGANIZATION_ID != '' && vars.SIGNPATH_PROJECT_SLUG != '' && vars.SIGNPATH_POLICY_SLUG != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      matrix:
+        variant: [cpu, gpu]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-${{ matrix.variant }}
+          path: unsigned/
+
+      - uses: actions/upload-artifact@v4
+        id: unsigned
+        with:
+          name: unsigned-${{ matrix.variant }}
+          path: unsigned/
+          retention-days: 1
+
+      - uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.variant }}-signed
+          path: signed/
+          if-no-files-found: error
+          retention-days: 30
+
+  # Publica (ou completa) a release: assina para o atualizador, escreve latest*.json,
+  # SHA256SUMS.txt e o SBOM — a mesma lógica do fluxo local (scripts/release-assets.ps1).
+  publish:
+    name: publica a release
+    needs: [consistencia, ci, build, sbom, sign]
+    if: >-
+      always()
+      && (github.ref_type == 'tag' || inputs.publish == true)
+      && needs.consistencia.result == 'success'
+      && needs.ci.result == 'success'
+      && needs.build.result == 'success'
+      && needs.sbom.result == 'success'
+      && (needs.sign.result == 'success' || needs.sign.result == 'skipped')
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.consistencia.outputs.version }}
+      TAG: ${{ needs.consistencia.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          path: artifacts/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sbom
+          path: artifacts/sbom/
+
+      - name: Fecha os artefatos (prefere o instalador assinado pela SignPath)
+        shell: pwsh
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw "segredo TAURI_SIGNING_PRIVATE_KEY ausente: a release precisa da chave do atualizador" }
+          $dist = "dist/$env:TAG"
+          New-Item -ItemType Directory -Force $dist | Out-Null
+          foreach ($v in 'cpu', 'gpu') {
+            $src = if (Test-Path "artifacts/installer-$v-signed") { "artifacts/installer-$v-signed" } else { "artifacts/installer-$v" }
+            Get-ChildItem $src -Filter '*.exe' -Recurse | Copy-Item -Destination $dist -Force
+          }
+          $sbom = Get-ChildItem artifacts/sbom -Filter '*.cdx.json' -Recurse | Select-Object -First 1
+          ./scripts/release-assets.ps1 -Dist $dist -Version $env:VERSION -Sbom $sbom.FullName
+
+      - name: Cria ou completa a release
+        shell: pwsh
+        run: |
+          $dist = "dist/$env:TAG"
+          $files = Get-ChildItem $dist -File | Where-Object { $_.Name -ne 'release-notes.md' } | Sort-Object Name
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            # Release criada pelo fluxo local (scripts/release.ps1 -Publish): os instaladores
+            # publicados ja estao instalados por ai e o latest.json aponta para eles — nada e
+            # substituido; so o SBOM entra, se ainda nao estava.
+            $existing = @(gh release view $env:TAG --json assets -q '.assets[].name')
+            $sbom = $files | Where-Object { $_.Name -like '*_sbom.cdx.json' -and $existing -notcontains $_.Name }
+            if ($sbom) { gh release upload $env:TAG $sbom.FullName; if ($LASTEXITCODE -ne 0) { throw "gh release upload falhou ($LASTEXITCODE)" } }
+            "Release $env:TAG ja existia (fluxo local); anexado: $(if ($sbom) { $sbom.Name } else { 'nada' })." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          } else {
+            gh release create $env:TAG @($files.FullName) --title "ISPer $env:VERSION" --notes-file "$dist/release-notes.md"
+            if ($LASTEXITCODE -ne 0) { throw "gh release create falhou ($LASTEXITCODE)" }
+            "Release $env:TAG publicada: $(($files | ForEach-Object Name) -join ', ')" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          }
