@@ -478,6 +478,106 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
     })
 }
 
+/// Fonte de amostras de um canal da reunião, vista pelo fatiador de blocos.
+/// Abstrai o microfone (cpal) e o loopback (wasapi) — e, nos testes, uma fonte
+/// de mentira — para que o fatiador não conheça dispositivo nenhum.
+trait AudioFeed {
+    /// Canal por onde chegam as amostras f32 intercaladas.
+    fn receiver(&self) -> &Receiver<Vec<f32>>;
+    /// Taxa e canais do que chega pelo `receiver` (podem mudar num `reopen`:
+    /// o fone sumiu e o padrão do sistema tem outro formato).
+    fn format(&self) -> (u32, u16);
+    /// Depois de quanto tempo sem NENHUMA amostra a fonte é dada como morta e
+    /// reaberta. `None`: a fonte cuida disso sozinha (o loopback tem watchdog).
+    fn stall_timeout(&self) -> Option<Duration>;
+    /// Tolerância maior antes do primeiro pacote (fones Bluetooth demoram).
+    fn first_packet_timeout(&self) -> Option<Duration> {
+        self.stall_timeout().map(|d| d * 3)
+    }
+    /// Reabre a fonte depois de um stall (novo `receiver`/`format`).
+    fn reopen(&mut self) -> Result<()>;
+    /// Encerra a captura (chamado uma vez, ao parar).
+    fn close(&mut self);
+}
+
+/// Microfone do canal "Eu" via cpal. Sabe se reabrir: se o fone for
+/// desconectado no meio da reunião, [`audio::open_input_stream_on`] cai para
+/// o microfone padrão do sistema e a gravação continua.
+struct MicFeed {
+    device: Option<String>,
+    stream: Option<cpal::Stream>,
+    rx: Receiver<Vec<f32>>,
+    sample_rate: u32,
+    channels: u16,
+}
+
+impl MicFeed {
+    fn open(device: Option<String>) -> Result<Self> {
+        use cpal::traits::StreamTrait;
+        let (tx, rx) = unbounded();
+        let (stream, sample_rate, channels) = audio::open_input_stream_on(device.as_deref(), tx)?;
+        stream.play().map_err(audio::audio_err)?;
+        Ok(Self {
+            device,
+            stream: Some(stream),
+            rx,
+            sample_rate,
+            channels,
+        })
+    }
+}
+
+impl AudioFeed for MicFeed {
+    fn receiver(&self) -> &Receiver<Vec<f32>> {
+        &self.rx
+    }
+    fn format(&self) -> (u32, u16) {
+        (self.sample_rate, self.channels)
+    }
+    fn stall_timeout(&self) -> Option<Duration> {
+        Some(audio::MIC_STALL)
+    }
+    fn first_packet_timeout(&self) -> Option<Duration> {
+        Some(audio::MIC_FIRST_PACKET)
+    }
+    fn reopen(&mut self) -> Result<()> {
+        // O stream velho morre primeiro (mesma thread que o criou).
+        drop(self.stream.take());
+        *self = Self::open(self.device.clone())?;
+        Ok(())
+    }
+    fn close(&mut self) {
+        drop(self.stream.take()); // dropar o stream encerra a captura
+    }
+}
+
+/// Loopback dos "Participantes": a thread do [`loopback::run`] entrega as
+/// amostras e já reabre o cliente sozinha quando ele estagna.
+struct LoopbackFeed {
+    rx: Receiver<Vec<f32>>,
+    sample_rate: u32,
+    channels: u16,
+    pump_stop_tx: Sender<()>,
+}
+
+impl AudioFeed for LoopbackFeed {
+    fn receiver(&self) -> &Receiver<Vec<f32>> {
+        &self.rx
+    }
+    fn format(&self) -> (u32, u16) {
+        (self.sample_rate, self.channels)
+    }
+    fn stall_timeout(&self) -> Option<Duration> {
+        None
+    }
+    fn reopen(&mut self) -> Result<()> {
+        Ok(())
+    }
+    fn close(&mut self) {
+        let _ = self.pump_stop_tx.send(());
+    }
+}
+
 /// Abre a fonte certa para o canal e roda o fatiador de blocos.
 fn capture_channel(
     speaker: Speaker,
@@ -488,35 +588,18 @@ fn capture_channel(
     job_tx: Sender<Job>,
     ready_tx: Sender<Result<Option<String>>>,
 ) {
-    use cpal::traits::StreamTrait;
-
     match speaker {
         // "Eu": microfone via cpal, como no ditado.
         Speaker::Me => {
-            let (data_tx, data_rx) = unbounded();
-            let (stream, sample_rate, channels) =
-                match audio::open_input_stream_on(input_device.as_deref(), data_tx) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        let _ = ready_tx.send(Err(e));
-                        return;
-                    }
-                };
-            if let Err(e) = stream.play() {
-                let _ = ready_tx.send(Err(IsperError::Audio(e.to_string())));
-                return;
-            }
+            let mut feed = match MicFeed::open(input_device) {
+                Ok(feed) => feed,
+                Err(e) => {
+                    let _ = ready_tx.send(Err(e));
+                    return;
+                }
+            };
             let _ = ready_tx.send(Ok(None));
-            chunk_loop(
-                speaker,
-                started,
-                stop_rx,
-                data_rx,
-                sample_rate,
-                channels,
-                job_tx,
-                move || drop(stream), // dropar o stream encerra a captura
-            );
+            chunk_loop(speaker, started, stop_rx, job_tx, &mut feed);
         }
         // "Participantes": loopback via wasapi, numa thread própria.
         // (Participant(_) só existe após a diarização — nunca chega aqui.)
@@ -536,39 +619,35 @@ fn capture_channel(
                     return;
                 }
             };
-            let (sample_rate, channels) = (ready.sample_rate, ready.channels);
+            let mut feed = LoopbackFeed {
+                rx: data_rx,
+                sample_rate: ready.sample_rate,
+                channels: ready.channels,
+                pump_stop_tx,
+            };
             let _ = ready_tx.send(Ok(ready.warning));
-            chunk_loop(
-                speaker,
-                started,
-                stop_rx,
-                data_rx,
-                sample_rate,
-                channels,
-                job_tx,
-                move || {
-                    let _ = pump_stop_tx.send(());
-                },
-            );
+            chunk_loop(speaker, started, stop_rx, job_tx, &mut feed);
         }
     }
 }
 
-/// Acumula amostras de um canal e despacha blocos para transcrição.
-#[allow(clippy::too_many_arguments)]
+/// Entre avisos repetidos de "não consegui reabrir" (um fone que não voltou
+/// não pode encher o log a cada dois segundos).
+const REOPEN_WARN_EVERY: Duration = Duration::from_secs(30);
+
+/// Acumula amostras de um canal e despacha blocos para transcrição. Se a
+/// fonte parar de entregar (ver [`AudioFeed::stall_timeout`]), despacha o que
+/// tem, pede para ela se reabrir e segue — a reunião não cai porque o fone
+/// caiu.
 fn chunk_loop(
     speaker: Speaker,
     started: Instant,
     stop_rx: Receiver<()>,
-    data_rx: Receiver<Vec<f32>>,
-    sample_rate: u32,
-    channels: u16,
     job_tx: Sender<Job>,
-    on_stop: impl FnOnce(),
+    feed: &mut dyn AudioFeed,
 ) {
-    let ch = channels.max(1) as usize;
-    let chunk_samples = (CHUNK_SECS * sample_rate as f32) as usize * ch;
-    let mut buf: Vec<f32> = Vec::with_capacity(chunk_samples + sample_rate as usize * ch);
+    let (mut sample_rate, mut channels) = feed.format();
+    let mut buf: Vec<f32> = Vec::new();
     // Offset global (em segundos) do início do buffer atual. Marcado pelo
     // RELÓGIO da reunião quando o buffer começa a encher: o loopback só
     // entrega amostras enquanto algo está tocando, então contar amostras
@@ -578,53 +657,152 @@ fn chunk_loop(
     // buffer e recarimbamos — cada trecho cai no timestamp certo mesmo com
     // entrega intermitente.
     let mut last_data_at: Option<Instant> = None;
+    let mut last_reopen_warn: Option<Instant> = None;
+
+    /// Despacha `buf` inteiro como um job (se tiver o mínimo de áudio).
+    fn dispatch(
+        job_tx: &Sender<Job>,
+        speaker: Speaker,
+        buf: &mut Vec<f32>,
+        start_secs: f32,
+        sample_rate: u32,
+        channels: u16,
+    ) {
+        let min = (0.3 * sample_rate as f32) as usize * channels.max(1) as usize;
+        if buf.len() >= min {
+            let _ = job_tx.send((
+                speaker,
+                start_secs,
+                RawAudio {
+                    samples: std::mem::take(buf),
+                    sample_rate,
+                    channels,
+                },
+            ));
+        } else {
+            buf.clear();
+        }
+    }
 
     loop {
+        let ch = channels.max(1) as usize;
+        let chunk_samples = (CHUNK_SECS * sample_rate as f32) as usize * ch;
+        // Clonado a cada volta: um `reopen` troca o canal.
+        let data_rx = feed.receiver().clone();
+        let stall = if last_data_at.is_none() {
+            feed.first_packet_timeout()
+        } else {
+            feed.stall_timeout()
+        }
+        .unwrap_or(Duration::from_secs(3600));
+
         crossbeam_channel::select! {
             recv(stop_rx) -> _ => {
-                on_stop();
+                feed.close();
                 std::thread::sleep(Duration::from_millis(60));
                 for c in data_rx.try_iter() {
                     buf.extend(c);
                 }
-                let min = (0.3 * sample_rate as f32) as usize * ch;
-                if buf.len() >= min {
-                    let _ = job_tx.send((speaker, buf_start_secs, RawAudio {
-                        samples: std::mem::take(&mut buf),
-                        sample_rate,
-                        channels,
-                    }));
-                }
+                dispatch(&job_tx, speaker, &mut buf, buf_start_secs, sample_rate, channels);
                 return; // o job_tx deste canal morre aqui
             },
-            recv(data_rx) -> chunk => if let Ok(c) = chunk {
-                let gap = last_data_at.map(|t| t.elapsed().as_secs_f32()).unwrap_or(0.0);
-                last_data_at = Some(Instant::now());
-                if !buf.is_empty() && gap > 0.5 {
-                    let piece: Vec<f32> = std::mem::take(&mut buf);
-                    let _ = job_tx.send((speaker, buf_start_secs, RawAudio {
-                        samples: piece,
-                        sample_rate,
-                        channels,
-                    }));
+            recv(data_rx) -> chunk => match chunk {
+                Ok(c) => {
+                    let gap = last_data_at.map(|t| t.elapsed().as_secs_f32()).unwrap_or(0.0);
+                    last_data_at = Some(Instant::now());
+                    if !buf.is_empty() && gap > 0.5 {
+                        dispatch(&job_tx, speaker, &mut buf, buf_start_secs, sample_rate, channels);
+                    }
+                    if buf.is_empty() {
+                        let chunk_secs = c.len() as f32 / ch as f32 / sample_rate as f32;
+                        buf_start_secs = (started.elapsed().as_secs_f32() - chunk_secs).max(0.0);
+                    }
+                    buf.extend(c);
+                    if buf.len() >= chunk_samples {
+                        let cut = quiet_cut(&buf, sample_rate, ch);
+                        let piece: Vec<f32> = buf.drain(..cut).collect();
+                        let secs = piece.len() as f32 / ch as f32 / sample_rate as f32;
+                        let _ = job_tx.send((speaker, buf_start_secs, RawAudio {
+                            samples: piece,
+                            sample_rate,
+                            channels,
+                        }));
+                        buf_start_secs += secs;
+                    }
                 }
-                if buf.is_empty() {
-                    let chunk_secs = c.len() as f32 / ch as f32 / sample_rate as f32;
-                    buf_start_secs = (started.elapsed().as_secs_f32() - chunk_secs).max(0.0);
-                }
-                buf.extend(c);
-                if buf.len() >= chunk_samples {
-                    let cut = quiet_cut(&buf, sample_rate, ch);
-                    let piece: Vec<f32> = buf.drain(..cut).collect();
-                    let secs = piece.len() as f32 / ch as f32 / sample_rate as f32;
-                    let _ = job_tx.send((speaker, buf_start_secs, RawAudio {
-                        samples: piece,
-                        sample_rate,
-                        channels,
-                    }));
-                    buf_start_secs += secs;
+                // A fonte fechou o canal: só o `stop` encerra este loop, então
+                // trata como stall (o loopback não tem reabertura por aqui —
+                // dorme para não girar em vão até o stop chegar).
+                Err(_) => {
+                    if feed.stall_timeout().is_none() {
+                        std::thread::sleep(Duration::from_millis(100));
+                    } else {
+                        recover(speaker, feed, &job_tx, &mut buf, buf_start_secs, &mut sample_rate, &mut channels, &mut last_data_at, &mut last_reopen_warn, stall);
+                    }
                 }
             },
+            default(stall) => if feed.stall_timeout().is_some() {
+                recover(speaker, feed, &job_tx, &mut buf, buf_start_secs, &mut sample_rate, &mut channels, &mut last_data_at, &mut last_reopen_warn, stall);
+            },
+        }
+    }
+}
+
+/// Nada chegou por `stall`: o dispositivo sumiu (fone desconectado), foi
+/// invalidado (suspensão) ou o driver travou. Despacha o que há no buffer e
+/// reabre a fonte; se não der, tenta de novo no próximo stall — sem desistir
+/// da reunião, que segue com o outro canal.
+#[allow(clippy::too_many_arguments)]
+fn recover(
+    speaker: Speaker,
+    feed: &mut dyn AudioFeed,
+    job_tx: &Sender<Job>,
+    buf: &mut Vec<f32>,
+    buf_start_secs: f32,
+    sample_rate: &mut u32,
+    channels: &mut u16,
+    last_data_at: &mut Option<Instant>,
+    last_warn: &mut Option<Instant>,
+    stall: Duration,
+) {
+    if !buf.is_empty() {
+        let min = (0.3 * *sample_rate as f32) as usize * (*channels).max(1) as usize;
+        if buf.len() >= min {
+            let _ = job_tx.send((
+                speaker,
+                buf_start_secs,
+                RawAudio {
+                    samples: std::mem::take(buf),
+                    sample_rate: *sample_rate,
+                    channels: *channels,
+                },
+            ));
+        }
+        buf.clear();
+    }
+    match feed.reopen() {
+        Ok(()) => {
+            let (rate, ch) = feed.format();
+            tracing::warn!(
+                "{}: sem áudio por {:.0} s — captura reaberta ({rate} Hz, {ch} canal(is))",
+                speaker.label(),
+                stall.as_secs_f32()
+            );
+            *sample_rate = rate;
+            *channels = ch;
+            *last_data_at = None;
+            *last_warn = None;
+        }
+        Err(e) => {
+            let due = last_warn.is_none_or(|t| t.elapsed() >= REOPEN_WARN_EVERY);
+            if due {
+                tracing::warn!(
+                    "{}: sem áudio por {:.0} s e não consegui reabrir ({e}) — tentando de novo",
+                    speaker.label(),
+                    stall.as_secs_f32()
+                );
+                *last_warn = Some(Instant::now());
+            }
         }
     }
 }
@@ -886,6 +1064,95 @@ mod tests {
             end_secs: end,
             text,
         }
+    }
+
+    /// Fonte de mentira para o fatiador: o teste controla o canal e observa
+    /// as reaberturas. Só a primeira reabertura troca o canal (as seguintes,
+    /// enquanto nada chega, só contam) — assim o teste sabe para onde enviar.
+    struct FakeFeed {
+        rx: Receiver<Vec<f32>>,
+        shared: Arc<std::sync::Mutex<FakeShared>>,
+    }
+
+    struct FakeShared {
+        tx: Sender<Vec<f32>>,
+        reopens: usize,
+        closed: bool,
+    }
+
+    impl AudioFeed for FakeFeed {
+        fn receiver(&self) -> &Receiver<Vec<f32>> {
+            &self.rx
+        }
+        fn format(&self) -> (u32, u16) {
+            // 100 Hz: o mínimo despachável (0,3 s) são 30 amostras, e os
+            // carimbos de tempo saem do relógio real do teste.
+            (100, 1)
+        }
+        fn stall_timeout(&self) -> Option<Duration> {
+            Some(Duration::from_millis(80))
+        }
+        fn reopen(&mut self) -> Result<()> {
+            let mut shared = self.shared.lock().unwrap();
+            if shared.reopens == 0 {
+                let (tx, rx) = unbounded();
+                self.rx = rx;
+                shared.tx = tx;
+            }
+            shared.reopens += 1;
+            Ok(())
+        }
+        fn close(&mut self) {
+            self.shared.lock().unwrap().closed = true;
+        }
+    }
+
+    #[test]
+    fn fonte_que_para_de_entregar_e_reaberta_e_a_reuniao_continua() {
+        let started = Instant::now();
+        let (job_tx, job_rx) = unbounded::<Job>();
+        let (stop_tx, stop_rx) = unbounded::<()>();
+        let (tx0, rx0) = unbounded();
+        let shared = Arc::new(std::sync::Mutex::new(FakeShared {
+            tx: tx0,
+            reopens: 0,
+            closed: false,
+        }));
+        let mut feed = FakeFeed {
+            rx: rx0,
+            shared: shared.clone(),
+        };
+        let worker = std::thread::spawn(move || {
+            chunk_loop(Speaker::Me, started, stop_rx, job_tx, &mut feed)
+        });
+
+        // 0,4 s de áudio chega logo no início… e depois nada: o "fone caiu".
+        shared.lock().unwrap().tx.send(vec![0.5; 40]).unwrap();
+        std::thread::sleep(Duration::from_millis(400));
+        assert!(
+            shared.lock().unwrap().reopens >= 1,
+            "o stall deve reabrir a fonte"
+        );
+        // O que estava no buffer foi despachado antes de reabrir, carimbado
+        // no início da reunião (chegou antes de 0,4 s de relógio → 0).
+        let (speaker, offset, audio) = job_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(speaker, Speaker::Me);
+        assert_eq!(audio.samples.len(), 40);
+        assert_eq!((audio.sample_rate, audio.channels), (100, 1));
+        assert_eq!(offset, 0.0);
+
+        // Pelo canal novo o áudio volta a fluir, carimbado pelo relógio: 0,3 s
+        // de áudio chegando com ≥ 0,4 s de reunião → começa em ≥ 0,1 s.
+        let tx = shared.lock().unwrap().tx.clone();
+        tx.send(vec![0.25; 30]).unwrap();
+        std::thread::sleep(Duration::from_millis(30));
+        stop_tx.send(()).unwrap();
+        worker.join().unwrap();
+        let (_, offset2, audio2) = job_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(audio2.samples.len(), 30);
+        assert!(offset2 >= 0.09, "{offset2} deveria ser ≥ 0,1 s");
+        assert!(shared.lock().unwrap().closed, "o stop fecha a fonte");
+        assert!(job_rx.try_recv().is_err(), "nada além dos dois blocos");
     }
 
     #[test]

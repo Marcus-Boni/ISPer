@@ -9,6 +9,68 @@ use rubato::{
 
 use crate::{IsperError, Result, WHISPER_SAMPLE_RATE};
 
+/// Um microfone em captura compartilhada entrega pacotes de ~10 ms sem parar,
+/// mesmo em silêncio absoluto. Ficar este tempo sem NENHUM pacote significa que
+/// o stream morreu: fone desconectado, dispositivo invalidado depois de uma
+/// suspensão ou driver travado — e não que a pessoa parou de falar.
+pub const MIC_STALL: Duration = Duration::from_secs(2);
+/// Antes do primeiro pacote a tolerância é maior: fones Bluetooth levam alguns
+/// segundos trocando de perfil até começarem a entregar áudio.
+pub const MIC_FIRST_PACKET: Duration = Duration::from_secs(6);
+
+/// Traduz os erros mais comuns do WASAPI/cpal (código HRESULT ou frase em
+/// inglês) numa dica em português sobre o que fazer. `None` quando não há
+/// uma causa conhecida — aí a mensagem original é o que temos.
+pub fn explain_error(message: &str) -> Option<&'static str> {
+    let m = message.to_ascii_lowercase();
+    let has = |needles: &[&str]| needles.iter().any(|n| m.contains(n));
+    if has(&["8889000a", "device_in_use", "being used by another process"]) {
+        Some(
+            "outro aplicativo está usando o dispositivo de áudio em modo exclusivo — feche-o ou \
+             desmarque \"Permitir que aplicativos assumam o controle exclusivo\" nas propriedades \
+             do dispositivo, em Som",
+        )
+    } else if has(&[
+        "88890004",
+        "device_invalidated",
+        "no longer available",
+        "unplugged",
+        "88890026", // AUDCLNT_E_RESOURCES_INVALIDATED (depois de suspensão)
+    ]) {
+        Some(
+            "o dispositivo de áudio foi desconectado ou mudou (fone removido, suspensão) — \
+             reconecte-o ou escolha outro microfone em Configurações",
+        )
+    } else if has(&["88890008", "unsupported_format", "format is not supported"]) {
+        Some(
+            "o formato do dispositivo não é aceito — em Som → propriedades do dispositivo → \
+             Avançado, escolha 16 ou 24 bits a 44,1 ou 48 kHz",
+        )
+    } else if has(&[
+        "80070490",
+        "e_notfound",
+        "no input device",
+        "nenhum dispositivo",
+    ]) {
+        Some("nenhum dispositivo de áudio ativo — conecte um microfone ou habilite-o em Som")
+    } else {
+        None
+    }
+}
+
+/// A mensagem original seguida da dica de [`explain_error`], quando houver.
+pub fn describe_error(message: &str) -> String {
+    match explain_error(message) {
+        Some(hint) => format!("{message} — {hint}"),
+        None => message.to_string(),
+    }
+}
+
+/// `IsperError::Audio` com a dica embutida — para todo erro de dispositivo.
+pub(crate) fn audio_err(e: impl std::fmt::Display) -> IsperError {
+    IsperError::Audio(describe_error(&e.to_string()))
+}
+
 /// Áudio cru como veio da fonte: amostras intercaladas na taxa original.
 /// Se stereo, o layout é [esq, dir, esq, dir, ...].
 #[derive(Debug, Clone)]
@@ -42,17 +104,20 @@ impl RawAudio {
 }
 
 fn stream_err(e: cpal::Error) {
-    // Underrun/overrun no início do loopback é transitório e inofensivo.
-    tracing::warn!("aviso no stream de áudio: {e}");
+    // Underrun/overrun no início do loopback é transitório e inofensivo; um
+    // dispositivo que sumiu aparece aqui com a dica — e quem captura percebe
+    // pela falta de pacotes ([`MIC_STALL`]) e reabre.
+    tracing::warn!(
+        "aviso no stream de áudio: {}",
+        describe_error(&e.to_string())
+    );
 }
 
 /// Grava do microfone padrão por `duration` (bloqueante — usado pela CLI).
 pub fn record(duration: Duration) -> Result<RawAudio> {
     let (tx, rx) = crossbeam_channel::unbounded::<Vec<f32>>();
     let (stream, sample_rate, channels) = open_input_stream(tx)?;
-    stream
-        .play()
-        .map_err(|e| IsperError::Audio(e.to_string()))?;
+    stream.play().map_err(audio_err)?;
     std::thread::sleep(duration);
     drop(stream); // encerra a captura; o lado `tx` do canal morre junto
 
@@ -122,9 +187,7 @@ pub(crate) fn open_input_stream_on(
     let device = chosen
         .or_else(|| host.default_input_device())
         .ok_or(IsperError::NoInputDevice)?;
-    let config = device
-        .default_input_config()
-        .map_err(|e| IsperError::Audio(e.to_string()))?;
+    let config = device.default_input_config().map_err(audio_err)?;
 
     let sample_rate = config.sample_rate();
     let channels = config.channels();
@@ -148,7 +211,7 @@ pub(crate) fn open_input_stream_on(
                 stream_err,
                 None,
             )
-            .map_err(|e| IsperError::Audio(e.to_string()))?,
+            .map_err(audio_err)?,
         cpal::SampleFormat::I16 => device
             .build_input_stream(
                 stream_config,
@@ -158,7 +221,7 @@ pub(crate) fn open_input_stream_on(
                 stream_err,
                 None,
             )
-            .map_err(|e| IsperError::Audio(e.to_string()))?,
+            .map_err(audio_err)?,
         cpal::SampleFormat::U16 => device
             .build_input_stream(
                 stream_config,
@@ -172,7 +235,7 @@ pub(crate) fn open_input_stream_on(
                 stream_err,
                 None,
             )
-            .map_err(|e| IsperError::Audio(e.to_string()))?,
+            .map_err(audio_err)?,
         other => {
             return Err(IsperError::Audio(format!(
                 "formato de amostra não suportado: {other:?}"
@@ -261,6 +324,27 @@ pub fn resample_to_16k(mono: &[f32], from_rate: u32) -> Result<Vec<f32>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn erros_de_dispositivo_ganham_dica_em_portugues() {
+        // Códigos HRESULT do WASAPI, como o crate `wasapi`/`windows` os imprime.
+        let in_use = describe_error("loopback (initialize captura): HRESULT 0x8889000A");
+        assert!(in_use.contains("modo exclusivo"), "{in_use}");
+        assert!(in_use.starts_with("loopback (initialize captura)"));
+        assert!(describe_error("erro (0x88890004)").contains("desconectado"));
+        assert!(describe_error("AUDCLNT_E_UNSUPPORTED_FORMAT").contains("44,1 ou 48 kHz"));
+        // Frases do cpal.
+        assert!(
+            explain_error(
+                "The requested device is no longer available. For example, it has been unplugged."
+            )
+            .is_some_and(|h| h.contains("desconectado"))
+        );
+        assert!(explain_error("The device is being used by another process").is_some());
+        // Sem causa conhecida, a mensagem volta intacta.
+        assert_eq!(explain_error("erro genérico 42"), None);
+        assert_eq!(describe_error("erro genérico 42"), "erro genérico 42");
+    }
 
     #[test]
     fn to_mono_faz_media_dos_canais() {
