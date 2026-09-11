@@ -45,38 +45,57 @@ function Test-Cdp {
   try { $null = Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json" -TimeoutSec 2; return $true } catch { return $false }
 }
 
+# Chave de politica do WebView2 que injeta argumentos no browser de UM exe. Usada
+# so quando ISPER_E2E_CDP_REGISTRY=1 (CI): em processo elevado, como no runner do
+# GitHub Actions, o WebView2 ignora a variavel de ambiente
+# WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, mas honra a chave (HKCU basta).
+$script:CdpRegistryPath = 'HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+
 function Start-Isper {
   # Abre o exe (com a porta CDP, salvo -NoCdp, e variáveis extras) e espera a tela Início.
   param([Parameter(Mandatory)][string]$Exe, [hashtable]$Env = @{}, [switch]$NoCdp)
+  $exeName = Split-Path $Exe -Leaf
+  $viaRegistry = (-not $NoCdp) -and [bool]$env:ISPER_E2E_CDP_REGISTRY
   if (-not $NoCdp) { $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$script:CdpPort" }
+  if ($viaRegistry) {
+    New-Item -Path $script:CdpRegistryPath -Force | Out-Null
+    Set-ItemProperty -Path $script:CdpRegistryPath -Name $exeName -Value "--remote-debugging-port=$script:CdpPort"
+  }
   foreach ($k in $Env.Keys) { [Environment]::SetEnvironmentVariable($k, [string]$Env[$k], 'Process') }
   Start-Process $Exe -WorkingDirectory (Split-Path $Exe)
   [Environment]::SetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS', $null, 'Process')
   foreach ($k in $Env.Keys) { [Environment]::SetEnvironmentVariable($k, $null, 'Process') }
   if ($NoCdp) { Start-Sleep -Seconds 4; return $true }
+  $ok = $false
   $lastError = ''
   for ($i = 0; $i -lt 40; $i++) {
     Start-Sleep -Seconds 1
     try {
       if ((Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json") | Where-Object { $_.url -like '*home.html*' }) {
         Start-Sleep -Seconds 3
-        return $true
+        $ok = $true
+        break
       }
     } catch { $lastError = $_.Exception.Message }
   }
+  # A chave e lida quando o browser nasce: sai logo depois, para o relancamento
+  # limpo (Restart-IsperClean) nao herdar a porta.
+  if ($viaRegistry) { Remove-ItemProperty -Path $script:CdpRegistryPath -Name $exeName -ErrorAction SilentlyContinue }
+  if ($ok) { return $true }
   # Nao abriu: diz por que, em vez de so "FALHA" (processos, porta, log).
-  "  (diagnostico) ultimo erro ao consultar a porta CDP $script:CdpPort`: $lastError"
+  # Write-Host: saida de diagnostico NAO pode virar valor de retorno da funcao.
+  Write-Host "  (diagnostico) ultimo erro ao consultar a porta CDP $script:CdpPort`: $lastError"
   Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -in 'isper-app.exe', 'msedgewebview2.exe' } |
     ForEach-Object {
       $cmd = [string]$_.CommandLine
       if ($cmd.Length -gt 220) { $cmd = $cmd.Substring(0, 220) + '...' }
-      "  (diagnostico) $($_.Name) pid=$($_.ProcessId) ppid=$($_.ParentProcessId) $cmd"
+      Write-Host "  (diagnostico) $($_.Name) pid=$($_.ProcessId) ppid=$($_.ParentProcessId) $cmd"
     }
   $listening = @(netstat -ano 2>$null | Select-String ":$script:CdpPort ")
-  "  (diagnostico) netstat porta $script:CdpPort`: $(if ($listening.Count) { ($listening | ForEach-Object { $_.Line.Trim() }) -join ' | ' } else { 'nada escutando' })"
+  Write-Host "  (diagnostico) netstat porta $script:CdpPort`: $(if ($listening.Count) { ($listening | ForEach-Object { $_.Line.Trim() }) -join ' | ' } else { 'nada escutando' })"
   $log = Get-TodayLog
-  if (Test-Path $log) { Get-Content $log -Tail 25 | ForEach-Object { "  (log) $_" } } else { "  (diagnostico) sem log em $log" }
+  if (Test-Path $log) { Get-Content $log -Tail 25 | ForEach-Object { Write-Host "  (log) $_" } } else { Write-Host "  (diagnostico) sem log em $log" }
   return $false
 }
 
