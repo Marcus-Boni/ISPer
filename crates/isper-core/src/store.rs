@@ -858,3 +858,71 @@ mod tests {
         assert_eq!(store.embeddings_stats("fake/m3").unwrap().chunks, 0);
     }
 }
+
+#[cfg(test)]
+mod prop_tests {
+    use proptest::prelude::*;
+    use rusqlite::Connection;
+
+    use super::like_pattern;
+
+    /// O mesmo `LIKE … ESCAPE '\\'` das consultas, avaliado pelo próprio SQLite.
+    fn sql_like(text: &str, pattern: &str) -> bool {
+        let conn = Connection::open_in_memory().expect("sqlite em memória");
+        conn.query_row("SELECT ?1 LIKE ?2 ESCAPE '\\'", [text, pattern], |r| {
+            r.get::<_, bool>(0)
+        })
+        .expect("avaliar LIKE")
+    }
+
+    proptest! {
+        /// A busca é literal: qualquer texto que contenha o termo casa com o padrão…
+        #[test]
+        fn termo_contido_no_texto_casa(
+            prefix in "\\PC{0,8}",
+            q in "\\PC{1,12}",
+            suffix in "\\PC{0,8}",
+        ) {
+            let term = q.trim();
+            prop_assume!(!term.is_empty());
+            let text = format!("{prefix}{term}{suffix}");
+            prop_assert!(sql_like(&text, &like_pattern(&q)), "{text:?} deveria casar com {q:?}");
+        }
+
+        /// …e os curingas do SQL não valem: `%` e `_` no termo só casam com eles mesmos.
+        #[test]
+        fn curingas_do_termo_nao_expandem(q in "[a-z%_\\\\ ]{1,12}") {
+            prop_assume!(q.contains(['%', '_']));
+            let sem_curingas: String = q
+                .chars()
+                .map(|c| if matches!(c, '%' | '_') { 'x' } else { c })
+                .collect();
+            prop_assert!(
+                !sql_like(&sem_curingas, &like_pattern(&q)),
+                "{sem_curingas:?} não deveria casar com {q:?}"
+            );
+        }
+
+        /// Forma do padrão: `%` nas pontas e, no meio, o termo (sem espaços nas
+        /// bordas) com cada `%`, `_` e `\` precedido de `\` — e nada mais escapado.
+        #[test]
+        fn padrao_tem_a_forma_esperada(q in "\\PC{0,20}") {
+            let p = like_pattern(&q);
+            prop_assert!(p.starts_with('%') && p.ends_with('%'));
+            let inner = &p[1..p.len() - 1];
+            let mut chars = inner.chars();
+            let mut rebuilt = String::new();
+            while let Some(c) = chars.next() {
+                if c == '\\' {
+                    let escaped = chars.next().expect("uma barra sempre escapa algo");
+                    prop_assert!(matches!(escaped, '%' | '_' | '\\'));
+                    rebuilt.push(escaped);
+                } else {
+                    prop_assert!(!matches!(c, '%' | '_'));
+                    rebuilt.push(c);
+                }
+            }
+            prop_assert_eq!(rebuilt, q.trim());
+        }
+    }
+}

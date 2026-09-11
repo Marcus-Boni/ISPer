@@ -96,29 +96,34 @@ pub fn spawn() -> AudioHandle {
     }
 }
 
-/// Detector de fim de fala por energia.
+/// Detector de fim de fala por energia. O relógio entra por parâmetro
+/// (`now`), nunca por `Instant::now()` aqui dentro: assim os testes simulam
+/// minutos de áudio em milissegundos, bloco a bloco, com tempo determinístico.
 struct Vad {
     enabled: bool,
     noise_floor: f32,
     voiced_run: u32,
     heard_speech: bool,
+    /// Quando a gravação começou (base do timeout sem fala).
+    started: Instant,
     last_voice: Instant,
 }
 
 impl Vad {
-    fn new() -> Self {
+    fn new(started: Instant) -> Self {
         Self {
             enabled: false,
             noise_floor: 0.0,
             voiced_run: 0,
             heard_speech: false,
-            last_voice: Instant::now(),
+            started,
+            last_voice: started,
         }
     }
 
-    /// Processa o RMS de um bloco (~10 ms). Devolve `true` quando é hora de
-    /// encerrar a gravação.
-    fn should_stop(&mut self, rms: f32, started: Instant) -> bool {
+    /// Processa o RMS de um bloco (~10 ms) recebido no instante `now`.
+    /// Devolve `true` quando é hora de encerrar a gravação.
+    fn should_stop(&mut self, rms: f32, now: Instant) -> bool {
         if !self.enabled {
             return false;
         }
@@ -138,13 +143,14 @@ impl Vad {
             if self.voiced_run >= 8 {
                 self.heard_speech = true;
             }
-            self.last_voice = Instant::now();
+            self.last_voice = now;
         } else {
             self.voiced_run = 0;
         }
 
-        (self.heard_speech && self.last_voice.elapsed() >= VAD_SILENCE)
-            || (!self.heard_speech && started.elapsed() >= VAD_NO_SPEECH_TIMEOUT)
+        (self.heard_speech && now.saturating_duration_since(self.last_voice) >= VAD_SILENCE)
+            || (!self.heard_speech
+                && now.saturating_duration_since(self.started) >= VAD_NO_SPEECH_TIMEOUT)
     }
 }
 
@@ -181,8 +187,8 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
     let mut samples: Vec<f32> = Vec::new();
     let mut sample_rate = 0u32;
     let mut channels = 0u16;
-    let mut vad = Vad::new();
     let mut started = Instant::now();
+    let mut vad = Vad::new(started);
     let mut device: Option<String> = None;
 
     loop {
@@ -204,7 +210,8 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
                         .sqrt();
                     let _ = level_tx.try_send(rms);
                     samples.extend(chunk);
-                    if vad.should_stop(rms, started) || started.elapsed() >= MAX_RECORDING {
+                    let now = Instant::now();
+                    if vad.should_stop(rms, now) || now.duration_since(started) >= MAX_RECORDING {
                         tracing::info!("VAD encerrou a gravação");
                         finish(&mut stream, &mut data_rx, &mut samples, sample_rate, channels, &event_tx);
                     }
@@ -227,8 +234,8 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
                             sample_rate = rate;
                             channels = ch;
                             samples.clear();
-                            vad = Vad::new();
                             started = Instant::now();
+                            vad = Vad::new(started);
                             stream = Some(s);
                             data_rx = Some(rx);
                         }
@@ -241,6 +248,97 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
                 Ok(Command::Stop) => {} // não estava gravando — ignora
                 Err(_) => return,
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Um bloco de áudio por leitura, como o stream real entrega (~10 ms).
+    const FRAME: Duration = Duration::from_millis(10);
+
+    fn frames(secs: f32) -> usize {
+        (secs * 100.0).round() as usize
+    }
+
+    /// Alimenta o VAD com uma sequência de níveis RMS num relógio sintético e
+    /// devolve o índice do bloco em que ele pediu para parar (se pediu).
+    fn run_vad(enabled: bool, levels: impl IntoIterator<Item = f32>) -> Option<usize> {
+        let started = Instant::now();
+        let mut vad = Vad::new(started);
+        vad.enabled = enabled;
+        levels
+            .into_iter()
+            .enumerate()
+            .find(|(i, rms)| vad.should_stop(*rms, started + FRAME * (*i as u32 + 1)))
+            .map(|(i, _)| i)
+    }
+
+    /// Fala "de verdade" para o detector: sílabas de 80 ms acima do piso com
+    /// vales de 20 ms entre elas (como a energia da voz oscila) — um tom
+    /// contínuo de amplitude constante é, por definição, ruído de fundo.
+    fn speech(syllables: usize, level: f32, dip: f32) -> impl Iterator<Item = f32> {
+        (0..syllables)
+            .flat_map(move |_| std::iter::repeat_n(level, 8).chain(std::iter::repeat_n(dip, 2)))
+    }
+
+    proptest! {
+        /// Desligado (push-to-talk), o VAD nunca encerra — só a tecla ou a trava de tempo.
+        #[test]
+        fn desligado_nunca_para(levels in proptest::collection::vec(0.0f32..1.0, 1..3_000)) {
+            prop_assert_eq!(run_vad(false, levels), None);
+        }
+
+        /// Ruído de fundo constante, em qualquer nível, nunca vira "fala": o
+        /// piso adapta e o mãos-livres desiste no timeout sem fala — nem antes.
+        #[test]
+        fn ruido_constante_nao_e_fala_e_desiste_no_timeout(level in 0.0f32..0.5) {
+            let stop = run_vad(true, std::iter::repeat_n(level, frames(20.0)));
+            prop_assert_eq!(stop, Some(frames(VAD_NO_SPEECH_TIMEOUT.as_secs_f32()) - 1));
+        }
+
+        /// Fala seguida de silêncio: encerra exatamente quando o silêncio
+        /// completa `VAD_SILENCE` depois do último bloco de voz.
+        #[test]
+        fn fala_e_silencio_para_no_fim_do_silencio(
+            lead in 5usize..100,
+            syllables in 1usize..40,
+            level in 0.05f32..1.0,
+            dip in 0.0f32..0.01,
+            silence in 0.0f32..0.003,
+        ) {
+            let levels = std::iter::repeat_n(silence, lead)
+                .chain(speech(syllables, level, dip))
+                .chain(std::iter::repeat_n(silence, frames(5.0)));
+            let stop = run_vad(true, levels);
+            // Último bloco de voz: fim da última sílaba (antes do vale de 20 ms).
+            let last_voice = lead + syllables * 10 - 3;
+            prop_assert_eq!(stop, Some(last_voice + frames(VAD_SILENCE.as_secs_f32())));
+        }
+
+        /// Enquanto a pessoa fala (com as oscilações naturais), o VAD não
+        /// interrompe — a trava de tempo máximo é de quem chama.
+        #[test]
+        fn fala_continua_nao_para(
+            syllables in 10usize..300,
+            level in 0.05f32..1.0,
+            dip in 0.0f32..0.01,
+        ) {
+            let levels = std::iter::repeat_n(0.001, 20).chain(speech(syllables, level, dip));
+            prop_assert_eq!(run_vad(true, levels), None);
+        }
+
+        /// Um estalo (menos de 80 ms de energia) não conta como fala: sem voz
+        /// reconhecida, só o timeout sem fala encerraria — e ele não chega.
+        #[test]
+        fn estalo_curto_nao_e_fala(click in 1usize..8, level in 0.1f32..1.0) {
+            let levels = std::iter::repeat_n(0.0, 50)
+                .chain(std::iter::repeat_n(level, click))
+                .chain(std::iter::repeat_n(0.0, frames(3.0)));
+            prop_assert_eq!(run_vad(true, levels), None);
         }
     }
 }
