@@ -141,10 +141,23 @@ jobs:
           Start-Sleep -Seconds 3
           Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 2
+          # Mesmo teste com a chave de politica em HKLM (o que o smoke usa).
+          $hklm = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+          New-Item -Path $hklm -Force | Out-Null
+          Set-ItemProperty -Path $hklm -Name 'isper-app.exe' -Value '--remote-debugging-port=9223'
+          $p = Start-Process .\target\release\isper-app.exe -WorkingDirectory .\target\release -PassThru
+          Start-Sleep -Seconds 10
+          $browser = @(Get-CimInstance Win32_Process -Filter "name='msedgewebview2.exe'" | Where-Object { $_.CommandLine -like '*embedded-browser-webview=1*' -and $_.CommandLine -notlike '*--type=*' })
+          "chave HKLM -> flag no browser: $(if ($browser.CommandLine -like '*remote-debugging-port*') { 'SIM' } else { 'NAO' }); porta 9223: $(if (netstat -ano | Select-String ':9223 ') { 'escutando' } else { 'nada' })"
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          Remove-ItemProperty -Path $hklm -Name 'isper-app.exe' -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 3
+          Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
 
       # ISPER_E2E_CDP_REGISTRY=1: o Start-Isper do tools/e2e injeta a porta CDP
-      # pela chave de politica do WebView2 (HKCU, so para isper-app.exe) e a
-      # remove assim que o app abre — o relancamento limpo do fim fica sem porta.
+      # pela chave de politica do WebView2 (HKLM e HKCU, so para isper-app.exe)
+      # e a remove assim que o app abre — o relancamento limpo fica sem porta.
       - name: Smoke ponta a ponta (CDP)
         shell: pwsh
         env:

@@ -45,11 +45,15 @@ function Test-Cdp {
   try { $null = Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json" -TimeoutSec 2; return $true } catch { return $false }
 }
 
-# Chave de politica do WebView2 que injeta argumentos no browser de UM exe. Usada
-# so quando ISPER_E2E_CDP_REGISTRY=1 (CI): em processo elevado, como no runner do
-# GitHub Actions, o WebView2 ignora a variavel de ambiente
-# WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, mas honra a chave (HKCU basta).
-$script:CdpRegistryPath = 'HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+# Chaves de politica do WebView2 que injetam argumentos no browser de UM exe.
+# Usadas so quando ISPER_E2E_CDP_REGISTRY=1 (CI): em processo elevado, como no
+# runner do GitHub Actions, o WebView2 ignora a variavel de ambiente
+# WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS (e a chave em HKCU); a politica em HKLM
+# exige administrador e por isso vale mesmo elevada. Gravamos as duas.
+$script:CdpRegistryKeys = @(
+  'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments',
+  'HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+)
 
 function Start-Isper {
   # Abre o exe (com a porta CDP, salvo -NoCdp, e variáveis extras) e espera a tela Início.
@@ -58,8 +62,12 @@ function Start-Isper {
   $viaRegistry = (-not $NoCdp) -and [bool]$env:ISPER_E2E_CDP_REGISTRY
   if (-not $NoCdp) { $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$script:CdpPort" }
   if ($viaRegistry) {
-    New-Item -Path $script:CdpRegistryPath -Force | Out-Null
-    Set-ItemProperty -Path $script:CdpRegistryPath -Name $exeName -Value "--remote-debugging-port=$script:CdpPort"
+    foreach ($key in $script:CdpRegistryKeys) {
+      try {
+        New-Item -Path $key -Force -ErrorAction Stop | Out-Null
+        Set-ItemProperty -Path $key -Name $exeName -Value "--remote-debugging-port=$script:CdpPort" -ErrorAction Stop
+      } catch { Write-Host "  (aviso) nao consegui gravar $key`: $($_.Exception.Message)" }
+    }
   }
   foreach ($k in $Env.Keys) { [Environment]::SetEnvironmentVariable($k, [string]$Env[$k], 'Process') }
   Start-Process $Exe -WorkingDirectory (Split-Path $Exe)
@@ -80,7 +88,9 @@ function Start-Isper {
   }
   # A chave e lida quando o browser nasce: sai logo depois, para o relancamento
   # limpo (Restart-IsperClean) nao herdar a porta.
-  if ($viaRegistry) { Remove-ItemProperty -Path $script:CdpRegistryPath -Name $exeName -ErrorAction SilentlyContinue }
+  if ($viaRegistry) {
+    foreach ($key in $script:CdpRegistryKeys) { Remove-ItemProperty -Path $key -Name $exeName -ErrorAction SilentlyContinue }
+  }
   if ($ok) { return $true }
   # Nao abriu: diz por que, em vez de so "FALHA" (processos, porta, log).
   # Write-Host: saida de diagnostico NAO pode virar valor de retorno da funcao.
