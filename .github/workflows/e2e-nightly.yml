@@ -121,9 +121,34 @@ jobs:
           "--- stdout ---"; Get-Content sanity-out.txt -ErrorAction SilentlyContinue | Select-Object -Last 40
           "--- stderr ---"; Get-Content sanity-err.txt -ErrorAction SilentlyContinue | Select-Object -Last 20
           if (-not $alive) { throw "o app nao fica aberto no runner" }
+          Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
 
+          # Como a porta CDP chega ao browser do WebView2 neste runner? A variavel
+          # de ambiente WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS e ignorada em processo
+          # elevado (o job roda como administrador); a chave de politica no
+          # registro (por exe) e o caminho que o smoke usa aqui.
+          $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $elevated = (New-Object Security.Principal.WindowsPrincipal $id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+          "processo elevado (administrador): $elevated"
+          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9223'
+          $p = Start-Process .\target\release\isper-app.exe -WorkingDirectory .\target\release -PassThru
+          Start-Sleep -Seconds 10
+          $browser = @(Get-CimInstance Win32_Process -Filter "name='msedgewebview2.exe'" | Where-Object { $_.CommandLine -like '*embedded-browser-webview=1*' -and $_.CommandLine -notlike '*--type=*' })
+          "variavel de ambiente -> flag no browser: $(if ($browser.CommandLine -like '*remote-debugging-port*') { 'SIM' } else { 'NAO' }); porta 9223: $(if (netstat -ano | Select-String ':9223 ') { 'escutando' } else { 'nada' })"
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          Remove-Item Env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
+          Start-Sleep -Seconds 3
+          Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+
+      # ISPER_E2E_CDP_REGISTRY=1: o Start-Isper do tools/e2e injeta a porta CDP
+      # pela chave de politica do WebView2 (HKCU, so para isper-app.exe) e a
+      # remove assim que o app abre — o relancamento limpo do fim fica sem porta.
       - name: Smoke ponta a ponta (CDP)
         shell: pwsh
+        env:
+          ISPER_E2E_CDP_REGISTRY: '1'
         run: .\tools\e2e\smoke.ps1 -Exe .\target\release\isper-app.exe
 
       # Quando o smoke falha, o que interessa e o que o runner tinha na hora:
