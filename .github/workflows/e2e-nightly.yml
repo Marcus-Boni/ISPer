@@ -81,6 +81,45 @@ jobs:
       - name: Compila o app (CPU)
         run: cargo build --release --no-default-features -p isper-app
 
+      # O tauri-build copia os bundle.resources — aqui, DLLs VAZIAS — para
+      # target/release, por cima das DLLs reais que o sherpa-rs-sys tinha posto
+      # lá. Um exe ao lado de uma sherpa-onnx-c-api.dll de 0 bytes nem abre
+      # (foi assim que a primeira execução deste workflow falhou). As vazias
+      # saem; as do sherpa-onnx voltam do pré-compilado baixado; o runtime do
+      # VC vem do próprio Windows do runner.
+      - name: DLLs reais ao lado do exe
+        shell: pwsh
+        run: |
+          Get-ChildItem target\release\*.dll | Where-Object { $_.Length -eq 0 } | ForEach-Object {
+            "removendo DLL vazia: $($_.Name)"
+            Remove-Item $_.FullName -Force
+          }
+          $libs = @(Get-ChildItem "$env:LOCALAPPDATA\sherpa-rs" -Recurse -Filter *.dll -ErrorAction SilentlyContinue)
+          if ($libs.Count -eq 0) { throw "DLLs do sherpa-onnx nao encontradas em $env:LOCALAPPDATA\sherpa-rs" }
+          $libs | Copy-Item -Destination target\release -Force
+          Get-ChildItem target\release\*.dll | Select-Object Name, Length | Format-Table -AutoSize | Out-String | Write-Output
+
+      # Antes do smoke: o exe abre e fica vivo? Se morrer, o código de saída e o
+      # que ele escreveu (o tracing também vai para o stdout) aparecem aqui — o
+      # smoke sozinho só diria "app não abriu".
+      - name: Sanidade — o exe abre?
+        shell: pwsh
+        run: |
+          $wv = Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue
+          "WebView2 Runtime: $(if ($wv) { $wv.pv } else { 'NAO ENCONTRADO' })"
+          $p = Start-Process .\target\release\isper-app.exe -WorkingDirectory .\target\release -PassThru -RedirectStandardOutput sanity-out.txt -RedirectStandardError sanity-err.txt
+          Start-Sleep -Seconds 12
+          if ($p.HasExited) {
+            "o exe SAIU com codigo $($p.ExitCode) (0x$('{0:X8}' -f $p.ExitCode))"
+          } else {
+            "o exe esta vivo (PID $($p.Id)); janelas: $((Get-Process -Id $p.Id).MainWindowTitle)"
+            Stop-Process -Id $p.Id -Force
+          }
+          Start-Sleep -Seconds 2
+          "--- stdout ---"; Get-Content sanity-out.txt -ErrorAction SilentlyContinue | Select-Object -Last 40
+          "--- stderr ---"; Get-Content sanity-err.txt -ErrorAction SilentlyContinue | Select-Object -Last 20
+          if ($p.HasExited -and $p.ExitCode -ne 0) { throw "o app nao fica aberto no runner" }
+
       - name: Smoke ponta a ponta (CDP)
         shell: pwsh
         run: .\tools\e2e\smoke.ps1 -Exe .\target\release\isper-app.exe
@@ -100,5 +139,6 @@ jobs:
         with:
           name: isper-logs
           path: ${{ env.ISPER_LOGS }}
-          if-no-files-found: ignore
+          # Sem log = o app nem chegou ao main (DLL faltando): vale um aviso.
+          if-no-files-found: warn
           retention-days: 14
