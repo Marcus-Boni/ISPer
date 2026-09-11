@@ -65,7 +65,7 @@ pub(crate) fn open_library(app: &AppHandle) {
 
 /// Abre (ou foca) a Biblioteca já com a reunião selecionada.
 pub(crate) fn open_library_at(app: &AppHandle, meeting_id: i64) {
-    *app.state::<AppState>().pending_meeting.lock().unwrap() = Some(meeting_id);
+    *app.state::<AppState>().pending_meeting.lock_or_recover() = Some(meeting_id);
     let already_open = app.get_webview_window("library").is_some();
     open_library(app);
     if already_open {
@@ -114,7 +114,6 @@ pub(crate) async fn open_library_window(
 pub(crate) fn take_pending_meeting(app: AppHandle) -> Option<i64> {
     app.state::<AppState>()
         .pending_meeting
-        .lock()
-        .unwrap()
+        .lock_or_recover()
         .take()
 }

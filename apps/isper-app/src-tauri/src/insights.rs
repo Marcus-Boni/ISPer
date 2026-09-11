@@ -59,7 +59,7 @@ pub(crate) struct InsightsDto {
 pub(crate) fn insights_dto(app: &AppHandle) -> InsightsDto {
     let state = app.state::<AppState>();
     let (enabled, interval_min) = {
-        let cfg = state.config.lock().unwrap();
+        let cfg = state.config.lock_or_recover();
         (cfg.live_insights, cfg.insights_interval_min)
     };
     let llm = isper_llm::load_settings();
@@ -68,7 +68,7 @@ pub(crate) fn insights_dto(app: &AppHandle) -> InsightsDto {
             .ok()
             .flatten()
             .is_some();
-    let ins = state.insights.lock().unwrap();
+    let ins = state.insights.lock_or_recover();
     InsightsDto {
         enabled,
         configured,
@@ -91,7 +91,7 @@ fn emit(app: &AppHandle) {
 pub(crate) fn reset_insights(app: &AppHandle) {
     {
         let state = app.state::<AppState>();
-        let mut ins = state.insights.lock().unwrap();
+        let mut ins = state.insights.lock_or_recover();
         if let Some(tx) = ins.tx.take() {
             let _ = tx.send(InsightsCmd::Stop);
         }
@@ -108,7 +108,7 @@ pub(crate) fn reset_insights(app: &AppHandle) {
 /// a próxima reunião).
 pub(crate) fn stop_insights_loop(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let mut ins = state.insights.lock().unwrap();
+    let mut ins = state.insights.lock_or_recover();
     if let Some(tx) = ins.tx.take() {
         let _ = tx.send(InsightsCmd::Stop);
     }
@@ -119,10 +119,10 @@ pub(crate) fn stop_insights_loop(app: &AppHandle) {
 /// Sobe o loop se não houver um rodando e houver reunião em andamento.
 fn ensure_loop(app: &AppHandle) {
     let state = app.state::<AppState>();
-    if state.meeting_started.lock().unwrap().is_none() {
+    if state.meeting_started.lock_or_recover().is_none() {
         return;
     }
-    let mut ins = state.insights.lock().unwrap();
+    let mut ins = state.insights.lock_or_recover();
     if ins.tx.is_some() {
         return;
     }
@@ -135,12 +135,12 @@ fn ensure_loop(app: &AppHandle) {
         loop {
             let interval = {
                 let state = app.state::<AppState>();
-                let cfg = state.config.lock().unwrap();
+                let cfg = state.config.lock_or_recover();
                 Duration::from_secs(60 * u64::from(cfg.insights_interval_min.max(1)))
             };
             {
                 let state = app.state::<AppState>();
-                state.insights.lock().unwrap().next_at = Some(Instant::now() + interval);
+                state.insights.lock_or_recover().next_at = Some(Instant::now() + interval);
             }
             emit(&app);
             let force = match rx.recv_timeout(interval) {
@@ -151,22 +151,25 @@ fn ensure_loop(app: &AppHandle) {
             if app
                 .state::<AppState>()
                 .meeting_started
-                .lock()
-                .unwrap()
+                .lock_or_recover()
                 .is_none()
             {
                 break;
             }
             // Com o recurso desligado o loop só atende "Atualizar agora" (rodada
             // avulsa) — as rodadas periódicas ficam para quem ligou.
-            let enabled = app.state::<AppState>().config.lock().unwrap().live_insights;
+            let enabled = app
+                .state::<AppState>()
+                .config
+                .lock_or_recover()
+                .live_insights;
             if !force && !enabled {
                 continue;
             }
             generate(&app, force);
         }
         let state = app.state::<AppState>();
-        let mut ins = state.insights.lock().unwrap();
+        let mut ins = state.insights.lock_or_recover();
         ins.tx = None;
         ins.next_at = None;
         ins.running = false;
@@ -178,14 +181,14 @@ fn ensure_loop(app: &AppHandle) {
 /// Uma rodada: janela recente → provider → estado + evento.
 fn generate(app: &AppHandle, force: bool) {
     let state = app.state::<AppState>();
-    let Some(started) = *state.meeting_started.lock().unwrap() else {
+    let Some(started) = *state.meeting_started.lock_or_recover() else {
         return;
     };
     let elapsed = started.elapsed().as_secs_f32();
-    let live = state.live.lock().unwrap().clone();
+    let live = state.live.lock_or_recover().clone();
     let total_chars: usize = live.iter().map(|s| s.text.len()).sum();
     {
-        let ins = state.insights.lock().unwrap();
+        let ins = state.insights.lock_or_recover();
         if !force && total_chars.saturating_sub(ins.seen_chars) < MIN_NEW_CHARS {
             tracing::debug!("insights: pouca fala nova — rodada pulada");
             return;
@@ -193,7 +196,7 @@ fn generate(app: &AppHandle, force: bool) {
     }
     if live.is_empty() {
         if force {
-            let mut ins = state.insights.lock().unwrap();
+            let mut ins = state.insights.lock_or_recover();
             ins.error = Some("ainda não há fala transcrita nesta reunião".into());
             drop(ins);
             emit(app);
@@ -218,7 +221,7 @@ fn generate(app: &AppHandle, force: bool) {
     let provider = match isper_llm::provider_from_settings(&settings) {
         Ok(p) => p,
         Err(e) => {
-            let mut ins = state.insights.lock().unwrap();
+            let mut ins = state.insights.lock_or_recover();
             ins.error = Some(match e {
                 isper_llm::LlmError::NotConfigured => {
                     "sem provider de IA — configure em Configurações → Inteligência".to_string()
@@ -232,7 +235,7 @@ fn generate(app: &AppHandle, force: bool) {
     };
 
     let previous = {
-        let mut ins = state.insights.lock().unwrap();
+        let mut ins = state.insights.lock_or_recover();
         ins.running = true;
         ins.error = None;
         ins.last.as_ref().map(|l| l.text.clone())
@@ -249,7 +252,7 @@ fn generate(app: &AppHandle, force: bool) {
         },
     );
     {
-        let mut ins = state.insights.lock().unwrap();
+        let mut ins = state.insights.lock_or_recover();
         ins.running = false;
         match outcome {
             Ok(text) => {
@@ -289,15 +292,14 @@ pub(crate) fn insights_now(app: AppHandle) -> Result<(), String> {
     if app
         .state::<AppState>()
         .meeting_started
-        .lock()
-        .unwrap()
+        .lock_or_recover()
         .is_none()
     {
         return Err("nenhuma reunião em andamento".into());
     }
     ensure_loop(&app);
     let state = app.state::<AppState>();
-    let ins = state.insights.lock().unwrap();
+    let ins = state.insights.lock_or_recover();
     match ins.tx.as_ref() {
         Some(tx) => tx
             .send(InsightsCmd::Now)

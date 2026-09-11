@@ -70,7 +70,11 @@ impl WhisperEngine {
         initial_prompt: Option<&str>,
     ) -> Result<Transcript> {
         // Uma inferência por vez — ditado e reunião dividem a GPU em paz.
-        let _guard = self.infer_lock.lock().unwrap();
+        // Envenenado (pânico numa inferência anterior)? O motor continua servindo.
+        let _guard = self
+            .infer_lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut state = self
             .ctx
             .create_state()

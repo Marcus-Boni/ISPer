@@ -105,12 +105,12 @@ pub(crate) fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, S
         None => (None, "(nenhum)".to_string()),
     };
 
-    *state.dictation_shortcut.lock().unwrap() = dict_sc;
-    *state.meeting_shortcut.lock().unwrap() = meet_sc;
-    *state.mark_shortcut.lock().unwrap() = mark_sc;
-    *state.active_shortcut.lock().unwrap() = dict_label.clone();
-    *state.active_meeting_shortcut.lock().unwrap() = meet_label.clone();
-    *state.active_mark_shortcut.lock().unwrap() = mark_label.clone();
+    *state.dictation_shortcut.lock_or_recover() = dict_sc;
+    *state.meeting_shortcut.lock_or_recover() = meet_sc;
+    *state.mark_shortcut.lock_or_recover() = mark_sc;
+    *state.active_shortcut.lock_or_recover() = dict_label.clone();
+    *state.active_meeting_shortcut.lock_or_recover() = meet_label.clone();
+    *state.active_mark_shortcut.lock_or_recover() = mark_label.clone();
     (dict_label, meet_label, mark_label)
 }
 
@@ -119,7 +119,7 @@ pub(crate) fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, S
 pub(crate) fn on_meeting_hotkey(app: &AppHandle) {
     {
         let state = app.state::<AppState>();
-        let mut last = state.last_meeting_toggle.lock().unwrap();
+        let mut last = state.last_meeting_toggle.lock_or_recover();
         if last.is_some_and(|t| t.elapsed() < MEETING_HOTKEY_DEBOUNCE) {
             return;
         }

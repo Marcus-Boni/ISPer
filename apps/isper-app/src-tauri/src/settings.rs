@@ -104,7 +104,12 @@ pub(crate) struct ModelDto {
 pub(crate) fn load_engine_in_background(app: AppHandle) {
     std::thread::spawn(move || {
         set_engine_status(&app, EngineStatus::Loading);
-        let preferred = app.state::<AppState>().config.lock().unwrap().model.clone();
+        let preferred = app
+            .state::<AppState>()
+            .config
+            .lock_or_recover()
+            .model
+            .clone();
         let Some(path) = isper_models::resolve_whisper_model(
             preferred.as_deref(),
             cfg!(feature = "cuda"),
@@ -120,7 +125,7 @@ pub(crate) fn load_engine_in_background(app: AppHandle) {
         tracing::info!("carregando modelo {}", path.display());
         match WhisperEngine::new(&path) {
             Ok(engine) => {
-                *app.state::<AppState>().engine.lock().unwrap() = Some(Arc::new(engine));
+                *app.state::<AppState>().engine.lock_or_recover() = Some(Arc::new(engine));
                 let file = path
                     .file_name()
                     .map(|f| f.to_string_lossy().into_owned())
@@ -154,13 +159,18 @@ pub(crate) fn load_engine_in_background(app: AppHandle) {
 }
 
 pub(crate) fn set_engine_status(app: &AppHandle, status: EngineStatus) {
-    *app.state::<AppState>().engine_status.lock().unwrap() = status;
+    *app.state::<AppState>().engine_status.lock_or_recover() = status;
     notify_status(app);
 }
 
 #[tauri::command]
 pub(crate) fn models_status(app: AppHandle) -> Vec<ModelDto> {
-    let preferred = app.state::<AppState>().config.lock().unwrap().model.clone();
+    let preferred = app
+        .state::<AppState>()
+        .config
+        .lock_or_recover()
+        .model
+        .clone();
     let dirs = dev_dirs();
     let active_file =
         isper_models::resolve_whisper_model(preferred.as_deref(), cfg!(feature = "cuda"), &dirs)
@@ -205,7 +215,7 @@ pub(crate) async fn download_model(app: AppHandle, file: String) -> Result<(), S
     .await
     .map_err(|e| e.to_string())??;
 
-    if app.state::<AppState>().engine.lock().unwrap().is_none() {
+    if app.state::<AppState>().engine.lock_or_recover().is_none() {
         load_engine_in_background(app.clone());
     }
     Ok(())
@@ -249,10 +259,10 @@ pub(crate) async fn download_diarize_models(app: AppHandle) -> Result<(), String
 #[tauri::command]
 pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
     let state = app.state::<AppState>();
-    let cfg = state.config.lock().unwrap().clone();
-    let active_shortcut = state.active_shortcut.lock().unwrap().clone();
-    let active_meeting_shortcut = state.active_meeting_shortcut.lock().unwrap().clone();
-    let active_mark_shortcut = state.active_mark_shortcut.lock().unwrap().clone();
+    let cfg = state.config.lock_or_recover().clone();
+    let active_shortcut = state.active_shortcut.lock_or_recover().clone();
+    let active_meeting_shortcut = state.active_meeting_shortcut.lock_or_recover().clone();
+    let active_mark_shortcut = state.active_mark_shortcut.lock_or_recover().clone();
     let llm = isper_llm::load_settings();
     let llm_key_present = if llm.provider.is_empty() {
         false
@@ -323,7 +333,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         .map(|l| l.trim().to_string())
         .filter(|l| !l.is_empty())
         .collect();
-    let previous = state.config.lock().unwrap().clone();
+    let previous = state.config.lock_or_recover().clone();
     let previous_model = previous.model.clone();
     let mut cfg = AppConfig {
         shortcut: patch.shortcut,
@@ -353,7 +363,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
     // que vale para o config.toml (`AppConfig::normalize`, com testes).
     cfg.normalize();
     config::save(&cfg).map_err(|e| e.to_string())?;
-    *state.config.lock().unwrap() = cfg.clone();
+    *state.config.lock_or_recover() = cfg.clone();
     state.audio.set_device(cfg.input_device.clone());
 
     // Troca de modelo a quente: o antigo continua servindo até o novo carregar.
@@ -364,7 +374,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
     // Reaplica os atalhos na hora — sem reiniciar o app.
     let (label, _meeting_label, _mark_label) = register_shortcuts(&app, &cfg);
     set_hint(&app, &label);
-    let recording = state.meeting.lock().unwrap().is_some();
+    let recording = state.meeting.lock_or_recover().is_some();
     set_meeting_text(&app, &meeting_item_text(&app, recording));
 
     // Provider de IA (a chave é gravada separadamente, via set_llm_key).
@@ -467,7 +477,7 @@ pub(crate) fn list_input_devices() -> Vec<String> {
 pub(crate) fn set_show_home(app: AppHandle, show: bool) -> Result<(), String> {
     let state = app.state::<AppState>();
     let cfg = {
-        let mut c = state.config.lock().unwrap();
+        let mut c = state.config.lock_or_recover();
         c.show_home_on_launch = show;
         c.clone()
     };
@@ -509,8 +519,8 @@ pub(crate) struct Diagnostics {
 #[tauri::command]
 pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
     let state = app.state::<AppState>();
-    let engine = state.engine_status.lock().unwrap().clone();
-    let preferred = state.config.lock().unwrap().model.clone();
+    let engine = state.engine_status.lock_or_recover().clone();
+    let preferred = state.config.lock_or_recover().model.clone();
     let model_path = isper_models::resolve_whisper_model(
         preferred.as_deref(),
         cfg!(feature = "cuda"),

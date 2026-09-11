@@ -191,7 +191,8 @@ fn unzip_store(zip: &[u8]) -> Vec<(String, Vec<u8>)> {
         );
         let name_len = u16_at(pos + 28) as usize;
         let local = u32_at(pos + 42) as usize;
-        let name = String::from_utf8(zip[pos + 46..pos + 46 + name_len].to_vec()).unwrap();
+        let name = String::from_utf8(zip[pos + 46..pos + 46 + name_len].to_vec())
+            .expect("nome da entrada em UTF-8");
         pos += 46 + name_len;
 
         assert_eq!(u32_at(local), 0x0403_4b50, "assinatura do cabeçalho local");

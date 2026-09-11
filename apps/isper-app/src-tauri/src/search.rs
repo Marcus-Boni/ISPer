@@ -205,7 +205,7 @@ pub(crate) fn embeddings_status(app: AppHandle) -> EmbeddingsStatus {
     let stats = model_id
         .as_deref()
         .and_then(|id| open_store().ok()?.embeddings_stats(id).ok());
-    let indexing = *app.state::<AppState>().indexing.lock().unwrap();
+    let indexing = *app.state::<AppState>().indexing.lock_or_recover();
     EmbeddingsStatus {
         provider: configured.then_some(provider),
         model: settings.effective_model(),
@@ -293,7 +293,7 @@ pub(crate) async fn semantic_search(
 pub(crate) async fn index_all(app: AppHandle) -> Result<IndexReport, String> {
     {
         let state = app.state::<AppState>();
-        let mut indexing = state.indexing.lock().unwrap();
+        let mut indexing = state.indexing.lock_or_recover();
         if indexing.is_some() {
             return Err("já há uma indexação em andamento".into());
         }
@@ -331,7 +331,7 @@ pub(crate) async fn index_all(app: AppHandle) -> Result<IndexReport, String> {
         };
         let progress = |done: usize| {
             let p = IndexProgress { done, total };
-            *app2.state::<AppState>().indexing.lock().unwrap() = Some(p);
+            *app2.state::<AppState>().indexing.lock_or_recover() = Some(p);
             let _ = app2.emit("isper-index-progress", p);
         };
         progress(0);
@@ -369,7 +369,7 @@ pub(crate) async fn index_all(app: AppHandle) -> Result<IndexReport, String> {
     .await
     .map_err(|e| e.to_string())
     .and_then(|r| r.map_err(|e| e.to_string()));
-    *app.state::<AppState>().indexing.lock().unwrap() = None;
+    *app.state::<AppState>().indexing.lock_or_recover() = None;
     notify_status(&app);
     result
 }

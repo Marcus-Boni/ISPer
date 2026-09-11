@@ -9,7 +9,7 @@ pub(crate) fn hint_text(label: &str) -> String {
 
 pub(crate) fn set_hint(app: &AppHandle, label: &str) {
     let state = app.state::<AppState>();
-    let guard = state.hint_item.lock().unwrap();
+    let guard = state.hint_item.lock_or_recover();
     if let Some(item) = guard.as_ref() {
         let _ = item.set_text(hint_text(label));
     }
@@ -18,7 +18,7 @@ pub(crate) fn set_hint(app: &AppHandle, label: &str) {
 /// Texto do item de reunião na bandeja, com o atalho ativo.
 pub(crate) fn meeting_item_text(app: &AppHandle, recording: bool) -> String {
     let state = app.state::<AppState>();
-    let label = state.active_meeting_shortcut.lock().unwrap().clone();
+    let label = state.active_meeting_shortcut.lock_or_recover().clone();
     let base = if recording {
         "Encerrar e transcrever a reunião"
     } else {
@@ -33,7 +33,7 @@ pub(crate) fn meeting_item_text(app: &AppHandle, recording: bool) -> String {
 
 pub(crate) fn set_meeting_text(app: &AppHandle, text: &str) {
     let state = app.state::<AppState>();
-    let guard = state.meeting_item.lock().unwrap();
+    let guard = state.meeting_item.lock_or_recover();
     if let Some(item) = guard.as_ref() {
         let _ = item.set_text(text);
     }
@@ -50,7 +50,7 @@ pub(crate) fn indicator_item_text(visible: bool) -> &'static str {
 
 pub(crate) fn set_indicator_text(app: &AppHandle, visible: bool) {
     let state = app.state::<AppState>();
-    let guard = state.indicator_item.lock().unwrap();
+    let guard = state.indicator_item.lock_or_recover();
     if let Some(item) = guard.as_ref() {
         let _ = item.set_text(indicator_item_text(visible));
     }
@@ -85,8 +85,8 @@ pub(crate) fn recording_icon(base: &Image<'static>) -> Image<'static> {
 /// Troca o ícone e o tooltip da bandeja conforme a gravação de reunião.
 pub(crate) fn set_tray_recording(app: &AppHandle, recording: bool) {
     let state = app.state::<AppState>();
-    let icons = state.tray_icons.lock().unwrap();
-    let tray = state.tray.lock().unwrap();
+    let icons = state.tray_icons.lock_or_recover();
+    let tray = state.tray.lock_or_recover();
     if let (Some((normal, rec)), Some(tray)) = (icons.as_ref(), tray.as_ref()) {
         let icon = if recording { rec } else { normal };
         let _ = tray.set_icon(Some(icon.clone()));
@@ -101,14 +101,14 @@ pub(crate) fn set_tray_recording(app: &AppHandle, recording: bool) {
 /// Sair pela bandeja. Com uma reunião em andamento, encerra e SALVA antes —
 /// sem isso a gravação inteira se perderia com um clique.
 pub(crate) fn quit_app(app: &AppHandle) {
-    let handle = app.state::<AppState>().meeting.lock().unwrap().take();
+    let handle = app.state::<AppState>().meeting.lock_or_recover().take();
     let Some(handle) = handle else {
         tracing::info!("saindo");
         app.exit(0);
         return;
     };
     tracing::info!("saindo com reunião ativa — encerrando e salvando antes");
-    *app.state::<AppState>().meeting_started.lock().unwrap() = None;
+    *app.state::<AppState>().meeting_started.lock_or_recover() = None;
     set_tray_recording(app, false);
     let _ = app.emit("isper-state", json!({"state": "meeting-processing"}));
     show_overlay(app);

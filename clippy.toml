@@ -1,0 +1,4 @@
+# Configuração dos lints do clippy (os níveis ficam em [workspace.lints] no Cargo.toml).
+# `unwrap()` continua livre dentro de `#[cfg(test)]`: num teste, o pânico É o relatório.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
