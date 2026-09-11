@@ -137,6 +137,9 @@ jobs:
       # MSBuild. `-allow-unsupported-compiler`: o MSVC do runner pode ser mais novo do que o
       # nvcc conhece. A arquitetura (89) e os flags /O2 vêm do .cargo/config.toml, como na
       # máquina do mantenedor.
+      # Só o que o whisper.cpp precisa, não o toolkit inteiro (Nsight etc.). No CUDA 13 os
+      # cabeçalhos `crt/*` (host_config.h, incluído pelo cuda_runtime.h) viraram o
+      # sub-pacote `crt`; sem ele o CMake falha com C1083. `thrust` traz CUB/Thrust.
       - name: CUDA Toolkit 13.3
         if: matrix.variant == 'gpu'
         id: cuda
@@ -144,7 +147,7 @@ jobs:
         with:
           cuda: '13.3.1'
           method: network
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
+          sub-packages: '["nvcc", "cudart", "crt", "cublas", "cublas_dev", "thrust"]'
           use-github-cache: true
 
       - name: Ambiente do MSVC
