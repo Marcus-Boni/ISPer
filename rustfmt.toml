@@ -1,0 +1,4 @@
+# Formatação: só opções estáveis. O estilo é o da edição 2024 para todos os
+# crates (o `cargo fmt --all -- --check` do CI usa exatamente isto).
+edition = "2024"
+style_edition = "2024"

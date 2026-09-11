@@ -34,7 +34,7 @@ OFL) vão dentro do app — nada é baixado em tempo de execução. Animações 
 
 | Ferramenta | Como foi instalado | Observação |
 |---|---|---|
-| Rust (rustup) | `rustup-init.exe -y` | toolchain `stable-x86_64-pc-windows-msvc` |
+| Rust (rustup) | `rustup-init.exe -y` | a versão vem de [`rust-toolchain.toml`](rust-toolchain.toml) (1.98.0, com rustfmt e clippy): o rustup instala sozinho no primeiro `cargo`; o CI usa a mesma |
 | VS Build Tools 2022 | `winget install Microsoft.VisualStudio.2022.BuildTools` + workload VCTools | compila o whisper.cpp (C++) |
 | CMake | zip portátil em `%LOCALAPPDATA%\Programs\cmake-*\bin` (no PATH de usuário) | exigido pelo whisper-rs-sys |
 | libclang | `pip install --user libclang` | exigido pelo bindgen; `LIBCLANG_PATH` aponta p/ `%APPDATA%\Python\Python311\site-packages\clang\native` (persistido como env var de usuário) |
@@ -384,7 +384,8 @@ prefira o modelo Small ou Medium; o Large é lento sem GPU.
 .\scripts\release.ps1 -Publish
 ```
 
-O script confere versão (`Cargo.toml` = `tauri.conf.json`), exige a seção
+O script lê a versão do `Cargo.toml` do app (fonte única — o `tauri.conf.json`
+não a repete; o Tauri lê de lá), exige a seção
 `## [versão]` no [`CHANGELOG.md`](CHANGELOG.md) (que vira as notas da release),
 árvore do git limpa e, com `-Publish`, CI verde no commit. Depois para o app,
 copia para `resources/` as DLLs do sherpa-onnx (de `target/release`) e do

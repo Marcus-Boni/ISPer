@@ -329,21 +329,13 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         shortcut: patch.shortcut.filter(|s| !s.trim().is_empty()),
         lang: {
             let l = patch.lang.trim().to_lowercase();
-            if l.is_empty() {
-                "pt".into()
-            } else {
-                l
-            }
+            if l.is_empty() { "pt".into() } else { l }
         },
         dictionary,
         model: patch.model.filter(|m| !m.trim().is_empty()),
         meeting_source: {
             let s = patch.meeting_source.trim().to_lowercase();
-            if s.is_empty() {
-                "system".into()
-            } else {
-                s
-            }
+            if s.is_empty() { "system".into() } else { s }
         },
         // Preferências do indicador não passam pela tela — preserva as atuais.
         overlay_pos: previous.overlay_pos,

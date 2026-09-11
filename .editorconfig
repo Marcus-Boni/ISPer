@@ -1,0 +1,25 @@
+# EditorConfig (https://editorconfig.org): mesmo espaçamento, codificação e fim
+# de linha em qualquer editor. O git normaliza para LF no repositório
+# (.gitattributes); o rustfmt cuida do Rust.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.rs]
+indent_size = 4
+max_line_length = 100
+
+[*.md]
+# Dois espaços no fim da linha são quebra de linha em Markdown.
+trim_trailing_whitespace = false
+
+[*.ps1]
+# O PowerShell 5.1 lê .ps1 sem BOM como ANSI: os scripts ficam em ASCII puro
+# (sem acentos nem símbolos) — ver tools/e2e/README.md.
+charset = utf-8
