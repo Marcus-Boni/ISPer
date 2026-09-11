@@ -109,16 +109,18 @@ jobs:
           "WebView2 Runtime: $(if ($wv) { $wv.pv } else { 'NAO ENCONTRADO' })"
           $p = Start-Process .\target\release\isper-app.exe -WorkingDirectory .\target\release -PassThru -RedirectStandardOutput sanity-out.txt -RedirectStandardError sanity-err.txt
           Start-Sleep -Seconds 12
-          if ($p.HasExited) {
-            "o exe SAIU com codigo $($p.ExitCode) (0x$('{0:X8}' -f $p.ExitCode))"
-          } else {
-            "o exe esta vivo (PID $($p.Id)); janelas: $((Get-Process -Id $p.Id).MainWindowTitle)"
+          # Decidido ANTES de encerrar: depois do Stop-Process o codigo de saida e o do kill.
+          $alive = -not $p.HasExited
+          if ($alive) {
+            "o exe esta vivo (PID $($p.Id)); janela: $((Get-Process -Id $p.Id).MainWindowTitle)"
             Stop-Process -Id $p.Id -Force
+          } else {
+            "o exe SAIU sozinho com codigo $($p.ExitCode) (0x$('{0:X8}' -f $p.ExitCode))"
           }
           Start-Sleep -Seconds 2
           "--- stdout ---"; Get-Content sanity-out.txt -ErrorAction SilentlyContinue | Select-Object -Last 40
           "--- stderr ---"; Get-Content sanity-err.txt -ErrorAction SilentlyContinue | Select-Object -Last 20
-          if ($p.HasExited -and $p.ExitCode -ne 0) { throw "o app nao fica aberto no runner" }
+          if (-not $alive) { throw "o app nao fica aberto no runner" }
 
       - name: Smoke ponta a ponta (CDP)
         shell: pwsh
