@@ -20,13 +20,15 @@ on:
 
 jobs:
   consistencia:
-    name: tag × manifests × CHANGELOG
+    name: tag × Cargo.toml × CHANGELOG
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - name: Tag bate com Cargo.toml, tauri.conf.json e tem seção no CHANGELOG
+      # A versão vive só no Cargo.toml do app (o tauri.conf.json não a repete:
+      # o Tauri lê de lá). A tag e a seção do CHANGELOG precisam bater com ela.
+      - name: Tag bate com Cargo.toml e tem seção no CHANGELOG
         shell: pwsh
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -36,13 +38,13 @@ jobs:
           $tag = if ($env:EVENT_NAME -eq 'push') { $env:REF_NAME } else { $env:INPUT_TAG }
           if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "tag '$tag' fora do padrao vMAJOR.MINOR.PATCH" }
           $version = $tag.TrimStart('v')
-          $conf = (Get-Content apps/isper-app/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           $cargo = (Select-String -Path apps/isper-app/src-tauri/Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
-          if ($conf -ne $version) { throw "tauri.conf.json esta em $conf, a tag e $tag" }
           if ($cargo -ne $version) { throw "Cargo.toml esta em $cargo, a tag e $tag" }
+          $conf = Get-Content apps/isper-app/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          if ($null -ne $conf.version) { throw "tauri.conf.json nao deve declarar 'version' (fonte unica: Cargo.toml)" }
           $pattern = '^## \[' + [regex]::Escape($version) + '\]'
           if (-not (Select-String -Path CHANGELOG.md -Pattern $pattern -Quiet)) { throw "CHANGELOG.md sem a secao '## [$version]'" }
-          "Tag $tag consistente: manifests em $version e CHANGELOG com a secao." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "Tag $tag consistente: Cargo.toml em $version e CHANGELOG com a secao." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
 
   ci:
     name: fmt · test · check

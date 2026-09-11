@@ -3,10 +3,11 @@
 Todas as mudanças relevantes do ISPer ficam aqui. O formato segue o
 [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e as versões, o
 [Versionamento Semântico](https://semver.org/lang/pt-BR/): MAJOR para quebras,
-MINOR para funcionalidades, PATCH para correções. A versão vive em
-`apps/isper-app/src-tauri/Cargo.toml` e em `tauri.conf.json`; a seção
-`## [versão]` daqui vira as notas da release (`scripts/release.ps1`), e o
-workflow `release.yml` recusa uma tag que não bata com os dois.
+MINOR para funcionalidades, PATCH para correções. A versão vive só em
+`apps/isper-app/src-tauri/Cargo.toml` (o Tauri lê de lá; o `tauri.conf.json`
+não a repete); a seção `## [versão]` daqui vira as notas da release
+(`scripts/release.ps1`), e o workflow `release.yml` recusa uma tag que não
+bata com ela.
 
 ## [Unreleased]
 
