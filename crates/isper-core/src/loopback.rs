@@ -156,7 +156,13 @@ struct Session {
 }
 
 fn wa<T>(r: std::result::Result<T, wasapi::WasapiError>, what: &str) -> Result<T> {
-    r.map_err(|e| IsperError::Audio(format!("loopback ({what}): {e}")))
+    // Com a dica em português quando a causa é conhecida (dispositivo em uso
+    // exclusivo por outro app, endpoint invalidado após suspensão…).
+    r.map_err(|e| {
+        IsperError::Audio(crate::audio::describe_error(&format!(
+            "loopback ({what}): {e}"
+        )))
+    })
 }
 
 fn open(source: &LoopbackSource) -> Result<Session> {

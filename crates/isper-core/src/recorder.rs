@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 
-use crate::{IsperError, RawAudio, Result, audio};
+use crate::{RawAudio, Result, audio};
 
 /// Silêncio contínuo (depois de ter ouvido fala) que encerra o mãos-livres.
 const VAD_SILENCE: Duration = Duration::from_millis(1200);
@@ -193,7 +193,15 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
 
     loop {
         if let Some(rx) = data_rx.clone() {
-            // Gravando: escuta comandos E dados ao mesmo tempo.
+            // Gravando: escuta comandos E dados ao mesmo tempo. Sem pacote
+            // algum por `stall`, o microfone morreu (fone desconectado,
+            // suspensão): a gravação termina com o que foi capturado, em vez
+            // de ficar presa até a pessoa soltar a tecla sem entender.
+            let stall = if samples.is_empty() {
+                audio::MIC_FIRST_PACKET
+            } else {
+                audio::MIC_STALL
+            };
             crossbeam_channel::select! {
                 recv(cmd_rx) -> cmd => match cmd {
                     Ok(Command::Stop) => {
@@ -216,6 +224,13 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
                         finish(&mut stream, &mut data_rx, &mut samples, sample_rate, channels, &event_tx);
                     }
                 },
+                default(stall) => {
+                    tracing::warn!(
+                        "microfone sem áudio por {:.0} s — encerrando a gravação com o que foi capturado",
+                        stall.as_secs_f32()
+                    );
+                    finish(&mut stream, &mut data_rx, &mut samples, sample_rate, channels, &event_tx);
+                },
             }
         } else {
             // Parado: só espera comando.
@@ -226,9 +241,8 @@ fn run(cmd_rx: Receiver<Command>, event_tx: Sender<RecorderEvent>, level_tx: Sen
                     match audio::open_input_stream_on(device.as_deref(), tx) {
                         Ok((s, rate, ch)) => {
                             if let Err(e) = s.play() {
-                                let _ = event_tx.send(RecorderEvent::Finished(Err(
-                                    IsperError::Audio(e.to_string()),
-                                )));
+                                let _ = event_tx
+                                    .send(RecorderEvent::Finished(Err(audio::audio_err(e))));
                                 continue;
                             }
                             sample_rate = rate;
