@@ -25,3 +25,6 @@ apps/isper-app/src-tauri/resources/
 
 # Captura de teste do `loopdump` (7,7 MB) — gerada localmente, nunca versionar
 /loopdump.wav
+
+# SBOMs gerados pelo cargo-cyclonedx (um por crate); o do app vai para dist/ com a release
+*.cdx.json
