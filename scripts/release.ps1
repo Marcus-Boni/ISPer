@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Pré-checagens (a release só sai consistente):
-    - Cargo.toml e tauri.conf.json com a mesma versão; CHANGELOG.md com a seção "## [versão]"
+    - versão lida do Cargo.toml do app (fonte única — o tauri.conf.json não a repete); CHANGELOG.md com a seção "## [versão]"
       (que vira as notas da release, salvo -Notes); árvore do git limpa (salvo -AllowDirty);
       com -Publish: gh autenticado, tag inexistente e CI verde no commit atual (salvo -SkipCiCheck).
   Recursos que vão dentro do instalador:
@@ -48,10 +48,10 @@ function Invoke-Native([scriptblock]$Block) {
 }
 
 # --- 1) versão, CHANGELOG, chave, git
+# Fonte unica da versao: o Cargo.toml do app (o Tauri le de la; o tauri.conf.json nao a repete).
+$version = (Select-String -Path (Join-Path $tauriDir 'Cargo.toml') -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
 $conf = Get-Content (Join-Path $tauriDir 'tauri.conf.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-$version = $conf.version
-$cargoVer = (Select-String -Path (Join-Path $tauriDir 'Cargo.toml') -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
-if ($cargoVer -ne $version) { throw "versao divergente: Cargo.toml=$cargoVer, tauri.conf.json=$version" }
+if ($null -ne $conf.version) { throw "tauri.conf.json nao deve declarar 'version' - a fonte unica e o Cargo.toml ($version)" }
 $tag = "v$version"
 
 $changelog = Get-Content (Join-Path $root 'CHANGELOG.md') -Raw -Encoding UTF8
