@@ -156,8 +156,9 @@ jobs:
           Start-Sleep -Seconds 2
 
       # ISPER_E2E_CDP_REGISTRY=1: o Start-Isper do tools/e2e injeta a porta CDP
-      # pela chave de politica do WebView2 (HKLM e HKCU, so para isper-app.exe)
-      # e a remove assim que o app abre — o relancamento limpo fica sem porta.
+      # pela chave de politica do WebView2 (HKLM e HKCU, so para isper-app.exe);
+      # a chave fica enquanto o app testado vive (cada janela nova precisa dos
+      # mesmos argumentos do browser) e sai antes do relancamento limpo.
       - name: Smoke ponta a ponta (CDP)
         shell: pwsh
         env:

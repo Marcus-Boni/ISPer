@@ -93,11 +93,11 @@ function Start-Isper {
       }
     } catch { $lastError = $_.Exception.Message }
   }
-  # A chave e lida quando o browser nasce: sai logo depois, para o relancamento
-  # limpo (Restart-IsperClean) nao herdar a porta.
-  if ($viaRegistry) {
-    foreach ($key in $script:CdpRegistryKeys) { Remove-ItemProperty -Path $key -Name $exeName -ErrorAction SilentlyContinue }
-  }
+  # A chave FICA enquanto o app testado vive: cada janela nova cria seu proprio
+  # ambiente WebView2 e ele precisa ter os MESMOS argumentos do browser ja
+  # aberto — sem a chave, Biblioteca e Configuracoes falhavam com
+  # ERROR_INVALID_STATE (0x8007139F). Restart-IsperClean a remove antes do
+  # relancamento limpo.
   if ($ok) { return $true }
   # Nao abriu: diz por que, em vez de so "FALHA" (processos, porta, log).
   # Write-Host: saida de diagnostico NAO pode virar valor de retorno da funcao.
@@ -193,10 +193,18 @@ function Get-TodayLog {
   Join-Path $env:LOCALAPPDATA "ISPer\logs\$name"
 }
 
+function Remove-CdpRegistry {
+  # Apaga a politica de argumentos do WebView2 gravada por Start-Isper (modo CI).
+  param([Parameter(Mandatory)][string]$Exe)
+  $exeName = Split-Path $Exe -Leaf
+  foreach ($key in $script:CdpRegistryKeys) { Remove-ItemProperty -Path $key -Name $exeName -ErrorAction SilentlyContinue }
+}
+
 function Restart-IsperClean {
   # Relança o exe sem porta CDP (estado normal de uso).
   param([Parameter(Mandatory)][string]$Exe)
   Stop-Isper
+  Remove-CdpRegistry -Exe $Exe
   Start-Process $Exe -WorkingDirectory (Split-Path $Exe)
   Start-Sleep -Seconds 3
 }
