@@ -20,7 +20,7 @@
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
 | F7 Maturidade de engenharia | 🟡 | 7.1 concluída (11/09); 7.5 com 2 itens entregues; 7.2, 7.3, 7.4 e 7.6 não começadas |
 
-**69 itens entregues · 27 em aberto** (2 deles de estudo pessoal). Ordem sugerida: 7.2 → 7.3 → 7.4 → 7.5 → 7.6.
+**68 itens entregues · 28 em aberto** (2 deles de estudo pessoal). Ordem sugerida: 7.2 → 7.3 → 7.4 → 7.5 → 7.6.
 
 ---
 
