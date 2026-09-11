@@ -11,6 +11,8 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-11
+
 ### Adicionado
 - Fase 7.2 (testes que provam robustez):
   - **110 testes automatizados** (eram 58): provider de IA falso para testar
