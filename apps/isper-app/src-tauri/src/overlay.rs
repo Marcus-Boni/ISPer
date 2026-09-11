@@ -221,3 +221,132 @@ pub(crate) fn show_indicator_cmd(app: AppHandle) {
 pub(crate) fn overlay_toggle_pin(app: AppHandle) -> bool {
     toggle_indicator(&app)
 }
+
+/// Retângulo de um monitor, em pixels físicos (como o Tauri os informa).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct MonitorRect {
+    pub(crate) x: i32,
+    pub(crate) y: i32,
+    pub(crate) w: u32,
+    pub(crate) h: u32,
+}
+
+impl From<&tauri::Monitor> for MonitorRect {
+    fn from(m: &tauri::Monitor) -> Self {
+        Self {
+            x: m.position().x,
+            y: m.position().y,
+            w: m.size().width,
+            h: m.size().height,
+        }
+    }
+}
+
+/// Quanto do indicador precisa continuar visível para a posição lembrada valer.
+const MIN_VISIBLE_PX: i32 = 40;
+
+/// Confere a posição lembrada do indicador contra os monitores de agora. Um
+/// monitor desligado, uma troca de resolução ou de escala (DPI) muda o mapa
+/// de pixels físicos e deixaria o indicador fora da tela — e ele não é
+/// focável, então ninguém conseguiria trazê-lo de volta. Devolve a posição
+/// (empurrada para dentro do monitor com que mais se sobrepõe, se estava
+/// parcialmente fora) ou `None` quando nenhum monitor a contém — aí vale a
+/// posição padrão.
+pub(crate) fn clamp_to_monitors(
+    pos: (i32, i32),
+    size: (u32, u32),
+    monitors: &[MonitorRect],
+) -> Option<(i32, i32)> {
+    let (x, y) = (pos.0 as i64, pos.1 as i64);
+    let (w, h) = (size.0 as i64, size.1 as i64);
+    // Largura e altura da janela que caem dentro de cada monitor.
+    let visible = |m: &MonitorRect| -> (i64, i64) {
+        let (mx, my, mw, mh) = (m.x as i64, m.y as i64, m.w as i64, m.h as i64);
+        (
+            (x + w).min(mx + mw) - x.max(mx),
+            (y + h).min(my + mh) - y.max(my),
+        )
+    };
+    let min = MIN_VISIBLE_PX as i64;
+    let best = monitors
+        .iter()
+        .map(|m| (visible(m), m))
+        .filter(|((vw, vh), _)| *vw >= min && *vh >= min)
+        .max_by_key(|((vw, vh), _)| vw * vh)?
+        .1;
+    // Cabe? Encosta na borda. Não cabe (janela maior que o monitor)? Alinha
+    // ao canto do monitor, onde os controles ficam visíveis.
+    let clamp = |v: i64, lo: i64, hi: i64| if hi < lo { lo } else { v.clamp(lo, hi) };
+    let (mx, my, mw, mh) = (best.x as i64, best.y as i64, best.w as i64, best.h as i64);
+    Some((
+        clamp(x, mx, mx + mw - w) as i32,
+        clamp(y, my, my + mh - h) as i32,
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MAIN: MonitorRect = MonitorRect {
+        x: 0,
+        y: 0,
+        w: 2560,
+        h: 1440,
+    };
+    /// Segundo monitor à esquerda do principal (coordenadas negativas, como
+    /// o Windows faz) e mais baixo.
+    const LEFT: MonitorRect = MonitorRect {
+        x: -1920,
+        y: 200,
+        w: 1920,
+        h: 1080,
+    };
+    const SIZE: (u32, u32) = (460, 104);
+
+    #[test]
+    fn posicao_dentro_de_um_monitor_fica_como_esta() {
+        assert_eq!(
+            clamp_to_monitors((1050, 1240), SIZE, &[MAIN]),
+            Some((1050, 1240))
+        );
+        assert_eq!(
+            clamp_to_monitors((-1200, 900), SIZE, &[MAIN, LEFT]),
+            Some((-1200, 900))
+        );
+    }
+
+    #[test]
+    fn parcialmente_fora_e_empurrada_para_dentro() {
+        // Passou da borda direita e de baixo do principal.
+        assert_eq!(
+            clamp_to_monitors((2400, 1400), SIZE, &[MAIN]),
+            Some((2100, 1336))
+        );
+        // Um pouco acima do topo do monitor da esquerda.
+        assert_eq!(
+            clamp_to_monitors((-1000, 150), SIZE, &[MAIN, LEFT]),
+            Some((-1000, 200))
+        );
+    }
+
+    #[test]
+    fn fora_de_todos_os_monitores_volta_none() {
+        // Monitor da esquerda foi desligado: só o principal restou.
+        assert_eq!(clamp_to_monitors((-1200, 900), SIZE, &[MAIN]), None);
+        // Quase toda fora (só 20 px visíveis) também não vale.
+        assert_eq!(clamp_to_monitors((2540, 700), SIZE, &[MAIN]), None);
+        assert_eq!(clamp_to_monitors((100, 100), SIZE, &[]), None);
+    }
+
+    #[test]
+    fn janela_maior_que_o_monitor_alinha_ao_canto() {
+        let tiny = MonitorRect {
+            x: 0,
+            y: 0,
+            w: 300,
+            h: 80,
+        };
+        assert_eq!(clamp_to_monitors((10, 10), SIZE, &[tiny]), Some((0, 0)));
+    }
+}

@@ -247,7 +247,24 @@ fn main() {
                 let (w, h) = overlay_size(&cfg);
                 let _ = overlay.set_size(tauri::LogicalSize::new(w, h));
             }
-            match cfg.overlay_pos {
+            // A posição lembrada só vale se ainda cai num monitor ligado: um
+            // monitor removido ou uma troca de resolução/escala deixaria o
+            // indicador (não focável) fora da tela, sem volta.
+            let win = overlay.outer_size()?;
+            let monitors: Vec<MonitorRect> = overlay
+                .available_monitors()?
+                .iter()
+                .map(MonitorRect::from)
+                .collect();
+            let remembered = cfg
+                .overlay_pos
+                .and_then(|pos| clamp_to_monitors(pos, (win.width, win.height), &monitors));
+            if cfg.overlay_pos.is_some() && remembered.is_none() {
+                tracing::info!(
+                    "posição lembrada do indicador está fora dos monitores atuais — usando a padrão"
+                );
+            }
+            match remembered {
                 Some((x, y)) => overlay.set_position(tauri::PhysicalPosition::new(x, y))?,
                 None => {
                     if let Some(monitor) = overlay.primary_monitor()? {

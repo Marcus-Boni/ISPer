@@ -220,3 +220,30 @@ pub(crate) async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>, S
 pub(crate) async fn install_update(app: AppHandle) -> Result<String, String> {
     install(&app).await.map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::friendly;
+
+    #[test]
+    fn erros_do_atualizador_em_portugues() {
+        let no_release = friendly("Could not fetch a valid release JSON from the remote (404)");
+        assert!(no_release.to_string().contains("nenhuma versão publicada"));
+        let offline = friendly("error sending request for url (https://github.com/...)");
+        assert!(
+            offline
+                .to_string()
+                .starts_with("sem conexão com o servidor")
+        );
+        assert!(
+            offline.to_string().contains("error sending request"),
+            "guarda a causa"
+        );
+        let tampered = friendly("the signature could not be verified (minisign)");
+        assert!(tampered.to_string().contains("assinatura"));
+        assert_eq!(
+            friendly("outro erro qualquer").to_string(),
+            "outro erro qualquer"
+        );
+    }
+}

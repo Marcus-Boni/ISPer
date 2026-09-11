@@ -52,6 +52,28 @@ pub(crate) struct HomeStatus {
     semantic_search: bool,
 }
 
+/// O que o Início mostra sobre a IA: (provider, modelo, chave presente). Sem
+/// provider escolhido não há nada a mostrar — e nem se consulta a chave. Sem
+/// modelo escolhido vale o padrão do provider, resolvido por `default_model`
+/// (que precisa da chave, por isso é preguiçoso).
+pub(crate) fn llm_summary(
+    llm: &isper_llm::LlmSettings,
+    key_present: impl FnOnce(&str) -> bool,
+    default_model: impl FnOnce() -> Option<String>,
+) -> (Option<String>, Option<String>, bool) {
+    let provider = llm.provider.trim();
+    if provider.is_empty() {
+        return (None, None, false);
+    }
+    let has_key = key_present(provider);
+    let model = llm
+        .model
+        .clone()
+        .filter(|m| !m.trim().is_empty())
+        .or_else(default_model);
+    (Some(provider.to_string()), model, has_key)
+}
+
 /// Fotografia de tudo que a tela Início mostra — uma chamada, sem estado no
 /// front (que só renderiza e reage ao evento `isper-status`).
 #[tauri::command]
@@ -73,21 +95,15 @@ pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
     let (call, call_ended, call_dismissed) = call_info(&app);
 
     let llm = isper_llm::load_settings();
-    let (llm_provider, llm_model, llm_key_present) = if llm.provider.is_empty() {
-        (None, None, false)
-    } else {
-        let key_present = isper_llm::get_api_key(&llm.provider)
-            .ok()
-            .flatten()
-            .is_some();
-        // Sem modelo escolhido, mostra o padrão do provider (só resolve com chave).
-        let model = llm.model.clone().or_else(|| {
+    let (llm_provider, llm_model, llm_key_present) = llm_summary(
+        &llm,
+        |provider| isper_llm::get_api_key(provider).ok().flatten().is_some(),
+        || {
             isper_llm::provider_from_settings(&llm)
                 .ok()
                 .map(|p| p.model().to_string())
-        });
-        (Some(llm.provider.clone()), model, key_present)
-    };
+        },
+    );
 
     let (stats, recent) = match open_store() {
         Ok(store) => (
@@ -138,5 +154,70 @@ pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
         overlay_pinned: cfg.overlay_pinned,
         insights: insights_dto(&app),
         semantic_search: llm.embeddings.is_configured(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::llm_summary;
+    use std::cell::Cell;
+
+    fn settings(provider: &str, model: Option<&str>) -> isper_llm::LlmSettings {
+        isper_llm::LlmSettings {
+            provider: provider.into(),
+            model: model.map(str::to_string),
+            embeddings: isper_llm::EmbeddingSettings::default(),
+        }
+    }
+
+    #[test]
+    fn sem_provider_nao_consulta_chave_nem_modelo() {
+        let asked = Cell::new(false);
+        let out = llm_summary(
+            &settings("  ", None),
+            |_| {
+                asked.set(true);
+                true
+            },
+            || {
+                asked.set(true);
+                Some("x".into())
+            },
+        );
+        assert_eq!(out, (None, None, false));
+        assert!(!asked.get());
+    }
+
+    #[test]
+    fn modelo_escolhido_dispensa_o_padrao_e_vazio_usa_o_padrao() {
+        let out = llm_summary(
+            &settings("groq", Some("openai/gpt-oss-120b")),
+            |p| p == "groq",
+            || panic!("não deveria resolver o padrão"),
+        );
+        assert_eq!(
+            out,
+            (
+                Some("groq".into()),
+                Some("openai/gpt-oss-120b".into()),
+                true
+            )
+        );
+        let out = llm_summary(
+            &settings("gemini", Some("  ")),
+            |_| false,
+            || Some("gemini-3.5-flash-lite".into()),
+        );
+        assert_eq!(
+            out,
+            (
+                Some("gemini".into()),
+                Some("gemini-3.5-flash-lite".into()),
+                false
+            )
+        );
+        // Sem chave, o padrão pode não resolver: o Início mostra só o provider.
+        let out = llm_summary(&settings("claude", None), |_| false, || None);
+        assert_eq!(out, (Some("claude".into()), None, false));
     }
 }
