@@ -462,9 +462,37 @@ cargo test --release -p isper-llm
 
 (`--release` reaproveita o whisper.cpp já compilado; no perfil debug o
 `cargo test` recompila o whisper.cpp + CUDA do zero, o que leva minutos.)
-O GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda
-formatação, os testes dos crates e um `cargo check` do app sem CUDA a cada
-push.
+O GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda,
+a cada push e PR, formatação (`cargo fmt --check`), os testes dos crates,
+`cargo clippy --workspace --all-targets -- -D warnings` (que inclui o
+`cargo check` do app sem CUDA), `cargo deny` (vulnerabilidades, licenças,
+origens) e gitleaks. A versão do Rust é a de
+[`rust-toolchain.toml`](rust-toolchain.toml), lida pelo CI — um stable novo com
+lints novos não quebra o build de surpresa.
+
+**Testes de rede** (API do Hugging Face e download com checksum) ficam
+`#[ignore]` para o CI rodar offline; depois de mexer no HTTP, rode à mão:
+
+```bash
+cargo test --release -p isper-models -- --ignored
+```
+
+**Fluxo de mudança**: a branch `main` é protegida por um ruleset do GitHub —
+sem push direto, sem force-push nem exclusão, histórico linear e PR
+obrigatório com os três checks do CI verdes. Toda mudança (do mantenedor, de
+quem contribui ou do Dependabot) entra por branch + PR:
+
+```bash
+git switch -c minha-mudanca
+```
+
+```bash
+gh pr create --fill
+```
+
+```bash
+gh pr merge --rebase --delete-branch
+```
 
 **Ponta a ponta**: [`tools/e2e`](tools/e2e/README.md) sobe o app real com a
 porta de depuração do WebView2 e verifica, via CDP, janelas, reunião com a
