@@ -2,7 +2,7 @@
 //! toda parte, para que cada módulo comece com um único `use crate::prelude::*;`.
 
 pub(crate) use std::path::{Path, PathBuf};
-pub(crate) use std::sync::{Arc, Mutex};
+pub(crate) use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 pub(crate) use std::time::{Duration, Instant};
 
 pub(crate) use serde_json::json;
@@ -23,3 +23,18 @@ pub(crate) use crate::tray::*;
 pub(crate) use crate::updater::*;
 pub(crate) use crate::views::*;
 pub(crate) use crate::{config, notify};
+
+/// `Mutex::lock()` sem `unwrap()`: um mutex envenenado (uma thread entrou em
+/// pânico com ele travado) não derruba o app inteiro — o pânico original já
+/// foi para o log pelo hook de `isper_core::panics`, e o estado protegido
+/// continua utilizável (no pior caso, uma preferência fica desatualizada).
+/// Derrubar o app da bandeja por causa disso custaria a reunião em andamento.
+pub(crate) trait LockExt<T> {
+    fn lock_or_recover(&self) -> MutexGuard<'_, T>;
+}
+
+impl<T> LockExt<T> for Mutex<T> {
+    fn lock_or_recover(&self) -> MutexGuard<'_, T> {
+        self.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}

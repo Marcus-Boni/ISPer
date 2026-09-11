@@ -5,7 +5,7 @@ use isper_core::RawAudio;
 
 pub(crate) fn on_pressed(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let mut phase = state.phase.lock().unwrap();
+    let mut phase = state.phase.lock_or_recover();
     match *phase {
         Phase::Idle => {
             *phase = Phase::Recording {
@@ -33,7 +33,7 @@ pub(crate) fn on_pressed(app: &AppHandle) {
 
 pub(crate) fn on_released(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let mut phase = state.phase.lock().unwrap();
+    let mut phase = state.phase.lock_or_recover();
     if let Phase::Recording {
         started,
         handsfree: false,
@@ -65,13 +65,13 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<S
 
     let state = app.state::<AppState>();
     let engine = {
-        let guard = state.engine.lock().unwrap();
+        let guard = state.engine.lock_or_recover();
         guard
             .clone()
             .ok_or_else(|| anyhow::anyhow!("o modelo ainda está carregando — tente em instantes"))?
     };
     let (lang, prompt) = {
-        let cfg = state.config.lock().unwrap();
+        let cfg = state.config.lock_or_recover();
         (cfg.lang.clone(), cfg.initial_prompt())
     };
 
@@ -91,7 +91,7 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<S
     // Pós-processamento local: dicionário pessoal (grafia/acentos/caixa) e
     // comandos de voz ("nova linha", "ponto final", "apagar isso"…).
     let (voice_commands, dictionary) = {
-        let cfg = state.config.lock().unwrap();
+        let cfg = state.config.lock_or_recover();
         (cfg.voice_commands, cfg.dictionary.clone())
     };
     let corrected = isper_core::text::apply_dictionary(&raw_text, &dictionary);
@@ -132,7 +132,7 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<S
 pub(crate) fn polish_if_enabled(app: &AppHandle, raw_text: &str) -> String {
     let (enabled, style) = {
         let state = app.state::<AppState>();
-        let cfg = state.config.lock().unwrap();
+        let cfg = state.config.lock_or_recover();
         (cfg.polish, cfg.polish_style.clone())
     };
     if !enabled {

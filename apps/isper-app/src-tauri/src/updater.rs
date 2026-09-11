@@ -87,14 +87,14 @@ pub(crate) async fn check(app: &AppHandle) -> anyhow::Result<Option<UpdateInfo>>
     let updater = build_updater(app)?;
     let found = updater.check().await.map_err(friendly)?;
     let info = found.as_ref().map(describe);
-    *app.state::<AppState>().update_available.lock().unwrap() = info.clone();
+    *app.state::<AppState>().update_available.lock_or_recover() = info.clone();
     Ok(info)
 }
 
 /// Baixa, verifica a assinatura e instala. No Windows o plugin encerra o
 /// ISPer e o instalador (modo passivo) reabre o app na versão nova.
 pub(crate) async fn install(app: &AppHandle) -> anyhow::Result<String> {
-    if app.state::<AppState>().meeting.lock().unwrap().is_some() {
+    if app.state::<AppState>().meeting.lock_or_recover().is_some() {
         anyhow::bail!("encerre a reunião antes de atualizar");
     }
     let updater = build_updater(app)?;
@@ -152,7 +152,7 @@ fn announce(app: &AppHandle, info: &UpdateInfo) {
     notify_status(app);
     let _ = app.emit("isper-update", info.clone());
     {
-        let mut announced = ANNOUNCED.lock().unwrap();
+        let mut announced = ANNOUNCED.lock_or_recover();
         if announced.as_deref() == Some(info.version.as_str()) {
             return;
         }
@@ -186,8 +186,7 @@ pub(crate) fn schedule_background_checks(app: &AppHandle) {
                 let enabled = app
                     .state::<AppState>()
                     .config
-                    .lock()
-                    .unwrap()
+                    .lock_or_recover()
                     .auto_update_check;
                 if !enabled {
                     continue;

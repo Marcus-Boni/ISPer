@@ -71,15 +71,14 @@ pub(crate) fn overlay_visible(app: &AppHandle) -> bool {
 pub(crate) fn overlay_pinned(app: &AppHandle) -> bool {
     app.state::<AppState>()
         .config
-        .lock()
-        .unwrap()
+        .lock_or_recover()
         .overlay_pinned
 }
 
 fn set_pinned(app: &AppHandle, pinned: bool) {
     let cfg = {
         let state = app.state::<AppState>();
-        let mut c = state.config.lock().unwrap();
+        let mut c = state.config.lock_or_recover();
         if c.overlay_pinned == pinned {
             return;
         }
@@ -94,7 +93,7 @@ fn set_pinned(app: &AppHandle, pinned: bool) {
 /// Mostra o indicador e, fora de reunião, o deixa FIXO na tela até "ocultar".
 /// Antes ele aparecia por 2,5 s e sumia — ninguém conseguia olhar.
 pub(crate) fn show_indicator(app: &AppHandle) {
-    let meeting_active = app.state::<AppState>().meeting.lock().unwrap().is_some();
+    let meeting_active = app.state::<AppState>().meeting.lock_or_recover().is_some();
     show_overlay(app);
     if meeting_active {
         let _ = app.emit("isper-state", json!({"state": "meeting"}));
@@ -142,11 +141,11 @@ pub(crate) struct OverlayPrefs {
 pub(crate) fn overlay_prefs(app: AppHandle) -> OverlayPrefs {
     let state = app.state::<AppState>();
     let (mini, pinned) = {
-        let cfg = state.config.lock().unwrap();
+        let cfg = state.config.lock_or_recover();
         (cfg.overlay_mini, cfg.overlay_pinned)
     };
-    let meeting_active = state.meeting.lock().unwrap().is_some();
-    let shortcut = state.active_shortcut.lock().unwrap().clone();
+    let meeting_active = state.meeting.lock_or_recover().is_some();
+    let shortcut = state.active_shortcut.lock_or_recover().clone();
     OverlayPrefs {
         mini,
         meeting_active,
@@ -177,7 +176,7 @@ pub(crate) fn overlay_set_mode(app: AppHandle, mode: String) -> Result<(), Strin
     }
     let state = app.state::<AppState>();
     let cfg = {
-        let mut c = state.config.lock().unwrap();
+        let mut c = state.config.lock_or_recover();
         c.overlay_mini = mode == "mini";
         c.overlay_captions = mode == "captions";
         c.clone()
@@ -204,7 +203,7 @@ pub(crate) fn overlay_hide(app: AppHandle) {
 pub(crate) fn overlay_moved(app: AppHandle, x: i32, y: i32) -> Result<(), String> {
     let state = app.state::<AppState>();
     let cfg = {
-        let mut c = state.config.lock().unwrap();
+        let mut c = state.config.lock_or_recover();
         c.overlay_pos = Some((x, y));
         c.clone()
     };

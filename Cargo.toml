@@ -21,6 +21,9 @@ all = { level = "warn", priority = -1 }
 dbg_macro = "warn"
 todo = "warn"
 unimplemented = "warn"
+# `unwrap()` só em testes (clippy.toml): em produção, `expect` com o motivo,
+# `?`, ou um fallback — um pânico no app derruba a bandeja e a reunião.
+unwrap_used = "warn"
 
 # Perfil de release com otimização máxima — inferência de áudio é CPU-intensiva.
 [profile.release]

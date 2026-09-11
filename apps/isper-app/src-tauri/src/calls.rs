@@ -46,7 +46,7 @@ pub(crate) struct CallInfo {
 /// dispensou o aviso) — para o `home_status`.
 pub(crate) fn call_info(app: &AppHandle) -> (Option<CallInfo>, bool, bool) {
     let state = app.state::<AppState>();
-    let call = state.call.lock().unwrap();
+    let call = state.call.lock_or_recover();
     (
         call.since.map(|s| CallInfo {
             since_secs: s.elapsed().as_secs(),
@@ -68,8 +68,7 @@ pub(crate) fn start_call_watcher(app: AppHandle) {
             let mode = app
                 .state::<AppState>()
                 .config
-                .lock()
-                .unwrap()
+                .lock_or_recover()
                 .call_detect
                 .clone();
             if mode == "off" {
@@ -99,18 +98,18 @@ pub(crate) fn start_call_watcher(app: AppHandle) {
 }
 
 fn clear_call(app: &AppHandle) {
-    *app.state::<AppState>().call.lock().unwrap() = CallState::default();
+    *app.state::<AppState>().call.lock_or_recover() = CallState::default();
     notify_status(app);
 }
 
 fn meeting_active(app: &AppHandle) -> bool {
-    app.state::<AppState>().meeting.lock().unwrap().is_some()
+    app.state::<AppState>().meeting.lock_or_recover().is_some()
 }
 
 fn on_call_started(app: &AppHandle, mode: &str) {
     {
         let state = app.state::<AppState>();
-        *state.call.lock().unwrap() = CallState {
+        *state.call.lock_or_recover() = CallState {
             since: Some(Instant::now()),
             ..CallState::default()
         };
@@ -123,13 +122,13 @@ fn on_call_started(app: &AppHandle, mode: &str) {
     }
 
     let engine_ready = matches!(
-        *app.state::<AppState>().engine_status.lock().unwrap(),
+        *app.state::<AppState>().engine_status.lock_or_recover(),
         EngineStatus::Ready { .. }
     );
     if mode == "auto" && engine_ready {
         match toggle_meeting(app) {
             Ok(()) => {
-                app.state::<AppState>().call.lock().unwrap().auto_started = true;
+                app.state::<AppState>().call.lock_or_recover().auto_started = true;
                 let app2 = app.clone();
                 let _ = notify::show(
                     notify::Toast {
@@ -151,8 +150,7 @@ fn on_call_started(app: &AppHandle, mode: &str) {
         let label = app
             .state::<AppState>()
             .active_meeting_shortcut
-            .lock()
-            .unwrap()
+            .lock_or_recover()
             .clone();
         (!label.is_empty() && !label.starts_with('(')).then_some(label)
     };
@@ -186,7 +184,7 @@ fn on_call_ended(app: &AppHandle, mode: &str) {
     let recording = meeting_active(app);
     let auto_started = {
         let state = app.state::<AppState>();
-        let mut call = state.call.lock().unwrap();
+        let mut call = state.call.lock_or_recover();
         let auto = call.auto_started;
         call.since = None;
         call.dismissed = false;
@@ -249,7 +247,7 @@ fn record_from_prompt(app: &AppHandle) {
         open_home(app);
         return;
     }
-    app.state::<AppState>().call.lock().unwrap().dismissed = true;
+    app.state::<AppState>().call.lock_or_recover().dismissed = true;
     match toggle_meeting(app) {
         Ok(()) => tracing::info!("gravação iniciada a partir do aviso de chamada"),
         Err(e) => tracing::warn!("não consegui gravar a chamada: {e}"),
@@ -260,7 +258,7 @@ fn record_from_prompt(app: &AppHandle) {
 /// A gravação terminou (por qualquer caminho): os avisos ligados a ela somem.
 pub(crate) fn on_meeting_stopped(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let mut call = state.call.lock().unwrap();
+    let mut call = state.call.lock_or_recover();
     call.auto_started = false;
     call.ended_while_recording = false;
 }
@@ -268,7 +266,7 @@ pub(crate) fn on_meeting_stopped(app: &AppHandle) {
 /// "Agora não" no banner do Início: some até a próxima chamada.
 #[tauri::command]
 pub(crate) fn dismiss_call_prompt(app: AppHandle) {
-    app.state::<AppState>().call.lock().unwrap().dismissed = true;
+    app.state::<AppState>().call.lock_or_recover().dismissed = true;
     notify_status(&app);
 }
 

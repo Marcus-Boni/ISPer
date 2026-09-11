@@ -130,8 +130,8 @@ fn main() {
                     let (is_meeting, is_mark) = {
                         let st = app.state::<AppState>();
                         let is_meeting =
-                            st.meeting_shortcut.lock().unwrap().as_ref() == Some(shortcut);
-                        let is_mark = st.mark_shortcut.lock().unwrap().as_ref() == Some(shortcut);
+                            st.meeting_shortcut.lock_or_recover().as_ref() == Some(shortcut);
+                        let is_mark = st.mark_shortcut.lock_or_recover().as_ref() == Some(shortcut);
                         (is_meeting, is_mark)
                     };
                     if is_mark {
@@ -323,9 +323,9 @@ fn main() {
             )?;
             {
                 let state = app.state::<AppState>();
-                *state.meeting_item.lock().unwrap() = Some(meeting_item);
-                *state.hint_item.lock().unwrap() = Some(hint);
-                *state.indicator_item.lock().unwrap() = Some(indicator_item);
+                *state.meeting_item.lock_or_recover() = Some(meeting_item);
+                *state.hint_item.lock_or_recover() = Some(hint);
+                *state.indicator_item.lock_or_recover() = Some(indicator_item);
             }
             // Duas versões do ícone: a normal e a com o ponto vermelho de gravação.
             let base_icon = app
@@ -365,8 +365,8 @@ fn main() {
                 .build(app)?;
             {
                 let state = app.state::<AppState>();
-                *state.tray.lock().unwrap() = Some(tray);
-                *state.tray_icons.lock().unwrap() = Some((base_icon, rec_icon));
+                *state.tray.lock_or_recover() = Some(tray);
+                *state.tray_icons.lock_or_recover() = Some((base_icon, rec_icon));
             }
 
             // Autostart ligado numa versão anterior não passava a flag — reaplica
@@ -425,7 +425,7 @@ fn main() {
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 for RecorderEvent::Finished(result) in events.iter() {
-                    *handle.state::<AppState>().phase.lock().unwrap() = Phase::Processing;
+                    *handle.state::<AppState>().phase.lock_or_recover() = Phase::Processing;
 
                     let outcome = result
                         .map_err(anyhow::Error::from)
@@ -451,7 +451,7 @@ fn main() {
                     std::thread::sleep(Duration::from_millis(1200));
                     {
                         let state = handle.state::<AppState>();
-                        let mut phase = state.phase.lock().unwrap();
+                        let mut phase = state.phase.lock_or_recover();
                         if matches!(*phase, Phase::Processing) {
                             *phase = Phase::Idle;
                         }

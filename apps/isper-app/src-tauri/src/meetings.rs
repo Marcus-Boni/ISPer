@@ -8,10 +8,10 @@ use isper_core::meeting::{self, MeetingHandle, MeetingOptions, MeetingSegment, S
 /// a mostrar o estado dela; se estiver fixo, volta ao repouso; senão, esconde.
 pub(crate) fn maybe_restore_overlay(app: &AppHandle) {
     let state = app.state::<AppState>();
-    if !matches!(*state.phase.lock().unwrap(), Phase::Idle) {
+    if !matches!(*state.phase.lock_or_recover(), Phase::Idle) {
         return;
     }
-    if state.meeting.lock().unwrap().is_some() {
+    if state.meeting.lock_or_recover().is_some() {
         let _ = app.emit("isper-state", json!({"state": "meeting"}));
     } else if overlay_pinned(app) {
         let _ = app.emit("isper-state", json!({"state": "idle"}));
@@ -26,11 +26,11 @@ pub(crate) fn maybe_restore_overlay(app: &AppHandle) {
 /// falha ao INICIAR volta como erro para quem chamou mostrar.
 pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
     let state = app.state::<AppState>();
-    let mut slot = state.meeting.lock().unwrap();
+    let mut slot = state.meeting.lock_or_recover();
 
     if let Some(handle) = slot.take() {
         drop(slot);
-        *state.meeting_started.lock().unwrap() = None;
+        *state.meeting_started.lock_or_recover() = None;
         stop_insights_loop(app);
         on_meeting_stopped(app);
         set_meeting_text(app, &meeting_item_text(app, false));
@@ -63,9 +63,9 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
     }
     drop(slot);
 
-    let engine = { state.engine.lock().unwrap().clone() };
-    state.live.lock().unwrap().clear();
-    state.moments.lock().unwrap().clear();
+    let engine = { state.engine.lock_or_recover().clone() };
+    state.live.lock_or_recover().clear();
+    state.moments.lock_or_recover().clear();
     // Cada fala transcrita durante a reunião vira um evento `isper-live` (Início
     // e indicador) e fica guardada para quem abrir a janela no meio.
     let live_app = app.clone();
@@ -78,7 +78,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
         };
         {
             let state = live_app.state::<AppState>();
-            let mut live = state.live.lock().unwrap();
+            let mut live = state.live.lock_or_recover();
             live.push(item.clone());
             if live.len() > LIVE_KEEP {
                 let excess = live.len() - LIVE_KEEP;
@@ -88,7 +88,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
         let _ = live_app.emit("isper-live", &item);
     });
     let opts = {
-        let cfg = state.config.lock().unwrap();
+        let cfg = state.config.lock_or_recover();
         MeetingOptions {
             lang: cfg.lang.clone(),
             initial_prompt: cfg.initial_prompt(),
@@ -107,8 +107,8 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             if !handle.warnings.is_empty() {
                 payload["message"] = json!(handle.warnings.join(" · "));
             }
-            *state.meeting.lock().unwrap() = Some(handle);
-            *state.meeting_started.lock().unwrap() = Some(Instant::now());
+            *state.meeting.lock_or_recover() = Some(handle);
+            *state.meeting_started.lock_or_recover() = Some(Instant::now());
             set_meeting_text(app, &meeting_item_text(app, true));
             set_tray_recording(app, true);
             notify_status(app);
@@ -152,7 +152,7 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
     // Momentos marcados (★) durante a gravação: seção do Markdown (o resumo
     // por IA prioriza esses trechos), tabela no banco e chips na Biblioteca.
     let moments: Vec<f32> = {
-        let mut taken = std::mem::take(&mut *app.state::<AppState>().moments.lock().unwrap());
+        let mut taken = std::mem::take(&mut *app.state::<AppState>().moments.lock_or_recover());
         taken.sort_by(|a, b| a.total_cmp(b));
         taken
     };
@@ -243,8 +243,7 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
     let after = app
         .state::<AppState>()
         .config
-        .lock()
-        .unwrap()
+        .lock_or_recover()
         .after_meeting
         .clone();
     let has_summary = store
@@ -325,7 +324,7 @@ pub(crate) fn diarize_in_background(
 ) {
     {
         let state = app.state::<AppState>();
-        *state.diarizing.lock().unwrap() = Some(meeting_id);
+        *state.diarizing.lock_or_recover() = Some(meeting_id);
     }
     notify_status(&app);
     std::thread::spawn(move || {
@@ -371,9 +370,12 @@ pub(crate) fn diarize_in_background(
                             secs = started.elapsed().as_secs_f32(),
                             "{participants} participante(s) identificado(s); {n} falas rotuladas"
                         );
-                        let notify_on =
-                            app.state::<AppState>().config.lock().unwrap().after_meeting
-                                == "notify";
+                        let notify_on = app
+                            .state::<AppState>()
+                            .config
+                            .lock_or_recover()
+                            .after_meeting
+                            == "notify";
                         if notify_on && n > 0 {
                             let line2 = format!(
                                 "{} · clique para ver quem falou o quê",
@@ -402,7 +404,7 @@ pub(crate) fn diarize_in_background(
         }
         {
             let state = app.state::<AppState>();
-            let mut d = state.diarizing.lock().unwrap();
+            let mut d = state.diarizing.lock_or_recover();
             if *d == Some(meeting_id) {
                 *d = None;
             }
@@ -426,7 +428,7 @@ pub(crate) fn live_transcript(app: AppHandle) -> Vec<LiveSegment> {
     // Edição 2024: os temporários da expressão final (State, MutexGuard) são
     // soltos antes das variáveis locais — o `let` intermediário de antes saiu.
     let state = app.state::<AppState>();
-    state.live.lock().unwrap().clone()
+    state.live.lock_or_recover().clone()
 }
 
 /// Marca o instante atual da reunião ("★"). Fica no estado até o fim da
@@ -434,13 +436,13 @@ pub(crate) fn live_transcript(app: AppHandle) -> Vec<LiveSegment> {
 /// no resumo por IA. Dois toques em menos de `MARK_DEBOUNCE` contam como um.
 pub(crate) fn mark_moment(app: &AppHandle) -> anyhow::Result<f32> {
     let state = app.state::<AppState>();
-    let started = *state.meeting_started.lock().unwrap();
+    let started = *state.meeting_started.lock_or_recover();
     let Some(started) = started else {
         anyhow::bail!("nenhuma reunião em andamento");
     };
     let at = started.elapsed().as_secs_f32();
     {
-        let mut moments = state.moments.lock().unwrap();
+        let mut moments = state.moments.lock_or_recover();
         if let Some(last) = moments.last().copied()
             && at - last < MARK_DEBOUNCE.as_secs_f32()
         {

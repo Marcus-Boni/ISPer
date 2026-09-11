@@ -79,18 +79,17 @@ pub(crate) fn llm_summary(
 #[tauri::command]
 pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
     let state = app.state::<AppState>();
-    let cfg = state.config.lock().unwrap().clone();
-    let engine = state.engine_status.lock().unwrap().clone();
-    let shortcut = state.active_shortcut.lock().unwrap().clone();
-    let meeting_shortcut = state.active_meeting_shortcut.lock().unwrap().clone();
-    let mark_shortcut = state.active_mark_shortcut.lock().unwrap().clone();
-    let update = state.update_available.lock().unwrap().clone();
-    let diarizing_meeting = *state.diarizing.lock().unwrap();
-    let meeting_active = state.meeting.lock().unwrap().is_some();
+    let cfg = state.config.lock_or_recover().clone();
+    let engine = state.engine_status.lock_or_recover().clone();
+    let shortcut = state.active_shortcut.lock_or_recover().clone();
+    let meeting_shortcut = state.active_meeting_shortcut.lock_or_recover().clone();
+    let mark_shortcut = state.active_mark_shortcut.lock_or_recover().clone();
+    let update = state.update_available.lock_or_recover().clone();
+    let diarizing_meeting = *state.diarizing.lock_or_recover();
+    let meeting_active = state.meeting.lock_or_recover().is_some();
     let meeting_elapsed_secs = state
         .meeting_started
-        .lock()
-        .unwrap()
+        .lock_or_recover()
         .map(|t| t.elapsed().as_secs());
     let (call, call_ended, call_dismissed) = call_info(&app);
 
