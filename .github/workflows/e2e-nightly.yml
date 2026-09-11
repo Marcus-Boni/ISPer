@@ -78,16 +78,21 @@ jobs:
         shell: pwsh
         run: .\tools\e2e\smoke.ps1 -Exe .\target\release\isper-app.exe
 
-      - name: Encerra o app
+      # O contexto `env` do Actions não enxerga as variáveis da máquina
+      # (LOCALAPPDATA): o caminho do log é exportado pelo shell.
+      - name: Encerra o app e localiza o log
         if: always()
         shell: pwsh
-        run: Stop-Process -Name isper-app -Force -ErrorAction SilentlyContinue
+        run: |
+          Stop-Process -Name isper-app -Force -ErrorAction SilentlyContinue
+          Add-Content -Path $env:GITHUB_ENV -Value "ISPER_LOGS=$env:LOCALAPPDATA\com.isper.desktop\logs"
 
       - name: Log do ISPer (para investigar uma falha)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: isper-logs
-          path: ${{ env.LOCALAPPDATA }}\com.isper.desktop\logs\
+          path: ${{ env.ISPER_LOGS }}
+\
           if-no-files-found: ignore
           retention-days: 14

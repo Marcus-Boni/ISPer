@@ -11,7 +11,46 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- Fase 7.2 (testes que provam robustez):
+  - **110 testes automatizados** (eram 58): provider de IA falso para testar
+    resumo, título, polimento e insights sem rede; testes *golden* das
+    exportações (Markdown, SRT e DOCX comparados byte a byte —
+    `ISPER_UPDATE_GOLDEN=1` regenera); testes de propriedade (`proptest`) da
+    busca literal no SQLite, do corte em silêncio dos blocos e do VAD por
+    energia; 19 testes no app (configuração, migração de pastas, posição do
+    indicador, atalhos, atualizador) e 4 na CLI — todos no CI.
+  - **Cobertura como tendência** (`coverage.yml`: cargo-llvm-cov → sumário do
+    job, lcov e Coveralls, sem bloquear PR) e **smoke noturno** do app real num
+    runner Windows (`e2e-nightly.yml`).
+  - `tools/e2e/soak.ps1`: reunião longa medindo a memória do processo (o soak
+    de 2 h do ROADMAP), e `docs/TESTES.md` com a estratégia de testes e o
+    roteiro de validação manual dos casos de áudio e tela.
+
+### Corrigido
+- **Fone desconectado no meio da reunião** (ou dispositivo invalidado depois
+  de uma suspensão): a captura do microfone é reaberta sozinha — cai para o
+  microfone padrão — e a reunião continua; antes o canal "Eu" ficava mudo até
+  o fim. No ditado, um microfone que para de entregar encerra a gravação com o
+  que foi capturado, em vez de ficar presa até soltar a tecla.
+- Erros de áudio do Windows vêm com a explicação em português: dispositivo em
+  uso exclusivo por outro app, desconectado, formato não aceito, nenhum
+  dispositivo.
+- Indicador flutuante: a posição lembrada é conferida contra os monitores
+  atuais ao abrir — monitor desligado ou escala/resolução trocada não deixa
+  mais o indicador fora da tela.
+
 ### Alterado
+- **Áudio dos participantes em disco** durante a reunião (`%TEMP%\ISPer`,
+  apagado ao fim): a memória de uma reunião longa fica estável em vez de
+  crescer ~115 MB por hora; a identificação de falantes lê o arquivo uma vez,
+  depois.
+- `clippy::unwrap_used` em todo o workspace: nenhum `unwrap()` em código de
+  produção; um mutex envenenado por um pânico em outra thread não derruba mais
+  o app (`lock_or_recover`).
+- Configurações: uma única regra de validação (`AppConfig::normalize`) para a
+  tela e para o `config.toml` editado à mão — um valor fora da lista volta ao
+  padrão em vez de ser gravado; termos repetidos no dicionário somem.
 - Fase 7.1 (qualidade automatizada) concluída — só engenharia, nada muda para
   quem usa o app:
   - **Versão numa só fonte**: o `tauri.conf.json` deixou de repetir a versão
