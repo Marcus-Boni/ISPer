@@ -232,9 +232,13 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
     let mut result = handle.stop()?;
 
     // Fase 4: quem falou o quê (se os modelos de diarização estiverem instalados).
-    if isper_diarize::models_installed() && !result.others_audio_16k.is_empty() {
+    if isper_diarize::models_installed() && !result.others_audio.is_empty() {
         println!("identificando falantes...");
-        match isper_diarize::diarize(&result.others_audio_f32()) {
+        let outcome = result
+            .others_audio_f32()
+            .map_err(|e| e.to_string())
+            .and_then(|audio| isper_diarize::diarize(&audio).map_err(|e| e.to_string()));
+        match outcome {
             Ok(turns) => {
                 let t: Vec<(f32, f32, usize)> =
                     turns.iter().map(|t| (t.start, t.end, t.speaker)).collect();

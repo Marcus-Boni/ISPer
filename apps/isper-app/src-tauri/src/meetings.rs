@@ -267,7 +267,7 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
     }
 
     // Fase 4: quem falou o quê — em segundo plano, se os modelos existirem.
-    if isper_diarize::models_installed() && !result.others_audio_16k.is_empty() {
+    if isper_diarize::models_installed() && !result.others_audio.is_empty() {
         diarize_in_background(app.clone(), meeting_id, result);
     }
 
@@ -330,16 +330,18 @@ pub(crate) fn diarize_in_background(
     notify_status(&app);
     std::thread::spawn(move || {
         let started = Instant::now();
-        let audio_secs =
-            result.others_audio_16k.len() as f32 / isper_core::WHISPER_SAMPLE_RATE as f32;
+        let audio_secs = result.others_audio.secs();
         tracing::info!(
             meeting_id,
             audio_secs,
             "diarização iniciada em segundo plano"
         );
-        let audio = result.others_audio_f32();
-        let outcome = isper_diarize::diarize(&audio);
-        drop(audio);
+        // O áudio sai do arquivo temporário só agora, para a diarização — e é
+        // liberado logo depois.
+        let outcome = result
+            .others_audio_f32()
+            .map_err(|e| e.to_string())
+            .and_then(|audio| isper_diarize::diarize(&audio).map_err(|e| e.to_string()));
         match outcome {
             Ok(turns) => {
                 let t: Vec<(f32, f32, usize)> =
