@@ -7,7 +7,11 @@
 //! de ~20 s — cortados num ponto de silêncio para não partir palavra — e
 //! transcrito em paralelo à gravação: ao encerrar, só o resto é processado.
 
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Read, Write};
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
@@ -138,13 +142,164 @@ pub struct MeetingResult {
     /// Segmentos dos dois canais, em ordem cronológica.
     pub segments: Vec<MeetingSegment>,
     pub duration_secs: f32,
-    /// Áudio dos participantes (16 kHz mono, PCM 16 bits) concatenado — insumo
-    /// da diarização, que roda depois, fora do core (crate `isper-diarize`).
-    /// Em i16 para caber na memória em reuniões longas: 1 h = 115 MB (em f32
-    /// seria o dobro); [`Self::others_audio_f32`] converte na hora de usar.
-    pub others_audio_16k: Vec<i16>,
+    /// Áudio dos participantes (16 kHz mono) concatenado — insumo da
+    /// diarização, que roda depois, fora do core (crate `isper-diarize`).
+    /// Fica num arquivo temporário, não em RAM (ver [`OthersAudio`]).
+    pub others_audio: OthersAudio,
     /// Mapa bloco a bloco entre o áudio concatenado e o relógio da reunião.
     pub others_blocks: Vec<AudioBlock>,
+}
+
+/// Áudio dos participantes (16 kHz mono, PCM 16 bits little-endian) gravado
+/// DURANTE a reunião num arquivo temporário — não em RAM. Uma hora são 115 MB
+/// em i16; duas horas em memória empurravam o app para centenas de MB à toa,
+/// sendo que o áudio só é lido de volta uma vez, pela diarização, depois que
+/// a reunião termina. O arquivo é apagado quando este valor é descartado.
+pub struct OthersAudio {
+    path: Option<PathBuf>,
+    samples: u64,
+}
+
+impl OthersAudio {
+    /// Sem áudio (reunião sem participantes, ou sem arquivo temporário).
+    pub fn empty() -> Self {
+        Self {
+            path: None,
+            samples: 0,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.samples == 0
+    }
+
+    /// Amostras gravadas (a 16 kHz).
+    pub fn samples(&self) -> u64 {
+        self.samples
+    }
+
+    /// Duração do áudio guardado, em segundos.
+    pub fn secs(&self) -> f32 {
+        self.samples as f32 / crate::WHISPER_SAMPLE_RATE as f32
+    }
+
+    /// Lê tudo de volta como f32 normalizado — o formato que a diarização
+    /// espera. É o único momento em que o áudio inteiro fica em memória.
+    pub fn read_f32(&self) -> Result<Vec<f32>> {
+        let Some(path) = &self.path else {
+            return Ok(Vec::new());
+        };
+        let mut reader = BufReader::with_capacity(1 << 16, File::open(path)?);
+        let mut out: Vec<f32> = Vec::with_capacity(self.samples as usize);
+        let mut buf = vec![0u8; 1 << 16];
+        // Uma leitura pode terminar no meio de uma amostra (2 bytes): o byte
+        // que sobra espera o próximo bloco em `pending`.
+        let mut pending: Vec<u8> = Vec::with_capacity(1 << 16);
+        loop {
+            let n = reader.read(&mut buf)?;
+            if n == 0 {
+                break;
+            }
+            pending.extend_from_slice(&buf[..n]);
+            let even = pending.len() - pending.len() % 2;
+            out.extend(
+                pending[..even]
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|b| i16::from_le_bytes(*b) as f32 / i16::MAX as f32),
+            );
+            pending.drain(..even);
+        }
+        Ok(out)
+    }
+}
+
+impl Drop for OthersAudio {
+    fn drop(&mut self) {
+        if let Some(path) = self.path.take() {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
+/// Escritor do [`OthersAudio`]: converte cada bloco f32 para i16 e o anexa ao
+/// arquivo temporário, com buffer — a thread de transcrição não espera o disco.
+struct PcmSpool {
+    file: BufWriter<File>,
+    path: PathBuf,
+    samples: u64,
+}
+
+/// Distingue arquivos de reuniões abertas ao mesmo tempo no mesmo processo.
+static SPOOL_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// Restos de sessões que caíram ficam em `%TEMP%\ISPer`; mais velhos que isso, somem.
+const SPOOL_STALE: Duration = Duration::from_secs(24 * 3600);
+
+impl PcmSpool {
+    fn create() -> Result<Self> {
+        let dir = std::env::temp_dir().join("ISPer");
+        std::fs::create_dir_all(&dir)?;
+        Self::sweep_stale(&dir);
+        let seq = SPOOL_SEQ.fetch_add(1, Ordering::Relaxed);
+        let path = dir.join(format!("participantes-{}-{seq}.pcm", std::process::id()));
+        let file = File::options().write(true).create_new(true).open(&path)?;
+        Ok(Self {
+            file: BufWriter::with_capacity(1 << 16, file),
+            path,
+            samples: 0,
+        })
+    }
+
+    /// Apaga `.pcm` antigos deixados por um processo que não chegou ao `Drop`.
+    fn sweep_stale(dir: &std::path::Path) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        let now = std::time::SystemTime::now();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let is_pcm = path.extension().is_some_and(|e| e == "pcm");
+            let old = entry
+                .metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| now.duration_since(t).ok())
+                .is_some_and(|age| age > SPOOL_STALE);
+            if is_pcm && old {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+
+    fn push(&mut self, samples: &[f32]) -> Result<()> {
+        let mut bytes: Vec<u8> = Vec::with_capacity(samples.len() * 2);
+        for s in samples {
+            let v = (s.clamp(-1.0, 1.0) * i16::MAX as f32).round() as i16;
+            bytes.extend_from_slice(&v.to_le_bytes());
+        }
+        self.file.write_all(&bytes)?;
+        self.samples += samples.len() as u64;
+        Ok(())
+    }
+
+    fn finish(mut self) -> Result<OthersAudio> {
+        self.file.flush()?;
+        Ok(OthersAudio {
+            path: Some(std::mem::take(&mut self.path)),
+            samples: self.samples,
+        })
+    }
+}
+
+impl Drop for PcmSpool {
+    /// Um spool descartado sem `finish` (erro de escrita) não deixa lixo.
+    fn drop(&mut self) {
+        if !self.path.as_os_str().is_empty() {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
 }
 
 /// Tempo no relógio da reunião → posição no áudio concatenado.
@@ -156,12 +311,10 @@ fn wall_to_concat(blocks: &[AudioBlock], t: f32) -> Option<f32> {
 }
 
 impl MeetingResult {
-    /// Áudio dos participantes em f32 normalizado, como a diarização espera.
-    pub fn others_audio_f32(&self) -> Vec<f32> {
-        self.others_audio_16k
-            .iter()
-            .map(|s| *s as f32 / i16::MAX as f32)
-            .collect()
+    /// Áudio dos participantes em f32 normalizado, como a diarização espera
+    /// (lido do arquivo temporário — ver [`OthersAudio::read_f32`]).
+    pub fn others_audio_f32(&self) -> Result<Vec<f32>> {
+        self.others_audio.read_f32()
     }
 
     /// Aplica turnos de falante (em tempo do áudio concatenado, como a
@@ -520,8 +673,18 @@ fn transcribe_worker(
     started: Instant,
 ) -> Result<MeetingResult> {
     let mut segments: Vec<MeetingSegment> = Vec::new();
-    let mut others_audio_16k: Vec<i16> = Vec::new();
     let mut others_blocks: Vec<AudioBlock> = Vec::new();
+    // Sem arquivo temporário a reunião segue normalmente — só a identificação
+    // de falantes fica sem insumo desta vez.
+    let mut spool = match PcmSpool::create() {
+        Ok(s) => Some(s),
+        Err(e) => {
+            tracing::warn!(
+                "sem arquivo temporário para o áudio dos participantes ({e}) — a identificação de falantes fica desligada nesta reunião"
+            );
+            None
+        }
+    };
     for (speaker, offset, raw) in job_rx.iter() {
         let block_secs = raw.duration_secs();
         if raw.rms() < SILENCE_RMS {
@@ -536,16 +699,20 @@ fn transcribe_worker(
             }
         };
         if speaker == Speaker::Others {
-            others_blocks.push(AudioBlock {
-                wall_start: offset,
-                concat_start: others_audio_16k.len() as f32 / crate::WHISPER_SAMPLE_RATE as f32,
-                secs: samples.len() as f32 / crate::WHISPER_SAMPLE_RATE as f32,
+            let written = spool.as_mut().map(|s| {
+                others_blocks.push(AudioBlock {
+                    wall_start: offset,
+                    concat_start: s.samples as f32 / crate::WHISPER_SAMPLE_RATE as f32,
+                    secs: samples.len() as f32 / crate::WHISPER_SAMPLE_RATE as f32,
+                });
+                s.push(&samples)
             });
-            others_audio_16k.extend(
-                samples
-                    .iter()
-                    .map(|s| (s.clamp(-1.0, 1.0) * i16::MAX as f32).round() as i16),
-            );
+            if let Some(Err(e)) = written {
+                tracing::warn!(
+                    "falha ao gravar o áudio dos participantes em disco ({e}) — identificação de falantes desligada nesta reunião"
+                );
+                spool = None;
+            }
         }
         match engine.transcribe(&samples, &lang, initial_prompt.as_deref()) {
             Ok(t) => {
@@ -581,10 +748,18 @@ fn transcribe_worker(
         }
     }
     segments.sort_by(|a, b| a.start_secs.total_cmp(&b.start_secs));
+    let others_audio = match spool.map(PcmSpool::finish) {
+        Some(Ok(audio)) => audio,
+        Some(Err(e)) => {
+            tracing::warn!("não consegui fechar o áudio dos participantes ({e})");
+            OthersAudio::empty()
+        }
+        None => OthersAudio::empty(),
+    };
     Ok(MeetingResult {
         segments,
         duration_secs: started.elapsed().as_secs_f32(),
-        others_audio_16k,
+        others_audio,
         others_blocks,
     })
 }
@@ -711,6 +886,62 @@ mod tests {
             end_secs: end,
             text,
         }
+    }
+
+    #[test]
+    fn audio_dos_participantes_vai_para_o_disco_e_volta_igual() {
+        let mut spool = PcmSpool::create().unwrap();
+        let path = spool.path.clone();
+        spool.push(&[0.0, 0.5, -0.5, 1.0, -1.0, 2.0, -2.0]).unwrap();
+        spool.push(&vec![0.25; 16_000]).unwrap();
+        let audio = spool.finish().unwrap();
+        assert!(path.is_file(), "o arquivo existe enquanto o handle vive");
+        assert_eq!(audio.samples(), 16_007);
+        assert!((audio.secs() - 16_007.0 / 16_000.0).abs() < 1e-6);
+
+        let back = audio.read_f32().unwrap();
+        assert_eq!(back.len(), 16_007);
+        // Fora de [-1, 1] satura; dentro, erro de quantização de 16 bits.
+        let expected = [0.0, 0.5, -0.5, 1.0, -1.0, 1.0, -1.0];
+        for (got, want) in back.iter().zip(expected) {
+            assert!((got - want).abs() < 1.0 / 32_000.0, "{got} vs {want}");
+        }
+        assert!((back[7] - 0.25).abs() < 1.0 / 32_000.0);
+
+        drop(audio);
+        assert!(!path.exists(), "o arquivo temporário some com o handle");
+    }
+
+    #[test]
+    fn leitura_em_blocos_nao_parte_amostra_e_vazio_e_vazio() {
+        // 100.001 amostras = 200.002 bytes: maior que o buffer de leitura
+        // (64 KiB) e não múltiplo dele — a amostra partida entre dois blocos
+        // tem de ser remontada.
+        let data: Vec<f32> = (0..100_001)
+            .map(|i| (i % 2000) as f32 / 1000.0 - 1.0)
+            .collect();
+        let mut spool = PcmSpool::create().unwrap();
+        spool.push(&data).unwrap();
+        let audio = spool.finish().unwrap();
+        let back = audio.read_f32().unwrap();
+        assert_eq!(back.len(), data.len());
+        for (got, want) in back.iter().zip(&data) {
+            assert!((got - want).abs() < 1.0 / 32_000.0, "{got} vs {want}");
+        }
+
+        let empty = OthersAudio::empty();
+        assert!(empty.is_empty());
+        assert_eq!(empty.secs(), 0.0);
+        assert!(empty.read_f32().unwrap().is_empty());
+    }
+
+    #[test]
+    fn spool_descartado_sem_finish_nao_deixa_lixo() {
+        let spool = PcmSpool::create().unwrap();
+        let path = spool.path.clone();
+        assert!(path.is_file());
+        drop(spool);
+        assert!(!path.exists());
     }
 
     #[test]

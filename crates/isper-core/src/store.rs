@@ -694,7 +694,7 @@ mod tests {
                 seg(Speaker::Others, 4.5, "Tudo bem?"),
             ],
             duration_secs: 6.0,
-            others_audio_16k: Vec::new(),
+            others_audio: crate::meeting::OthersAudio::empty(),
             others_blocks: Vec::new(),
         }
     }
