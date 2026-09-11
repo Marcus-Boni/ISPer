@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Relatar uma vulnerabilidade (privado)
+    url: https://github.com/Marcus-Boni/ISPer/security/advisories/new
+    about: Problemas de segurança vão por aqui, nunca em issue pública. Veja SECURITY.md.
+  - name: Documentação
+    url: https://github.com/Marcus-Boni/ISPer#readme
+    about: Instalação, uso, build com CUDA, modelos, atualizador e testes.

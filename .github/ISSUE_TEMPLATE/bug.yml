@@ -1,0 +1,82 @@
+name: Relatar um bug
+description: Algo não funciona como deveria no app, na CLI ou no atualizador.
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por relatar. Quanto mais exato o relato, mais rápido sai a correção.
+        **Problema de segurança?** Não use este formulário — relate em privado: https://github.com/Marcus-Boni/ISPer/security/advisories/new
+  - type: input
+    id: version
+    attributes:
+      label: Versão do ISPer
+      description: Aparece na tela Início e em Configurações → Diagnóstico.
+      placeholder: "0.14.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: variant
+    attributes:
+      label: Variante do instalador
+      options:
+        - GPU (CUDA)
+        - CPU
+        - Compilado do código-fonte
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows
+      description: Edição e versão (Configurações do Windows → Sistema → Sobre).
+      placeholder: "Windows 11 Pro 24H2"
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir
+      description: Passo a passo, do começo. Diga se estava em reunião (Teams?), ditando, ou com o app parado na bandeja.
+      placeholder: |
+        1. Abrir o ISPer e iniciar uma reunião pelo Início
+        2. Desconectar o fone USB
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: O que você esperava
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: O que aconteceu
+      description: Mensagens de erro, comportamento observado, capturas de tela.
+    validations:
+      required: true
+  - type: textarea
+    id: audio
+    attributes:
+      label: Contexto de áudio
+      description: Microfone/fone usado (USB, Bluetooth, embutido), fonte dos participantes (sistema ou só o Teams), outro app de áudio aberto.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Trecho do log
+      description: |
+        Configurações → Diagnóstico → *abrir pasta de logs* (`isper.log.<data>`). Cole as linhas em torno do problema.
+        **Apague trechos de transcrição**: são dados pessoais seus e de quem estava na reunião.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: Estou na última versão publicada (o app avisa quando há versão nova).
+          required: true
+        - label: Procurei nas issues abertas e não encontrei este problema.
+          required: true
+        - label: Retirei do relato qualquer trecho de transcrição ou dado pessoal.
+          required: true

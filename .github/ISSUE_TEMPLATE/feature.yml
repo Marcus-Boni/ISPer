@@ -1,0 +1,45 @@
+name: Sugerir uma melhoria
+description: Uma funcionalidade nova ou uma mudança no que já existe.
+title: "[ideia] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Antes, dê uma olhada no [ROADMAP](https://github.com/Marcus-Boni/ISPer/blob/main/ROADMAP.md): talvez a ideia já esteja planejada — aí vale comentar lá.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Que problema isso resolve?
+      description: Descreva a situação de uso, não a solução. "Quando estou em reunião e ..., preciso de ..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: O que você propõe
+      description: Como você imagina que funcionaria no app (telas, atalhos, comportamento).
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas que você considerou
+      description: Inclusive "hoje eu contorno assim: ...".
+  - type: dropdown
+    id: privacy
+    attributes:
+      label: Envolve enviar algo para fora da máquina?
+      description: O ISPer é local por padrão; só texto vai a provedores de IA, e só se configurados. Isso pesa na avaliação.
+      options:
+        - Não, tudo local
+        - Sim, texto para um provedor de IA já suportado
+        - Sim, algo novo (explique acima)
+    validations:
+      required: true
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Colaboração
+      options:
+        - label: Eu me disponho a implementar (ou ajudar a implementar) esta melhoria.
