@@ -39,6 +39,18 @@ Windows compila o app sem CUDA e o abre de verdade (WebView2 + CDP). Como o
 runner não tem placa de som nem GPU, `meeting.ps1` e `soak.ps1` continuam
 locais.
 
+Duas coisas que só o runner ensinou (e que valem para qualquer máquina onde o
+job rode **elevado**, como administrador): o WebView2 ignora a variável de
+ambiente `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` — e a chave em HKCU — num
+processo elevado, então com `ISPER_E2E_CDP_REGISTRY=1` o `Start-Isper` grava
+a porta na política `HKLM\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments`
+(valor `isper-app.exe`) e a `Restart-IsperClean` a remove; e a política precisa
+ficar enquanto o app testado vive, porque cada janela nova cria um ambiente
+WebView2 que tem de ter os mesmos argumentos do browser já aberto (senão
+`ERROR_INVALID_STATE`, 0x8007139F). Os scripts também fixam
+`$ErrorActionPreference = 'Continue'`: o pwsh do Actions roda com `Stop`, e um
+roteiro de verificações não pode abortar na primeira janela que demora.
+
 Sem `-Exe`, os scripts usam o app instalado em `%LOCALAPPDATA%\Programs\ISPer`
 se existir, senão `target\release\isper-app.exe`. Cada verificação imprime
 `OK`/`FALHA`; o código de saída é 1 se algo falhou.
