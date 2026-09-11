@@ -121,3 +121,19 @@ pub(crate) fn quit_app(app: &AppHandle) {
         app.exit(0);
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn textos_da_bandeja_acompanham_o_estado() {
+        assert_eq!(
+            hint_text("Ctrl+Alt+D"),
+            "Segure Ctrl+Alt+D para ditar (toque rápido = mãos-livres)"
+        );
+        assert_ne!(indicator_item_text(true), indicator_item_text(false));
+        assert!(indicator_item_text(true).starts_with("Ocultar"));
+        assert!(indicator_item_text(false).starts_with("Mostrar"));
+    }
+}

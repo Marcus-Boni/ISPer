@@ -479,3 +479,108 @@ fn run_llm(cmd: &LlmCmd) -> anyhow::Result<()> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    /// A checagem que o próprio clap recomenda: nomes, conflitos e valores
+    /// padrão consistentes — falha em tempo de teste, não na mão do usuário.
+    #[test]
+    fn definicao_da_cli_e_consistente() {
+        Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn subcomandos_e_opcoes_sao_reconhecidos() {
+        let cli = Cli::try_parse_from([
+            "isper-cli",
+            "--lang",
+            "en",
+            "meeting",
+            "30",
+            "--source",
+            "teams",
+        ])
+        .unwrap();
+        assert_eq!(cli.lang, "en");
+        assert!(cli.model.is_none());
+        match &cli.cmd {
+            Cmd::Meeting { seconds, source } => {
+                assert_eq!(*seconds, 30);
+                assert_eq!(source, "teams");
+                assert_eq!(LoopbackSource::parse(source), LoopbackSource::teams());
+            }
+            _ => panic!("esperava o subcomando meeting"),
+        }
+
+        let cli = Cli::try_parse_from(["isper-cli", "rec", "5"]).unwrap();
+        assert_eq!(cli.lang, "pt", "idioma padrão");
+        assert!(matches!(cli.cmd, Cmd::Rec { seconds: 5 }));
+
+        let cli = Cli::try_parse_from([
+            "isper-cli",
+            "llm",
+            "use",
+            "groq",
+            "--model",
+            "openai/gpt-oss-120b",
+        ])
+        .unwrap();
+        assert!(matches!(
+            cli.cmd,
+            Cmd::Llm(LlmCmd::Use { ref provider, ref model })
+                if provider == "groq" && model.as_deref() == Some("openai/gpt-oss-120b")
+        ));
+
+        let cli =
+            Cli::try_parse_from(["isper-cli", "models", "download", "ggml-small.bin"]).unwrap();
+        assert!(
+            matches!(cli.cmd, Cmd::Models(ModelsCmd::Download { ref file }) if file == "ggml-small.bin")
+        );
+
+        let cli = Cli::try_parse_from([
+            "isper-cli",
+            "--model",
+            "C:/modelos/x.bin",
+            "file",
+            "fala.wav",
+        ])
+        .unwrap();
+        assert_eq!(cli.model.as_deref(), Some(Path::new("C:/modelos/x.bin")));
+        assert!(matches!(cli.cmd, Cmd::File { ref path } if path == Path::new("fala.wav")));
+    }
+
+    #[test]
+    fn argumentos_obrigatorios_faltando_dao_erro_de_uso() {
+        assert!(
+            Cli::try_parse_from(["isper-cli"]).is_err(),
+            "sem subcomando"
+        );
+        assert!(
+            Cli::try_parse_from(["isper-cli", "meeting"]).is_err(),
+            "sem segundos"
+        );
+        assert!(
+            Cli::try_parse_from(["isper-cli", "models", "download"]).is_err(),
+            "sem arquivo"
+        );
+        assert!(
+            Cli::try_parse_from(["isper-cli", "llm", "set-key"]).is_err(),
+            "sem provider"
+        );
+        assert!(
+            Cli::try_parse_from(["isper-cli", "rec", "cinco"]).is_err(),
+            "segundos não numéricos"
+        );
+    }
+
+    #[test]
+    fn dev_dirs_comeca_no_diretorio_atual() {
+        let dirs = dev_dirs();
+        let cwd = std::env::current_dir().unwrap();
+        assert_eq!(dirs.first(), Some(&cwd));
+        assert!(dirs.len() <= 4);
+    }
+}

@@ -8,10 +8,9 @@
 # modelos.
 # `workflow_call`: o release.yml roda esta mesma bateria sobre a tag.
 #
-# O `isper-diarize` não entra no `cargo test`: ele não tem testes, e ligar o
-# binário de teste exige as import libs do sherpa-onnx pré-compilado
-# (`cargs.lib`/`sherpa-onnx-c-api.lib`), que o runner não tinha (LNK1181).
-# O clippy do app (que depende dele) compila o crate sem ligar.
+# O `isper-diarize` não tem testes próprios e não entra sozinho no `cargo
+# test`; ele é compilado e ligado pelo binário de teste do app, com as import
+# libs do sherpa-onnx pré-compilado que o `sherpa-rs` baixa durante o build.
 name: CI
 
 on:
@@ -63,9 +62,8 @@ jobs:
       - name: Formatação
         run: cargo fmt --all -- --check
 
-      - name: Testes (núcleo, IA, modelos)
-        run: cargo test --release -p isper-core -p isper-llm -p isper-models
-
+      # Antes dos testes: o build script do Tauri (binário de teste do app)
+      # exige que os bundle.resources existam.
       - name: Recursos de mentira (o bundler exige que os bundle.resources existam)
         shell: pwsh
         run: |
@@ -78,11 +76,16 @@ jobs:
             New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/vcredist/$dll" | Out-Null
           }
 
-      # Clippy é `cargo check` + lints, então substitui a checagem do app e da CLI.
-      # Roda depois dos recursos de mentira porque o build script do Tauri exige
-      # os bundle.resources. Não liga binários: o isper-diarize entra sem o
-      # LNK1181 dos testes. `--all-targets` cobre testes e o loopdump; `--release`
-      # reaproveita o whisper.cpp que o `cargo test` acima já compilou.
+      # Todos os crates com testes, inclusive o app e a CLI (sem CUDA): a
+      # lógica pura extraída deles — config, pastas, atalhos, posição do
+      # indicador, definição da CLI — roda aqui, além dos testes golden e de
+      # propriedade do núcleo.
+      - name: Testes (núcleo, IA, modelos, app e CLI)
+        run: cargo test --release --no-default-features -p isper-core -p isper-llm -p isper-models -p isper-cli -p isper-app
+
+      # Clippy é `cargo check` + lints em TODOS os alvos (testes e o loopdump
+      # inclusive); `--release` reaproveita o whisper.cpp que o `cargo test`
+      # acima já compilou.
       - name: Clippy (avisos são erros) — app e CLI sem CUDA
         run: cargo clippy --workspace --all-targets --release --no-default-features -- -D warnings
 

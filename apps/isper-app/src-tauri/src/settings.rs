@@ -325,64 +325,33 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         .collect();
     let previous = state.config.lock().unwrap().clone();
     let previous_model = previous.model.clone();
-    let cfg = AppConfig {
-        shortcut: patch.shortcut.filter(|s| !s.trim().is_empty()),
-        lang: {
-            let l = patch.lang.trim().to_lowercase();
-            if l.is_empty() { "pt".into() } else { l }
-        },
+    let mut cfg = AppConfig {
+        shortcut: patch.shortcut,
+        lang: patch.lang,
         dictionary,
-        model: patch.model.filter(|m| !m.trim().is_empty()),
-        meeting_source: {
-            let s = patch.meeting_source.trim().to_lowercase();
-            if s.is_empty() { "system".into() } else { s }
-        },
+        model: patch.model,
+        meeting_source: patch.meeting_source,
         // Preferências do indicador não passam pela tela — preserva as atuais.
         overlay_pos: previous.overlay_pos,
         overlay_mini: previous.overlay_mini,
         overlay_captions: previous.overlay_captions,
         auto_update_check: patch.auto_update_check,
         show_home_on_launch: patch.show_home_on_launch,
-        input_device: patch.input_device.filter(|d| !d.trim().is_empty()),
-        meeting_shortcut: patch.meeting_shortcut.filter(|s| !s.trim().is_empty()),
-        mark_shortcut: patch.mark_shortcut.filter(|s| !s.trim().is_empty()),
+        input_device: patch.input_device,
+        meeting_shortcut: patch.meeting_shortcut,
+        mark_shortcut: patch.mark_shortcut,
         polish: patch.polish,
-        polish_style: {
-            let s = patch.polish_style.unwrap_or_default().trim().to_lowercase();
-            if isper_llm::POLISH_STYLES.contains(&s.as_str()) {
-                s
-            } else {
-                "clean".into()
-            }
-        },
-        after_meeting: {
-            let s = patch
-                .after_meeting
-                .unwrap_or_default()
-                .trim()
-                .to_lowercase();
-            if ["notify", "open", "silent"].contains(&s.as_str()) {
-                s
-            } else {
-                "notify".into()
-            }
-        },
+        polish_style: patch.polish_style.unwrap_or_default(),
+        after_meeting: patch.after_meeting.unwrap_or_default(),
         voice_commands: patch.voice_commands,
-        call_detect: {
-            let s = patch.call_detect.unwrap_or_default().trim().to_lowercase();
-            if CALL_DETECT_MODES.contains(&s.as_str()) {
-                s
-            } else {
-                "notify".into()
-            }
-        },
+        call_detect: patch.call_detect.unwrap_or_default(),
         live_insights: patch.live_insights,
-        insights_interval_min: patch
-            .insights_interval_min
-            .filter(|m| INSIGHTS_INTERVALS.contains(m))
-            .unwrap_or(5),
+        insights_interval_min: patch.insights_interval_min.unwrap_or_default(),
         overlay_pinned: previous.overlay_pinned,
     };
+    // Caixa, espaços, vazios e valores fora das listas: a mesma regra única
+    // que vale para o config.toml (`AppConfig::normalize`, com testes).
+    cfg.normalize();
     config::save(&cfg).map_err(|e| e.to_string())?;
     *state.config.lock().unwrap() = cfg.clone();
     state.audio.set_device(cfg.input_device.clone());

@@ -130,3 +130,41 @@ pub(crate) fn on_meeting_hotkey(app: &AppHandle) {
         let _ = toggle_meeting(&app);
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rotulos_legiveis_dos_combos() {
+        assert_eq!(pretty_label("ctrl+alt+space"), "Ctrl+Alt+Espaço");
+        assert_eq!(pretty_label("ctrl+shift+f9"), "Ctrl+Shift+F9");
+        assert_eq!(pretty_label("super+space"), "Win+Espaço");
+        assert_eq!(pretty_label("Alt + K"), "Alt+K");
+        assert_eq!(pretty_label(""), "");
+    }
+
+    #[test]
+    fn candidatos_padrao_sao_atalhos_validos_e_nao_se_repetem() {
+        let dictation: Vec<&str> = SHORTCUT_CANDIDATES.iter().map(|(c, _)| *c).collect();
+        let all: Vec<&str> = dictation
+            .iter()
+            .copied()
+            .chain(MEETING_SHORTCUT_CANDIDATES)
+            .chain(MARK_SHORTCUT_CANDIDATES)
+            .collect();
+        for combo in &all {
+            assert!(Shortcut::from_str(combo).is_ok(), "combo inválido: {combo}");
+        }
+        // Um combo nunca é candidato de dois grupos: o segundo grupo ficaria
+        // sem ele (já registrado) sem ninguém perceber.
+        let mut unique = all.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), all.len(), "candidato repetido entre grupos");
+        // E os rótulos fixos da lista de ditado batem com o gerador.
+        for (combo, label) in SHORTCUT_CANDIDATES {
+            assert_eq!(pretty_label(combo), label);
+        }
+    }
+}
