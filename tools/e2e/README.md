@@ -24,12 +24,20 @@ atalhos globais, áudio e o atualizador.
 | `smoke.ps1` | Início, Biblioteca, Configurações e indicador abrem sem erros de JS (inclusive violações de CSP); modos do indicador; indicador fixo alterna e volta ao estado original; `home_status` traz detecção de chamada e insights; busca semântica e atualizador respondem | ~45 s |
 | `meeting.ps1` | Reunião com a fixture de duas vozes: ao vivo, legendas, momentos (comando com debounce + atalho global), encerrar, banco, Markdown, DOCX, Biblioteca, limpeza | ~2 min |
 | `updater-local.ps1` | Atualizador completo contra uma release falsa assinada com a sua chave e servida em localhost: checagem, banner, download com assinatura, download adulterado recusado, recusa durante reunião (nada é instalado) | ~6 min |
+| `soak.ps1` | Reunião longa (10 min por padrão; `-Minutes 120` para as 2 h) com a fixture em loop, medindo a memória do processo a cada 30 s: o áudio dos participantes vai para disco (`%TEMP%\ISPer\*.pcm`), então a memória privada deve ficar estável depois do aquecimento (`-MaxGrowthMB`, padrão 150). Confere também a transcrição ao vivo e a limpeza dos `.pcm`, apaga a reunião de teste e grava um CSV em `target\soak\` | 10 min a 2 h |
 
 ```powershell
 .\tools\e2e\smoke.ps1 -Exe .\target\release\isper-app.exe
 .\tools\e2e\meeting.ps1 -Exe .\target\release\isper-app.exe
 .\tools\e2e\updater-local.ps1
+.\tools\e2e\soak.ps1 -Minutes 120 -Exe .\target\release\isper-app.exe
 ```
+
+O `smoke.ps1` também roda toda noite no GitHub Actions
+([`e2e-nightly.yml`](../../.github/workflows/e2e-nightly.yml)): o runner
+Windows compila o app sem CUDA e o abre de verdade (WebView2 + CDP). Como o
+runner não tem placa de som nem GPU, `meeting.ps1` e `soak.ps1` continuam
+locais.
 
 Sem `-Exe`, os scripts usam o app instalado em `%LOCALAPPDATA%\Programs\ISPer`
 se existir, senão `target\release\isper-app.exe`. Cada verificação imprime
