@@ -7,7 +7,7 @@
 
 ---
 
-## Estado atual — 10/09/2026 · v0.13.0
+## Estado atual — 11/09/2026 · v0.13.0 (+ fase 7.1 em `main`, sem release)
 
 | Fase | Estado | Resumo |
 |---|---|---|
@@ -18,9 +18,9 @@
 | F4 Notetaker Teams | ✅ | validado em reunião real (07/09); detecção de chamada entregue em 10/09 (validar numa chamada real) |
 | F5 Inteligência | ✅ | resumo, título, polimento, insights ao vivo e busca semântica (Gemini ou Ollama local) — 10/09 |
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
-| F7 Maturidade de engenharia | 🟡 | 7.1 em andamento (6 de 11); 7.5 com 2 itens entregues; 7.2, 7.3, 7.4 e 7.6 não começadas |
+| F7 Maturidade de engenharia | 🟡 | 7.1 concluída (11/09); 7.5 com 2 itens entregues; 7.2, 7.3, 7.4 e 7.6 não começadas |
 
-**63 itens entregues · 33 em aberto** (2 deles de estudo pessoal). Ordem sugerida: fechar 7.1 → 7.2 → 7.3 → 7.4 → 7.5 → 7.6.
+**69 itens entregues · 27 em aberto** (2 deles de estudo pessoal). Ordem sugerida: 7.2 → 7.3 → 7.4 → 7.5 → 7.6.
 
 ---
 
@@ -208,7 +208,7 @@ Com F0–F6 entregues e o app em uso real, esta fase é sobre o que separa um
 projeto bom de um produto confiável — o que times grandes fazem por padrão.
 A ordem é impacto ÷ esforço.
 
-### 7.1 Qualidade automatizada (barato, alto impacto)
+### 7.1 Qualidade automatizada ✅ (concluída em 11/09/2026)
 
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` no CI + `[workspace.lints]` compartilhado por todos os crates
 - [x] `cargo deny` (vulnerabilidades RustSec, licenças permitidas, duplicatas, origens) com `deny.toml` versionado
@@ -216,11 +216,11 @@ A ordem é impacto ÷ esforço.
 - [x] gitleaks no CI — nenhum segredo no histórico
 - [x] CSP real no Tauri (`default-src 'self'`) no lugar de `null`; violações entram em `window.__isperErrors` e o smoke test falha se houver alguma
 - [x] Remover os `style="…"` inline dos HTML e fechar `style-src-attr` (10/09): 36 atributos e dois `style.cssText` viraram classes utilitárias em `base.css` (classe dobrada em vez de `!important`); a entrada escalonada usa `data-i` → `--i` via CSSOM. Qualquer atributo que voltar aparece como violação de CSP no smoke test
-- [ ] Versão numa só fonte (o Tauri lê o `Cargo.toml`; remover do `tauri.conf.json` e a validação do release.yml vira desnecessária)
-- [ ] Edição Rust unificada (app em 2021 → 2024 com `cargo fix --edition`, em árvore limpa)
-- [ ] Higiene do repositório: `loopdump.wav` (7,7 MB, captura de teste da F4) está versionado na raiz — mover para `fixtures/` ou remover do histórico; `isper.db` da raiz é lixo local (já ignorado)
-- [ ] `rust-toolchain.toml` (canal fixo), `rustfmt.toml` e `.editorconfig` — mesmo resultado na sua máquina, no CI e em quem clonar
-- [ ] Proteção da branch `main`: CI verde obrigatório antes do merge e PRs para tudo (o Dependabot já abriu 5 PRs em 10/09; o do `ureq` 2 → 3 quebra o CI e precisa de migração manual)
+- [x] Versão numa só fonte (11/09): o `tauri.conf.json` não declara mais `version` (o Tauri lê do `Cargo.toml` do app); `release.ps1` e `release.yml` conferem só o `Cargo.toml` e recusam a duplicata se ela voltar
+- [x] Edição Rust unificada (11/09): app em 2024 via `cargo fix --edition` — só avisos benignos de ordem de drop em expressões finais; `let`-chains onde o clippy novo pediu
+- [x] Higiene do repositório (11/09): `loopdump.wav` fora do índice e no `.gitignore` (o arquivo local fica; o histórico não é reescrito — branch pública com tags e releases apontando para esses commits); `isper.db` da raiz segue como lixo local ignorado
+- [x] `rust-toolchain.toml` (1.98.0 + rustfmt + clippy; o CI lê o canal do arquivo), `rustfmt.toml` (estilo 2024) e `.editorconfig` (11/09)
+- [x] Proteção da branch `main` (11/09): ruleset do GitHub — sem push direto, sem force-push nem exclusão, histórico linear, PR obrigatório com os três checks do CI verdes. PRs do Dependabot triados num PR só: sysinfo 0.39, toml 1, dirs 6, crossbeam-channel 0.5.17, **ureq 3 migrado à mão** (isper-llm e isper-models, com testes de rede `#[ignore]`), checkout v7 e gitleaks-action v3
 
 ### 7.2 Testes que provam robustez
 
@@ -281,4 +281,4 @@ Whisper (MIT) · whisper.cpp (MIT) · whisper-rs (Unlicense) · Tauri (MIT/Apach
 
 ---
 
-**Próximo passo:** fechar a 7.1 (versão única, edição 2024, higiene do repo, toolchain fixo, branch protegida) e entrar na 7.2 — testes que provam robustez (soak test de 2 h, áudio dos participantes em disco, casos de áudio, testes no app). Validar a detecção de chamada e os insights ao vivo numa reunião real do Teams.
+**Próximo passo:** 7.2 — testes que provam robustez (`LlmProvider` falso, testes no app e na CLI, golden das exportações, soak test de 2 h com áudio dos participantes em disco, casos de áudio). Em paralelo, validar a detecção de chamada e os insights ao vivo numa reunião real do Teams.
