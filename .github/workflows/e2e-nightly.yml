@@ -1,0 +1,93 @@
+# Ponta a ponta noturno: compila o app (CPU, sem CUDA) num runner Windows e
+# roda o smoke real — o exe sobe com WebView2, abre Início, Biblioteca,
+# Configurações e o indicador, alterna modos e consulta o atualizador, tudo
+# pelo Chrome DevTools Protocol (tools/e2e). O runner não tem placa de som
+# nem GPU: o teste de reunião (meeting.ps1, que toca áudio e transcreve) e o
+# soak (soak.ps1) continuam locais; aqui a pergunta é "o app instalado abre e
+# as janelas funcionam depois do que entrou hoje?".
+#
+# Não é check obrigatório de PR: roda de madrugada (03:00 em Brasília) e à mão.
+name: E2E noturno
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  smoke:
+    name: smoke do app real (Windows, CPU, sem áudio)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Canal do Rust (rust-toolchain.toml)
+        id: toolchain
+        shell: pwsh
+        run: |
+          $m = Select-String -Path rust-toolchain.toml -Pattern '^channel\s*=\s*"([^"]+)"'
+          if (-not $m) { throw "rust-toolchain.toml sem 'channel'" }
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "channel=$($m.Matches[0].Groups[1].Value)"
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: e2e-nightly
+          cache-on-failure: true
+
+      # O cdp.mjs usa o WebSocket global do Node 22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # O build script do Tauri exige os bundle.resources; as DLLs reais do
+      # sherpa-onnx que o exe carrega vêm do pré-compilado que o sherpa-rs
+      # baixa e copia para target/release durante o build.
+      - name: Recursos de mentira (bundle.resources)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/sherpa | Out-Null
+          foreach ($dll in @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll')) {
+            New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/sherpa/$dll" | Out-Null
+          }
+          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/vcredist | Out-Null
+          foreach ($dll in @('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+            New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/vcredist/$dll" | Out-Null
+          }
+
+      - name: Compila o app (CPU)
+        run: cargo build --release --no-default-features -p isper-app
+
+      - name: Smoke ponta a ponta (CDP)
+        shell: pwsh
+        run: .\tools\e2e\smoke.ps1 -Exe .\target\release\isper-app.exe
+
+      - name: Encerra o app
+        if: always()
+        shell: pwsh
+        run: Stop-Process -Name isper-app -Force -ErrorAction SilentlyContinue
+
+      - name: Log do ISPer (para investigar uma falha)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isper-logs
+          path: ${{ env.LOCALAPPDATA }}\com.isper.desktop\logs\
+          if-no-files-found: ignore
+          retention-days: 14

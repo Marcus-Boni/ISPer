@@ -1,0 +1,97 @@
+# Cobertura de testes como TENDÊNCIA, não como gate: roda no push em main e à
+# mão (workflow_dispatch). O resumo por crate vai para o sumário do job e o
+# lcov para o Coveralls (gratuito para repositórios públicos; basta ativar o
+# repositório em coveralls.io uma vez), que desenha a linha ao longo do tempo.
+# Nenhum check obrigatório depende deste workflow — cair meio ponto de
+# cobertura nunca bloqueia um PR; o que importa é a direção.
+#
+# Windows como o CI: o núcleo depende de WASAPI (crate `wasapi`), que não
+# compila em Linux. Sem CUDA e sem ligar o app (só os crates com testes).
+name: Cobertura
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  coverage:
+    name: cargo llvm-cov (Windows, CPU)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Canal do Rust (rust-toolchain.toml)
+        id: toolchain
+        shell: pwsh
+        run: |
+          $m = Select-String -Path rust-toolchain.toml -Pattern '^channel\s*=\s*"([^"]+)"'
+          if (-not $m) { throw "rust-toolchain.toml sem 'channel'" }
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "channel=$($m.Matches[0].Groups[1].Value)"
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          components: llvm-tools-preview
+
+      - uses: taiki-e/install-action@cargo-llvm-cov
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # A instrumentação muda os artefatos: cache próprio, separado do CI.
+          key: coverage
+          cache-on-failure: true
+
+      - name: Recursos de mentira (o bundler exige que os bundle.resources existam)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/sherpa | Out-Null
+          foreach ($dll in @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll')) {
+            New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/sherpa/$dll" | Out-Null
+          }
+          New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/vcredist | Out-Null
+          foreach ($dll in @('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+            New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/vcredist/$dll" | Out-Null
+          }
+
+      # `--release` reaproveita a compilação do whisper.cpp entre os dois
+      # comandos (o segundo só gera o relatório a partir do mesmo profile).
+      - name: Testes instrumentados (lcov)
+        run: cargo llvm-cov --release --no-default-features -p isper-core -p isper-llm -p isper-models -p isper-cli -p isper-app --lcov --output-path lcov.info
+
+      - name: Resumo por arquivo no sumário do job
+        shell: pwsh
+        run: |
+          cargo llvm-cov report --release --summary-only | Tee-Object -FilePath cobertura.txt
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '### Cobertura de testes (linhas, regiões e funções)'
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
+          Get-Content cobertura.txt | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lcov
+          path: lcov.info
+          retention-days: 30
+
+      # A tendência mora aqui. Sem o repositório ativado no Coveralls, o envio
+      # falha — e o job continua verde: cobertura informa, não bloqueia.
+      - name: Coveralls (tendência)
+        uses: coverallsapp/github-action@v2
+        continue-on-error: true
+        with:
+          file: lcov.info
+          format: lcov
