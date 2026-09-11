@@ -453,22 +453,36 @@ ao pedir ajuda.
 ## Testes e CI
 
 ```bash
-cargo test --release -p isper-core --features cuda
-```
-
-```bash
-cargo test --release -p isper-llm
+cargo test --release -p isper-core -p isper-llm -p isper-models -p isper-cli -p isper-app
 ```
 
 (`--release` reaproveita o whisper.cpp já compilado; no perfil debug o
 `cargo test` recompila o whisper.cpp + CUDA do zero, o que leva minutos.)
+São 110 testes: unitários e de propriedade (`proptest`) no núcleo — corte em
+silêncio dos blocos, VAD por energia com relógio injetado, busca literal
+conferida contra o próprio SQLite —, *golden* das exportações (Markdown, SRT e
+DOCX comparados byte a byte com
+[`crates/isper-core/tests/golden/`](crates/isper-core/tests/golden/);
+`ISPER_UPDATE_GOLDEN=1 cargo test --release -p isper-core --test golden`
+regenera), a camada de IA com um provider falso (sem rede) e a lógica pura do
+app e da CLI (configuração, migração de pastas, posição do indicador, atalhos,
+definição da CLI). `clippy::unwrap_used` vale para todo o workspace: `unwrap()`
+só em testes. A estratégia completa, com o roteiro de validação manual dos
+casos de áudio (fone desconectado, suspensão, modo exclusivo, monitores), está
+em [`docs/TESTES.md`](docs/TESTES.md).
+
 O GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda,
-a cada push e PR, formatação (`cargo fmt --check`), os testes dos crates,
-`cargo clippy --workspace --all-targets -- -D warnings` (que inclui o
-`cargo check` do app sem CUDA), `cargo deny` (vulnerabilidades, licenças,
-origens) e gitleaks. A versão do Rust é a de
-[`rust-toolchain.toml`](rust-toolchain.toml), lida pelo CI — um stable novo com
-lints novos não quebra o build de surpresa.
+a cada push e PR, formatação (`cargo fmt --check`), os testes de todos os
+crates (app e CLI sem CUDA), `cargo clippy --workspace --all-targets -- -D
+warnings`, `cargo deny` (vulnerabilidades, licenças, origens) e gitleaks. A
+versão do Rust é a de [`rust-toolchain.toml`](rust-toolchain.toml), lida pelo
+CI — um stable novo com lints novos não quebra o build de surpresa.
+
+**Cobertura** ([`coverage.yml`](.github/workflows/coverage.yml)): a cada push
+em `main`, `cargo llvm-cov` publica o resumo no sumário do job e envia o lcov
+ao [Coveralls](https://coveralls.io) — tendência, não gate: nenhum PR é
+bloqueado por cobertura. Para a linha aparecer, ative o repositório no
+Coveralls uma vez (login com o GitHub → *Add repos*).
 
 **Testes de rede** (API do Hugging Face e download com checksum) ficam
 `#[ignore]` para o CI rodar offline; depois de mexer no HTTP, rode à mão:
@@ -496,12 +510,19 @@ gh pr merge --rebase --delete-branch
 
 **Ponta a ponta**: [`tools/e2e`](tools/e2e/README.md) sobe o app real com a
 porta de depuração do WebView2 e verifica, via CDP, janelas, reunião com a
-fixture de duas vozes (ao vivo, legendas, momentos, exportações) e o
-atualizador contra uma release falsa em localhost. Não rodam no CI (precisam
-de GPU, áudio e janelas): rode antes de lançar uma versão.
+fixture de duas vozes (ao vivo, legendas, momentos, exportações), o
+atualizador contra uma release falsa em localhost e a memória numa reunião
+longa (`soak.ps1`). O `smoke.ps1` roda toda noite no GitHub Actions
+([`e2e-nightly.yml`](.github/workflows/e2e-nightly.yml), runner Windows sem
+áudio nem GPU); os demais precisam de GPU e áudio: rode-os antes de lançar uma
+versão.
 
 ```powershell
 .\tools\e2e\smoke.ps1 -Exe .\target\release\isper-app.exe
+```
+
+```powershell
+.\tools\e2e\soak.ps1 -Minutes 120 -Exe .\target\release\isper-app.exe
 ```
 
 ## Licença

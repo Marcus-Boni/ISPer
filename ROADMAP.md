@@ -7,7 +7,7 @@
 
 ---
 
-## Estado atual — 11/09/2026 · v0.13.0 (+ fase 7.1 em `main`, sem release)
+## Estado atual — 11/09/2026 · v0.13.0 (+ fases 7.1 e 7.2 em `main`, sem release)
 
 | Fase | Estado | Resumo |
 |---|---|---|
@@ -18,9 +18,9 @@
 | F4 Notetaker Teams | ✅ | validado em reunião real (07/09); detecção de chamada entregue em 10/09 (validar numa chamada real) |
 | F5 Inteligência | ✅ | resumo, título, polimento, insights ao vivo e busca semântica (Gemini ou Ollama local) — 10/09 |
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
-| F7 Maturidade de engenharia | 🟡 | 7.1 concluída (11/09); 7.5 com 2 itens entregues; 7.2, 7.3, 7.4 e 7.6 não começadas |
+| F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.5 com 2 itens entregues; 7.3, 7.4 e 7.6 não começadas |
 
-**68 itens entregues · 28 em aberto** (2 deles de estudo pessoal). Ordem sugerida: 7.2 → 7.3 → 7.4 → 7.5 → 7.6.
+**76 itens entregues · 20 em aberto** (2 deles de estudo pessoal). Ordem sugerida: 7.3 → 7.4 → 7.5 → 7.6.
 
 ---
 
@@ -222,16 +222,16 @@ A ordem é impacto ÷ esforço.
 - [x] `rust-toolchain.toml` (1.98.0 + rustfmt + clippy; o CI lê o canal do arquivo), `rustfmt.toml` (estilo 2024) e `.editorconfig` (11/09)
 - [x] Proteção da branch `main` (11/09): ruleset do GitHub — sem push direto, sem force-push nem exclusão, histórico linear, PR obrigatório com os três checks do CI verdes. PRs do Dependabot triados num PR só: sysinfo 0.39, toml 1, dirs 6, crossbeam-channel 0.5.17, **ureq 3 migrado à mão** (isper-llm e isper-models, com testes de rede `#[ignore]`), checkout v7 e gitleaks-action v3
 
-### 7.2 Testes que provam robustez
+### 7.2 Testes que provam robustez ✅ (concluída em 11/09/2026 — 110 testes, eram 58)
 
-- [ ] `LlmProvider` falso para testar resumo, título e polimento sem rede
-- [ ] Testes no crate do app e na CLI (hoje 0 e 0; os 39 testes estão em core, llm e models): extrair a lógica pura (config, `paths`, migração de pastas, `home_status`) para funções testáveis; auditar os 113 `unwrap()` do workspace (`expect` com contexto ou `?`)
-- [ ] Testes de propriedade (`proptest`): `like_pattern`, `quiet_cut`, VAD por energia
-- [ ] Testes *golden* das exportações (Markdown, DOCX, SRT)
-- [ ] Cobertura com `cargo-llvm-cov` publicada como tendência (não como gate)
-- [ ] Soak test de 2 h de reunião — o áudio dos participantes fica em RAM (~230 MB/h em f32); mover para disco
-- [ ] Casos de áudio: fone desconectado no meio (reabrir e continuar), suspensão/hibernação, apps em modo exclusivo, DPI em vários monitores
-- [ ] e2e no CI (runner com áudio virtual, ex.: VB-Cable) ou como job *nightly*
+- [x] `LlmProvider` falso (`isper-llm/src/testing.rs`, só em testes): resumo, título, polimento e insights testados de ponta a ponta sem rede — conteúdo do pedido, separação do título, guarda-corpo do polimento, propagação de erro do provider
+- [x] Testes no crate do app (19) e na CLI (4), rodando no CI: `AppConfig::normalize` virou a regra única de validação (tela de Configurações e `config.toml` editado à mão), `load_from`/`save_to` com caminho, `migrate_legacy_local_in`, `missing_vars`, `clamp_to_monitors`, `llm_summary`, rótulos e candidatos de atalho, erros do atualizador; CLI com o `debug_assert` do clap e o parse dos subcomandos. Auditoria dos `unwrap()`: `clippy::unwrap_used` ligado no workspace (livre só em testes, `clippy.toml`), os 123 `lock().unwrap()` do app viraram `lock_or_recover()` (mutex envenenado não derruba o app) e não sobrou `unwrap()` em produção
+- [x] Testes de propriedade (`proptest`): `like_pattern` conferido contra o `LIKE … ESCAPE` do próprio SQLite, `quiet_cut`, VAD por energia com relógio injetado (`Vad::new(started)` / `should_stop(rms, now)`)
+- [x] Testes *golden* das exportações: `crates/isper-core/tests/golden/` com Markdown, SRT, `document.xml` e o `.docx` inteiro (ZIP determinístico, lido e conferido — CRC e tamanhos); `ISPER_UPDATE_GOLDEN=1` regenera
+- [x] Cobertura como tendência: `coverage.yml` (cargo-llvm-cov no push em `main`, resumo no sumário do job, lcov como artefato, envio ao Coveralls sem bloquear PR) — falta só ativar o repositório em coveralls.io uma vez
+- [x] Áudio dos participantes em disco: `OthersAudio`/`PcmSpool` gravam o PCM 16 kHz em `%TEMP%\ISPer` durante a reunião (era `Vec<i16>` em RAM, 115 MB/h) e a diarização lê de volta uma vez, depois; `tools/e2e/soak.ps1` mede a memória numa reunião longa (`-Minutes 120` é o soak de 2 h — rodar antes da próxima release)
+- [x] Casos de áudio: microfone que para de entregar (fone desconectado, suspensão) é reaberto pelo fatiador (`AudioFeed`/`MicFeed`) sem derrubar a reunião, e o ditado encerra com o que capturou; erros do WASAPI/cpal ganham dica em português (modo exclusivo, dispositivo invalidado, formato, sem dispositivo); a posição do indicador é conferida contra os monitores atuais (monitor desligado, DPI). Roteiro de validação manual em `docs/TESTES.md`
+- [x] e2e no CI como job noturno (`e2e-nightly.yml`): compila o app CPU num runner Windows e roda o `smoke.ps1` contra o exe real via CDP. VB-Cable descartado: o runner não tem dispositivo de áudio e o driver exigiria reboot; `meeting.ps1` e `soak.ps1` seguem locais
 
 ### 7.3 Segurança e confiança do binário
 
@@ -270,7 +270,7 @@ A ordem é impacto ÷ esforço.
 
 - Commits pequenos e frequentes desde o dia 1; mensagens descritivas
 - `cargo clippy -- -D warnings` e `cargo fmt` antes de todo commit
-- Núcleo testável sem microfone real (trait `AudioSource` → mock nos testes)
+- Núcleo testável sem microfone real (trait `AudioFeed` no fatiador de blocos → fonte falsa nos testes; VAD com relógio injetado; provider de IA falso)
 - Modelos nunca no git (`models/` no `.gitignore`)
 - Privacidade por padrão: nenhum áudio sai da máquina, nunca
 - README com GIF de demonstração; CHANGELOG a partir da Fase 3
@@ -281,4 +281,4 @@ Whisper (MIT) · whisper.cpp (MIT) · whisper-rs (Unlicense) · Tauri (MIT/Apach
 
 ---
 
-**Próximo passo:** 7.2 — testes que provam robustez (`LlmProvider` falso, testes no app e na CLI, golden das exportações, soak test de 2 h com áudio dos participantes em disco, casos de áudio). Em paralelo, validar a detecção de chamada e os insights ao vivo numa reunião real do Teams.
+**Próximo passo:** 7.3 — segurança e confiança do binário. Antes, três coisas que só quem tem a máquina faz: rodar o soak de 2 h (`tools/e2e/soak.ps1 -Minutes 120`), ativar o repositório no Coveralls (uma vez) e validar a detecção de chamada e os insights ao vivo numa reunião real do Teams — com o roteiro manual de `docs/TESTES.md` para os casos de áudio.
