@@ -93,6 +93,5 @@ jobs:
         with:
           name: isper-logs
           path: ${{ env.ISPER_LOGS }}
-\
           if-no-files-found: ignore
           retention-days: 14
