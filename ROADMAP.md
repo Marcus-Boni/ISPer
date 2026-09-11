@@ -200,7 +200,7 @@ qualidade de transcrição, legendas, momentos marcados e distribuição (v0.11.
 - [x] v0.11.1: instalador corrigido — faltavam as DLLs do sherpa-onnx (`sherpa-onnx-c-api`, `onnxruntime`, `cargs`) e o app instalado pela 0.11.0 não abria; descoberto ao instalar pelo setup.exe e validar a primeira atualização automática
 - [x] v0.12.0: variante CPU do instalador (gerada localmente pelo `release.ps1`; o runner do GitHub não tem CUDA nem consegue ligar o sherpa-onnx pré-compilado), runtime do Visual C++ dentro dos instaladores, pânicos no log, testes ponta a ponta em `tools/e2e`, `CHANGELOG.md` e workflow `release.yml` validando a tag
 - [x] v0.12.1/v0.12.2: pastas do usuário pela API do Windows (não pelas variáveis de ambiente) e dados locais em `%LOCALAPPDATA%\com.isper.desktop`, fora da pasta padrão de instalação do Tauri (`%LOCALAPPDATA%\ISPer`), com migração automática
-- [ ] Assinatura de código (certificado Authenticode ou Azure Trusted Signing) para o instalador não disparar o SmartScreen — depende de comprar/assinar o serviço — *rastreado em 7.3*
+- [ ] Assinatura de código do instalador — caminho decidido em 10/09: gratuito via SignPath Foundation, depois de mover o build da release para o CI (*detalhes e alternativas descartadas em 7.3*)
 
 ## Fase 7 — Maturidade de engenharia (a partir de 10/09/2026)
 
@@ -235,10 +235,12 @@ A ordem é impacto ÷ esforço.
 
 ### 7.3 Segurança e confiança do binário
 
-- [ ] Assinatura Authenticode (Azure Trusted Signing) — o maior atrito de quem instala (já pendente acima)
+> **Decisão (10/09/2026) — assinatura de código pelo caminho gratuito: SignPath Foundation.** Certificado OV para projetos open source, chave no HSM deles, emitido para a Foundation; o ISPer cumpre os critérios (licença MIT, repositório público, download gratuito, projeto mantido e já publicado). Descartados: **Azure Trusted Signing** (US$ 9,99/mês, mas hoje não aceita pessoa física nem empresa no Brasil), **certificado OV pago** (US$ 100–400/ano + chave em token/HSM) e **autoassinado** (para o SmartScreen vale o mesmo que não assinar). O que a assinatura dá: editor verificado e reputação que acumula no certificado entre versões — ela **não** elimina o aviso do SmartScreen por si só (desde 2024 nem EV dá reputação instantânea; são semanas de instalações limpas). Enquanto o público for o autor e colegas de confiança, o instalador segue sem assinatura: a integridade das atualizações já é garantida pelo minisign do Tauri, e o aviso na primeira instalação é um clique ("Mais informações → Executar assim mesmo").
+
+- [ ] Builds de release no CI — pré-requisito do SignPath (a assinatura acontece no pipeline deles a partir de um build em CI): runner **self-hosted** do GitHub Actions nesta máquina, já que CUDA e o sherpa-onnx pré-compilado não compilam nos runners hospedados; artefatos idênticos aos do `release.ps1` (GPU + CPU, `.sig`, `latest*.json`)
+- [ ] Assinatura gratuita via **SignPath Foundation**: candidatura em signpath.org (repositório, página de download, descrição do que o app faz), integração no workflow de release (o build em CI envia o `-setup.exe`, a SignPath devolve assinado), `SECURITY.md` como contato — e paciência com o SmartScreen enquanto a reputação do certificado se forma
 - [ ] SBOM (CycloneDX via `cargo cyclonedx`) publicado com cada release
-- [ ] `SECURITY.md` (como reportar vulnerabilidade), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, templates de issue e PR
-- [ ] Builds de release no CI (reprodutíveis), não na máquina local
+- [ ] `SECURITY.md` (como reportar vulnerabilidade), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, templates de issue e PR — quem baixa precisa saber para quem reportar
 
 ### 7.4 Dados e observabilidade responsável
 
