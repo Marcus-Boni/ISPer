@@ -46,9 +46,16 @@ jobs:
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
 
+      # Ver o comentário equivalente em ci.yml: a pasta do sherpa-onnx
+      # pré-compilado precisa viajar no cache junto com o target/.
+      - name: Pasta do sherpa-onnx pré-compilado
+        shell: pwsh
+        run: Add-Content -Path $env:GITHUB_ENV -Value "SHERPA_CACHE=$env:LOCALAPPDATA\sherpa-rs"
+
       - uses: Swatinem/rust-cache@v2
         with:
-          key: e2e-nightly
+          key: e2e-nightly-v2
+          cache-directories: ${{ env.SHERPA_CACHE }}
           cache-on-failure: true
 
       # O cdp.mjs usa o WebSocket global do Node 22.

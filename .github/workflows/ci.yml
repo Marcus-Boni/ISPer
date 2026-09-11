@@ -54,8 +54,21 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           components: rustfmt, clippy
 
+      # O sherpa-rs-sys baixa o sherpa-onnx pré-compilado (DLLs e import libs)
+      # para %LOCALAPPDATA%\sherpa-rs e grava esse caminho na saída do build
+      # script, que mora no target/. Um cache que traz o target/ sem essa pasta
+      # faz o link do binário de teste falhar (LNK1181: cargs.lib) — por isso
+      # ela entra no cache junto. O contexto `env` do Actions não enxerga
+      # LOCALAPPDATA: o caminho é exportado pelo shell.
+      - name: Pasta do sherpa-onnx pré-compilado
+        shell: pwsh
+        run: Add-Content -Path $env:GITHUB_ENV -Value "SHERPA_CACHE=$env:LOCALAPPDATA\sherpa-rs"
+
       - uses: Swatinem/rust-cache@v2
         with:
+          # Chave nova: os caches antigos não têm a pasta do sherpa.
+          key: v2
+          cache-directories: ${{ env.SHERPA_CACHE }}
           # O whisper.cpp compilado (whisper-rs-sys) é o que mais pesa.
           cache-on-failure: true
 
