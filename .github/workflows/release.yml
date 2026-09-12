@@ -85,9 +85,9 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   # A variante GPU roda em windows-2022 (Visual Studio 2022, MSVC 14.4x — o mesmo toolchain
-  # da máquina do mantenedor): o nvcc do CUDA 13.3 não sabe localizar o cl.exe no layout do
-  # Visual Studio 2026 (pasta `18\`) que o windows-latest traz. Quando o toolkit passar para
-  # o 13.4 (que suporta o VS 2026), a variante pode voltar ao windows-latest.
+  # da máquina do mantenedor): o CUDA 13.3 não suporta o MSVC 14.5x do Visual Studio 2026
+  # que o windows-latest traz. Quando o toolkit passar para o 13.4 (o primeiro com suporte
+  # ao VS 2026), a variante pode voltar ao windows-latest.
   build:
     name: instalador ${{ matrix.variant }}
     needs: consistencia
@@ -143,9 +143,11 @@ jobs:
       # PATH) e Ninja como gerador — assim o CMake não depende da integração do CUDA com o
       # MSBuild. A arquitetura (89) e os flags /O2 vêm do .cargo/config.toml, como na
       # máquina do mantenedor.
-      # Só o que o whisper.cpp precisa, não o toolkit inteiro (Nsight etc.). No CUDA 13 os
-      # cabeçalhos `crt/*` (host_config.h, incluído pelo cuda_runtime.h) viraram o
-      # sub-pacote `crt`; sem ele o CMake falha com C1083. `thrust` traz CUB/Thrust.
+      # Só o que o whisper.cpp precisa, não o toolkit inteiro (Nsight etc.). No CUDA 13 o
+      # compilador foi fatiado em sub-pacotes: `nvcc` traz nvcc.exe, cudafe++ e ptxas; `nvvm`
+      # traz o cicc (front-end de dispositivo, em nvvm/bin — sem ele o nvcc aborta com "The
+      # system cannot find the path specified" ao chamá-lo); `crt` traz os cabeçalhos crt/*
+      # que o cuda_runtime.h inclui (sem ele, C1083). `thrust` traz CUB/Thrust.
       - name: CUDA Toolkit 13.3
         if: matrix.variant == 'gpu'
         id: cuda
@@ -153,7 +155,7 @@ jobs:
         with:
           cuda: '13.3.1'
           method: network
-          sub-packages: '["nvcc", "cudart", "crt", "cublas", "cublas_dev", "thrust"]'
+          sub-packages: '["nvcc", "nvvm", "crt", "cudart", "cublas", "cublas_dev", "thrust"]'
           use-github-cache: true
 
       - name: Ambiente do MSVC (Visual Studio 2022)
