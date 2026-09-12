@@ -24,7 +24,7 @@ git tag v0.15.0 && git push origin v0.15.0
 |---|---|---|
 | `consistencia` | tag × Cargo.toml × seção do CHANGELOG | windows-latest |
 | `ci` | a bateria do CI (fmt, testes, clippy, deny, gitleaks) | ci.yml |
-| `build` (cpu, gpu) | `tauri build` de cada variante; a GPU instala o CUDA Toolkit no runner (Jimver/cuda-toolkit) e compila o whisper.cpp com Ninja no ambiente do MSVC; as DLLs do sherpa-onnx vêm do pré-compilado que o `sherpa-rs` baixa e o runtime do VC vem do Visual Studio do runner | windows-latest |
+| `build` (cpu, gpu) | `tauri build` de cada variante; a GPU instala o CUDA Toolkit 13.3 no runner (Jimver/cuda-toolkit, sub-pacotes nvcc/nvvm/crt/cudart/cublas/thrust) e compila o whisper.cpp com Ninja no ambiente do MSVC; as DLLs do sherpa-onnx vêm do pré-compilado que o `sherpa-rs` baixa e o runtime do VC vem do Visual Studio do runner | cpu: windows-latest · gpu: windows-2022 (o CUDA 13.3 não suporta o Visual Studio 2026 do windows-latest; o 13.4 é o primeiro que suporta) |
 | `sbom` | `cargo cyclonedx` do app, filtrado para Windows | ubuntu-latest |
 | `sign` | assinatura Authenticode via SignPath — pulado até a aprovação | ubuntu-latest |
 | `publish` | `scripts/release-assets.ps1` (assinatura minisign, `latest*.json`, `SHA256SUMS.txt`, SBOM) e `gh release create` | windows-latest |
