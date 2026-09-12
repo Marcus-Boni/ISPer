@@ -365,7 +365,13 @@ Opções: `--model <caminho>` (padrão `models/ggml-small.bin`), `--lang <pt|en|
 ## Instalador e atualizações
 
 O ISPer é distribuído em duas variantes de instalador NSIS por usuário (sem
-UAC), geradas e assinadas por [`scripts/release.ps1`](scripts/release.ps1):
+UAC). A partir da 0.15.0 elas são compiladas no GitHub Actions no push da tag
+([`release.yml`](.github/workflows/release.yml) — a variante GPU instala o
+CUDA Toolkit no runner), com SBOM CycloneDX e `SHA256SUMS.txt` publicados
+junto; [`scripts/release.ps1`](scripts/release.ps1) faz o mesmo na máquina
+do mantenedor, como reserva. O processo completo, os segredos envolvidos e o
+caminho da assinatura Authenticode (SignPath Foundation) estão em
+[`docs/RELEASE.md`](docs/RELEASE.md).
 
 | Variante | Arquivo | Para quem | Atualiza por |
 |---|---|---|---|

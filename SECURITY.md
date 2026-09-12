@@ -62,6 +62,11 @@ sessão aberta na máquina, e o comportamento das APIs de IA de terceiros.
   RustSec, licenças e origens das dependências), gitleaks (segredos no
   histórico), Dependabot com atualizações de segurança e toolchain do Rust
   fixo — tudo no CI, exigido para qualquer mudança entrar em `main`.
+- **Releases auditáveis**: os instaladores são compilados no GitHub Actions a
+  partir da tag, e cada release publica o SBOM CycloneDX do app
+  (`ISPer_<v>_sbom.cdx.json` — todos os crates e versões que entram no
+  binário) e `SHA256SUMS.txt`. Como conferir um download está em
+  [`docs/RELEASE.md`](docs/RELEASE.md).
 
 ## O que ainda não temos
 

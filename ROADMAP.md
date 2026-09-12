@@ -18,9 +18,9 @@
 | F4 Notetaker Teams | ✅ | validado em reunião real (07/09); detecção de chamada entregue em 10/09 (validar numa chamada real) |
 | F5 Inteligência | ✅ | resumo, título, polimento, insights ao vivo e busca semântica (Gemini ou Ollama local) — 10/09 |
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
-| F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.5 com 2 itens entregues; 7.3, 7.4 e 7.6 não começadas |
+| F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (falta a candidatura à SignPath); 7.5 com 2 itens entregues; 7.4 e 7.6 não começadas |
 
-**76 itens entregues · 20 em aberto** (2 deles de estudo pessoal). Ordem sugerida: 7.3 → 7.4 → 7.5 → 7.6.
+**79 itens entregues · 17 em aberto** (2 deles de estudo pessoal). Ordem sugerida: candidatura SignPath → 7.4 → 7.5 → 7.6.
 
 ---
 
@@ -237,10 +237,12 @@ A ordem é impacto ÷ esforço.
 
 > **Decisão (10/09/2026) — assinatura de código pelo caminho gratuito: SignPath Foundation.** Certificado OV para projetos open source, chave no HSM deles, emitido para a Foundation; o ISPer cumpre os critérios (licença MIT, repositório público, download gratuito, projeto mantido e já publicado). Descartados: **Azure Trusted Signing** (US$ 9,99/mês, mas hoje não aceita pessoa física nem empresa no Brasil), **certificado OV pago** (US$ 100–400/ano + chave em token/HSM) e **autoassinado** (para o SmartScreen vale o mesmo que não assinar). O que a assinatura dá: editor verificado e reputação que acumula no certificado entre versões — ela **não** elimina o aviso do SmartScreen por si só (desde 2024 nem EV dá reputação instantânea; são semanas de instalações limpas). Enquanto o público for o autor e colegas de confiança, o instalador segue sem assinatura: a integridade das atualizações já é garantida pelo minisign do Tauri, e o aviso na primeira instalação é um clique ("Mais informações → Executar assim mesmo").
 
-- [ ] Builds de release no CI — pré-requisito do SignPath (a assinatura acontece no pipeline deles a partir de um build em CI): runner **self-hosted** do GitHub Actions nesta máquina, já que CUDA e o sherpa-onnx pré-compilado não compilam nos runners hospedados; artefatos idênticos aos do `release.ps1` (GPU + CPU, `.sig`, `latest*.json`)
-- [ ] Assinatura gratuita via **SignPath Foundation**: candidatura em signpath.org (repositório, página de download, descrição do que o app faz), integração no workflow de release (o build em CI envia o `-setup.exe`, a SignPath devolve assinado), `SECURITY.md` como contato — e paciência com o SmartScreen enquanto a reputação do certificado se forma
-- [ ] SBOM (CycloneDX via `cargo cyclonedx`) publicado com cada release
-- [ ] `SECURITY.md` (como reportar vulnerabilidade), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, templates de issue e PR — quem baixa precisa saber para quem reportar
+> **Correção (11/09/2026):** a SignPath Foundation só assina artefatos cujos jobs do GitHub Actions rodaram **todos em runners hospedados** — o runner self-hosted planejado abaixo não serviria (e num repositório público executaria código de qualquer PR). A premissa "CUDA e sherpa-onnx não compilam nos runners" caiu: o sherpa-onnx pré-compilado é baixado pelo `sherpa-rs` em qualquer máquina e o toolkit CUDA é instalado no runner pelo `Jimver/cuda-toolkit`. Detalhes em [`docs/RELEASE.md`](docs/RELEASE.md).
+
+- [x] Builds de release no CI (11/09): `release.yml` compila as duas variantes em runners hospedados do GitHub — a CPU em `windows-latest`; a GPU em `windows-2022`, com o CUDA Toolkit 13.3 instalado no runner (sub-pacotes nvcc/nvvm/crt/cudart/cublas/thrust) e o whisper.cpp gerado com Ninja no ambiente do MSVC —, gera o SBOM, assina para o atualizador, escreve `latest*.json` e `SHA256SUMS.txt` e publica a release no push da tag; `workflow_dispatch` é ensaio. `scripts/release.ps1` vira caminho de reserva e compartilha a lógica de fechamento (`scripts/release-assets.ps1`)
+- [ ] Assinatura gratuita via **SignPath Foundation**: o job `sign` já está no pipeline (pulado até as variáveis `SIGNPATH_*` existirem) e a assinatura minisign do atualizador acontece depois dele, porque o Authenticode muda os bytes. Falta a **candidatura** em signpath.org (ação do mantenedor: repositório, página de releases, descrição do app, `SECURITY.md` como contato) — começando pela variante CPU, porque a GPU embute as DLLs redistribuíveis do CUDA, que a SignPath pode ou não aceitar como bibliotecas de sistema; depois, cadastrar token e variáveis e publicar a próxima versão. A reputação no SmartScreen acumula com o tempo
+- [x] SBOM CycloneDX 1.5 (`cargo cyclonedx`, ~420 componentes) publicado com cada release, junto com `SHA256SUMS.txt` (11/09; a v0.14.0 recebeu os dois retroativamente)
+- [x] `SECURITY.md` (relato privado pelo GitHub — habilitado —, escopo, versões com suporte, como o app se protege), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), modelos de issue e PR (11/09, PR #10); alertas e atualizações de segurança do Dependabot habilitados
 
 ### 7.4 Dados e observabilidade responsável
 
@@ -281,4 +283,4 @@ Whisper (MIT) · whisper.cpp (MIT) · whisper-rs (Unlicense) · Tauri (MIT/Apach
 
 ---
 
-**Próximo passo:** 7.3 — segurança e confiança do binário. Antes, três coisas que só quem tem a máquina faz: rodar o soak de 2 h (`tools/e2e/soak.ps1 -Minutes 120`), ativar o repositório no Coveralls (uma vez) e validar a detecção de chamada e os insights ao vivo numa reunião real do Teams — com o roteiro manual de `docs/TESTES.md` para os casos de áudio.
+**Próximo passo:** a candidatura à SignPath Foundation (ação do mantenedor, ver `docs/RELEASE.md`) e, enquanto ela tramita, a 7.4 — dados e observabilidade responsável. Continuam com quem tem a máquina: cadastrar o segredo `TAURI_SIGNING_PRIVATE_KEY` no repositório (o job `publish` precisa dele), rodar o soak de 2 h (`tools/e2e/soak.ps1 -Minutes 120`), ativar o repositório no Coveralls e validar a detecção de chamada e os insights ao vivo numa reunião real do Teams.

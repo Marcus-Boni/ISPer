@@ -11,6 +11,21 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- Fase 7.3 (segurança e confiança do binário), primeira parte:
+  - **Release no GitHub Actions** (`release.yml`): as duas variantes do
+    instalador compiladas em runners do GitHub (a GPU com o CUDA Toolkit
+    instalado no runner), SBOM CycloneDX, `SHA256SUMS.txt`, assinatura do
+    atualizador e publicação da release no push da tag — exigência da SignPath
+    Foundation para a futura assinatura Authenticode, cujo job já está no
+    pipeline, pulado até a aprovação. `scripts/release.ps1` vira caminho de
+    reserva; `docs/RELEASE.md` descreve o processo.
+  - **SBOM** (`ISPer_<v>_sbom.cdx.json`) e **somas SHA-256** publicados com
+    cada release; a v0.14.0 recebeu os dois retroativamente.
+  - `SECURITY.md` (relato privado de vulnerabilidade pelo GitHub, agora
+    habilitado), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` e modelos de issue e
+    PR; alertas e atualizações de segurança do Dependabot habilitados.
+
 ## [0.14.0] - 2026-09-11
 
 ### Adicionado
