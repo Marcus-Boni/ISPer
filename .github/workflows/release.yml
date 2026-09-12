@@ -25,8 +25,6 @@ name: Release
 on:
   push:
     tags: ['v*']
-    # TEMPORARIO (ensaio do pipeline na branch de desenvolvimento) — remover antes do merge.
-    branches: ['fase-7.3-release-ci']
   workflow_dispatch:
     inputs:
       publish:
