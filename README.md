@@ -468,10 +468,33 @@ Pânicos também vão para o log, com mensagem, arquivo:linha, thread e
 backtrace: o exe não tem stderr, então sem isso um crash sumia sem rastro.
 
 O app grava logs em `%LOCALAPPDATA%\com.isper.desktop\logs\isper.log.<data>` (um arquivo
-por dia, 14 dias guardados) além do stdout. Configurações → Sistema →
-**Diagnóstico** lista versão, motor, modelo, DLLs do CUDA, microfones e
-caminhos, com "Copiar diagnóstico" e "Abrir pasta de logs" — é o que mandar
-ao pedir ajuda.
+por dia, 14 dias guardados) além do stdout. O arquivo é **JSON Lines**: um
+objeto por linha com `timestamp`, `level`, `message` e os campos do evento
+(`audio_secs`, `infer_secs`…), fácil de filtrar:
+
+```powershell
+Get-Content "$env:LOCALAPPDATA\com.isper.desktop\logs\isper.log.$(Get-Date -Format yyyy-MM-dd)" | ConvertFrom-Json | Where-Object level -eq WARN
+```
+
+Configurações → Sistema → **Diagnóstico** lista versão, motor, modelo, DLLs
+do CUDA, microfones, caminhos, a versão do schema do banco e as **métricas
+locais** dos últimos 30 dias (ditados e blocos de reunião: quantidade,
+falhas, p50/p95 da inferência e fator de tempo real — gravadas no banco, nunca
+enviadas). "**Exportar diagnóstico**" gera um `.zip` em `Documentos\ISPer`
+com o diagnóstico, as versões (ISPer, Tauri, WebView2, Windows), `config.toml`
+e `llm.toml` (sem chaves), as métricas e os três últimos logs — as linhas com
+texto ditado saem antes. É o que mandar ao pedir ajuda; nada é enviado sozinho.
+
+**Dados** (Configurações → Sistema): "Guardar reuniões e ditados por" define
+a retenção — 30, 90, 180 dias ou 1 ano (padrão: para sempre). Com um prazo, o
+ISPer apaga do banco e da pasta de Reuniões o que passou dele, ao abrir, uma
+vez por dia e ao encurtar o prazo (LGPD: guardar só o necessário; não há
+lixeira). "Fazer backup do banco" grava uma cópia íntegra em
+`Documentos\ISPer\Backups`, mesmo com o app aberto; para restaurar, feche o
+ISPer e copie o arquivo por cima de `%APPDATA%\ISPer\isper.db`. O banco tem
+schema versionado (`PRAGMA user_version`): uma versão nova migra o banco
+antigo ao abrir, e um banco de versão mais nova é recusado com aviso em vez
+de alterado.
 
 ## Testes e CI
 

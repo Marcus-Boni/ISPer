@@ -67,6 +67,15 @@ sessão aberta na máquina, e o comportamento das APIs de IA de terceiros.
   (`ISPer_<v>_sbom.cdx.json` — todos os crates e versões que entram no
   binário) e `SHA256SUMS.txt`. Como conferir um download está em
   [`docs/RELEASE.md`](docs/RELEASE.md).
+- **Guardar só o necessário**: a retenção (Configurações → Sistema) apaga
+  reuniões e ditados com mais de 30, 90, 180 ou 365 dias — do banco e da
+  pasta de Reuniões —, e o backup do banco é um clique. Transcrições são
+  dados pessoais seus e de quem participou (LGPD).
+- **Sem telemetria**: as métricas de uso (quantos ditados, tempo de
+  inferência, falhas) ficam no banco local e aparecem no Diagnóstico; nada é
+  enviado a servidor nenhum, e não existe opção para enviar. O pacote
+  "Exportar diagnóstico" é um arquivo que só sai da máquina se você o mandar
+  — e as linhas de log com texto ditado são removidas dele.
 
 ## O que ainda não temos
 
@@ -75,7 +84,13 @@ SmartScreen do Windows pede confirmação ("Mais informações → Executar assi
 mesmo"). A integridade do que você baixa é garantida pela assinatura minisign
 do atualizador e pelas somas SHA-256 publicadas com cada release; a assinatura
 de código pelo caminho gratuito da SignPath Foundation está no
-[ROADMAP](ROADMAP.md) (fase 7.3).
+[ROADMAP](ROADMAP.md) (fase 7.3; candidatura enviada em 13/09/2026).
+
+O banco **não é criptografado pelo app**: ele vive no seu perfil de usuário
+(`%APPDATA%\ISPer\isper.db`), protegido pelas permissões do Windows, e o
+BitLocker cobre o disco. SQLCipher foi avaliado e adiado (ROADMAP 7.4) — quem
+compartilha a máquina deve usar contas separadas do Windows ou a retenção
+curta.
 
 ---
 

@@ -7,7 +7,7 @@
 
 ---
 
-## Estado atual — 11/09/2026 · v0.14.0 (fases 7.1 e 7.2)
+## Estado atual — 13/09/2026 · v0.14.0 publicada (fases 7.1 e 7.2) · 7.3 e 7.4 em `main`, à espera da 0.15.0
 
 | Fase | Estado | Resumo |
 |---|---|---|
@@ -18,9 +18,9 @@
 | F4 Notetaker Teams | ✅ | validado em reunião real (07/09); detecção de chamada entregue em 10/09 (validar numa chamada real) |
 | F5 Inteligência | ✅ | resumo, título, polimento, insights ao vivo e busca semântica (Gemini ou Ollama local) — 10/09 |
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
-| F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (falta a candidatura à SignPath); 7.5 com 2 itens entregues; 7.4 e 7.6 não começadas |
+| F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (13/09; criptografia em repouso adiada com decisão registrada); 7.5 com 2 itens entregues; 7.6 não começada |
 
-**79 itens entregues · 17 em aberto** (2 deles de estudo pessoal). Ordem sugerida: candidatura SignPath → 7.4 → 7.5 → 7.6.
+**82 itens entregues · 14 em aberto** (2 deles de estudo pessoal). Ordem sugerida: 7.5 → 7.6, enquanto a candidatura à SignPath tramita.
 
 ---
 
@@ -246,10 +246,10 @@ A ordem é impacto ÷ esforço.
 
 ### 7.4 Dados e observabilidade responsável
 
-- [ ] Migrações de schema por `PRAGMA user_version` (em vez de `ALTER` ignorando erro) e config versionada com migração explícita
-- [ ] Política de retenção (apagar transcrições após N dias — LGPD) e backup/exportação do banco
-- [ ] Criptografia em repouso opcional (SQLCipher) para transcrições sensíveis
-- [ ] Logs em JSON com rotação; "Exportar diagnóstico" (zip com logs + config sem segredos + versões); métricas locais (latência p50/p95, taxa de erro) — telemetria remota só opt-in
+- [x] Migrações de schema por `PRAGMA user_version` (13/09): `SCHEMA_VERSION = 2`, um passo por transação, banco legado entra como 0 e passa por um passo 1 idempotente, banco de versão maior é recusado com mensagem clara; instantes numéricos (`started_ts`, `at_ts`) preenchidos a partir das datas em texto. `config.toml` com `config_version` e `AppConfig::migrate` (mudanças de formato), separado de `normalize` (valores)
+- [x] Retenção (13/09): Configurações → Sistema → "Guardar reuniões e ditados por" (30/90/180/365 dias; padrão para sempre) — varredura ao abrir, uma vez por dia e ao encurtar o prazo; apaga do banco (reunião, segmentos, momentos, vetores, ditados) e os `.md`/`.srt`/`.docx` da reunião. Backup com um clique (`VACUUM INTO` em `Documentos\ISPer\Backups`, com o app aberto); restauração manual documentada
+- [ ] Criptografia em repouso opcional (SQLCipher) — **decisão (13/09): adiada.** O `rusqlite` só oferece SQLCipher compilando o OpenSSL junto (`bundled-sqlcipher-vendored-openssl`: Perl no build, minutos a mais no CI, chave para guardar e recuperar) e o ganho é pequeno enquanto o banco vive no perfil do usuário, protegido pelas ACLs do Windows — o BitLocker cobre o disco inteiro. Volta ao plano se surgir demanda (máquina compartilhada, exigência de compliance)
+- [x] Observabilidade (13/09): log em arquivo em **JSON Lines** com rotação diária e 14 dias; "Exportar diagnóstico" (`.zip` com `diagnostico.json`, versões — ISPer, Tauri, WebView2, Windows —, `config.toml` e `llm.toml` sem segredos, métricas e os três últimos logs com as linhas de texto ditado removidas); métricas locais no Diagnóstico — ditados e blocos de reunião dos últimos 30 dias, falhas, p50/p95 da inferência e fator de tempo real — gravadas pelo próprio app (`events`, 90 dias). **Sem telemetria remota**, nem opt-in: nada sai da máquina
 
 ### 7.5 Experiência premium
 
@@ -283,4 +283,4 @@ Whisper (MIT) · whisper.cpp (MIT) · whisper-rs (Unlicense) · Tauri (MIT/Apach
 
 ---
 
-**Próximo passo:** a candidatura à SignPath Foundation (ação do mantenedor, ver `docs/RELEASE.md`) e, enquanto ela tramita, a 7.4 — dados e observabilidade responsável. Continuam com quem tem a máquina: cadastrar o segredo `TAURI_SIGNING_PRIVATE_KEY` no repositório (o job `publish` precisa dele), rodar o soak de 2 h (`tools/e2e/soak.ps1 -Minutes 120`), ativar o repositório no Coveralls e validar a detecção de chamada e os insights ao vivo numa reunião real do Teams.
+**Próximo passo:** 7.5 — experiência premium (onboarding, tema, desfazer, acessibilidade, i18n), enquanto a candidatura à SignPath tramita (enviada em 13/09; o segredo `TAURI_SIGNING_PRIVATE_KEY` já está no repositório). Vale uma release 0.15.0 antes: as fases 7.3 e 7.4 mudam o que o usuário vê (retenção, backup, diagnóstico exportado, release compilada no CI). Continuam com quem tem a máquina: rodar o soak de 2 h (`tools/e2e/soak.ps1 -Minutes 120`), ativar o repositório no Coveralls e validar a detecção de chamada e os insights ao vivo numa reunião real do Teams.

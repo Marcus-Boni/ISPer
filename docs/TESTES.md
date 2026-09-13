@@ -57,9 +57,18 @@ Cada caso diz como reproduzir e o que deve acontecer. Anote o resultado
 | T1 | Monitor secundário desligado | Arrastar o indicador para o segundo monitor, fechar o ISPer, desligar o monitor, abrir o ISPer | O indicador aparece no rodapé do monitor principal e o log diz `posição lembrada do indicador está fora dos monitores atuais` |
 | T2 | Troca de escala (DPI) | Indicador no canto inferior direito; mudar a escala do Windows de 100 % para 150 %; reabrir | O indicador é empurrado para dentro da tela — nunca fica cortado ou invisível |
 | T3 | Indicador entre dois monitores | Deixar metade em cada monitor e reabrir | Fica inteiro no monitor com que mais se sobrepunha |
+| D1 | Retenção apaga o que passou do prazo | Com uma reunião antiga na Biblioteca (ou uma data editada no banco), definir "Guardar reuniões e ditados por" = 30 dias e salvar | Em segundos a reunião some da Biblioteca e o `.md` (e `.srt`/`.docx`, se existirem) sai de `Documentos\ISPer\Reunioes`; o log traz `retenção aplicada` com as contagens. Reuniões sem data legível não são tocadas |
+| D2 | Backup e restauração | "Fazer backup do banco"; fechar o ISPer; copiar o arquivo de `Documentos\ISPer\Backups` por cima de `%APPDATA%\ISPer\isper.db`; abrir | O Explorer abre no backup; depois da cópia, a Biblioteca mostra exatamente o que havia no momento do backup; o Diagnóstico mostra o mesmo `schema v2` |
+| D3 | Pacote de diagnóstico sem texto ditado | Fazer um ditado; "Exportar diagnóstico (.zip)"; abrir o zip | `logs/isper.log.<hoje>` não contém a frase ditada (a linha virou `[linha com texto ditado removida do diagnóstico]`); `config.toml` e `llm.toml` não têm chave de API; `versoes.txt` traz ISPer, Tauri, WebView2 e Windows |
+| D4 | Banco de versão mais nova | Com o app fechado, `PRAGMA user_version = 99` no `isper.db` (DB Browser for SQLite); abrir o ISPer | O app não altera o banco; o log diz `o banco está na versão 99, mais nova do que este ISPer entende`; voltar `user_version` para 2 restaura tudo |
 
 O que os testes automatizados já cobrem desses casos: o mecanismo de stall e
 reabertura (`meeting::tests::fonte_que_para_de_entregar_e_reaberta_e_a_reuniao_continua`),
-a tradução dos erros (`audio::tests::erros_de_dispositivo_ganham_dica_em_portugues`)
-e a posição do indicador (`overlay::tests`). O que só a mão prova é o
-comportamento do driver de verdade — por isso o roteiro.
+a tradução dos erros (`audio::tests::erros_de_dispositivo_ganham_dica_em_portugues`),
+a posição do indicador (`overlay::tests`), as migrações, a retenção, o backup
+e as métricas do banco (`store::tests`, inclusive um banco legado criado à
+mão e um de versão futura) e a redação do log exportado (`data::tests`). O
+e2e `tools/e2e/data.ps1` faz D2 e D3 no app real (backup válido, zip com as
+entradas certas e sem texto ditado, log em JSON Lines) e roda toda noite no
+CI junto com o smoke. O que só a mão prova é o comportamento do driver de
+verdade e a restauração de um backup — por isso o roteiro.

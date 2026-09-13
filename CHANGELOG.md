@@ -25,6 +25,31 @@ bata com ela.
   - `SECURITY.md` (relato privado de vulnerabilidade pelo GitHub, agora
     habilitado), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` e modelos de issue e
     PR; alertas e atualizações de segurança do Dependabot habilitados.
+  - Política de assinatura de código no README, nos termos da SignPath
+    Foundation (candidatura enviada em 13/09).
+- Fase 7.4 (dados e observabilidade responsável):
+  - **Retenção** (Configurações → Sistema → *Guardar reuniões e ditados por*):
+    30, 90, 180 dias ou 1 ano — o ISPer apaga do banco e da pasta de Reuniões
+    o que passou do prazo, ao abrir, uma vez por dia e ao encurtar o prazo.
+    Padrão: para sempre, como antes.
+  - **Backup do banco** com um clique (`Documentos\ISPer\Backups\isper-<data>.db`,
+    cópia íntegra mesmo com o app aberto) e instrução de restauração.
+  - **Exportar diagnóstico**: um `.zip` em `Documentos\ISPer` com o
+    diagnóstico, versões (ISPer, Tauri, WebView2, Windows), `config.toml` e
+    `llm.toml` (sem chaves — elas ficam no Credential Manager), métricas e
+    os três últimos logs, com as linhas de texto ditado removidas.
+  - **Métricas locais** no Diagnóstico: ditados e blocos de reunião dos
+    últimos 30 dias — quantidade, falhas, p50/p95 da inferência e fator de
+    tempo real. Ficam no banco; nada é enviado a lugar nenhum.
+  - Banco com **schema versionado** (`PRAGMA user_version`, migrações em
+    transação; um banco de versão mais nova é recusado em vez de alterado) e
+    `config.toml` versionado (`config_version`, migração explícita).
+
+### Alterado
+- O arquivo de log (`%LOCALAPPDATA%\com.isper.desktop\logs\isper.log.<data>`)
+  passa a **JSON Lines** — um objeto por linha, com `timestamp`, `level`,
+  `message` e os campos do evento; filtra-se com PowerShell ou jq. O log no
+  terminal continua em texto.
 
 ## [0.14.0] - 2026-09-11
 
