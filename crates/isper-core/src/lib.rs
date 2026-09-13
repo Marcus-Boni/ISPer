@@ -39,6 +39,8 @@ pub enum IsperError {
     Whisper(String),
     #[error("erro de banco de dados: {0}")]
     Db(#[from] rusqlite::Error),
+    #[error("banco de dados: {0}")]
+    Schema(String),
     #[error("erro de E/S: {0}")]
     Io(#[from] std::io::Error),
 }

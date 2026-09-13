@@ -2,14 +2,14 @@
 //! local). Além de gravar, oferece leitura, busca e exclusão para a
 //! janela "Biblioteca" do app.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
-use crate::Result;
 use crate::meeting::MeetingResult;
+use crate::{IsperError, Result};
 
 pub struct MeetingStore {
     conn: Connection,
@@ -129,6 +129,240 @@ fn like_pattern(q: &str) -> String {
     out
 }
 
+// ------------------------------------------------------------- schema
+
+/// Versão do schema, gravada em `PRAGMA user_version`. Cada passo de
+/// `migrate` leva o banco de `n` para `n + 1` numa transação própria; um banco
+/// de versão maior (criado por um ISPer mais novo) é recusado em vez de
+/// alterado às cegas. Bancos anteriores a esta numeração chegam como 0 e
+/// passam pelo passo 1, que é idempotente sobre o que eles já têm.
+pub const SCHEMA_VERSION: i64 = 2;
+
+/// Eventos de métrica mais antigos que isto (90 dias) saem do banco.
+pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
+
+/// Reunião apagada pela retenção: o Markdown é do app apagar.
+#[derive(Debug, Clone, Serialize)]
+pub struct PurgedMeeting {
+    pub id: i64,
+    pub md_path: Option<String>,
+}
+
+/// O que uma passada de retenção apagou.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct Purged {
+    pub meetings: Vec<PurgedMeeting>,
+    pub dictations: usize,
+}
+
+/// Métricas de um tipo de evento (`dictation`, `meeting_block`…) num período.
+#[derive(Debug, Clone, Serialize)]
+pub struct KindMetrics {
+    pub kind: String,
+    pub total: i64,
+    pub errors: i64,
+    /// Duração da inferência, em segundos (só eventos com sucesso).
+    pub p50_secs: Option<f64>,
+    pub p95_secs: Option<f64>,
+    /// Fator de tempo real: inferência ÷ áudio (0,1 = dez vezes mais rápido).
+    pub p50_rtf: Option<f64>,
+    pub p95_rtf: Option<f64>,
+}
+
+/// Segundos de um relógio local "naive" (sem fuso) a partir das datas que o
+/// app grava como texto — `dd/mm/aaaa HH:MM` ou `dd/mm/aaaa HH:MM:SS`. Só
+/// servem para comparar entre si: o corte da retenção vem do mesmo relógio.
+/// Texto fora do formato dá `None`, e uma linha sem instante nunca é apagada.
+pub fn parse_local_stamp(s: &str) -> Option<i64> {
+    let (date, time) = s.trim().split_once(' ')?;
+    let mut d = date.split('/');
+    let day: i64 = d.next()?.parse().ok()?;
+    let month: i64 = d.next()?.parse().ok()?;
+    let year: i64 = d.next()?.parse().ok()?;
+    if d.next().is_some()
+        || !(1..=31).contains(&day)
+        || !(1..=12).contains(&month)
+        || !(1970..=9999).contains(&year)
+    {
+        return None;
+    }
+    let mut t = time.split(':');
+    let hour: i64 = t.next()?.parse().ok()?;
+    let minute: i64 = t.next()?.parse().ok()?;
+    let second: i64 = match t.next() {
+        Some(v) => v.parse().ok()?,
+        None => 0,
+    };
+    if t.next().is_some() || hour > 23 || minute > 59 || second > 59 {
+        return None;
+    }
+    Some(days_from_civil(year, month, day) * 86_400 + hour * 3_600 + minute * 60 + second)
+}
+
+/// Dias desde 1970-01-01 no calendário gregoriano (algoritmo de Howard Hinnant).
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = (m + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let names = stmt.query_map([], |r| r.get::<_, String>(1))?;
+    for name in names {
+        if name? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn add_column_if_missing(conn: &Connection, table: &str, column: &str, decl: &str) -> Result<()> {
+    if !column_exists(conn, table, column)? {
+        conn.execute(
+            &format!("ALTER TABLE {table} ADD COLUMN {column} {decl}"),
+            [],
+        )?;
+    }
+    Ok(())
+}
+
+/// Leva o banco até [`SCHEMA_VERSION`], um passo por transação.
+fn migrate(conn: &Connection) -> Result<()> {
+    let mut version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+    if version > SCHEMA_VERSION {
+        return Err(IsperError::Schema(format!(
+            "o banco está na versão {version}, mais nova do que este ISPer entende \
+             ({SCHEMA_VERSION}) — atualize o app ou restaure um backup"
+        )));
+    }
+    while version < SCHEMA_VERSION {
+        let tx = conn.unchecked_transaction()?;
+        match version {
+            0 => migrate_to_v1(&tx)?,
+            1 => migrate_to_v2(&tx)?,
+            other => {
+                return Err(IsperError::Schema(format!(
+                    "sem migração a partir da versão {other}"
+                )));
+            }
+        }
+        version += 1;
+        tx.pragma_update(None, "user_version", version)?;
+        tx.commit()?;
+        tracing::info!(version, "schema do banco migrado");
+    }
+    Ok(())
+}
+
+/// Passo 1 — o schema que existia antes da numeração: tabelas e as três
+/// colunas que versões antigas acrescentavam com `ALTER TABLE` ignorando o
+/// erro. Idempotente: um banco antigo já tem parte disto, um novo nada.
+fn migrate_to_v1(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS meetings (
+            id            INTEGER PRIMARY KEY,
+            title         TEXT NOT NULL,
+            started_at    TEXT NOT NULL,
+            duration_secs REAL NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS segments (
+            id         INTEGER PRIMARY KEY,
+            meeting_id INTEGER NOT NULL REFERENCES meetings(id),
+            speaker    TEXT NOT NULL,
+            start_secs REAL NOT NULL,
+            end_secs   REAL NOT NULL,
+            text       TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_segments_meeting ON segments(meeting_id);
+        CREATE TABLE IF NOT EXISTS dictations (
+            id         INTEGER PRIMARY KEY,
+            at         TEXT NOT NULL,
+            text       TEXT NOT NULL,
+            audio_secs REAL,
+            infer_secs REAL
+        );
+        CREATE TABLE IF NOT EXISTS moments (
+            id         INTEGER PRIMARY KEY,
+            meeting_id INTEGER NOT NULL REFERENCES meetings(id),
+            at_secs    REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_moments_meeting ON moments(meeting_id);
+        CREATE TABLE IF NOT EXISTS embeddings (
+            id         INTEGER PRIMARY KEY,
+            kind       TEXT NOT NULL,
+            ref_id     INTEGER NOT NULL,
+            chunk      INTEGER NOT NULL,
+            start_secs REAL,
+            text       TEXT NOT NULL,
+            model      TEXT NOT NULL,
+            dim        INTEGER NOT NULL,
+            vector     BLOB NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_embeddings_ref ON embeddings(kind, ref_id);
+        CREATE INDEX IF NOT EXISTS idx_embeddings_model ON embeddings(model, kind);",
+    )?;
+    add_column_if_missing(conn, "meetings", "summary", "TEXT")?;
+    add_column_if_missing(conn, "meetings", "md_path", "TEXT")?;
+    add_column_if_missing(conn, "dictations", "raw_text", "TEXT")?;
+    Ok(())
+}
+
+/// Passo 2 (fase 7.4) — instantes numéricos para a retenção (as datas eram só
+/// texto de exibição), preenchidos a partir do texto existente, e a tabela de
+/// eventos das métricas locais.
+fn migrate_to_v2(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "meetings", "started_ts", "INTEGER")?;
+    add_column_if_missing(conn, "dictations", "at_ts", "INTEGER")?;
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_meetings_started_ts ON meetings(started_ts);
+        CREATE INDEX IF NOT EXISTS idx_dictations_at_ts ON dictations(at_ts);
+        CREATE TABLE IF NOT EXISTS events (
+            id         INTEGER PRIMARY KEY,
+            at_ts      INTEGER NOT NULL,
+            kind       TEXT NOT NULL,
+            ok         INTEGER NOT NULL,
+            secs       REAL,
+            audio_secs REAL
+        );
+        CREATE INDEX IF NOT EXISTS idx_events_kind_ts ON events(kind, at_ts);",
+    )?;
+    backfill_stamps(conn, "meetings", "started_at", "started_ts")?;
+    backfill_stamps(conn, "dictations", "at", "at_ts")?;
+    Ok(())
+}
+
+/// Preenche `ts_col` a partir do texto de `text_col` onde ainda está vazio.
+fn backfill_stamps(conn: &Connection, table: &str, text_col: &str, ts_col: &str) -> Result<()> {
+    let rows: Vec<(i64, String)> = {
+        let mut stmt = conn.prepare(&format!(
+            "SELECT id, {text_col} FROM {table} WHERE {ts_col} IS NULL"
+        ))?;
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?
+    };
+    let mut update = conn.prepare(&format!("UPDATE {table} SET {ts_col} = ?1 WHERE id = ?2"))?;
+    for (id, text) in rows {
+        if let Some(ts) = parse_local_stamp(&text) {
+            update.execute(params![ts, id])?;
+        }
+    }
+    Ok(())
+}
+
+/// Percentil por posto mais próximo numa lista já ordenada.
+fn percentile(sorted: &[f64], p: u32) -> Option<f64> {
+    if sorted.is_empty() {
+        return None;
+    }
+    let rank = ((f64::from(p) / 100.0) * sorted.len() as f64).ceil() as usize;
+    Some(sorted[rank.clamp(1, sorted.len()) - 1])
+}
+
 impl MeetingStore {
     /// Abre (ou cria) o banco no caminho dado.
     ///
@@ -139,61 +373,15 @@ impl MeetingStore {
         let conn = Connection::open(path)?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         let _ = conn.pragma_update(None, "journal_mode", "WAL");
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS meetings (
-                id            INTEGER PRIMARY KEY,
-                title         TEXT NOT NULL,
-                started_at    TEXT NOT NULL,
-                duration_secs REAL NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS segments (
-                id         INTEGER PRIMARY KEY,
-                meeting_id INTEGER NOT NULL REFERENCES meetings(id),
-                speaker    TEXT NOT NULL,
-                start_secs REAL NOT NULL,
-                end_secs   REAL NOT NULL,
-                text       TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_segments_meeting ON segments(meeting_id);
-            CREATE TABLE IF NOT EXISTS dictations (
-                id         INTEGER PRIMARY KEY,
-                at         TEXT NOT NULL,
-                text       TEXT NOT NULL,
-                audio_secs REAL,
-                infer_secs REAL
-            );",
-        )?;
-        // Migrações leves: colunas novas em bancos antigos (erro = já existe).
-        let _ = conn.execute("ALTER TABLE meetings ADD COLUMN summary TEXT", []);
-        let _ = conn.execute("ALTER TABLE meetings ADD COLUMN md_path TEXT", []);
-        let _ = conn.execute("ALTER TABLE dictations ADD COLUMN raw_text TEXT", []);
-        // Momentos marcados (★) durante a reunião.
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS moments (
-                id         INTEGER PRIMARY KEY,
-                meeting_id INTEGER NOT NULL REFERENCES meetings(id),
-                at_secs    REAL NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_moments_meeting ON moments(meeting_id);",
-        )?;
-        // Busca semântica: um vetor por trecho, com o modelo que o gerou —
-        // vetores de modelos diferentes nunca se comparam.
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS embeddings (
-                id         INTEGER PRIMARY KEY,
-                kind       TEXT NOT NULL,
-                ref_id     INTEGER NOT NULL,
-                chunk      INTEGER NOT NULL,
-                start_secs REAL,
-                text       TEXT NOT NULL,
-                model      TEXT NOT NULL,
-                dim        INTEGER NOT NULL,
-                vector     BLOB NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_embeddings_ref ON embeddings(kind, ref_id);
-            CREATE INDEX IF NOT EXISTS idx_embeddings_model ON embeddings(model, kind);",
-        )?;
+        migrate(&conn)?;
         Ok(Self { conn })
+    }
+
+    /// Versão do schema deste banco (`PRAGMA user_version`).
+    pub fn schema_version(&self) -> Result<i64> {
+        Ok(self
+            .conn
+            .pragma_query_value(None, "user_version", |r| r.get(0))?)
     }
 
     // ------------------------------------------------------------ escrita
@@ -207,8 +395,15 @@ impl MeetingStore {
         md_path: Option<&str>,
     ) -> Result<i64> {
         self.conn.execute(
-            "INSERT INTO meetings (title, started_at, duration_secs, md_path) VALUES (?1, ?2, ?3, ?4)",
-            params![title, started_at, result.duration_secs, md_path],
+            "INSERT INTO meetings (title, started_at, started_ts, duration_secs, md_path)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                title,
+                started_at,
+                parse_local_stamp(started_at),
+                result.duration_secs,
+                md_path
+            ],
         )?;
         let id = self.conn.last_insert_rowid();
         let mut stmt = self.conn.prepare(
@@ -319,8 +514,16 @@ impl MeetingStore {
         infer_secs: f32,
     ) -> Result<i64> {
         self.conn.execute(
-            "INSERT INTO dictations (at, text, raw_text, audio_secs, infer_secs) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![at, text, raw_text, audio_secs, infer_secs],
+            "INSERT INTO dictations (at, at_ts, text, raw_text, audio_secs, infer_secs)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                at,
+                parse_local_stamp(at),
+                text,
+                raw_text,
+                audio_secs,
+                infer_secs
+            ],
         )?;
         Ok(self.conn.last_insert_rowid())
     }
@@ -333,6 +536,137 @@ impl MeetingStore {
         self.conn
             .execute("DELETE FROM dictations WHERE id = ?1", params![id])?;
         Ok(())
+    }
+
+    // ------------------------------------------------- retenção e backup
+
+    /// Apaga reuniões (com segmentos, momentos e vetores) e ditados cujo
+    /// instante é anterior a `cutoff_ts` (no relógio de [`parse_local_stamp`]).
+    /// Linhas sem instante conhecido ficam. Devolve o que saiu — inclusive os
+    /// caminhos dos Markdowns, que são do app apagar.
+    pub fn purge_older_than(&self, cutoff_ts: i64) -> Result<Purged> {
+        let tx = self.conn.unchecked_transaction()?;
+        let meetings: Vec<PurgedMeeting> = {
+            let mut stmt = tx.prepare(
+                "SELECT id, md_path FROM meetings WHERE started_ts IS NOT NULL AND started_ts < ?1",
+            )?;
+            stmt.query_map(params![cutoff_ts], |r| {
+                Ok(PurgedMeeting {
+                    id: r.get(0)?,
+                    md_path: r.get(1)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?
+        };
+        for m in &meetings {
+            tx.execute(
+                "DELETE FROM embeddings WHERE kind = 'meeting' AND ref_id = ?1",
+                params![m.id],
+            )?;
+            tx.execute("DELETE FROM moments WHERE meeting_id = ?1", params![m.id])?;
+            tx.execute("DELETE FROM segments WHERE meeting_id = ?1", params![m.id])?;
+            tx.execute("DELETE FROM meetings WHERE id = ?1", params![m.id])?;
+        }
+        tx.execute(
+            "DELETE FROM embeddings WHERE kind = 'dictation' AND ref_id IN
+                (SELECT id FROM dictations WHERE at_ts IS NOT NULL AND at_ts < ?1)",
+            params![cutoff_ts],
+        )?;
+        let dictations = tx.execute(
+            "DELETE FROM dictations WHERE at_ts IS NOT NULL AND at_ts < ?1",
+            params![cutoff_ts],
+        )?;
+        tx.commit()?;
+        Ok(Purged {
+            meetings,
+            dictations,
+        })
+    }
+
+    /// Cópia íntegra e compactada do banco em `dest` (`VACUUM INTO`): funciona
+    /// com o app aberto e outras conexões escrevendo, sem parar nada. `dest`
+    /// não pode existir — o SQLite não sobrescreve.
+    pub fn backup_to(&self, dest: &Path) -> Result<()> {
+        if let Some(dir) = dest.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        self.conn
+            .execute("VACUUM INTO ?1", params![dest.to_string_lossy()])?;
+        Ok(())
+    }
+
+    // ------------------------------------------------------------ métricas
+
+    /// Registra um evento medido (`kind` = `dictation`, `meeting_block`…):
+    /// sucesso ou falha, duração da inferência e do áudio. Eventos com mais
+    /// de [`EVENTS_KEEP_SECS`] saem no mesmo passo — métrica é tendência,
+    /// não histórico. Nada disto sai da máquina.
+    pub fn record_event(
+        &self,
+        at_ts: i64,
+        kind: &str,
+        ok: bool,
+        secs: Option<f32>,
+        audio_secs: Option<f32>,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO events (at_ts, kind, ok, secs, audio_secs) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![at_ts, kind, i64::from(ok), secs, audio_secs],
+        )?;
+        self.conn.execute(
+            "DELETE FROM events WHERE at_ts < ?1",
+            params![at_ts - EVENTS_KEEP_SECS],
+        )?;
+        Ok(())
+    }
+
+    /// Métricas por tipo de evento desde `since_ts`: total, falhas e p50/p95
+    /// da inferência (s) e do fator de tempo real (inferência ÷ áudio).
+    pub fn metrics(&self, since_ts: i64) -> Result<Vec<KindMetrics>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT kind, ok, secs, audio_secs FROM events WHERE at_ts >= ?1 ORDER BY kind",
+        )?;
+        let rows = stmt.query_map(params![since_ts], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, i64>(1)? != 0,
+                r.get::<_, Option<f64>>(2)?,
+                r.get::<_, Option<f64>>(3)?,
+            ))
+        })?;
+        // (total, falhas, inferências, fatores de tempo real)
+        let mut by_kind: BTreeMap<String, (i64, i64, Vec<f64>, Vec<f64>)> = BTreeMap::new();
+        for row in rows {
+            let (kind, ok, secs, audio) = row?;
+            let entry = by_kind.entry(kind).or_default();
+            entry.0 += 1;
+            if !ok {
+                entry.1 += 1;
+                continue;
+            }
+            if let Some(s) = secs {
+                entry.2.push(s);
+                if let Some(a) = audio.filter(|a| *a > 0.0) {
+                    entry.3.push(s / a);
+                }
+            }
+        }
+        Ok(by_kind
+            .into_iter()
+            .map(|(kind, (total, errors, mut secs, mut rtf))| {
+                secs.sort_by(f64::total_cmp);
+                rtf.sort_by(f64::total_cmp);
+                KindMetrics {
+                    kind,
+                    total,
+                    errors,
+                    p50_secs: percentile(&secs, 50),
+                    p95_secs: percentile(&secs, 95),
+                    p50_rtf: percentile(&rtf, 50),
+                    p95_rtf: percentile(&rtf, 95),
+                }
+            })
+            .collect())
     }
 
     // ------------------------------------------------------ busca semântica
@@ -673,11 +1007,15 @@ mod tests {
     use super::*;
     use crate::meeting::{MeetingResult, MeetingSegment, Speaker};
 
-    fn temp_store(name: &str) -> MeetingStore {
+    fn temp_path(name: &str) -> std::path::PathBuf {
         let path =
             std::env::temp_dir().join(format!("isper-store-test-{name}-{}.db", std::process::id()));
         let _ = std::fs::remove_file(&path);
-        MeetingStore::open(&path).expect("abrir banco temporário")
+        path
+    }
+
+    fn temp_store(name: &str) -> MeetingStore {
+        MeetingStore::open(&temp_path(name)).expect("abrir banco temporário")
     }
 
     fn sample_result() -> MeetingResult {
@@ -697,6 +1035,231 @@ mod tests {
             others_audio: crate::meeting::OthersAudio::empty(),
             others_blocks: Vec::new(),
         }
+    }
+
+    #[test]
+    fn banco_novo_nasce_na_versao_atual_e_reabrir_e_idempotente() {
+        let path = temp_path("versao");
+        let store = MeetingStore::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+        drop(store);
+        let store = MeetingStore::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+        assert!(column_exists(&store.conn, "meetings", "started_ts").unwrap());
+        assert!(column_exists(&store.conn, "dictations", "at_ts").unwrap());
+        assert!(column_exists(&store.conn, "events", "kind").unwrap());
+        assert!(!column_exists(&store.conn, "events", "inexistente").unwrap());
+    }
+
+    #[test]
+    fn banco_antigo_sem_versao_e_migrado_com_as_datas_preenchidas() {
+        let path = temp_path("legado");
+        {
+            // O schema como era antes da numeração (sem summary, md_path, raw_text,
+            // moments e embeddings), com dados.
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE meetings (id INTEGER PRIMARY KEY, title TEXT NOT NULL,
+                    started_at TEXT NOT NULL, duration_secs REAL NOT NULL);
+                 CREATE TABLE segments (id INTEGER PRIMARY KEY,
+                    meeting_id INTEGER NOT NULL REFERENCES meetings(id), speaker TEXT NOT NULL,
+                    start_secs REAL NOT NULL, end_secs REAL NOT NULL, text TEXT NOT NULL);
+                 CREATE TABLE dictations (id INTEGER PRIMARY KEY, at TEXT NOT NULL,
+                    text TEXT NOT NULL, audio_secs REAL, infer_secs REAL);
+                 INSERT INTO meetings (title, started_at, duration_secs)
+                    VALUES ('Antiga', '10/09/2026 14:00', 60.0);
+                 INSERT INTO meetings (title, started_at, duration_secs)
+                    VALUES ('Sem data', 'ontem', 10.0);
+                 INSERT INTO dictations (at, text) VALUES ('11/09/2026 09:15:30', 'oi');",
+            )
+            .unwrap();
+            let v: i64 = conn
+                .pragma_query_value(None, "user_version", |r| r.get(0))
+                .unwrap();
+            assert_eq!(v, 0, "banco legado não tem versão");
+        }
+        let store = MeetingStore::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+        let ts: Option<i64> = store
+            .conn
+            .query_row(
+                "SELECT started_ts FROM meetings WHERE title = 'Antiga'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(ts, parse_local_stamp("10/09/2026 14:00"));
+        let none: Option<i64> = store
+            .conn
+            .query_row(
+                "SELECT started_ts FROM meetings WHERE title = 'Sem data'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            none, None,
+            "data ilegível fica sem instante — e a retenção não a toca"
+        );
+        let at: Option<i64> = store
+            .conn
+            .query_row("SELECT at_ts FROM dictations", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(at, parse_local_stamp("11/09/2026 09:15:30"));
+        // As colunas que as versões antigas acrescentavam com ALTER estão lá
+        // (as consultas normais funcionam) e as tabelas novas também.
+        let rows = store.list_meetings().unwrap();
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().all(|m| m.md_path.is_none() && !m.has_summary));
+        assert_eq!(store.list_dictations(None, 10).unwrap().len(), 1);
+        assert!(store.metrics(0).unwrap().is_empty());
+    }
+
+    #[test]
+    fn banco_de_versao_mais_nova_e_recusado() {
+        let path = temp_path("futuro");
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.pragma_update(None, "user_version", SCHEMA_VERSION + 1)
+                .unwrap();
+        }
+        let err = MeetingStore::open(&path).err().expect("deve recusar");
+        assert!(err.to_string().contains("mais nova"), "{err}");
+    }
+
+    #[test]
+    fn parse_local_stamp_le_o_formato_do_app_e_ordena() {
+        assert_eq!(parse_local_stamp("01/01/1970 00:00"), Some(0));
+        assert_eq!(parse_local_stamp("02/01/1970 00:00:00"), Some(86_400));
+        assert_eq!(parse_local_stamp("01/03/2000 00:00"), Some(951_868_800));
+        assert_eq!(
+            parse_local_stamp("12/09/2026 14:30:15"),
+            Some(parse_local_stamp("12/09/2026 14:30").unwrap() + 15)
+        );
+        assert!(
+            parse_local_stamp("10/09/2026 14:00").unwrap()
+                < parse_local_stamp("11/09/2026 09:00").unwrap()
+        );
+        for bad in [
+            "",
+            "ontem",
+            "2026-09-12 14:00",
+            "32/01/2026 00:00",
+            "10/13/2026 00:00",
+            "10/09/2026 24:00",
+            "10/09/2026",
+            "10/09/2026 10:00:00:00",
+        ] {
+            assert_eq!(parse_local_stamp(bad), None, "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn retencao_apaga_so_o_que_passou_do_corte_e_devolve_os_markdowns() {
+        let store = temp_store("retencao");
+        let old = store
+            .save(
+                "Velha",
+                "01/06/2026 10:00",
+                &sample_result(),
+                Some("/tmp/velha.md"),
+            )
+            .unwrap();
+        let new = store
+            .save("Nova", "10/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        store.save_moments(old, &[1.0]).unwrap();
+        store
+            .save_dictation("01/06/2026 10:05:00", "antigo", None, 1.0, 0.5)
+            .unwrap();
+        store
+            .save_dictation("10/09/2026 10:05:00", "recente", None, 1.0, 0.5)
+            .unwrap();
+        let cutoff = parse_local_stamp("01/09/2026 00:00").unwrap();
+        let purged = store.purge_older_than(cutoff).unwrap();
+        assert_eq!(purged.meetings.len(), 1);
+        assert_eq!(purged.meetings[0].id, old);
+        assert_eq!(purged.meetings[0].md_path.as_deref(), Some("/tmp/velha.md"));
+        assert_eq!(purged.dictations, 1);
+        let ids: Vec<i64> = store
+            .list_meetings()
+            .unwrap()
+            .iter()
+            .map(|m| m.id)
+            .collect();
+        assert_eq!(ids, vec![new]);
+        let left = store.list_dictations(None, 10).unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].text, "recente");
+        let moments: i64 = store
+            .conn
+            .query_row("SELECT COUNT(*) FROM moments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(moments, 0, "momentos da reunião apagada somem junto");
+        let again = store.purge_older_than(cutoff).unwrap();
+        assert!(
+            again.meetings.is_empty() && again.dictations == 0,
+            "segunda passada não acha nada"
+        );
+    }
+
+    #[test]
+    fn backup_e_uma_copia_integra_que_abre_sozinha() {
+        let store = temp_store("backup");
+        store
+            .save("R", "10/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        let dest = temp_path("backup-copia");
+        store.backup_to(&dest).unwrap();
+        let copy = MeetingStore::open(&dest).unwrap();
+        assert_eq!(copy.list_meetings().unwrap().len(), 1);
+        assert_eq!(copy.schema_version().unwrap(), SCHEMA_VERSION);
+        assert!(
+            store.backup_to(&dest).is_err(),
+            "VACUUM INTO não sobrescreve"
+        );
+    }
+
+    #[test]
+    fn metricas_dao_p50_p95_e_falhas_por_tipo_e_esquecem_o_muito_antigo() {
+        let store = temp_store("metricas");
+        let now = 1_000_000_000;
+        store
+            .record_event(
+                now - EVENTS_KEEP_SECS - 1,
+                "dictation",
+                true,
+                Some(9.0),
+                None,
+            )
+            .unwrap();
+        for (i, secs) in [0.5, 0.7, 0.9, 1.1, 5.0].iter().enumerate() {
+            store
+                .record_event(now + i as i64, "dictation", true, Some(*secs), Some(10.0))
+                .unwrap();
+        }
+        store
+            .record_event(now + 10, "dictation", false, None, Some(3.0))
+            .unwrap();
+        store
+            .record_event(now + 11, "meeting_block", true, Some(2.0), Some(20.0))
+            .unwrap();
+        let m = store.metrics(now - 3600).unwrap();
+        assert_eq!(m.len(), 2);
+        let d = m.iter().find(|k| k.kind == "dictation").unwrap();
+        assert_eq!((d.total, d.errors), (6, 1));
+        // f32 no evento, REAL (f64) no banco: compara com tolerância.
+        assert!((d.p50_secs.unwrap() - 0.9).abs() < 1e-6);
+        assert!((d.p95_secs.unwrap() - 5.0).abs() < 1e-6);
+        assert!((d.p50_rtf.unwrap() - 0.09).abs() < 1e-6);
+        let b = m.iter().find(|k| k.kind == "meeting_block").unwrap();
+        assert_eq!((b.total, b.errors, b.p50_secs), (1, 0, Some(2.0)));
+        let total: i64 = store
+            .conn
+            .query_row("SELECT COUNT(*) FROM events", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(total, 7, "o evento de mais de 90 dias foi esquecido");
+        assert_eq!(percentile(&[], 50), None);
     }
 
     #[test]
