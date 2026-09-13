@@ -28,3 +28,6 @@ apps/isper-app/src-tauri/resources/
 
 # SBOMs gerados pelo cargo-cyclonedx (um por crate); o do app vai para dist/ com a release
 *.cdx.json
+
+# Estado de ferramentas locais de desenvolvimento (nada do projeto)
+/.omx/

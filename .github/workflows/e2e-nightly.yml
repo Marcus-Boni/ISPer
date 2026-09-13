@@ -165,6 +165,14 @@ jobs:
           ISPER_E2E_CDP_REGISTRY: '1'
         run: .\tools\e2e\smoke.ps1 -Exe .\target\release\isper-app.exe
 
+      # Fase 7.4 no app real: retenção configurável, backup do banco, pacote de
+      # diagnóstico (zip válido, sem texto ditado) e log em JSON Lines.
+      - name: E2E dados (retenção · backup · diagnóstico)
+        shell: pwsh
+        env:
+          ISPER_E2E_CDP_REGISTRY: '1'
+        run: .\tools\e2e\data.ps1 -Exe .\target\release\isper-app.exe
+
       # Quando o smoke falha, o que interessa e o que o runner tinha na hora:
       # processos do app e do WebView2 (com a linha de comando), quem escuta a
       # porta CDP e o fim do log do ISPer.
