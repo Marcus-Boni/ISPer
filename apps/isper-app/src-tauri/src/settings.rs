@@ -39,6 +39,8 @@ pub(crate) struct SettingsDto {
     emb_model: Option<String>,
     emb_base_url: Option<String>,
     emb_key_present: bool,
+    /// Retenção de reuniões e ditados, em dias (0 = para sempre).
+    retention_days: u32,
 }
 
 #[derive(serde::Deserialize)]
@@ -81,6 +83,8 @@ pub(crate) struct SettingsPatch {
     emb_model: Option<String>,
     #[serde(default)]
     emb_base_url: Option<String>,
+    #[serde(default)]
+    retention_days: Option<u32>,
 }
 
 pub(crate) fn default_true() -> bool {
@@ -320,6 +324,7 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         emb_model: emb.model,
         emb_base_url: emb.base_url,
         emb_key_present,
+        retention_days: cfg.retention_days,
     })
 }
 
@@ -358,6 +363,8 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         live_insights: patch.live_insights,
         insights_interval_min: patch.insights_interval_min.unwrap_or_default(),
         overlay_pinned: previous.overlay_pinned,
+        retention_days: patch.retention_days.unwrap_or_default(),
+        config_version: config::CONFIG_VERSION,
     };
     // Caixa, espaços, vazios e valores fora das listas: a mesma regra única
     // que vale para o config.toml (`AppConfig::normalize`, com testes).

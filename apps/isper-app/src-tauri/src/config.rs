@@ -9,6 +9,15 @@ use serde::{Deserialize, Serialize};
 /// Modos de `after_meeting`.
 pub(crate) const AFTER_MEETING_MODES: [&str; 3] = ["notify", "open", "silent"];
 
+/// Versão do formato do `config.toml`. Um arquivo antigo chega com 0 (o campo
+/// não existia) e passa por [`AppConfig::migrate`]; um arquivo de versão maior
+/// (gravado por um ISPer mais novo) é lido com os campos que este entende e
+/// regravado nesta versão, com aviso no log.
+pub const CONFIG_VERSION: u32 = 1;
+
+/// Opções de retenção, em dias; 0 = guardar para sempre.
+pub(crate) const RETENTION_DAYS: [u32; 5] = [0, 30, 90, 180, 365];
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AppConfig {
     /// Atalho preferido (ex.: "ctrl+alt+space"). `None` = automático
@@ -82,6 +91,13 @@ pub struct AppConfig {
     /// do Início / bandeja); "ocultar" desfixa.
     #[serde(default)]
     pub overlay_pinned: bool,
+    /// Apagar reuniões e ditados com mais de N dias (LGPD: guardar só o
+    /// necessário). 0 = para sempre. A varredura roda ao abrir e uma vez por dia.
+    #[serde(default)]
+    pub retention_days: u32,
+    /// Versão do formato deste arquivo — ver [`CONFIG_VERSION`].
+    #[serde(default)]
+    pub config_version: u32,
 }
 
 impl Default for AppConfig {
@@ -108,6 +124,8 @@ impl Default for AppConfig {
             live_insights: false,
             insights_interval_min: default_insights_interval(),
             overlay_pinned: false,
+            retention_days: 0,
+            config_version: CONFIG_VERSION,
         }
     }
 }
@@ -159,6 +177,32 @@ impl AppConfig {
         }
     }
 
+    /// Leva um arquivo de versão antiga até [`CONFIG_VERSION`], um passo por
+    /// versão, e devolve o que cada passo fez (vai para o log). Diferente de
+    /// `normalize`, que corrige valores, aqui entram mudanças de formato:
+    /// campo renomeado, unidade trocada, valor que mudou de significado.
+    /// Um arquivo de versão maior mantém os campos que este ISPer entende e
+    /// desce para a versão atual (o que ele não conhece já foi ignorado na
+    /// leitura).
+    pub fn migrate(&mut self) -> Vec<&'static str> {
+        let mut notes = Vec::new();
+        if self.config_version > CONFIG_VERSION {
+            notes.push("arquivo de uma versão mais nova do ISPer: campos desconhecidos ignorados");
+            self.config_version = CONFIG_VERSION;
+        }
+        while self.config_version < CONFIG_VERSION {
+            match self.config_version {
+                // 0 → 1: o campo de versão passou a existir. As versões até a
+                // 0.14 gravavam exatamente estes campos, com estes nomes e
+                // unidades — nada a converter; `normalize` cuida dos valores.
+                0 => notes.push("config.toml sem versão → 1"),
+                _ => break,
+            }
+            self.config_version += 1;
+        }
+        notes
+    }
+
     /// Corrige o que veio de fora — a tela de Configurações ou um
     /// `config.toml` editado à mão: caixa e espaços, vazios que significam
     /// "padrão", termos repetidos no dicionário e valores fora das listas
@@ -208,6 +252,10 @@ impl AppConfig {
         if !crate::insights::INSIGHTS_INTERVALS.contains(&self.insights_interval_min) {
             self.insights_interval_min = default_insights_interval();
         }
+        if !RETENTION_DAYS.contains(&self.retention_days) {
+            self.retention_days = 0;
+        }
+        self.config_version = CONFIG_VERSION;
     }
 }
 
@@ -222,8 +270,9 @@ pub fn load() -> AppConfig {
     }
 }
 
-/// Lê `p` (ausente → padrão; inválido → padrão com aviso) e normaliza: um
-/// valor fora da lista num arquivo editado à mão é corrigido, não propagado.
+/// Lê `p` (ausente → padrão; inválido → padrão com aviso), migra o formato
+/// e normaliza: um valor fora da lista num arquivo editado à mão é corrigido,
+/// não propagado.
 pub fn load_from(p: &Path) -> AppConfig {
     let mut cfg = match std::fs::read_to_string(p) {
         Ok(text) => toml::from_str(&text).unwrap_or_else(|e| {
@@ -232,6 +281,9 @@ pub fn load_from(p: &Path) -> AppConfig {
         }),
         Err(_) => AppConfig::default(),
     };
+    for note in cfg.migrate() {
+        tracing::info!("config: {note}");
+    }
     cfg.normalize();
     cfg
 }
@@ -282,9 +334,64 @@ mod tests {
         assert_eq!(cfg.insights_interval_min, 5);
         assert_eq!(cfg.meeting_shortcut.as_deref(), Some("ctrl+alt+m"));
         assert!(cfg.show_home_on_launch && cfg.voice_commands && cfg.auto_update_check);
+        assert_eq!(cfg.config_version, 0, "arquivo sem o campo chega como 0");
         // Um campo desconhecido (versão mais nova gravou) não derruba a leitura.
-        let cfg: AppConfig = toml::from_str("campo_do_futuro = 1\n").unwrap();
+        let mut cfg: AppConfig = toml::from_str("campo_do_futuro = 1\n").unwrap();
+        cfg.migrate();
         assert_eq!(cfg, AppConfig::default());
+    }
+
+    #[test]
+    fn config_sem_versao_e_migrada_e_regravada_na_versao_atual() {
+        let p = temp_config("migra");
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        // Um config.toml da 0.14: sem config_version nem retention_days.
+        std::fs::write(&p, "lang = \"en\"\npolish = true\n").unwrap();
+        let cfg = load_from(&p);
+        assert_eq!(cfg.config_version, CONFIG_VERSION);
+        assert_eq!(cfg.lang, "en");
+        assert!(cfg.polish);
+        assert_eq!(cfg.retention_days, 0, "retenção nasce desligada");
+        save_to(&p, &cfg).unwrap();
+        let text = std::fs::read_to_string(&p).unwrap();
+        assert!(
+            text.contains(&format!("config_version = {CONFIG_VERSION}")),
+            "{text}"
+        );
+        // Migrar de novo não faz nada.
+        let mut again = cfg.clone();
+        assert!(again.migrate().is_empty());
+        assert_eq!(again, cfg);
+        let _ = std::fs::remove_dir_all(p.parent().unwrap());
+    }
+
+    #[test]
+    fn config_de_versao_mais_nova_mantem_o_que_entende_e_desce_de_versao() {
+        let mut cfg: AppConfig =
+            toml::from_str("config_version = 99\nlang = \"en\"\ncampo_novo = \"x\"\n").unwrap();
+        let notes = cfg.migrate();
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].contains("mais nova"));
+        assert_eq!(cfg.config_version, CONFIG_VERSION);
+        assert_eq!(cfg.lang, "en");
+    }
+
+    #[test]
+    fn retencao_fora_da_lista_volta_a_desligada() {
+        let mut cfg = AppConfig {
+            retention_days: 45,
+            ..AppConfig::default()
+        };
+        cfg.normalize();
+        assert_eq!(cfg.retention_days, 0);
+        for days in RETENTION_DAYS {
+            let mut cfg = AppConfig {
+                retention_days: days,
+                ..AppConfig::default()
+            };
+            cfg.normalize();
+            assert_eq!(cfg.retention_days, days);
+        }
     }
 
     #[test]
