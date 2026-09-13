@@ -77,7 +77,15 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<S
 
     let audio_secs = raw.duration_secs();
     let samples = raw.into_whisper_input()?;
-    let t = engine.transcribe(&samples, &lang, prompt.as_deref())?;
+    // Métrica local: inferência (tempo e fator de tempo real) e falhas do motor.
+    let t = match engine.transcribe(&samples, &lang, prompt.as_deref()) {
+        Ok(t) => t,
+        Err(e) => {
+            record_event(EVENT_DICTATION, false, None, Some(audio_secs));
+            return Err(e.into());
+        }
+    };
+    record_event(EVENT_DICTATION, true, Some(t.infer_secs), Some(audio_secs));
     let raw_text = t.text.trim().to_string();
     if raw_text.is_empty() {
         anyhow::bail!("não entendi — tente de novo");

@@ -373,6 +373,11 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
     *state.config.lock_or_recover() = cfg.clone();
     state.audio.set_device(cfg.input_device.clone());
 
+    // Prazo de retenção novo (ou mais curto): aplica agora, em segundo plano.
+    if cfg.retention_days != 0 && cfg.retention_days != previous.retention_days {
+        sweep_in_background(&app);
+    }
+
     // Troca de modelo a quente: o antigo continua servindo até o novo carregar.
     if cfg.model != previous_model {
         load_engine_in_background(app.clone());
@@ -520,6 +525,14 @@ pub(crate) struct Diagnostics {
     exe_path: String,
     /// Variáveis de ambiente ausentes no processo (pastas então vêm da API do Windows).
     missing_env: Vec<String>,
+    /// Versão do schema do banco (`PRAGMA user_version`); `None` se ele não abriu.
+    db_schema: Option<i64>,
+    /// Tamanho do arquivo do banco, em bytes.
+    db_bytes: u64,
+    /// Retenção configurada, em dias (0 = para sempre).
+    retention_days: u32,
+    /// Métricas locais dos últimos 30 dias (ditado, blocos de reunião).
+    metrics: Vec<isper_core::store::KindMetrics>,
 }
 
 /// Raio-X para suporte: caminhos, modelo, DLLs do CUDA, dispositivos.
@@ -527,7 +540,25 @@ pub(crate) struct Diagnostics {
 pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
     let state = app.state::<AppState>();
     let engine = state.engine_status.lock_or_recover().clone();
-    let preferred = state.config.lock_or_recover().model.clone();
+    let (preferred, retention_days) = {
+        let cfg = state.config.lock_or_recover();
+        (cfg.model.clone(), cfg.retention_days)
+    };
+    let db_file = crate::paths::roaming_dir().map(|d| d.join("isper.db"));
+    let db_bytes = db_file
+        .as_ref()
+        .and_then(|p| std::fs::metadata(p).ok())
+        .map(|m| m.len())
+        .unwrap_or(0);
+    let (db_schema, metrics) = match open_store() {
+        Ok(store) => (
+            store.schema_version().ok(),
+            store
+                .metrics(local_now_ts() - METRICS_WINDOW_DAYS * 86_400)
+                .unwrap_or_default(),
+        ),
+        Err(_) => (None, Vec::new()),
+    };
     let model_path = isper_models::resolve_whisper_model(
         preferred.as_deref(),
         cfg!(feature = "cuda"),
@@ -558,9 +589,7 @@ pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
             .map(|p| p.display().to_string())
             .unwrap_or_default(),
         diarize_installed: isper_diarize::models_installed(),
-        db_path: crate::paths::roaming_dir()
-            .map(|d| d.join("isper.db").display().to_string())
-            .unwrap_or_default(),
+        db_path: db_file.map(|p| p.display().to_string()).unwrap_or_default(),
         config_path: config::path()
             .map(|p| p.display().to_string())
             .unwrap_or_default(),
@@ -574,6 +603,10 @@ pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
         cuda_dlls,
         exe_path: exe.map(|p| p.display().to_string()).unwrap_or_default(),
         missing_env: crate::paths::missing_env_vars(),
+        db_schema,
+        db_bytes,
+        retention_days,
+        metrics,
     }
 }
 

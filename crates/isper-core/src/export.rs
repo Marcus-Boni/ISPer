@@ -145,8 +145,9 @@ fn xml_escape(s: &str) -> String {
 }
 
 /// ZIP com método "store" (sem compressão): cabeçalhos locais, diretório
-/// central e EOCD. Data fixa (1980-01-01) para saída determinística.
-fn zip_store(entries: &[(&str, &[u8])]) -> Vec<u8> {
+/// central e EOCD. Data fixa (1980-01-01) para saída determinística. Serve ao
+/// DOCX e ao pacote de diagnóstico do app — qualquer descompactador o lê.
+pub fn zip_store(entries: &[(&str, &[u8])]) -> Vec<u8> {
     const DOS_TIME: u16 = 0;
     const DOS_DATE: u16 = 0x0021;
     let mut out: Vec<u8> = Vec::new();
