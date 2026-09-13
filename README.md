@@ -434,16 +434,33 @@ ISPers instalados aceitam: faça backup dela e não a compartilhe. Se ela se
 perder, gere outra e publique uma versão com a nova pública — quem já tem o app
 instalado reinstala uma vez.
 
-**Assinatura de código (SmartScreen)**: o instalador não tem certificado
+**Política de assinatura de código**: o instalador ainda não tem certificado
 Authenticode, então o Windows avisa na primeira execução ("Mais informações →
 Executar assim mesmo"). A assinatura minisign protege a integridade das
-*atualizações*; não substitui o certificado. Para tirar o aviso é preciso um
-certificado de assinatura de código — o caminho mais barato hoje é o Azure
-Trusted Signing (assinatura por API, sem token físico); com ele, configure
-`bundle.windows.signCommand` no `tauri.conf.json` (ou `certificateThumbprint`
-+ `timestampUrl` para um certificado no repositório de certificados do
-Windows) e o `tauri build` passa a assinar exe e instalador. A reputação no
-SmartScreen ainda leva alguns downloads para se firmar.
+*atualizações* e o `SHA256SUMS.txt` de cada release permite conferir o
+download; nenhum dos dois substitui o certificado. O caminho escolhido é o
+programa para projetos open source da **SignPath Foundation** (candidatura em
+andamento; o job `sign` do [`release.yml`](.github/workflows/release.yml) já
+está pronto e é pulado até a aprovação), começando pela variante CPU — a GPU
+embute as DLLs redistribuíveis do CUDA. Quando aprovado, cada release passa a
+ser assinada no pipeline da SignPath, a partir do build feito nos runners do
+GitHub e depois de aprovação manual do mantenedor. Nos termos da Foundation:
+
+- *Free code signing provided by [SignPath.io](https://signpath.io),
+  certificate by [SignPath Foundation](https://signpath.org).*
+- **Equipe** — committers e reviewers: Marcus Boni
+  ([@Marcus-Boni](https://github.com/Marcus-Boni)); approvers: Marcus Boni.
+  Contribuições externas entram só por pull request revisado, com os três
+  checks do CI verdes ([CONTRIBUTING.md](CONTRIBUTING.md)).
+- **Privacidade** — *This program will not transfer any information to other
+  networked systems unless specifically requested by the user.* Na prática: o
+  áudio e as transcrições nunca saem da máquina; a verificação de atualização
+  consulta as releases do GitHub (desligável em Configurações → Sistema); só o
+  texto que você pedir para resumir vai ao provedor de IA que você mesmo
+  configurar, e só se configurar um. Detalhes em [SECURITY.md](SECURITY.md).
+
+A reputação no SmartScreen se forma com o tempo, a partir do certificado; a
+assinatura não elimina o aviso de imediato.
 
 ## Logs e diagnóstico
 
