@@ -24,6 +24,19 @@ use crate::{IsperError, Result, WhisperEngine, audio, loopback};
 /// "ao vivo": chega com o atraso de um bloco (~20 s) + a inferência.
 pub type SegmentSink = Arc<dyn Fn(&MeetingSegment) + Send + Sync>;
 
+/// Um bloco de áudio que passou pelo Whisper (ou falhou), para métricas locais.
+#[derive(Debug, Clone, Copy)]
+pub struct BlockStats {
+    pub speaker: Speaker,
+    /// Duração do áudio do bloco, em segundos.
+    pub block_secs: f32,
+    /// Quanto a inferência levou; `None` = o bloco falhou.
+    pub infer_secs: Option<f32>,
+}
+
+/// Chamado a cada bloco transcrito ou que falhou ([`BlockStats`]).
+pub type BlockSink = Arc<dyn Fn(&BlockStats) + Send + Sync>;
+
 /// Opções de uma gravação de reunião.
 #[derive(Clone)]
 pub struct MeetingOptions {
@@ -35,6 +48,9 @@ pub struct MeetingOptions {
     pub input_device: Option<String>,
     /// Chamado a cada segmento transcrito durante a gravação.
     pub on_segment: Option<SegmentSink>,
+    /// Chamado a cada bloco transcrito (ou que falhou): duração do áudio e
+    /// tempo de inferência, para as métricas locais do app.
+    pub on_block: Option<BlockSink>,
     /// Dicionário pessoal: além de virar `initial_prompt`, corrige por
     /// semelhança o que o Whisper ainda errar ([`crate::text::apply_dictionary`]).
     pub dictionary: Vec<String>,
@@ -417,6 +433,7 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
         source,
         input_device,
         on_segment,
+        on_block,
         dictionary,
     } = opts;
 
@@ -457,16 +474,15 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
     // O worker termina quando os DOIS capturadores largarem o canal de jobs.
     drop(job_tx);
 
+    let worker_opts = TranscribeOptions {
+        lang,
+        initial_prompt,
+        dictionary,
+        on_segment,
+        on_block,
+    };
     std::thread::spawn(move || {
-        let result = transcribe_worker(
-            engine,
-            lang,
-            initial_prompt,
-            on_segment,
-            dictionary,
-            job_rx,
-            started,
-        );
+        let result = transcribe_worker(engine, worker_opts, job_rx, started);
         let _ = done_tx.send(result);
     });
 
@@ -840,16 +856,29 @@ fn quiet_cut(buf: &[f32], sample_rate: u32, ch: usize) -> usize {
     best_frame * ch
 }
 
+/// O que o worker de transcrição usa das opções (o resto é da captura).
+struct TranscribeOptions {
+    lang: String,
+    initial_prompt: Option<String>,
+    dictionary: Vec<String>,
+    on_segment: Option<SegmentSink>,
+    on_block: Option<BlockSink>,
+}
+
 /// Consome os blocos dos dois canais e monta a lista final de segmentos.
 fn transcribe_worker(
     engine: Arc<WhisperEngine>,
-    lang: String,
-    initial_prompt: Option<String>,
-    on_segment: Option<SegmentSink>,
-    dictionary: Vec<String>,
+    opts: TranscribeOptions,
     job_rx: Receiver<Job>,
     started: Instant,
 ) -> Result<MeetingResult> {
+    let TranscribeOptions {
+        lang,
+        initial_prompt,
+        dictionary,
+        on_segment,
+        on_block,
+    } = opts;
     let mut segments: Vec<MeetingSegment> = Vec::new();
     let mut others_blocks: Vec<AudioBlock> = Vec::new();
     // Sem arquivo temporário a reunião segue normalmente — só a identificação
@@ -901,6 +930,13 @@ fn transcribe_worker(
                     infer_secs = t.infer_secs,
                     "bloco transcrito"
                 );
+                if let Some(sink) = &on_block {
+                    sink(&BlockStats {
+                        speaker,
+                        block_secs,
+                        infer_secs: Some(t.infer_secs),
+                    });
+                }
                 for seg in t.segments {
                     if seg.text.is_empty() {
                         continue;
@@ -922,7 +958,16 @@ fn transcribe_worker(
                     segments.push(seg);
                 }
             }
-            Err(e) => tracing::warn!("bloco falhou: {e}"),
+            Err(e) => {
+                tracing::warn!("bloco falhou: {e}");
+                if let Some(sink) = &on_block {
+                    sink(&BlockStats {
+                        speaker,
+                        block_secs,
+                        infer_secs: None,
+                    });
+                }
+            }
         }
     }
     segments.sort_by(|a, b| a.start_secs.total_cmp(&b.start_secs));

@@ -224,6 +224,19 @@
     <label class="switch"><input type="checkbox" id="autoupdate"><span class="track"><span class="thumb"></span></span>Avisar quando houver versão nova (ao abrir e uma vez por dia)</label>
   </div>
   <p class="hint">No início com o Windows o ISPer nasce quieto na bandeja; a tela Início também abre com um clique no ícone da bandeja.</p>
+  <label class="lbl" for="retention">Guardar reuniões e ditados por</label>
+  <select id="retention" class="field">
+    <option value="0">Para sempre (padrão)</option>
+    <option value="30">30 dias</option>
+    <option value="90">90 dias</option>
+    <option value="180">180 dias</option>
+    <option value="365">1 ano</option>
+  </select>
+  <p class="hint">Transcrições são dados pessoais seus e de quem participou (LGPD). Com um prazo, o ISPer apaga do banco e da pasta de Reuniões o que passou dele — ao abrir e uma vez por dia. Não há lixeira: faça um backup antes de encurtar o prazo.</p>
+  <div class="row">
+    <button class="btn btn-sm flex-none" id="backupdb">Fazer backup do banco</button>
+    <span class="hint m0">Cópia íntegra do banco (reuniões, ditados, índice semântico) em <code>Documentos\ISPer\Backups</code>, mesmo com o app aberto. Para restaurar: feche o ISPer e copie o arquivo por cima de <code>%APPDATA%\ISPer\isper.db</code>.</span>
+  </div>
   <label class="lbl">Atualizações</label>
   <div class="row">
     <button class="btn btn-sm flex-none" id="checkupd">Verificar agora</button>
@@ -236,8 +249,9 @@
   <div id="diag" class="diag"><div class="skeleton sk-line w60"></div></div>
   <div class="row mt10">
     <button class="btn btn-sm flex-none" id="copydiag">Copiar diagnóstico</button>
+    <button class="btn btn-sm flex-none" id="exportdiag">Exportar diagnóstico (.zip)</button>
     <button class="btn btn-sm btn-ghost flex-none" id="openlogs">Abrir pasta de logs</button>
-    <span class="hint m0">Os logs ficam em <code>%LOCALAPPDATA%\com.isper.desktop\logs</code> (um arquivo por dia, 14 dias). Ao pedir ajuda, mande o diagnóstico e o log do dia.</span>
+    <span class="hint m0">Os logs ficam em <code>%LOCALAPPDATA%\com.isper.desktop\logs</code> (um arquivo JSON por dia, 14 dias). Ao pedir ajuda, mande o .zip exportado: diagnóstico, configurações (sem chaves), versões, métricas e os três últimos logs — as linhas com texto ditado saem antes. Nada disso é enviado sozinho.</span>
   </div>
 </div>
 
@@ -339,6 +353,7 @@
       embProviderChanged();
       $('showhome').checked = s.show_home_on_launch !== false;
       $('autoupdate').checked = s.auto_update_check !== false;
+      $('retention').value = String(s.retention_days || 0);
       $('curver').textContent = s.version || '?';
       currentVersion = s.version || '?';
       $('autostart').checked = !!s.autostart;
@@ -516,6 +531,7 @@
         after_meeting: $('after').value,
         voice_commands: $('voicecmd').checked,
         auto_update_check: $('autoupdate').checked,
+        retention_days: Number($('retention').value) || 0,
         call_detect: $('calldetect').value,
         live_insights: $('insights').checked,
         insights_interval_min: Number($('insint').value) || 5,
@@ -612,7 +628,17 @@
     add('Microfones', d.input_devices.length ? d.input_devices.join(' · ') : '(nenhum detectado)', d.input_devices.length ? '' : 'bad');
     add('Executável', d.exe_path);
     add('Modelos', d.models_dir);
-    add('Banco', d.db_path);
+    const fmtBytes = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+    const fmtSecs = (s) => s == null ? '—' : s < 1 ? Math.round(s * 1000) + ' ms' : s.toFixed(1) + ' s';
+    add('Banco', d.db_path + (d.db_schema != null ? ' · schema v' + d.db_schema : '') + (d.db_bytes ? ' · ' + fmtBytes(d.db_bytes) : ''));
+    add('Retenção', d.retention_days ? 'apaga o que passar de ' + d.retention_days + ' dias' : 'guarda para sempre');
+    for (const m of (d.metrics || [])) {
+      const name = m.kind === 'dictation' ? 'Ditados (30 dias)' : m.kind === 'meeting_block' ? 'Blocos de reunião (30 dias)' : m.kind + ' (30 dias)';
+      const rate = m.total ? Math.round(m.errors / m.total * 1000) / 10 : 0;
+      const lat = m.p50_secs != null ? ' · inferência p50 ' + fmtSecs(m.p50_secs) + ' · p95 ' + fmtSecs(m.p95_secs) : '';
+      const rtf = m.p50_rtf ? ' · ' + (1 / m.p50_rtf).toFixed(1) + '× tempo real' : '';
+      add(name, m.total + (m.total === 1 ? ' evento' : ' eventos') + ' · ' + m.errors + (m.errors === 1 ? ' falha' : ' falhas') + ' (' + rate + ' %)' + lat + rtf, rate > 10 ? 'bad' : '');
+    }
     add('Config', d.config_path);
     add('Logs', d.logs_dir);
     add('Reuniões', d.meetings_dir);
@@ -624,6 +650,18 @@
     catch (_) { status('não consegui copiar', 'err'); }
   });
   $('openlogs').addEventListener('click', () => invoke('open_logs_folder').catch(e => status('erro: ' + e, 'err')));
+  $('exportdiag').addEventListener('click', async () => {
+    const b = $('exportdiag');
+    UI.busy(b, true);
+    try { const p = await invoke('export_diagnostics'); UI.busy(b, false); UI.flash(b, 'exportado ✓'); status('diagnóstico exportado em ' + p, 'ok'); }
+    catch (e) { UI.busy(b, false); status('exportação falhou: ' + e, 'err'); }
+  });
+  $('backupdb').addEventListener('click', async () => {
+    const b = $('backupdb');
+    UI.busy(b, true);
+    try { const p = await invoke('backup_database'); UI.busy(b, false); UI.flash(b, 'pronto ✓'); status('backup gravado em ' + p, 'ok'); }
+    catch (e) { UI.busy(b, false); status('backup falhou: ' + e, 'err'); }
+  });
   $('notifytest').addEventListener('click', async () => {
     const b = $('notifytest');
     UI.busy(b, true);

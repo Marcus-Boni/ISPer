@@ -87,6 +87,15 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
         }
         let _ = live_app.emit("isper-live", &item);
     });
+    // Cada bloco que passa pelo Whisper vira uma métrica local (Diagnóstico).
+    let on_block: meeting::BlockSink = Arc::new(|b: &meeting::BlockStats| {
+        record_event(
+            EVENT_MEETING_BLOCK,
+            b.infer_secs.is_some(),
+            b.infer_secs,
+            Some(b.block_secs),
+        );
+    });
     let opts = {
         let cfg = state.config.lock_or_recover();
         MeetingOptions {
@@ -95,6 +104,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             source: LoopbackSource::parse(&cfg.meeting_source),
             input_device: cfg.input_device.clone(),
             on_segment: Some(on_segment),
+            on_block: Some(on_block),
             dictionary: cfg.dictionary.clone(),
         }
     };

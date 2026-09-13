@@ -14,6 +14,7 @@
 
 mod calls;
 mod config;
+mod data;
 mod dictation;
 mod home;
 mod insights;
@@ -40,8 +41,14 @@ use isper_core::recorder::{self, RecorderEvent};
 
 use crate::prelude::*;
 
+/// Logs em arquivo com mais de tantos dias são apagados ao iniciar.
+const LOG_KEEP_DAYS: u64 = 14;
+
 /// Log no stdout (útil no terminal) E em arquivo com rotação diária: o exe é
-/// `windows_subsystem`, então sem o arquivo ninguém vê um aviso sequer.
+/// `windows_subsystem`, então sem o arquivo ninguém vê um aviso sequer. O
+/// arquivo sai em JSON Lines (um objeto por linha, campos no nível de cima:
+/// `timestamp`, `level`, `message` e os campos estruturados do evento) — dá
+/// para filtrar com PowerShell ou jq e é o que vai no pacote de diagnóstico.
 /// O guard devolvido precisa viver até o fim do `main` (descarrega o buffer).
 pub(crate) fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGuard> {
     use tracing_subscriber::EnvFilter;
@@ -58,9 +65,9 @@ pub(crate) fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGua
             .init();
         return None;
     };
-    // Retenção: apaga logs com mais de 14 dias.
+    // Retenção: apaga logs com mais de LOG_KEEP_DAYS dias.
     if let Ok(entries) = std::fs::read_dir(&dir) {
-        let cutoff = std::time::SystemTime::now() - Duration::from_secs(14 * 24 * 3600);
+        let cutoff = std::time::SystemTime::now() - Duration::from_secs(LOG_KEEP_DAYS * 24 * 3600);
         for e in entries.flatten() {
             let old = e
                 .metadata()
@@ -75,6 +82,10 @@ pub(crate) fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGua
     let file = tracing_appender::rolling::daily(&dir, "isper.log");
     let (writer, guard) = tracing_appender::non_blocking(file);
     let file_layer = tracing_subscriber::fmt::layer()
+        .json()
+        .flatten_event(true)
+        .with_current_span(false)
+        .with_span_list(false)
         .with_target(false)
         .with_ansi(false)
         .with_writer(writer);
@@ -183,6 +194,8 @@ fn main() {
             export_meeting,
             open_logs_folder,
             diagnostics,
+            export_diagnostics,
+            backup_database,
             notify_test,
             home_status,
             toggle_meeting_cmd,
@@ -392,6 +405,9 @@ fn main() {
 
             // Versão nova? Só consulta (e só se o usuário deixou); instalar é um clique.
             schedule_background_checks(app.handle());
+
+            // Retenção (LGPD): apaga o que passou do prazo escolhido — ao abrir e uma vez por dia.
+            schedule_retention(app.handle());
 
             // Chamada do Teams em andamento? → "Gravar transcrição?" (ou grava sozinho).
             start_call_watcher(app.handle().clone());
