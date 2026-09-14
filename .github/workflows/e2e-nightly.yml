@@ -59,7 +59,7 @@ jobs:
           cache-on-failure: true
 
       # O cdp.mjs usa o WebSocket global do Node 22.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -204,7 +204,7 @@ jobs:
 
       - name: Log do ISPer (para investigar uma falha)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: isper-logs
           path: ${{ env.ISPER_LOGS }}
