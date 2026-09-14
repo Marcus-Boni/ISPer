@@ -31,7 +31,10 @@ bata com ela.
   - **Retenção** (Configurações → Sistema → *Guardar reuniões e ditados por*):
     30, 90, 180 dias ou 1 ano — o ISPer apaga do banco e da pasta de Reuniões
     o que passou do prazo, ao abrir, uma vez por dia e ao encurtar o prazo.
-    Padrão: para sempre, como antes.
+    **O padrão é para sempre**, como sempre foi: nada é apagado sem que o
+    usuário escolha um prazo e confirme na tela; antes de apagar, um backup
+    automático do banco é gravado em `Documentos\ISPer\Backups` (ficam os três
+    últimos).
   - **Backup do banco** com um clique (`Documentos\ISPer\Backups\isper-<data>.db`,
     cópia íntegra mesmo com o app aberto) e instrução de restauração.
   - **Exportar diagnóstico**: um `.zip` em `Documentos\ISPer` com o

@@ -583,6 +583,22 @@ impl MeetingStore {
         })
     }
 
+    /// Quantas reuniões e quantos ditados uma varredura com este corte
+    /// apagaria — para o app decidir se faz um backup antes.
+    pub fn count_older_than(&self, cutoff_ts: i64) -> Result<(i64, i64)> {
+        let meetings: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM meetings WHERE started_ts IS NOT NULL AND started_ts < ?1",
+            params![cutoff_ts],
+            |r| r.get(0),
+        )?;
+        let dictations: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM dictations WHERE at_ts IS NOT NULL AND at_ts < ?1",
+            params![cutoff_ts],
+            |r| r.get(0),
+        )?;
+        Ok((meetings, dictations))
+    }
+
     /// Cópia íntegra e compactada do banco em `dest` (`VACUUM INTO`): funciona
     /// com o app aberto e outras conexões escrevendo, sem parar nada. `dest`
     /// não pode existir — o SQLite não sobrescreve.
@@ -1176,6 +1192,7 @@ mod tests {
             .save_dictation("10/09/2026 10:05:00", "recente", None, 1.0, 0.5)
             .unwrap();
         let cutoff = parse_local_stamp("01/09/2026 00:00").unwrap();
+        assert_eq!(store.count_older_than(cutoff).unwrap(), (1, 1));
         let purged = store.purge_older_than(cutoff).unwrap();
         assert_eq!(purged.meetings.len(), 1);
         assert_eq!(purged.meetings[0].id, old);
@@ -1201,6 +1218,7 @@ mod tests {
             again.meetings.is_empty() && again.dictations == 0,
             "segunda passada não acha nada"
         );
+        assert_eq!(store.count_older_than(cutoff).unwrap(), (0, 0));
     }
 
     #[test]

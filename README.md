@@ -486,10 +486,13 @@ e `llm.toml` (sem chaves), as métricas e os três últimos logs — as linhas c
 texto ditado saem antes. É o que mandar ao pedir ajuda; nada é enviado sozinho.
 
 **Dados** (Configurações → Sistema): "Guardar reuniões e ditados por" define
-a retenção — 30, 90, 180 dias ou 1 ano (padrão: para sempre). Com um prazo, o
-ISPer apaga do banco e da pasta de Reuniões o que passou dele, ao abrir, uma
-vez por dia e ao encurtar o prazo (LGPD: guardar só o necessário; não há
-lixeira). "Fazer backup do banco" grava uma cópia íntegra em
+a retenção — 30, 90, 180 dias ou 1 ano. **O padrão é para sempre**: nada é
+apagado sem você escolher um prazo e confirmar na tela. Com um prazo, o ISPer
+apaga do banco e da pasta de Reuniões o que passou dele, ao abrir, uma vez
+por dia e ao encurtar o prazo (LGPD: guardar só o necessário), e antes de
+apagar grava um backup automático em `Documentos\ISPer\Backups` (ficam os
+três últimos) — o que saiu continua recuperável. "Fazer backup do banco"
+grava uma cópia íntegra em
 `Documentos\ISPer\Backups`, mesmo com o app aberto; para restaurar, feche o
 ISPer e copie o arquivo por cima de `%APPDATA%\ISPer\isper.db`. O banco tem
 schema versionado (`PRAGMA user_version`): uma versão nova migra o banco

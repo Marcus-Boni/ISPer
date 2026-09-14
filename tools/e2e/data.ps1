@@ -41,6 +41,11 @@ $before = [int]$s.retention_days
 $sel = EvJson 'settings.html' 'JSON.stringify({ options: Array.from(document.querySelectorAll("#retention option")).map(o => o.value), value: document.getElementById("retention").value })'
 Check ($null -ne $sel -and ($sel.options -join ',') -eq '0,30,90,180,365') "select de retencao com as opcoes 0/30/90/180/365"
 Check ([string]$sel.value -eq [string]$before) "select de retencao reflete a config ($before dias)"
+# Escolher um prazo na tela pede confirmacao; cancelar volta ao valor salvo.
+$ui = EvJson 'settings.html' 'JSON.stringify((() => { const s = document.getElementById("retention"); s.value = "30"; s.dispatchEvent(new Event("change")); return { shown: !document.getElementById("retconfirm").hidden, text: document.getElementById("retconfirmtext").textContent }; })())'
+Check ($null -ne $ui -and $ui.shown -and $ui.text -like '*30 dias*') "escolher 30 dias na tela mostra o aviso de confirmacao"
+$ui2 = EvJson 'settings.html' 'JSON.stringify((() => { document.getElementById("retno").click(); return { shown: !document.getElementById("retconfirm").hidden, value: document.getElementById("retention").value }; })())'
+Check ($null -ne $ui2 -and -not $ui2.shown -and [string]$ui2.value -eq [string]$before) "Cancelar esconde o aviso e volta o select para $before"
 $patch = @{
   shortcut = $s.shortcut; lang = $s.lang; dictionary = $s.dictionary; model = $s.model
   meeting_source = $s.meeting_source; llm_provider = $s.llm_provider; llm_model = $s.llm_model

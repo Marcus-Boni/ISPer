@@ -67,9 +67,11 @@ sessão aberta na máquina, e o comportamento das APIs de IA de terceiros.
   (`ISPer_<v>_sbom.cdx.json` — todos os crates e versões que entram no
   binário) e `SHA256SUMS.txt`. Como conferir um download está em
   [`docs/RELEASE.md`](docs/RELEASE.md).
-- **Guardar só o necessário**: a retenção (Configurações → Sistema) apaga
-  reuniões e ditados com mais de 30, 90, 180 ou 365 dias — do banco e da
-  pasta de Reuniões —, e o backup do banco é um clique. Transcrições são
+- **Guardar só o necessário, sem surpresas**: a retenção (Configurações →
+  Sistema) apaga reuniões e ditados com mais de 30, 90, 180 ou 365 dias — do
+  banco e da pasta de Reuniões. Vem **desligada** (para sempre), exige
+  confirmação na tela e grava um backup automático do banco antes de cada
+  varredura que apague algo; o backup manual é um clique. Transcrições são
   dados pessoais seus e de quem participou (LGPD).
 - **Sem telemetria**: as métricas de uso (quantos ditados, tempo de
   inferência, falhas) ficam no banco local e aparecem no Diagnóstico; nada é
