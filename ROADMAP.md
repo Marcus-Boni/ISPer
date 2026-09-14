@@ -7,7 +7,7 @@
 
 ---
 
-## Estado atual — 13/09/2026 · v0.14.0 publicada (fases 7.1 e 7.2) · 7.3 e 7.4 em `main`, à espera da 0.15.0
+## Estado atual — 13/09/2026 · v0.15.0 (fases 7.1 a 7.4; 7.3 e 7.4 com 3 de 4)
 
 | Fase | Estado | Resumo |
 |---|---|---|

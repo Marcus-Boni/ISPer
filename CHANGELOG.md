@@ -11,6 +11,8 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-13
+
 ### Adicionado
 - Fase 7.3 (segurança e confiança do binário), primeira parte:
   - **Release no GitHub Actions** (`release.yml`): as duas variantes do
@@ -313,7 +315,10 @@ bata com ela.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.2...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.2...v0.13.0
 [0.12.2]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/Marcus-Boni/ISPer/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.11.1...v0.12.0
