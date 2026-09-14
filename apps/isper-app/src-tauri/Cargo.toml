@@ -52,7 +52,7 @@ sysinfo = "0.39"
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 # Toasts do Windows (mesma base do plugin oficial) + registro do nosso
 # AppUserModelID no HKCU para o exe "solto" aparecer como ISPer, com ícone.
-tauri-winrt-notification = "0.7"
+tauri-winrt-notification = "0.8"
 winreg = "0.55"
 
 [lints]
