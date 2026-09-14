@@ -232,7 +232,12 @@
     <option value="180">180 dias</option>
     <option value="365">1 ano</option>
   </select>
-  <p class="hint">Transcrições são dados pessoais seus e de quem participou (LGPD). Com um prazo, o ISPer apaga do banco e da pasta de Reuniões o que passou dele — ao abrir e uma vez por dia. Não há lixeira: faça um backup antes de encurtar o prazo.</p>
+  <div class="row" id="retconfirm" hidden>
+    <span class="hint m0 bad" id="retconfirmtext">Confirmar?</span>
+    <button class="btn btn-sm btn-primary flex-none" id="retyes">Sim, apagar o que passar do prazo</button>
+    <button class="btn btn-sm btn-ghost flex-none" id="retno">Cancelar</button>
+  </div>
+  <p class="hint">O padrão é <b>para sempre</b>: nada é apagado sem você escolher um prazo aqui e confirmar. Com um prazo, o ISPer apaga do banco e da pasta de Reuniões o que passou dele — ao abrir, uma vez por dia e ao encurtar o prazo —, e antes de apagar grava um backup automático em <code>Documentos\ISPer\Backups</code> (ficam os três últimos). Transcrições são dados pessoais seus e de quem participou (LGPD).</p>
   <div class="row">
     <button class="btn btn-sm flex-none" id="backupdb">Fazer backup do banco</button>
     <span class="hint m0">Cópia íntegra do banco (reuniões, ditados, índice semântico) em <code>Documentos\ISPer\Backups</code>, mesmo com o app aberto. Para restaurar: feche o ISPer e copie o arquivo por cima de <code>%APPDATA%\ISPer\isper.db</code>.</span>
@@ -354,6 +359,8 @@
       $('showhome').checked = s.show_home_on_launch !== false;
       $('autoupdate').checked = s.auto_update_check !== false;
       $('retention').value = String(s.retention_days || 0);
+      retentionSaved = String(s.retention_days || 0);
+      $('retconfirm').hidden = true;
       $('curver').textContent = s.version || '?';
       currentVersion = s.version || '?';
       $('autostart').checked = !!s.autostart;
@@ -531,7 +538,8 @@
         after_meeting: $('after').value,
         voice_commands: $('voicecmd').checked,
         auto_update_check: $('autoupdate').checked,
-        retention_days: Number($('retention').value) || 0,
+        // Um prazo escolhido mas não confirmado não vale: volta ao salvo.
+        retention_days: ($('retconfirm').hidden ? Number($('retention').value) : Number(retentionSaved)) || 0,
         call_detect: $('calldetect').value,
         live_insights: $('insights').checked,
         insights_interval_min: Number($('insint').value) || 5,
@@ -612,6 +620,8 @@
 
   // ---- diagnóstico (Sistema)
   let diagText = '';
+  // Prazo de retenção como está salvo (string do select); muda só depois de Salvar.
+  let retentionSaved = '0';
   async function loadDiagnostics() {
     let d;
     try { d = await invoke('diagnostics'); } catch (e) { $('diag').replaceChildren(el('span', 'hint', 'indisponível: ' + e)); return; }
@@ -656,6 +666,17 @@
     try { const p = await invoke('export_diagnostics'); UI.busy(b, false); UI.flash(b, 'exportado ✓'); status('diagnóstico exportado em ' + p, 'ok'); }
     catch (e) { UI.busy(b, false); status('exportação falhou: ' + e, 'err'); }
   });
+  // ---- retenção: escolher um prazo pede confirmação explícita (não há lixeira;
+  // o backup automático antes de apagar é a rede de segurança, não a permissão).
+  const retentionLabel = (v) => ({ '30': '30 dias', '90': '90 dias', '180': '180 dias', '365': '1 ano' })[v] || v + ' dias';
+  $('retention').addEventListener('change', () => {
+    const v = $('retention').value;
+    if (v === '0' || v === retentionSaved) { $('retconfirm').hidden = true; return; }
+    $('retconfirmtext').textContent = 'Reuniões e ditados com mais de ' + retentionLabel(v) + ' serão apagados do banco e da pasta de Reuniões (com um backup automático antes). Confirmar?';
+    $('retconfirm').hidden = false;
+  });
+  $('retyes').addEventListener('click', () => { $('retconfirm').hidden = true; status('prazo de ' + retentionLabel($('retention').value) + ' escolhido — clique em Salvar para valer', 'ok'); });
+  $('retno').addEventListener('click', () => { $('retention').value = retentionSaved; $('retconfirm').hidden = true; });
   $('backupdb').addEventListener('click', async () => {
     const b = $('backupdb');
     UI.busy(b, true);

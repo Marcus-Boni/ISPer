@@ -31,6 +31,12 @@ const SWEEP_EVERY: Duration = Duration::from_secs(24 * 3600);
 /// Logs incluídos no pacote de diagnóstico (os mais recentes).
 const DIAG_LOG_FILES: usize = 3;
 
+/// Backups automáticos da retenção que ficam guardados (os mais recentes).
+const RETENTION_BACKUPS_KEEP: usize = 3;
+
+/// Prefixo dos backups automáticos que a retenção grava antes de apagar.
+const RETENTION_BACKUP_PREFIX: &str = "isper-antes-da-retencao-";
+
 /// Registra um evento de métrica (`kind`, sucesso, inferência, áudio). Falha
 /// só vai ao log em `debug`: métrica nunca atrasa nem derruba o fluxo.
 pub(crate) fn record_event(kind: &str, ok: bool, secs: Option<f32>, audio_secs: Option<f32>) {
@@ -48,7 +54,10 @@ pub(crate) fn record_event(kind: &str, ok: bool, secs: Option<f32>, audio_secs: 
 
 /// Aplica a política de retenção uma vez: apaga do banco o que passou de
 /// `retention_days` e, em disco, o Markdown de cada reunião apagada (e os
-/// SRT/DOCX exportados ao lado dele). `Ok(None)` = retenção desligada.
+/// SRT/DOCX exportados ao lado dele). `Ok(None)` = retenção desligada — o
+/// padrão: nada some sem o usuário ter escolhido um prazo. Antes de apagar
+/// qualquer coisa, grava um backup automático do banco (os três últimos
+/// ficam em `Documentos\ISPer\Backups`): o que sair continua recuperável.
 pub(crate) fn retention_sweep(app: &AppHandle) -> anyhow::Result<Option<Purged>> {
     let days = app
         .state::<AppState>()
@@ -59,7 +68,20 @@ pub(crate) fn retention_sweep(app: &AppHandle) -> anyhow::Result<Option<Purged>>
         return Ok(None);
     }
     let cutoff = local_now_ts() - i64::from(days) * 86_400;
-    let purged = open_store()?.purge_older_than(cutoff)?;
+    let store = open_store()?;
+    let (old_meetings, old_dictations) = store.count_older_than(cutoff)?;
+    if old_meetings == 0 && old_dictations == 0 {
+        return Ok(Some(Purged::default()));
+    }
+    // Rede de segurança: sem backup, não apaga.
+    let backup = safety_backup(&store)?;
+    tracing::info!(
+        path = %backup.display(),
+        meetings = old_meetings,
+        dictations = old_dictations,
+        "backup automático antes da retenção"
+    );
+    let purged = store.purge_older_than(cutoff)?;
     let mut files = 0usize;
     for path in purged.meetings.iter().filter_map(|m| m.md_path.as_deref()) {
         files += remove_meeting_files(Path::new(path));
@@ -74,6 +96,45 @@ pub(crate) fn retention_sweep(app: &AppHandle) -> anyhow::Result<Option<Purged>>
         );
     }
     Ok(Some(purged))
+}
+
+/// Backup automático da retenção (`isper-antes-da-retencao-<data>.db`), com
+/// os mais antigos além de [`RETENTION_BACKUPS_KEEP`] apagados.
+fn safety_backup(store: &isper_core::store::MeetingStore) -> anyhow::Result<PathBuf> {
+    let dir = docs_dir()?.join("Backups");
+    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+    let dest = dir.join(format!("{RETENTION_BACKUP_PREFIX}{stamp}.db"));
+    store.backup_to(&dest)?;
+    prune_backups(&dir, RETENTION_BACKUP_PREFIX, RETENTION_BACKUPS_KEEP);
+    Ok(dest)
+}
+
+/// Deixa só os `keep` arquivos mais recentes (pelo nome, que carrega a data)
+/// entre os que começam com `prefix`. Só toca nos backups automáticos — os
+/// que o usuário fez à mão têm outro nome e ficam.
+fn prune_backups(dir: &Path, prefix: &str, keep: usize) {
+    let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.file_name()
+                        .is_some_and(|f| f.to_string_lossy().starts_with(prefix))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    files.sort();
+    let excess = files.len().saturating_sub(keep);
+    for path in files.into_iter().take(excess) {
+        if let Err(e) = std::fs::remove_file(&path) {
+            tracing::warn!(
+                "não consegui apagar o backup antigo {}: {e}",
+                path.display()
+            );
+        }
+    }
 }
 
 /// Apaga o Markdown da reunião e as exportações com o mesmo nome (`.srt`,
@@ -335,6 +396,44 @@ mod tests {
         assert_eq!(remove_meeting_files(&md), 2, "md + srt; sem docx");
         assert!(!md.exists() && !md.with_extension("srt").exists());
         assert_eq!(remove_meeting_files(&md), 0, "já não há nada — sem erro");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn prune_backups_deixa_os_mais_novos_e_nao_toca_nos_manuais() {
+        let dir = std::env::temp_dir().join(format!("isper-data-prune-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for stamp in [
+            "20260901-100000",
+            "20260905-100000",
+            "20260910-100000",
+            "20260913-100000",
+        ] {
+            std::fs::write(
+                dir.join(format!("{RETENTION_BACKUP_PREFIX}{stamp}.db")),
+                "x",
+            )
+            .unwrap();
+        }
+        std::fs::write(dir.join("isper-20260801-090000.db"), "manual").unwrap();
+        prune_backups(&dir, RETENTION_BACKUP_PREFIX, 3);
+        let mut left: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        assert_eq!(
+            left,
+            vec![
+                "isper-20260801-090000.db",
+                "isper-antes-da-retencao-20260905-100000.db",
+                "isper-antes-da-retencao-20260910-100000.db",
+                "isper-antes-da-retencao-20260913-100000.db",
+            ]
+        );
+        prune_backups(&dir.join("nao-existe"), RETENTION_BACKUP_PREFIX, 3);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
