@@ -1,8 +1,10 @@
 # Plano de implementação — Portal oficial do ISPer
 
-**Data:** 15 de setembro de 2026.  
-**Estado:** proposta para revisão e aprovação; implementação não iniciada.  
-**Entregável desta etapa:** este documento. Nenhum código, dependência, configuração de aplicação ou deploy foi criado ou alterado.  
+**Data:** 15 de setembro de 2026.
+
+**Estado:** implementação local concluída em 16 de setembro de 2026; publicação no Cloudflare Pages depende das credenciais e do projeto configurados no GitHub.
+
+**Entregável inicial:** este documento foi aprovado antes da implementação; o portal resultante está isolado em `/website`.
 **Destino proposto:** `/website`, isolado do desktop; publicação estática em `https://<projeto>.pages.dev`. O nome depende da disponibilidade no Cloudflare.
 
 **Leitura sugerida:** começar pelas decisões de revisão na seção 2.1, seguir para as seis fases na seção 13 e conferir a definição de pronto na seção 16. As seções intermediárias especificam a execução e os contratos de cada área.
