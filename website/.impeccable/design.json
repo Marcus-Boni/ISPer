@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-16T12:00:00-03:00",
+  "title": "Design System: ISPer Portal",
+  "extensions": {
+    "colorMeta": {
+      "warm-void": { "role": "neutral", "displayName": "Warm Void", "canonical": "#161311", "tonalRamp": ["#110f0e", "#161311", "#1b1714", "#1e1a18"] },
+      "terracotta": { "role": "primary", "displayName": "Terracotta Coral", "canonical": "#f07e72", "tonalRamp": ["#7a3f39", "#c5665c", "#f07e72", "#f79f94"] },
+      "ivory": { "role": "neutral", "displayName": "Soft Ivory", "canonical": "#ece7e1", "tonalRamp": ["#7e756e", "#a79e96", "#d3cbc3", "#ece7e1"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Editorial Display", "purpose": "Landing thesis and major section transitions." },
+      "body": { "displayName": "Readable Interface", "purpose": "Controls, product copy and documentation." }
+    },
+    "shadows": [
+      { "name": "panel-float", "value": "0 30px 80px -60px rgba(0,0,0,0.85)", "purpose": "Large floating product panels." },
+      { "name": "coral-action", "value": "0 18px 36px -24px rgba(240,126,114,0.9)", "purpose": "Primary action emphasis." }
+    ],
+    "motion": [
+      { "name": "state-fast", "value": "160ms ease", "purpose": "Hover and active state changes." },
+      { "name": "reveal", "value": "720ms power3.out", "purpose": "One-time section reveals." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "640px" },
+      { "name": "compact", "value": "980px" },
+      { "name": "wide-motion", "value": "1081px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main download or completion action.",
+      "html": "<button class=\"ds-btn-primary\">BAIXAR PARA WINDOWS</button>",
+      "css": ".ds-btn-primary{background:var(--accent);color:var(--accent-ink);padding:14px 20px;border:0;border-radius:12px;font:650 14px var(--font-hanken);box-shadow:0 18px 36px -24px rgba(240,126,114,.9);transition:background .16s,transform .16s}.ds-btn-primary:hover{background:var(--accent-2);transform:translateY(-1px)}.ds-btn-primary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "description": "Documentation or library search.",
+      "html": "<input class=\"ds-search\" placeholder=\"Buscar guias, CUDA, Teams...\">",
+      "css": ".ds-search{background:var(--bg-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:320px}.ds-search:focus{border-color:var(--accent);outline:2px solid rgba(240,126,114,.22);outline-offset:0}"
+    },
+    {
+      "name": "Product Panel",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Warm floating container for the app stage and release selector.",
+      "html": "<section class=\"ds-panel\">ISPer product content</section>",
+      "css": ".ds-panel{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:32px;box-shadow:0 30px 80px -60px rgba(0,0,0,.85)}"
+    },
+    {
+      "name": "Speaker Label",
+      "kind": "chip",
+      "description": "Speaker identity with both name and color.",
+      "html": "<span class=\"ds-speaker\">Participante 1</span>",
+      "css": ".ds-speaker{display:inline-flex;color:var(--p1);border:1px solid currentColor;border-radius:999px;padding:6px 10px;font:650 12px var(--font-hanken)}"
+    },
+    {
+      "name": "Sticky Header",
+      "kind": "nav",
+      "description": "Warm translucent global navigation.",
+      "html": "<nav class=\"ds-nav\"><strong>ISPer.</strong><a>Documentação</a><a>Download</a></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:28px;background:rgba(22,19,17,.9);color:var(--ink);border-bottom:1px solid var(--line);padding:16px 24px;backdrop-filter:blur(14px)}.ds-nav a:hover{color:var(--accent-2)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Warm Transcript Desk",
+    "overview": "A warm editorial interface that makes local processing tangible through real product states. Persuasion, operation and reading share one quiet visual grammar.",
+    "keyCharacteristics": ["Warm near-black surfaces", "Editorial Fraunces display", "Terracotta used sparingly", "Product UI as proof", "Motion with static fallback"],
+    "rules": [
+      { "name": "Scarce Coral", "body": "Reserve terracotta for action, active state and recording.", "section": "colors" },
+      { "name": "Named Speakers", "body": "Speaker color always accompanies a textual name.", "section": "colors" }
+    ],
+    "dos": ["Use actual product states as visual material.", "Keep unsupported features explicit.", "Preserve static content with reduced motion."],
+    "donts": ["Do not claim cloud summaries are local.", "Do not turn every section into equal icon cards.", "Do not hide docs behind mobile navigation."]
+  }
+}

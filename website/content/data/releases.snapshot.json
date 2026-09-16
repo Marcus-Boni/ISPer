@@ -1,0 +1,42 @@
+{
+  "repository": "Marcus-Boni/ISPer",
+  "tag": "v0.15.0",
+  "version": "0.15.0",
+  "channel": "stable",
+  "publishedAt": "2026-09-14T02:43:29Z",
+  "fetchedAt": "2026-09-16T12:00:00.000Z",
+  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.15.0",
+  "notes": [
+    "Release reproduzível pelo GitHub Actions, com variantes CPU e CUDA, SBOM CycloneDX e somas SHA-256.",
+    "Retenção configurável, backup do banco, exportação de diagnóstico e métricas locais dos últimos 30 dias.",
+    "Logs em JSON Lines e banco com schema versionado e migrações transacionais."
+  ],
+  "assets": [
+    {
+      "name": "ISPer_0.15.0_x64-cpu-setup.exe",
+      "platform": "windows",
+      "arch": "x64",
+      "variant": "cpu",
+      "kind": "installer",
+      "sizeBytes": 9799797,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.15.0/ISPer_0.15.0_x64-cpu-setup.exe",
+      "sha256": "156006d82db972fb54f47ba86c953ceb833e533f1d2bcc4f96fae389e5f72f0d",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.15.0/SHA256SUMS.txt",
+      "authenticodeStatus": "not-signed",
+      "requirements": ["Windows 10/11 x64", "CPU moderna com AVX2 recomendado", "8 GB de RAM ou mais"]
+    },
+    {
+      "name": "ISPer_0.15.0_x64-setup.exe",
+      "platform": "windows",
+      "arch": "x64",
+      "variant": "cuda",
+      "kind": "installer",
+      "sizeBytes": 422760478,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.15.0/ISPer_0.15.0_x64-setup.exe",
+      "sha256": "17bca634736aa44249a213031532d05930fba4c8a09d778e75eacf28261cde9e",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.15.0/SHA256SUMS.txt",
+      "authenticodeStatus": "not-signed",
+      "requirements": ["Windows 10/11 x64", "GPU NVIDIA compatível com CUDA", "VRAM conforme modelo Whisper escolhido"]
+    }
+  ]
+}

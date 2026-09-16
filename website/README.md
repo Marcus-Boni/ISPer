@@ -1,34 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ISPer Website
 
-## Getting Started
+Portal estático oficial do ISPer, isolado do app desktop. O site usa Next.js App Router com `output: "export"` e publica o conteúdo final em `out/`, pronto para Cloudflare Pages sem runtime de servidor.
 
-First, run the development server:
+## Desenvolvimento
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+corepack enable
+corepack prepare pnpm@12.3.4 --activate
+pnpm install --frozen-lockfile
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+O desenvolvimento acontece dentro desta pasta. Não crie workspace Node na raiz do monorepo e não importe código runtime de `apps/isper-app`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Validação local
 
-## Learn More
+```bash
+node scripts/validate-content.mjs
+pnpm exec eslint .
+pnpm exec tsc --noEmit
+node scripts/prepare-content.mjs
+pnpm exec next build
+pnpm exec pagefind --site out
+node scripts/verify-export.mjs
+node scripts/check-links.mjs
+node scripts/check-budgets.mjs
+```
 
-To learn more about Next.js, take a look at the following resources:
+`next build` já gera o export estático em `out/` por causa de `output: "export"`. Os scripts de verificação usam APIs nativas do Node para manter a infraestrutura simples e reproduzível.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+O workflow `.github/workflows/website.yml` roda em PRs, em pushes para `main`, em releases publicadas e manualmente. O deploy de produção acontece apenas em push para `main` e somente quando estes segredos/variáveis existem no GitHub Actions:
 
-## Deploy on Vercel
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_PAGES_PROJECT_NAME` opcional, padrão `isper`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+O job de deploy usa o mesmo artefato `out/` validado no job de build. Se as credenciais Cloudflare estiverem ausentes, o workflow registra o skip no resumo e mantém os checks locais verdes.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Cloudflare Pages
+
+Configuração esperada:
+
+- Build command: `pnpm exec next build && pnpm exec pagefind --site out`
+- Diretório de saída: `out`
+- Node: `22`
+- Package manager: `pnpm@12.3.4`
+
+Os arquivos `public/_headers` e `public/_redirects` são copiados para `out/` pelo export e aplicados pelo Cloudflare Pages.
+
+## Orçamentos
+
+`scripts/check-budgets.mjs` mede a transferência inicial de cada rota representativa e falha quando JavaScript, CSS, HTML ou o total ultrapassam os limites definidos. Lighthouse fica configurado em `lighthouserc.cjs`; sua execução depende de disponibilizar `@lhci/cli` no ambiente de qualidade.

@@ -1,79 +1,86 @@
+import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { ArrowRight, AudioLines, BookOpen, BrainCircuit, Check, Code2, Download, Keyboard, LockKeyhole, Mic2, Search, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { CopyCommand } from "@/components/landing/copy-command";
+import { InteractiveStage } from "@/components/landing/interactive-stage";
+import { RevealEffects } from "@/components/landing/reveal-effects";
 import { siteConfig } from "@/lib/site";
 
+const BenchmarkChart = dynamic(() => import("@/components/landing/benchmark-chart").then((module) => module.BenchmarkChart), {
+  loading: () => <div className="benchmark-panel chart-placeholder" aria-label="Carregando visualização dos benchmarks" />,
+});
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
+
+const faq = [
+  ["O áudio sai do meu computador?", "A transcrição e a diarização rodam no Windows. Se você ativar um provedor de IA para resumos, o texto necessário é enviado ao provedor escolhido; o áudio não é enviado para transcrição."],
+  ["Preciso de uma GPU NVIDIA?", "Não. A edição CPU funciona sem GPU dedicada. A edição CUDA acelera modelos maiores em hardware NVIDIA compatível."],
+  ["Funciona com o Microsoft Teams?", "Sim. O ISPer usa o loopback de processo do Windows para capturar o áudio da chamada e combina esse canal com o seu microfone."],
+  ["O ISPer tem mensalidade?", "Não. O software é open source sob licença MIT. Serviços opcionais de IA podem ter custos próprios conforme o provedor configurado."],
+];
+
 export default function Home() {
+  const softwareSchema = {
+    "@context": "https://schema.org", "@type": "SoftwareApplication", name: "ISPer", applicationCategory: "BusinessApplication", operatingSystem: "Windows 10, Windows 11", softwareVersion: siteConfig.currentVersion.replace("v", ""), description: siteConfig.description, url: siteConfig.url, downloadUrl: siteConfig.latestRelease, license: `${siteConfig.repository}/blob/main/LICENSE`, offers: { "@type": "Offer", price: "0", priceCurrency: "BRL" },
+  };
+  const faqSchema = { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faq.map(([question, answer]) => ({ "@type": "Question", name: question, acceptedAnswer: { "@type": "Answer", text: answer } })) };
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-6 py-20">
-      <div className="w-full max-w-3xl border border-[var(--line)] bg-[var(--panel)]/80 backdrop-blur-md rounded-2xl p-8 sm:p-12 shadow-2xl relative overflow-hidden">
-        {/* Glow ambient highlight */}
-        <div
-          className="absolute -top-24 -right-24 w-60 h-60 rounded-full bg-[var(--accent)]/15 blur-3xl pointer-events-none"
-          aria-hidden="true"
-        />
+    <main id="conteudo">
+      <RevealEffects />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema).replace(/</g, "\\u003c") }} />
 
-        {/* Brand & status badge */}
-        <div className="flex items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-3">
-            <span className="font-display text-2xl font-bold tracking-tight text-[var(--ink)]">
-              ISPer<span className="text-[var(--accent)]">.</span>
-            </span>
-            <span className="text-xs font-mono px-2.5 py-0.5 rounded-full border border-[var(--line)] text-[var(--muted)]">
-              {siteConfig.currentVersion}
-            </span>
+      <section className="hero shell">
+        <div className="hero-copy">
+          <div className="hero-proof"><span><ShieldCheck aria-hidden="true" />Open source MIT</span><span>Windows · CPU e CUDA</span></div>
+          <h1>Suas palavras.<br /><em>No seu computador.</em></h1>
+          <p className="hero-lead">Dite em qualquer aplicativo e transcreva reuniões com IA local. Sem mensalidade e sem enviar seu áudio para uma API.</p>
+          <div className="hero-actions">
+            <Link className="button button-primary button-large" href="/download/"><Download aria-hidden="true" />Escolher instalador <span>{siteConfig.currentVersion}</span></Link>
+            <Link className="button button-secondary button-large" href="/docs/primeiros-passos/instalacao/"><BookOpen aria-hidden="true" />Ver instalação</Link>
           </div>
-
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--line)] bg-[var(--bg-2)] text-xs text-[var(--muted)]">
-            <span className="w-2 h-2 rounded-full bg-[var(--good)] animate-pulse" />
-            <span>Boilerplate Pronto</span>
-          </div>
+          <p className="hero-note">Sem bot na chamada · instalador x64 · CPU ou CUDA para NVIDIA</p>
+          <CopyCommand />
         </div>
+        <div className="hero-stage"><InteractiveStage /></div>
+      </section>
 
-        {/* Heading */}
-        <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-[var(--ink)] leading-[1.15] mb-6">
-          Transcrição com IA. <br />
-          <span className="text-[var(--accent)]">Local, privada e sem custos.</span>
-        </h1>
+      <section className="trust-strip" aria-label="Características essenciais">
+        <div className="shell trust-grid"><span><LockKeyhole />Transcrição local</span><span><Mic2 />Ditado em qualquer app</span><span><Users />Falantes separados</span><span><Search />Histórico pesquisável</span></div>
+      </section>
 
-        <p className="text-[var(--ink-2)] text-base sm:text-lg leading-relaxed mb-8 max-w-2xl">
-          Ambiente base preparado com as melhores práticas de engenharia: Next.js 16 (App Router),
-          TypeScript, Tailwind CSS v4, shadcn/ui, Lenis, GSAP, anime.js e export estático para Cloudflare Pages.
-        </p>
-
-        {/* Stack badges */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10 text-xs font-mono">
-          <div className="p-3 rounded-lg border border-[var(--line)] bg-[var(--bg-2)]">
-            <span className="text-[var(--muted)] block mb-1">Framework</span>
-            <span className="text-[var(--ink)] font-semibold">Next.js 16</span>
-          </div>
-          <div className="p-3 rounded-lg border border-[var(--line)] bg-[var(--bg-2)]">
-            <span className="text-[var(--muted)] block mb-1">Estilização</span>
-            <span className="text-[var(--ink)] font-semibold">Tailwind v4</span>
-          </div>
-          <div className="p-3 rounded-lg border border-[var(--line)] bg-[var(--bg-2)]">
-            <span className="text-[var(--muted)] block mb-1">Smooth Scroll</span>
-            <span className="text-[var(--ink)] font-semibold">Lenis 1.3</span>
-          </div>
-          <div className="p-3 rounded-lg border border-[var(--line)] bg-[var(--bg-2)]">
-            <span className="text-[var(--muted)] block mb-1">Hospedagem</span>
-            <span className="text-[var(--ink)] font-semibold">Cloudflare Pages</span>
-          </div>
+      <section id="recursos" className="section shell" data-reveal>
+        <div className="section-heading"><h2>Um fluxo contínuo entre falar, registrar e encontrar.</h2><p>O ISPer vive na bandeja do Windows. Você chama quando precisa e volta ao trabalho sem trocar de contexto.</p></div>
+        <div className="bento-grid">
+          <article className="feature feature-wide feature-dictation"><div className="feature-copy"><Keyboard /><h3>Fale onde o cursor estiver</h3><p>Segure o atalho global, fale e solte. O texto é colado no campo em foco e seu clipboard anterior é restaurado.</p><div className="app-row"><span>Teams</span><span>Word</span><span>Terminal</span><span>Notion</span><span>WhatsApp</span></div></div><div className="typed-note"><span className="caret" />A próxima versão entra em homologação na sexta-feira.</div></article>
+          <article className="feature feature-meeting"><AudioLines /><h3>Reuniões sem um bot na sala</h3><p>O loopback captura a chamada; o microfone identifica você. A diarização local organiza o restante por participante.</p><div className="speaker-stack"><span className="p1">Participante 1</span><span className="p2">Participante 2</span><span className="me">Eu</span></div></article>
+          <article className="feature feature-intelligence"><BrainCircuit /><h3>IA sob sua escolha</h3><p>Resumos opcionais com Groq, Gemini ou Claude. Se a API falhar, o texto original continua preservado.</p><ul><li><Check />Transcrição e diarização locais</li><li><Check />Chaves no Credential Manager</li><li><Check />Revisão antes de usar</li></ul></article>
+          <article className="feature feature-wide feature-search"><div><Search /><h3>Encontre pelo sentido, não só pela palavra.</h3><p>A busca semântica percorre reuniões e ditados no SQLite. Use Gemini ou um endpoint compatível com OpenAI, incluindo Ollama local.</p></div><div className="search-demo"><div><Search /><span>quando decidimos o prazo?</span><kbd>Enter</kbd></div><p><strong>Reunião de lançamento</strong><mark>“A próxima versão entra em homologação na sexta-feira.”</mark></p></div></article>
         </div>
+      </section>
 
-        {/* Action buttons */}
-        <div className="flex flex-wrap items-center gap-4">
-          <a
-            href={siteConfig.links.github}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-2)] text-[var(--accent-ink)] font-semibold text-sm transition-all shadow-lg hover:shadow-[0_10px_24px_-10px_rgba(240,126,114,0.7)]"
-          >
-            Ver no GitHub
-          </a>
-          <div className="text-xs text-[var(--muted)] font-mono">
-            Pronto para receber as fases da Landing Page e Documentação.
-          </div>
-        </div>
-      </div>
+      <section className="stage-section" data-reveal>
+        <div className="shell stage-section-grid"><div><h2>Uma biblioteca que se torna memória de trabalho.</h2><p>Reuniões, ditados, resumos e momentos marcados ficam organizados localmente. Pesquise, revise os falantes e volte ao ponto exato da conversa.</p><Link className="text-link" href="/docs/busca-semantica/configuracao/">Entender a busca semântica <ArrowRight /></Link></div><div className="library-card"><div className="library-head"><span>Biblioteca</span><div><Search />buscar no título, resumo e transcript…</div></div><div className="library-list"><article><time>Hoje · 14:32</time><strong>Planejamento do lançamento</strong><p>3 participantes · 38 min · resumo pronto</p></article><article><time>Ontem · 09:10</time><strong>Revisão da documentação</strong><p>2 participantes · 24 min · 2 momentos</p></article><article><time>11 set · 16:45</time><strong>Notas por ditado</strong><p>12 trechos · processados localmente</p></article></div></div></div>
+      </section>
+
+      <section id="benchmarks" className="section shell" data-reveal>
+        <div className="section-heading benchmark-heading"><div><h2>Desempenho que você consegue auditar.</h2><p>Mostramos o que foi medido, o que é cálculo e o que ainda precisa de benchmark. Sem transformar estimativa em promessa.</p></div><Link className="text-link" href="/docs/referencia/benchmarks/">Ver metodologia <ArrowRight /></Link></div>
+        <BenchmarkChart />
+        <div className="comparison-wrap"><table className="comparison-table"><caption>Comparação de arquitetura e privacidade</caption><thead><tr><th>Critério</th><th className="isper-col">ISPer local</th><th>API de transcrição</th><th>Notetaker corporativo</th></tr></thead><tbody><tr><th>Áudio enviado para transcrever</th><td className="isper-col">Não</td><td>Sim</td><td>Sim</td></tr><tr><th>Mensalidade obrigatória</th><td className="isper-col">Não</td><td>Por uso</td><td>Geralmente</td></tr><tr><th>Bot entra na reunião</th><td className="isper-col">Não</td><td>Não se aplica</td><td>Frequentemente</td></tr><tr><th>Funciona sem internet após configurar</th><td className="isper-col">Transcrição: sim</td><td>Não</td><td>Não</td></tr><tr><th>Resumo</th><td className="isper-col">Provider opcional</td><td>Conforme API</td><td>Incluso no serviço</td></tr></tbody></table></div>
+      </section>
+
+      <section className="shortcut-section" data-reveal>
+        <div className="shell shortcut-grid"><div><h2>O atalho desaparece. A ideia fica.</h2><p>O padrão é <strong>Ctrl + Alt + Espaço</strong>. Se houver conflito, o ISPer tenta combinações alternativas — e você pode gravar a sua nas Configurações.</p><Link className="text-link" href="/docs/solucao-de-problemas/atalhos/">Configurar atalhos <ArrowRight /></Link></div><div className="key-combo" aria-label="Ctrl mais Alt mais Espaço"><kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd>Espaço</kbd></div></div>
+      </section>
+
+      <section className="section shell" data-reveal>
+        <div className="section-heading"><h2>Perguntas antes do primeiro ditado.</h2><p>As respostas curtas estão aqui. Os detalhes operacionais ficam na documentação versionada.</p></div>
+        <div className="faq-list">{faq.map(([question, answer]) => <details key={question}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div>
+      </section>
+
+      <section className="final-cta shell" data-reveal><div><Sparkles /><h2>Transforme fala em trabalho pronto.</h2><p>Baixe o ISPer, escolha um modelo e faça seu primeiro ditado em poucos minutos.</p></div><div className="final-actions"><Link className="button button-primary button-large" href="/download/"><Download />Escolher instalador</Link><a className="button button-secondary button-large" href={siteConfig.repository}><Code2 />Ver código</a></div></section>
     </main>
   );
 }

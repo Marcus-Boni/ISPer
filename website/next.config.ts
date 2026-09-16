@@ -10,6 +10,20 @@ const nextConfig: NextConfig = {
   pageExtensions: ["js", "jsx", "md", "mdx", "ts", "tsx"],
 };
 
-const withMDX = createMDX({});
+const withMDX = createMDX({
+  extension: /\.(md|mdx)$/,
+  options: {
+    remarkPlugins: [
+      "remark-gfm",
+      "remark-github-blockquote-alert",
+      "remark-frontmatter",
+      ["remark-mdx-frontmatter", { name: "metadata" }],
+    ],
+    rehypePlugins: [
+      "rehype-slug",
+      ["rehype-pretty-code", { theme: "github-dark-default", keepBackground: false }],
+    ],
+  },
+});
 
 export default withMDX(nextConfig);

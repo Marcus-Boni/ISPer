@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Bklit UI registry source is third-party code. Our adapter and use sites remain linted.
+    "src/components/charts/**",
+    // Experimental chart primitives are kept as optional UI inventory, but
+    // the static export currently ships a lighter benchmark component.
+    "src/components/charts/**",
+    "src/components/kokonutui/**",
   ]),
 ]);
 

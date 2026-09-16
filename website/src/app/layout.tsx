@@ -1,31 +1,41 @@
-import type { Metadata } from "next";
-import { fontFraunces, fontHanken } from "./fonts";
+import type { Metadata, Viewport } from "next";
+import { SiteFooter } from "@/components/layout/site-footer";
+import { SiteHeader } from "@/components/layout/site-header";
 import { SmoothScrollProvider } from "@/components/motion/smooth-scroll";
+import { siteConfig } from "@/lib/site";
+import { fontFraunces, fontHanken } from "./fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: {
-    default: "ISPer — Transcrição com IA local e resumo de reuniões",
-    template: "%s | ISPer",
+  metadataBase: new URL(siteConfig.url),
+  title: { default: siteConfig.title, template: "%s | ISPer" },
+  description: siteConfig.description,
+  applicationName: siteConfig.name,
+  alternates: { canonical: "/" },
+  keywords: ["transcrição local", "Whisper Windows", "ditado por voz", "transcrição de reuniões", "software open source"],
+  authors: [{ name: "Marcus Boni", url: siteConfig.repository }],
+  creator: "Marcus Boni",
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    url: "/",
+    title: siteConfig.title,
+    description: siteConfig.description,
+    siteName: siteConfig.name,
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "ISPer — transcrição local com IA" }],
   },
-  description:
-    "Transcrição de áudio por IA direto no seu hardware. 100% privado, offline e sem custos de API.",
-  metadataBase: new URL("https://isper.pages.dev"),
+  twitter: { card: "summary_large_image", title: siteConfig.title, description: siteConfig.description, images: ["/opengraph-image"] },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export const viewport: Viewport = { themeColor: "#161311", colorScheme: "dark" };
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="pt-BR"
-      className={`${fontFraunces.variable} ${fontHanken.variable} dark`}
-    >
-      <body className="min-h-screen bg-[var(--bg)] text-[var(--ink)] font-sans antialiased atmos-bg relative selection:bg-[rgba(240,126,114,0.35)] selection:text-[var(--ink)]">
+    <html lang="pt-BR" className={`${fontFraunces.variable} ${fontHanken.variable} dark`}>
+      <body className="atmos-bg">
+        <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
         <div className="noise-overlay" aria-hidden="true" />
-        <SmoothScrollProvider>{children}</SmoothScrollProvider>
+        <SmoothScrollProvider><SiteHeader />{children}<SiteFooter /></SmoothScrollProvider>
       </body>
     </html>
   );
