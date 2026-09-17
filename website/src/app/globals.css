@@ -34,6 +34,11 @@
   --p4: #7cf0c9;
   --p5: #f0a07c;
 
+  /* Chart de-emphasis. --muted sits at the same lightness as --accent (0.705 vs
+     0.719), which the palette validator rejects: ΔE 13.1 for normal vision, below
+     the floor of 15. This step clears it at 21.2, and protan separation at 11.5. */
+  --chart-context: #7a6f66;
+
   /* Structure */
   --header-h: 4.25rem;
   --shell-gutter: 2rem;
@@ -170,26 +175,32 @@ section[id],
   scroll-margin-top: calc(var(--header-h) + 1.5rem);
 }
 
-a {
-  color: inherit;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.22em;
-}
+/* Element resets belong in @layer base. Unlayered rules beat every layered one
+   regardless of specificity, so an unlayered `a { color: inherit }` silently
+   defeats every Tailwind text-colour utility applied to a link — the class is
+   in the markup, the colour never arrives. */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.22em;
+  }
 
-button,
-input {
-  font: inherit;
-}
+  button,
+  input {
+    font: inherit;
+  }
 
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: var(--r-sm);
-}
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: var(--r-sm);
+  }
 
-::selection {
-  background: rgba(240, 126, 114, 0.34);
-  color: var(--ink);
+  ::selection {
+    background: rgba(240, 126, 114, 0.34);
+    color: var(--ink);
+  }
 }
 
 .atmos-bg {
@@ -1556,16 +1567,13 @@ input {
     align-self: flex-start;
   }
 
-  .benchmark-table {
-    display: block;
-    overflow-x: auto;
-  }
-
-  .benchmark-table thead,
-  .benchmark-table tbody {
-    display: table;
-    width: 100%;
-    min-width: 30rem;
+  /* Three short columns wrap fine; forcing a min-width pushed "Natureza do dado"
+     — the column that says which numbers are real — off the screen. */
+  .benchmark-table th,
+  .benchmark-table td {
+    padding: 0.7rem 0.5rem;
+    font-size: 0.85rem;
+    vertical-align: top;
   }
 
   .command-card code {
@@ -1773,46 +1781,133 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 .stage-controls .stage-primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 650; }
 .stage-controls svg { width: .8rem; }
 .stage-controls span { display: flex; align-items: center; gap: .4rem; margin-left: auto; color: var(--muted); font-size: .65rem; }
-.chart-legend {
+/* Emphasis comparison: thin marks, rounded only at the data end, values direct-
+   labelled beside each mark, and each mark carrying where its number came from. */
+.measure-list {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1.6rem;
+}
+
+.measure-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label track value"
+    "source source source";
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.measure-label {
+  grid-area: label;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.measure-track {
+  grid-area: track;
+  position: relative;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.measure-fill,
+.measure-range {
+  position: absolute;
+  inset-block: 0;
+  border-radius: 0 999px 999px 0;
+}
+
+.measure-fill {
+  left: 0;
+  min-width: 0.35rem;
+  background: var(--chart-context);
+}
+
+.is-measured .measure-fill {
+  background: var(--accent);
+}
+
+/* A zero-tariff bar still has to be visible, so the track shows a cap at the origin. */
+.is-contract .measure-fill {
+  background: var(--good);
+}
+
+/* The upper half of a stated range reads lighter: it is the part that is a guess. */
+.measure-range {
+  background: repeating-linear-gradient(135deg, var(--chart-context) 0 3px, transparent 3px 6px);
+  opacity: 0.75;
+}
+
+.measure-value {
+  grid-area: value;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-measured .measure-value {
+  color: var(--accent-2);
+}
+
+.measure-source {
+  grid-area: source;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 1.25rem;
-  margin: 1.1rem 0 0;
-  padding: 0;
-  list-style: none;
+  align-items: baseline;
+  gap: 0.5rem;
   color: var(--muted);
   font-size: 0.82rem;
 }
 
-.chart-legend li {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
+.measure-source b {
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
-.chart-legend li::before {
-  content: "";
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 3px;
+.is-measured .measure-source b {
+  border-color: rgba(240, 126, 114, 0.45);
+  color: var(--accent-2);
 }
 
-.chart-legend .is-local::before {
-  background: var(--accent);
+.is-contract .measure-source b {
+  border-color: rgba(132, 194, 151, 0.45);
+  color: var(--good);
 }
 
-.chart-legend .is-cloud::before {
-  background: var(--muted);
-}
-
-.chart-legend .chart-unit {
-  margin-left: auto;
+.measure-scale {
+  margin: 0;
   color: var(--muted-2);
+  font-size: 0.78rem;
 }
 
-.chart-legend .chart-unit::before {
-  display: none;
+/* The bar is the point of the comparison, so on a narrow screen it takes the full
+   width and the label sits above it, instead of a 12rem label column leaving the
+   track 23px of a 380px row. */
+@media (max-width: 860px) {
+  .measure-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label value"
+      "track track"
+      "source source";
+    gap: 0.45rem 0.75rem;
+  }
+
+  .measure-list {
+    gap: 1.75rem;
+  }
 }
 
 .chart-canvas { margin-top: .8rem; }
@@ -1907,7 +2002,14 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 .docs-prose h2 { margin: 3.6rem 0 1.1rem; scroll-margin-top: 6.25rem; color: var(--ink); font: 550 2rem/1.12 var(--font-display); letter-spacing: -.02em; }
 .docs-prose h3 { margin: 2.4rem 0 .75rem; scroll-margin-top: 6.25rem; color: var(--ink); font-size: 1.25rem; }
 .docs-prose p { margin: 1.1rem 0 0; line-height: 1.8; }
-.docs-prose ul, .docs-prose ol { display: grid; gap: .65rem; margin: 1.1rem 0 0; padding-left: 1.5rem; }
+/* Tailwind preflight clears list-style, so markers have to be asked for again.
+   The previous `display: grid` also reserved the marker gutter without drawing
+   anything in it, leaving every procedure as orphaned indented lines — the
+   `li::marker` rule below was already written for markers that never rendered. */
+.docs-prose ul, .docs-prose ol { display: flex; flex-direction: column; gap: .65rem; margin: 1.1rem 0 0; padding-left: 1.5rem; }
+.docs-prose ul { list-style: disc; }
+.docs-prose ol { list-style: decimal; }
+.docs-prose li { display: list-item; }
 .docs-prose li::marker { color: var(--accent); }
 .docs-prose a { color: var(--accent-2); font-weight: 620; text-decoration: underline; text-decoration-color: rgba(240,126,114,.45); text-underline-offset: 4px; }
 .docs-prose :not(pre) > code { padding: .12rem .38rem; border: 1px solid var(--line); border-radius: .32rem; background: var(--bg-2); color: var(--accent-2); font: .9em var(--font-mono); }

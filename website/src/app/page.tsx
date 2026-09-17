@@ -8,8 +8,8 @@ import { RevealEffects } from "@/components/landing/reveal-effects";
 import { PageTransition } from "@/components/motion/page-transition";
 import { siteConfig } from "@/lib/site";
 
-const BenchmarkChart = dynamic(() => import("@/components/landing/benchmark-chart").then((module) => module.BenchmarkChart), {
-  loading: () => <div className="benchmark-panel chart-placeholder" aria-label="Carregando visualização dos benchmarks" />,
+const BenchmarkPanel = dynamic(() => import("@/components/landing/benchmark-panel").then((module) => module.BenchmarkPanel), {
+  loading: () => <div className="benchmark-panel chart-placeholder" aria-label="Carregando a comparação de desempenho" />,
 });
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
@@ -75,7 +75,7 @@ export default function Home() {
 
       <section id="benchmarks" className="section shell" data-reveal>
         <div className="section-heading benchmark-heading"><div><h2>Desempenho que você consegue auditar.</h2><p className="section-lead">Mostramos o que foi medido, o que é cálculo e o que ainda precisa de benchmark. Sem transformar estimativa em promessa.</p></div><Link className="text-link" transitionTypes={["nav-forward"]} href="/docs/referencia/benchmarks/">Ver metodologia <ArrowRight aria-hidden="true" /></Link></div>
-        <div data-reveal-item><BenchmarkChart /></div>
+        <div data-reveal-item><BenchmarkPanel /></div>
         <div className="comparison-wrap" data-reveal-item><table className="comparison-table"><caption>Comparação de arquitetura e privacidade</caption><thead><tr><th>Critério</th><th className="isper-col">ISPer local</th><th>API de transcrição</th><th>Notetaker corporativo</th></tr></thead><tbody><tr><th>Áudio enviado para transcrever</th><td className="isper-col">Não</td><td>Sim</td><td>Sim</td></tr><tr><th>Mensalidade obrigatória</th><td className="isper-col">Não</td><td>Por uso</td><td>Geralmente</td></tr><tr><th>Bot entra na reunião</th><td className="isper-col">Não</td><td>Não se aplica</td><td>Frequentemente</td></tr><tr><th>Funciona sem internet após configurar</th><td className="isper-col">Transcrição: sim</td><td>Não</td><td>Não</td></tr><tr><th>Resumo</th><td className="isper-col">Provider opcional</td><td>Conforme API</td><td>Incluso no serviço</td></tr></tbody></table></div>
       </section>
 
