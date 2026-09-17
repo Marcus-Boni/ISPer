@@ -1,11 +1,11 @@
 ---
-title: "Identificação de falantes"
+title: "Como a diarização separa as vozes"
 description: "Configure diarização local para transformar Participantes em Participante 1, Participante 2 e outros rótulos."
 section: "Identificação de Falantes"
 order: 50
 ---
 
-# Identificação de falantes
+# Como a diarização separa as vozes
 
 A diarização separa vozes diferentes dentro da faixa de participantes. O ISPer usa modelos locais via `sherpa-onnx`, com pyannote e 3D-Speaker.
 

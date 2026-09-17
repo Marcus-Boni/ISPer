@@ -93,6 +93,13 @@ const views: View[] = [
 
 const provenanceLabel = { measured: "Medido", scenario: "Cenário", contract: "Contrato" } as const;
 
+/** "Contrato" is not self-explanatory the way the other two are. */
+const provenanceHint = {
+  measured: "número observado e publicado",
+  scenario: "estimativa ilustrativa, não medição",
+  contract: "garantia do produto, não estimativa",
+} as const;
+
 export function BenchmarkPanel() {
   const [active, setActive] = useState<View["id"]>("tempo");
   const view = views.find((item) => item.id === active) ?? views[0];
@@ -127,14 +134,14 @@ export function BenchmarkPanel() {
               </span>
               <span className="measure-value">{mark.display}</span>
               <span className="measure-source">
-                <b>{provenanceLabel[mark.kind]}</b>
+                <b title={provenanceHint[mark.kind]}>{provenanceLabel[mark.kind]}<span className="visually-hidden"> — {provenanceHint[mark.kind]}</span></b>
                 <span>{mark.provenance.replace(/^[^·]+· ?/, "")}</span>
               </span>
             </div>
           );
         })}
         <p className="measure-scale">
-          escala 0–{view.scaleMax.toLocaleString("pt-BR")} {view.unit}
+          escala 0–{view.scaleMax.toLocaleString("pt-BR")} {view.unit} · <b>medido</b> é observação publicada, <b>cenário</b> é estimativa ilustrativa, <b>contrato</b> é garantia do produto
         </p>
       </div>
 

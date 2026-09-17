@@ -1,11 +1,11 @@
 ---
-title: "Inteligência e resumos"
+title: "Escolher um provedor de resumos"
 description: "Conecte Groq, Gemini, Claude ou outro provedor compatível para gerar resumos e insights."
 section: "Inteligência e Resumos"
 order: 60
 ---
 
-# Inteligência e resumos
+# Escolher um provedor de resumos
 
 O ISPer transcreve localmente. A camada de inteligência é opcional e trabalha sobre texto: resumo, decisões, pontos principais, action items, título automático e insights ao vivo.
 

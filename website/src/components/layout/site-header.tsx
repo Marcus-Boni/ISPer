@@ -2,11 +2,19 @@
 
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { GithubMark } from "@/components/icons/github-mark";
 import { RouteLink } from "@/components/motion/route-link";
 import { navItems, siteConfig } from "@/lib/site";
 
+/** A same-page anchor is never "where you are"; a route is. */
+function isCurrent(pathname: string, href: string) {
+  if (href.includes("#")) return false;
+  return pathname === href || pathname.startsWith(href.endsWith("/") ? href : `${href}/`);
+}
+
 export function SiteHeader() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -50,7 +58,11 @@ export function SiteHeader() {
       <div className="shell header-inner">
         <RouteLink href="/" className="brand" aria-label="ISPer — início">ISPer<span>.</span></RouteLink>
         <nav className="desktop-nav" aria-label="Navegação principal">
-          {navItems.map((item) => <RouteLink key={item.href} href={item.href}>{item.label}</RouteLink>)}
+          {navItems.map((item) => (
+            <RouteLink key={item.href} href={item.href} aria-current={isCurrent(pathname, item.href) ? "page" : undefined}>
+              {item.label}
+            </RouteLink>
+          ))}
         </nav>
         <div className="header-actions">
           <a className="github-link" href={siteConfig.repository} target="_blank" rel="noreferrer noopener">
@@ -66,7 +78,11 @@ export function SiteHeader() {
       </div>
       <div className="header-progress" aria-hidden="true"><i /></div>
       <nav id="mobile-navigation" className={`mobile-nav ${open ? "is-open" : ""}`} aria-label="Navegação móvel" hidden={!open}>
-        {navItems.map((item) => <RouteLink key={item.href} href={item.href} onClick={() => setOpen(false)}>{item.label}</RouteLink>)}
+        {navItems.map((item) => (
+          <RouteLink key={item.href} href={item.href} aria-current={isCurrent(pathname, item.href) ? "page" : undefined} onClick={() => setOpen(false)}>
+            {item.label}
+          </RouteLink>
+        ))}
         <a href={siteConfig.repository} target="_blank" rel="noreferrer noopener"><GithubMark />Repositório no GitHub</a>
       </nav>
     </header>

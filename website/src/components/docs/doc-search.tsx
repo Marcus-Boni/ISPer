@@ -110,8 +110,10 @@ export function DocSearch({ items, inputId = "docs-search" }: { items: SearchIte
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
+      // Clear, then close. Blurring would drop the reader's tab position to the
+      // top of the document, which is worse than staying where they are.
       if (query) clear();
-      else input.current?.blur();
+      else close();
       return;
     }
     if (!open || results.length === 0) return;
@@ -168,7 +170,13 @@ export function DocSearch({ items, inputId = "docs-search" }: { items: SearchIte
       {open ? (
         <ul className="doc-search-results" id={listId} role="listbox" aria-label="Resultados da busca">
           {results.length > 0 ? results.map((item, index) => (
-            <li key={item.href} id={`${listId}-${index}`} role="option" aria-selected={index === active}>
+            <li
+              key={item.href}
+              id={`${listId}-${index}`}
+              role="option"
+              aria-selected={index === active}
+              aria-label={`${item.title} — ${item.section}`}
+            >
               <Link href={item.href} className={index === active ? "is-active" : undefined} onClick={close}>
                 <span className="result-section">{item.section}</span>
                 <span className="result-title">{item.title}</span>

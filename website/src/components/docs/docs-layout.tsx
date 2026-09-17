@@ -62,10 +62,17 @@ export function DocsLayout({ nav, searchIndex, current, previous, next, children
 
         <section className="docs-body">
           <nav className="docs-crumbs" aria-label="Trilha">
-            <Link href="/docs/">
-              <BookOpen aria-hidden="true" />
-              Documentação
-            </Link>
+            {current ? (
+              <Link href="/docs/">
+                <BookOpen aria-hidden="true" />
+                Documentação
+              </Link>
+            ) : (
+              <span aria-current="page">
+                <BookOpen aria-hidden="true" />
+                Documentação
+              </span>
+            )}
             {current ? (
               <>
                 <ChevronRight aria-hidden="true" />

@@ -6,6 +6,7 @@ import { ArrowRight, AudioLines, BookOpen, BrainCircuit, Check, Code2, Cpu, Down
 import { CopyCommand } from "@/components/landing/copy-command";
 import { InteractiveStage } from "@/components/landing/interactive-stage";
 import { AudioBoundary } from "@/components/landing/audio-boundary";
+import { ComparisonWrap } from "@/components/landing/comparison-wrap";
 import { RevealEffects } from "@/components/landing/reveal-effects";
 import { PageTransition } from "@/components/motion/page-transition";
 import { shortcut, siteConfig } from "@/lib/site";
@@ -103,7 +104,7 @@ export default function Home() {
       <section id="benchmarks" className="section shell" data-reveal>
         <div className="section-heading benchmark-heading"><div><h2>Desempenho que você consegue auditar.</h2><p className="section-lead">Mostramos o que foi medido, o que é cálculo e o que ainda precisa de benchmark. Sem transformar estimativa em promessa.</p></div><Link className="text-link" transitionTypes={["nav-forward"]} href="/docs/referencia/benchmarks/">Ver metodologia <ArrowRight aria-hidden="true" /></Link></div>
         <div data-reveal-item><BenchmarkPanel /></div>
-        <div className="comparison-wrap" data-reveal-item tabIndex={0} role="region" aria-label="Comparação de arquitetura e privacidade"><table className="comparison-table"><caption>Comparação de arquitetura e privacidade<small>Categorias genéricas de arquitetura · nenhum fornecedor nomeado ou avaliado</small></caption><thead><tr><th scope="col">Critério</th>{comparisonColumns.map((label, index) => <th key={label} scope="col" className={index === 0 ? "isper-col" : undefined}>{label}</th>)}</tr></thead><tbody>{comparison.map((row) => <tr key={row.criterion}><th scope="row">{row.criterion}</th>{row.cells.map((cell, index) => <td key={`${row.criterion}-${index}`} data-label={comparisonColumns[index]} className={index === 0 ? "isper-col" : undefined}><span className={`verdict verdict-${cell.verdict}`}><span className="visually-hidden">{verdictLabel[cell.verdict]}: </span>{cell.text}</span></td>)}</tr>)}</tbody></table></div>
+        <ComparisonWrap><table className="comparison-table"><caption>Comparação de arquitetura e privacidade<small>Categorias genéricas de arquitetura · nenhum fornecedor nomeado ou avaliado</small></caption><thead><tr><th scope="col">Critério</th>{comparisonColumns.map((label, index) => <th key={label} scope="col" className={index === 0 ? "isper-col" : undefined}>{label}</th>)}</tr></thead><tbody>{comparison.map((row) => <tr key={row.criterion}><th scope="row">{row.criterion}</th>{row.cells.map((cell, index) => <td key={`${row.criterion}-${index}`} data-label={comparisonColumns[index]} className={index === 0 ? "isper-col" : undefined}><span className={`verdict verdict-${cell.verdict}`}><span className="visually-hidden">{verdictLabel[cell.verdict]}: </span>{cell.text}</span></td>)}</tr>)}</tbody></table></ComparisonWrap>
       </section>
 
       <section className="shortcut-section" data-reveal>

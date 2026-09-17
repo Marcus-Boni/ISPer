@@ -26,6 +26,8 @@ const smartScreenSteps = [
 ];
 
 export default function DownloadPage() {
+  // Every distributed installer has to be signed before the page stops warning.
+  const signed = downloadVariants.length > 0 && downloadVariants.every((asset) => asset.authenticodeStatus === "verified");
   const published = currentRelease.publishedAt
     ? new Date(currentRelease.publishedAt).toLocaleDateString("pt-BR")
     : null;
@@ -53,17 +55,26 @@ export default function DownloadPage() {
           assets={downloadVariants}
           notice={
             /* What you are about to see, before "click here" — this used to sit
-               below the button that triggers the dialog. */
-            <section className="notice notice-warn" aria-labelledby="smartscreen">
-              <h2 id="smartscreen"><ShieldAlert aria-hidden="true" />O Windows vai avisar na primeira execução</h2>
-              <p>
-                Esta release ainda não tem assinatura Authenticode, então o SmartScreen aparece ao abrir o instalador. Isso é esperado.
-              </p>
-              <ol className="notice-steps">
-                {smartScreenSteps.map((step) => <li key={step}>{step}</li>)}
-              </ol>
-              <Link className="text-link" href="/docs/referencia/releases/">Como a release é assinada e publicada <ArrowRight aria-hidden="true" /></Link>
-            </section>
+               below the button that triggers the dialog. Driven by the release
+               data, so a signed build stops showing an unsigned build's warning. */
+            signed ? (
+              <section className="notice" aria-labelledby="smartscreen">
+                <h2 id="smartscreen"><ShieldCheck aria-hidden="true" />Instalador assinado</h2>
+                <p>Esta release tem assinatura Authenticode, então o Windows não deve exibir o SmartScreen. Conferir o SHA-256 abaixo continua valendo.</p>
+                <Link className="text-link" href="/docs/referencia/releases/">Como a release é assinada e publicada <ArrowRight aria-hidden="true" /></Link>
+              </section>
+            ) : (
+              <section className="notice notice-warn" aria-labelledby="smartscreen">
+                <h2 id="smartscreen"><ShieldAlert aria-hidden="true" />O Windows vai avisar na primeira execução</h2>
+                <p>
+                  Esta release ainda não tem assinatura Authenticode, então o SmartScreen aparece ao abrir o instalador. Isso é esperado.
+                </p>
+                <ol className="notice-steps">
+                  {smartScreenSteps.map((step) => <li key={step}>{step}</li>)}
+                </ol>
+                <Link className="text-link" href="/docs/referencia/releases/">Como a release é assinada e publicada <ArrowRight aria-hidden="true" /></Link>
+              </section>
+            )
           }
         />
 

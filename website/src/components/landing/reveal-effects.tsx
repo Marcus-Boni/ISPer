@@ -46,7 +46,7 @@ export function RevealEffects() {
               leaves, and the stage plays the two things the page is about to
               explain while it holds. The reader can take it over at any point. */
         const media = gsap.matchMedia();
-        media.add("(min-width: 1081px)", () => {
+        media.add("(min-width: 981px)", () => {
           gsap.to(".hero-stage .app-window", {
             rotateY: 0,
             rotateX: 0,
@@ -127,7 +127,8 @@ export function RevealEffects() {
 
       /* Failsafe: never leave content that GSAP hid but never revealed. */
       const failsafe = window.setTimeout(() => {
-        document.querySelectorAll<HTMLElement>("[data-reveal], [data-reveal-item]").forEach((element) => {
+        const animated = "[data-reveal], [data-reveal-item], .hero-line, .hero-stage, .hero-lead, .hero-actions > *, .hero-proof li, .command-card > *, .trust-grid > *";
+        document.querySelectorAll<HTMLElement>(animated).forEach((element) => {
           if (Number(getComputedStyle(element).opacity) < 0.99) gsap.set(element, { clearProps: "all" });
         });
       }, 6000);

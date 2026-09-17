@@ -1,11 +1,11 @@
 ---
-title: "Busca semântica"
+title: "Configurar a busca semântica"
 description: "Indexe reuniões e ditados por sentido usando embeddings locais ou provedores compatíveis."
 section: "Busca Semântica"
 order: 70
 ---
 
-# Busca semântica
+# Configurar a busca semântica
 
 A busca semântica transforma reuniões e ditados em vetores guardados no SQLite local. Ela encontra trechos pelo sentido, mesmo quando a palavra exata não aparece.
 
