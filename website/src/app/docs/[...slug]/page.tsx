@@ -9,6 +9,7 @@ import {
   getDocsSearchIndex,
 } from "@/lib/docs";
 import { docComponents } from "@/lib/docs-content";
+import { PageTransition } from "@/components/motion/page-transition";
 
 export function generateStaticParams() {
   return getAllDocs().map((doc) => ({ slug: doc.segments }));
@@ -43,6 +44,7 @@ export default async function DocPage({
   if (!Content) notFound();
 
   return (
+    <PageTransition>
     <DocsLayout
       nav={getDocsNav()}
       searchIndex={getDocsSearchIndex()}
@@ -54,5 +56,6 @@ export default async function DocPage({
         <Content />
       </article>
     </DocsLayout>
+    </PageTransition>
   );
 }

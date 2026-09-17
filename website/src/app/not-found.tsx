@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { PageTransition } from "@/components/motion/page-transition";
 
 export default function NotFound() {
   return (
+    <PageTransition>
     <main id="conteudo" className="mx-auto flex min-h-[70svh] max-w-3xl flex-col justify-center px-4 py-16 text-center">
       <p className="font-mono text-sm text-[var(--accent-2)]">404</p>
       <h1 className="mt-3 font-display text-5xl font-semibold">Página não encontrada.</h1>
@@ -15,5 +17,6 @@ export default function NotFound() {
         Abrir documentação
       </Link>
     </main>
+    </PageTransition>
   );
 }

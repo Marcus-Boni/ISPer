@@ -5,6 +5,7 @@ import { ArrowRight, AudioLines, BookOpen, BrainCircuit, Check, Code2, Cpu, Down
 import { CopyCommand } from "@/components/landing/copy-command";
 import { InteractiveStage } from "@/components/landing/interactive-stage";
 import { RevealEffects } from "@/components/landing/reveal-effects";
+import { PageTransition } from "@/components/motion/page-transition";
 import { siteConfig } from "@/lib/site";
 
 const BenchmarkChart = dynamic(() => import("@/components/landing/benchmark-chart").then((module) => module.BenchmarkChart), {
@@ -27,6 +28,7 @@ export default function Home() {
   const faqSchema = { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faq.map(([question, answer]) => ({ "@type": "Question", name: question, acceptedAnswer: { "@type": "Answer", text: answer } })) };
 
   return (
+    <PageTransition>
     <main id="conteudo">
       <RevealEffects />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema).replace(/</g, "\\u003c") }} />
@@ -40,8 +42,8 @@ export default function Home() {
           </h1>
           <p className="hero-lead">Dite em qualquer aplicativo e transcreva reuniões com IA local. Sem mensalidade e sem enviar seu áudio para uma API.</p>
           <div className="hero-actions">
-            <Link className="button button-primary button-large" href="/download/"><Download aria-hidden="true" />Escolher instalador<span className="button-tag">{siteConfig.currentVersion}</span></Link>
-            <Link className="button button-secondary button-large" href="/docs/primeiros-passos/instalacao/"><BookOpen aria-hidden="true" />Ver instalação</Link>
+            <Link className="button button-primary button-large" href="/download/" transitionTypes={["nav-forward"]}><Download aria-hidden="true" />Escolher instalador<span className="button-tag">{siteConfig.currentVersion}</span></Link>
+            <Link className="button button-secondary button-large" href="/docs/primeiros-passos/instalacao/" transitionTypes={["nav-forward"]}><BookOpen aria-hidden="true" />Ver instalação</Link>
           </div>
           <ul className="hero-proof">
             <li><ShieldCheck aria-hidden="true" />Open source MIT</li>
@@ -68,17 +70,17 @@ export default function Home() {
       </section>
 
       <section className="stage-section" data-reveal>
-        <div className="shell stage-section-grid"><div><h2>Uma biblioteca que se torna memória de trabalho.</h2><p className="section-lead">Reuniões, ditados, resumos e momentos marcados ficam organizados localmente. Pesquise, revise os falantes e volte ao ponto exato da conversa.</p><Link className="text-link" href="/docs/busca-semantica/configuracao/">Entender a busca semântica <ArrowRight aria-hidden="true" /></Link></div><div className="library-card" data-reveal-item><div className="library-head"><span>Biblioteca</span><div><Search aria-hidden="true" />buscar no título, resumo e transcript…</div></div><div className="library-list"><article><time>Hoje · 14:32</time><strong>Planejamento do lançamento</strong><p>3 participantes · 38 min · resumo pronto</p></article><article><time>Ontem · 09:10</time><strong>Revisão da documentação</strong><p>2 participantes · 24 min · 2 momentos</p></article><article><time>11 set · 16:45</time><strong>Notas por ditado</strong><p>12 trechos · processados localmente</p></article></div></div></div>
+        <div className="shell stage-section-grid"><div><h2>Uma biblioteca que se torna memória de trabalho.</h2><p className="section-lead">Reuniões, ditados, resumos e momentos marcados ficam organizados localmente. Pesquise, revise os falantes e volte ao ponto exato da conversa.</p><Link className="text-link" transitionTypes={["nav-forward"]} href="/docs/busca-semantica/configuracao/">Entender a busca semântica <ArrowRight aria-hidden="true" /></Link></div><div className="library-card" data-reveal-item><div className="library-head"><span>Biblioteca</span><div><Search aria-hidden="true" />buscar no título, resumo e transcript…</div></div><div className="library-list"><article><time>Hoje · 14:32</time><strong>Planejamento do lançamento</strong><p>3 participantes · 38 min · resumo pronto</p></article><article><time>Ontem · 09:10</time><strong>Revisão da documentação</strong><p>2 participantes · 24 min · 2 momentos</p></article><article><time>11 set · 16:45</time><strong>Notas por ditado</strong><p>12 trechos · processados localmente</p></article></div></div></div>
       </section>
 
       <section id="benchmarks" className="section shell" data-reveal>
-        <div className="section-heading benchmark-heading"><div><h2>Desempenho que você consegue auditar.</h2><p className="section-lead">Mostramos o que foi medido, o que é cálculo e o que ainda precisa de benchmark. Sem transformar estimativa em promessa.</p></div><Link className="text-link" href="/docs/referencia/benchmarks/">Ver metodologia <ArrowRight aria-hidden="true" /></Link></div>
+        <div className="section-heading benchmark-heading"><div><h2>Desempenho que você consegue auditar.</h2><p className="section-lead">Mostramos o que foi medido, o que é cálculo e o que ainda precisa de benchmark. Sem transformar estimativa em promessa.</p></div><Link className="text-link" transitionTypes={["nav-forward"]} href="/docs/referencia/benchmarks/">Ver metodologia <ArrowRight aria-hidden="true" /></Link></div>
         <div data-reveal-item><BenchmarkChart /></div>
         <div className="comparison-wrap" data-reveal-item><table className="comparison-table"><caption>Comparação de arquitetura e privacidade</caption><thead><tr><th>Critério</th><th className="isper-col">ISPer local</th><th>API de transcrição</th><th>Notetaker corporativo</th></tr></thead><tbody><tr><th>Áudio enviado para transcrever</th><td className="isper-col">Não</td><td>Sim</td><td>Sim</td></tr><tr><th>Mensalidade obrigatória</th><td className="isper-col">Não</td><td>Por uso</td><td>Geralmente</td></tr><tr><th>Bot entra na reunião</th><td className="isper-col">Não</td><td>Não se aplica</td><td>Frequentemente</td></tr><tr><th>Funciona sem internet após configurar</th><td className="isper-col">Transcrição: sim</td><td>Não</td><td>Não</td></tr><tr><th>Resumo</th><td className="isper-col">Provider opcional</td><td>Conforme API</td><td>Incluso no serviço</td></tr></tbody></table></div>
       </section>
 
       <section className="shortcut-section" data-reveal>
-        <div className="shell shortcut-grid"><div><h2>O atalho desaparece. A ideia fica.</h2><p className="section-lead">O padrão é <strong>Ctrl + Alt + Espaço</strong>. Se houver conflito, o ISPer tenta combinações alternativas — e você pode gravar a sua nas Configurações.</p><Link className="text-link" href="/docs/solucao-de-problemas/atalhos/">Configurar atalhos <ArrowRight aria-hidden="true" /></Link></div><div className="key-combo" aria-label="Ctrl mais Alt mais Espaço"><kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd>Espaço</kbd></div></div>
+        <div className="shell shortcut-grid"><div><h2>O atalho desaparece. A ideia fica.</h2><p className="section-lead">O padrão é <strong>Ctrl + Alt + Espaço</strong>. Se houver conflito, o ISPer tenta combinações alternativas — e você pode gravar a sua nas Configurações.</p><Link className="text-link" transitionTypes={["nav-forward"]} href="/docs/solucao-de-problemas/atalhos/">Configurar atalhos <ArrowRight aria-hidden="true" /></Link></div><div className="key-combo" aria-label="Ctrl mais Alt mais Espaço"><kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd>Espaço</kbd></div></div>
       </section>
 
       <section className="section shell" data-reveal>
@@ -86,7 +88,8 @@ export default function Home() {
         <div className="faq-list">{faq.map(([question, answer]) => <details key={question} data-reveal-item><summary>{question}<i aria-hidden="true" /></summary><p>{answer}</p></details>)}</div>
       </section>
 
-      <section className="final-cta shell" data-reveal><div><Sparkles aria-hidden="true" /><h2>Transforme fala em trabalho pronto.</h2><p className="section-lead">Baixe o ISPer, escolha um modelo e faça seu primeiro ditado em poucos minutos.</p></div><div className="final-actions"><Link className="button button-primary button-large" href="/download/"><Download aria-hidden="true" />Escolher instalador</Link><a className="button button-secondary button-large" href={siteConfig.repository}><Code2 aria-hidden="true" />Ver código</a></div></section>
+      <section className="final-cta shell" data-reveal><div><Sparkles aria-hidden="true" /><h2>Transforme fala em trabalho pronto.</h2><p className="section-lead">Baixe o ISPer, escolha um modelo e faça seu primeiro ditado em poucos minutos.</p></div><div className="final-actions"><Link className="button button-primary button-large" href="/download/" transitionTypes={["nav-forward"]}><Download aria-hidden="true" />Escolher instalador</Link><a className="button button-secondary button-large" href={siteConfig.repository}><Code2 aria-hidden="true" />Ver código</a></div></section>
     </main>
+    </PageTransition>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { GithubMark } from "@/components/icons/github-mark";
+import { RouteLink } from "@/components/motion/route-link";
 import { navItems, siteConfig } from "@/lib/site";
 
 export function SiteHeader() {
@@ -38,11 +38,11 @@ export function SiteHeader() {
   }, [open]);
 
   return (
-    <header className={`site-header ${scrolled ? "is-scrolled" : ""}`}>
+    <header className={`site-header ${scrolled ? "is-scrolled" : ""}`} style={{ viewTransitionName: "site-header" }}>
       <div className="shell header-inner">
-        <Link href="/" className="brand" aria-label="ISPer — início">ISPer<span>.</span></Link>
+        <RouteLink href="/" className="brand" aria-label="ISPer — início">ISPer<span>.</span></RouteLink>
         <nav className="desktop-nav" aria-label="Navegação principal">
-          {navItems.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
+          {navItems.map((item) => <RouteLink key={item.href} href={item.href}>{item.label}</RouteLink>)}
         </nav>
         <div className="header-actions">
           <a className="github-link" href={siteConfig.repository} target="_blank" rel="noreferrer noopener">
@@ -50,7 +50,7 @@ export function SiteHeader() {
             <span>GitHub</span>
             <span className="visually-hidden">(abre em nova aba)</span>
           </a>
-          <Link className="button button-primary header-download" href="/download/">Baixar</Link>
+          <RouteLink className="button button-primary header-download" href="/download/">Baixar</RouteLink>
           <button className="menu-button" type="button" aria-label={open ? "Fechar menu" : "Abrir menu"} aria-expanded={open} aria-controls="mobile-navigation" onClick={() => setOpen((value) => !value)}>
             {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
           </button>
@@ -58,7 +58,7 @@ export function SiteHeader() {
       </div>
       <div className="header-progress" aria-hidden="true"><i /></div>
       <nav id="mobile-navigation" className={`mobile-nav ${open ? "is-open" : ""}`} aria-label="Navegação móvel" hidden={!open}>
-        {navItems.map((item) => <Link key={item.href} href={item.href} onClick={() => setOpen(false)}>{item.label}</Link>)}
+        {navItems.map((item) => <RouteLink key={item.href} href={item.href} onClick={() => setOpen(false)}>{item.label}</RouteLink>)}
         <a href={siteConfig.repository} target="_blank" rel="noreferrer noopener"><GithubMark />Repositório no GitHub</a>
       </nav>
     </header>

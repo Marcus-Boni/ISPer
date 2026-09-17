@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, BookOpen } from "lucide-react";
 import { DocsLayout } from "@/components/docs/docs-layout";
 import { getAllDocs, getDocsNav, getDocsSearchIndex } from "@/lib/docs";
+import { PageTransition } from "@/components/motion/page-transition";
 
 export const metadata: Metadata = {
   title: "Documentação",
@@ -21,6 +22,7 @@ export default function DocsIndexPage() {
   }));
 
   return (
+    <PageTransition>
     <DocsLayout nav={nav} searchIndex={searchIndex}>
       <div className="max-w-3xl">
         <BookOpen aria-hidden="true" className="h-8 w-8 text-[var(--accent)]" />
@@ -59,5 +61,6 @@ export default function DocsIndexPage() {
         ))}
       </div>
     </DocsLayout>
+    </PageTransition>
   );
 }

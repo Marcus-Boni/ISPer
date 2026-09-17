@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import Lenis from "lenis";
 import { registerLenis } from "./scroll-engine";
 
 export function SmoothScrollProvider({ children }: { children: React.ReactNode }) {
+  const lenisRef = useRef<Lenis | null>(null);
+  const pathname = usePathname();
+
   useEffect(() => {
     // Touch devices keep native momentum; reduced motion keeps native scrolling entirely.
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -18,6 +22,7 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
       anchors: { offset: -96 },
     });
 
+    lenisRef.current = lenis;
     registerLenis(lenis);
 
     let frame = requestAnimationFrame(function raf(time: number) {
@@ -28,9 +33,16 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
     return () => {
       cancelAnimationFrame(frame);
       lenis.destroy();
+      lenisRef.current = null;
       registerLenis(null);
     };
   }, []);
+
+  // A new route starts at its top. Lenis holds its own scroll value, so the
+  // router's reset has to be mirrored here or the next wheel event snaps back.
+  useEffect(() => {
+    lenisRef.current?.scrollTo(0, { immediate: true, force: true });
+  }, [pathname]);
 
   return <>{children}</>;
 }

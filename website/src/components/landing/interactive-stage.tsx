@@ -3,6 +3,24 @@
 import { BookOpen, Mic, Pause, Play, RotateCcw, Search, Settings, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+const WAVEFORM_BARS = 28;
+const BAR_SLOT = 13;
+const BAR_WIDTH = 6;
+const WAVE_HEIGHT = 72;
+
+/**
+ * A speech-shaped profile: fuller through the middle of an utterance, quieter at
+ * its edges. Each bar is centred on the midline so the wave reads symmetrically
+ * around its axis instead of hanging from a common top edge.
+ */
+const waveformBars = Array.from({ length: WAVEFORM_BARS }, (_, index) => {
+  const position = index / (WAVEFORM_BARS - 1);
+  const envelope = 0.52 + 0.48 * Math.sin(Math.PI * position);
+  const detail = 0.64 + 0.36 * Math.sin(index * 1.7) * Math.sin(index * 0.9 + 1.3);
+  const height = Math.max(16, Math.round(56 * envelope * detail));
+  return { x: index * BAR_SLOT, y: (WAVE_HEIGHT - height) / 2, height };
+});
+
 const transcript = [
   { time: "00:04", speaker: "Participante 1", tone: "p1", text: "Vamos fechar as prioridades do lançamento desta semana." },
   { time: "00:10", speaker: "Eu", tone: "me", text: "A página de download precisa explicar CPU e CUDA sem ambiguidade." },
@@ -18,18 +36,24 @@ export function InteractiveStage() {
   useEffect(() => {
     if (!active || !waveform.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let cancel = () => {};
+    const bars = waveform.current.querySelectorAll<SVGRectElement>("rect");
     void import("animejs").then(({ animate, stagger }) => {
-      const animation = animate(waveform.current?.querySelectorAll("rect") ?? [], {
-        scaleY: [0.35, 1, 0.5],
+      const animation = animate(bars, {
+        scaleY: [0.3, 1, 0.45],
         duration: 760,
         delay: stagger(34),
         loop: true,
         alternate: true,
         ease: "inOutSine",
       });
-      cancel = () => animation.pause();
+      cancel = () => {
+        animation.pause();
+        // Hand the bars back to CSS so they ease down to the resting height
+        // instead of freezing wherever the loop happened to stop.
+        bars.forEach((bar) => bar.style.removeProperty("transform"));
+      };
     });
-    return cancel;
+    return () => cancel();
   }, [active]);
 
   useEffect(() => {
@@ -57,8 +81,8 @@ export function InteractiveStage() {
           <div id="stage-panel-dictation" className="dictation-view" role="tabpanel" aria-labelledby="stage-tab-dictation">
             <div className="shortcut-line"><span>Atalho configurável</span><div><kbd>Ctrl</kbd><b>+</b><kbd>Shift</kbd><b>+</b><kbd>Espaço</kbd></div></div>
             <div className={`dictation-orb ${active ? "active" : ""}`}><Mic aria-hidden="true" /></div>
-            <svg ref={waveform} className="waveform" viewBox="0 0 360 72" role="img" aria-label={active ? "Forma de onda animada, ditado em andamento" : "Forma de onda parada"}>
-              {Array.from({ length: 28 }, (_, index) => <rect key={index} x={index * 13} y={18} width="6" height={16 + ((index * 7) % 34)} rx="3" style={{ transformOrigin: `${index * 13 + 3}px 36px` }} />)}
+            <svg ref={waveform} className={`waveform ${active ? "is-active" : ""}`} viewBox={`0 0 ${WAVEFORM_BARS * BAR_SLOT} ${WAVE_HEIGHT}`} role="img" aria-label={active ? "Forma de onda animada, ditado em andamento" : "Forma de onda em repouso"}>
+              {waveformBars.map((bar) => <rect key={bar.x} x={bar.x} y={bar.y} width={BAR_WIDTH} height={bar.height} rx={BAR_WIDTH / 2} />)}
             </svg>
             <p className="dictation-copy">{active ? "A documentação precisa ser clara desde o primeiro clique." : "Segure para falar. Solte para colar no aplicativo em foco."}</p>
           </div>

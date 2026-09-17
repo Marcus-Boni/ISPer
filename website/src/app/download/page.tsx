@@ -9,6 +9,7 @@ import {
   releaseLinks,
   sourceInstallSteps,
 } from "@/lib/releases";
+import { PageTransition } from "@/components/motion/page-transition";
 
 export const metadata: Metadata = {
   title: "Download",
@@ -19,6 +20,7 @@ export const metadata: Metadata = {
 
 export default function DownloadPage() {
   return (
+    <PageTransition>
     <main id="conteudo" className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="max-w-3xl">
         <p className="font-mono text-sm text-[var(--accent-2)]">{currentRelease.tag}</p>
@@ -93,5 +95,6 @@ export default function DownloadPage() {
         </div>
       </section>
     </main>
+    </PageTransition>
   );
 }

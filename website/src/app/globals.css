@@ -51,6 +51,7 @@
   --ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
   --dur-fast: 140ms;
   --dur-mid: 260ms;
+  --dur-page: 420ms;
 
   --scroll-progress: 0;
 }
@@ -1620,6 +1621,7 @@ input {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .caret, .chart-placeholder { animation: none !important; }
+  .waveform rect { transform: scaleY(1) !important; transition: none !important; }
   .hero-stage .app-stage { position: static; }
   [data-reveal], [data-reveal-item], .button, .dictation-orb, .transcript-row, .text-link svg, .github-link svg, .desktop-nav a::after {
     transition-duration: 0.01ms !important;
@@ -1628,6 +1630,96 @@ input {
 }
 
 [hidden] { display: none !important; }
+
+/* ---------------------------------------------------------------------------
+   View transitions
+
+   Content travels; the chrome does not. Forward slides left, back slides right,
+   and anything without a direction — a sibling route, the browser's own back
+   button — lifts in place. Old content leaves quickly so it stops competing for
+   attention; new content arrives more slowly, after the exit has cleared.
+   --------------------------------------------------------------------------- */
+
+::view-transition-group(*) {
+  animation-timing-function: var(--ease-soft);
+}
+
+/* The overlay would otherwise swallow clicks for the length of the animation. */
+::view-transition {
+  pointer-events: none;
+}
+
+@keyframes page-fade {
+  from { opacity: 0; filter: blur(4px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+@keyframes page-slide {
+  from { translate: var(--slide-offset, 0) 0; }
+  to { translate: 0 0; }
+}
+
+@keyframes page-lift {
+  from { translate: 0 var(--lift-offset, 0); }
+  to { translate: 0 0; }
+}
+
+::view-transition-old(.nav-forward),
+::view-transition-old(.nav-back) {
+  animation:
+    150ms ease-in both page-fade reverse,
+    var(--dur-page) var(--ease-soft) both page-slide reverse;
+}
+
+::view-transition-new(.nav-forward),
+::view-transition-new(.nav-back) {
+  animation:
+    210ms ease-out 150ms both page-fade,
+    var(--dur-page) var(--ease-soft) both page-slide;
+}
+
+::view-transition-old(.nav-forward) { --slide-offset: -56px; }
+::view-transition-new(.nav-forward) { --slide-offset: 56px; }
+::view-transition-old(.nav-back) { --slide-offset: 56px; }
+::view-transition-new(.nav-back) { --slide-offset: -56px; }
+
+::view-transition-old(.page-shift) {
+  --lift-offset: -12px;
+  animation:
+    150ms ease-in both page-fade reverse,
+    var(--dur-page) var(--ease-soft) both page-lift reverse;
+}
+
+::view-transition-new(.page-shift) {
+  --lift-offset: 16px;
+  animation:
+    210ms ease-out 150ms both page-fade,
+    var(--dur-page) var(--ease-soft) both page-lift;
+}
+
+/* The header is the spatial anchor: it must not travel with the content.
+   Hiding the old snapshot avoids a flash of two headers mid-transition. */
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+
+::view-transition-old(site-header) {
+  display: none;
+}
+
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+}
 
 .app-stage { position: relative; perspective: 1200px; }
 .stage-caption { display: flex; justify-content: space-between; gap: 1rem; margin: 0 .75rem .65rem; color: var(--muted); font-size: .72rem; }
@@ -1655,7 +1747,11 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 .dictation-orb.active { transform: scale(1.05); background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 12px var(--accent-soft), 0 24px 50px -24px rgba(240,126,114,.9); }
 .dictation-orb svg { width: 1.7rem; }
 .waveform { width: 100%; max-width: 22.5rem; height: 4.5rem; overflow: visible; }
-.waveform rect { fill: var(--accent); opacity: .72; }
+/* Bars scale about their own centre, so the wave opens symmetrically around the
+   midline. At rest they collapse toward that line; anime.js drives them while
+   recording and hands them back to this transition when it stops. */
+.waveform rect { fill: var(--accent); opacity: .72; transform-box: fill-box; transform-origin: center; transform: scaleY(.22); transition: transform 560ms var(--ease-out), opacity 560ms var(--ease-out); }
+.waveform.is-active rect { transform: scaleY(1); transition: none; }
 .dictation-copy { max-width: 25rem; min-height: 3rem; margin: .4rem 0 0; color: var(--ink-2); text-align: center; }
 .meeting-view { min-height: 23rem; padding: 1.25rem; }
 .meeting-toolbar { display: flex; justify-content: space-between; color: var(--muted); font-size: .75rem; }

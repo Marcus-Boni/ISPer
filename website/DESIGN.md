@@ -144,6 +144,9 @@ Lenis owns wheel smoothing on pointer devices and is the single scroll source GS
 1. **Arrival** — the landing headline wipes up line by line behind its own mask, and the rest of the hero follows it once.
 2. **The settle** — the hero's product window is sticky while the copy scrolls past it, and a single scrubbed timeline squares its perspective as the hero leaves. This is the page's one orchestrated scroll moment.
 3. **Entrances** — sections differ by role: headings and their supporting line lead, grids stagger their own items, and the shortcut keys press in.
+4. **Navigation** — React's `<ViewTransition>` animates route changes. Content travels and the header does not: it is the reader's spatial anchor, so it holds its `view-transition-name` and its animation is suppressed. Going deeper slides left, coming back slides right, and moves between siblings lift in place instead, because a slide would claim a journey that did not happen. Direction is derived from route depth rather than hand-tagged per link, so the same header link reads correctly from every page.
+
+Old content leaves in 150ms so it stops competing for attention; new content arrives over 210ms, delayed until the exit has cleared, while its movement runs the full 420ms.
 
 Motion never hides content it cannot restore. Anything already on screen animates from a visible state, and a failsafe clears every from-state if the scroll layer stops reporting.
 
@@ -175,6 +178,8 @@ Motion never hides content it cannot restore. Anything already on screen animate
 - Documentation uses a sticky desktop tree and a collapsed mobile disclosure.
 
 ### Interactive App Stage
+
+The waveform is centred on its own midline and scales about that axis, so it opens symmetrically the way an audio meter does. At rest it collapses toward the line — an honest "not listening" state — and the resting height is a CSS transition the animation library hands back to when recording stops.
 
 The stage reproduces real ISPer states with synthetic content. It exposes dictation and meeting modes, speaker colors, waveform, keyboard shortcut and optional summary boundary without requesting microphone access.
 
