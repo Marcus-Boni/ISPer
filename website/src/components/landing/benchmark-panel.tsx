@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTablist } from "@/lib/use-tablist";
 
 /**
  * Two numbers, one of them measured.
@@ -95,6 +96,7 @@ const provenanceLabel = { measured: "Medido", scenario: "Cenário", contract: "C
 export function BenchmarkPanel() {
   const [active, setActive] = useState<View["id"]>("tempo");
   const view = views.find((item) => item.id === active) ?? views[0];
+  const { list: tabList, tabProps } = useTablist(["tempo", "custo"] as const, active, setActive);
 
   return (
     <div className="benchmark-panel">
@@ -103,17 +105,9 @@ export function BenchmarkPanel() {
           <h3>{view.title}</h3>
           <p>{view.note}</p>
         </div>
-        <div className="chart-tabs" role="tablist" aria-label="Métrica comparada">
+        <div className="chart-tabs" role="tablist" aria-label="Métrica comparada" ref={tabList}>
           {views.map((item) => (
-            <button
-              key={item.id}
-              id={`chart-tab-${item.id}`}
-              type="button"
-              role="tab"
-              aria-selected={item.id === active}
-              aria-controls="benchmark-figure"
-              onClick={() => setActive(item.id)}
-            >
+            <button key={item.id} id={`chart-tab-${item.id}`} type="button" aria-controls="benchmark-figure" {...tabProps(item.id)}>
               {item.tab}
             </button>
           ))}

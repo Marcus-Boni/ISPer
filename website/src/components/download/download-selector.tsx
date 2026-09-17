@@ -18,7 +18,7 @@ const variantCopy: Record<ReleaseVariant, { title: string; pitch: string }> = {
 
 type CopyState = "idle" | "copied" | "failed";
 
-export function DownloadSelector({ assets }: { assets: ReleaseAsset[] }) {
+export function DownloadSelector({ assets, notice }: { assets: ReleaseAsset[]; notice?: React.ReactNode }) {
   const [variant, setVariant] = useState<ReleaseVariant>("cpu");
   const [copyState, setCopyState] = useState<CopyState>("idle");
 
@@ -76,16 +76,22 @@ export function DownloadSelector({ assets }: { assets: ReleaseAsset[] }) {
         })}
       </div>
 
-      <div className="download-row">
-        <div>
-          <p className="download-kicker">Instalador selecionado</p>
-          <p className="download-file">{selected.name}</p>
-          <p className="download-size">{formatBytes(selected.sizeBytes)} · Windows {selected.arch}</p>
+      {/* The warning sits beside the button, not after it: the reader sees what
+          Windows is about to say while deciding to click, without the notice
+          pushing the primary action off the fold. */}
+      <div className="download-commit">
+        <div className="download-row">
+          <div>
+            <p className="download-kicker">Instalador selecionado</p>
+            <p className="download-file">{selected.name}</p>
+            <p className="download-size">{formatBytes(selected.sizeBytes)} · Windows {selected.arch}</p>
+          </div>
+          <a className="button button-primary button-large" href={selected.downloadUrl}>
+            <Download aria-hidden="true" />
+            Baixar instalador
+          </a>
         </div>
-        <a className="button button-primary button-large" href={selected.downloadUrl}>
-          <Download aria-hidden="true" />
-          Baixar instalador
-        </a>
+        {notice}
       </div>
 
       {/* The page asks the reader to verify the download, so it has to show the

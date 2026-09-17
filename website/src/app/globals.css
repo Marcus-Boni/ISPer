@@ -1100,11 +1100,29 @@ section[id],
   transform: translateX(3px);
 }
 
+/* A horizontal scroller has to admit it scrolls. The mask fades the cut edge so
+   it stops reading as the table's own border, and the region is focusable so a
+   keyboard user can reach the columns a pointer would drag to. */
 .comparison-wrap {
   position: relative;
   margin-top: 1.25rem;
   overflow: auto;
+  overscroll-behavior-x: contain;
   border-radius: var(--r-lg);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 2.5rem), transparent 100%);
+}
+
+/* Once the reader has scrolled to the end there is nothing left to hint at. */
+.comparison-wrap:not(:has(+ *)),
+.comparison-wrap:focus-visible {
+  mask-image: none;
+}
+
+.comparison-table caption small {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--muted-2);
+  font-size: 0.78rem;
 }
 
 .benchmark-panel {
@@ -1660,12 +1678,71 @@ section[id],
     flex-basis: 100%;
   }
 
+  /* Four columns in 380px means two of them are unreachable, so each criterion
+     becomes its own card with the column name beside every value. */
   .comparison-wrap {
-    overflow-x: auto;
+    overflow: visible;
+    mask-image: none;
+    border: 0;
+    background: none;
+    box-shadow: none;
   }
 
-  .comparison-table {
-    min-width: 34rem;
+  .comparison-table,
+  .comparison-table caption,
+  .comparison-table tbody,
+  .comparison-table tr,
+  .comparison-table td {
+    display: block;
+  }
+
+  .comparison-table thead {
+    display: none;
+  }
+
+  .comparison-table caption {
+    padding: 0 0 1rem;
+  }
+
+  .comparison-table tr {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: rgba(30, 26, 24, 0.76);
+    overflow: hidden;
+  }
+
+  .comparison-table tbody th {
+    display: block;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+    padding: 0.75rem 1rem;
+    color: var(--ink);
+    font-size: 0.92rem;
+  }
+
+  .comparison-table td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    border-top: 0;
+    padding: 0.6rem 1rem;
+  }
+
+  .comparison-table td + td {
+    border-top: 1px solid var(--line);
+  }
+
+  .comparison-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+
+  .comparison-table .isper-col {
+    box-shadow: inset 2px 0 0 rgba(132, 194, 151, 0.5);
   }
 
   .key-combo {
@@ -2204,8 +2281,84 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 }
 
 .download-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(11rem, max-content);
+  align-items: start;
+  gap: clamp(1.5rem, 4vw, 3rem);
+  margin-bottom: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+/* The measure cap belongs to the prose. Applying it to the column forced the
+   headline into three lines and pushed the whole choice down the page. */
+.download-head .section-lead {
   max-width: 62ch;
-  margin-bottom: clamp(2rem, 4vw, 3rem);
+}
+
+.release-meta {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.4rem 0 0;
+  border-left: 1px solid var(--line);
+  padding-left: clamp(1rem, 2vw, 1.5rem);
+}
+
+.release-meta > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.release-meta dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.release-meta dd {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.release-meta .text-link {
+  margin-top: 0.35rem;
+  font-size: 0.88rem;
+}
+
+.download-commit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem);
+  align-items: start;
+  gap: 1rem;
+}
+
+.download-panel .notice {
+  margin-top: 0;
+  padding: 1rem 1.15rem;
+}
+
+.download-panel .notice h2 {
+  font-size: 1rem;
+}
+
+.download-panel .notice p {
+  font-size: 0.88rem;
+}
+
+.download-panel .notice-steps {
+  font-size: 0.88rem;
+}
+
+.download-panel .notice .text-link {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 1080px) {
+  .download-commit {
+    grid-template-columns: 1fr;
+  }
 }
 
 .download-head h1,
@@ -2547,6 +2700,17 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.65;
+}
+
+@media (max-width: 880px) {
+  .download-head {
+    grid-template-columns: 1fr;
+  }
+
+  .release-meta {
+    border-left: 0;
+    padding-left: 0;
+  }
 }
 
 @media (max-width: 640px) {

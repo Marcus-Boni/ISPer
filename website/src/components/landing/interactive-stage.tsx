@@ -4,6 +4,7 @@ import { BookOpen, Mic, Pause, Play, RotateCcw, Search, Settings, Sparkles } fro
 import { Fragment } from "react";
 import { useEffect, useRef, useState } from "react";
 import { shortcut, siteConfig } from "@/lib/site";
+import { useTablist } from "@/lib/use-tablist";
 
 const WAVEFORM_BARS = 28;
 const BAR_SLOT = 13;
@@ -86,6 +87,9 @@ export function InteractiveStage() {
 
   const reset = () => { setActive(false); setStep(0); };
 
+  const modes = ["dictation", "meeting"] as const;
+  const { list: tabList, tabProps } = useTablist(modes, mode, (next) => { setMode(next); reset(); });
+
   /** Any deliberate interaction ends the scroll-driven sequence. */
   const takeOver = () => {
     if (!driven) return;
@@ -100,14 +104,14 @@ export function InteractiveStage() {
         <div className="app-titlebar">
           <div className="app-brand">ISPer<span>.</span><small>{siteConfig.currentVersion}</small></div>
           <div className={`app-state ${active ? "active" : ""}`}><i />{active ? (mode === "dictation" ? "ouvindo" : "gravando reunião") : "pronto"}</div>
-          <div className="app-tools"><button type="button" aria-label="Biblioteca"><BookOpen /></button><button type="button" aria-label="Configurações"><Settings /></button></div>
+          <div className="app-tools" aria-hidden="true"><span><BookOpen /></span><span><Settings /></span></div>
         </div>
-        <div className="stage-tabs" role="tablist" aria-label="Modo da demonstração">
-          <button id="stage-tab-dictation" type="button" role="tab" aria-selected={mode === "dictation"} aria-controls="stage-panel-dictation" onClick={() => { setMode("dictation"); reset(); }}>Ditado</button>
-          <button id="stage-tab-meeting" type="button" role="tab" aria-selected={mode === "meeting"} aria-controls="stage-panel-meeting" onClick={() => { setMode("meeting"); reset(); }}>Reunião</button>
+        <div className="stage-tabs" role="tablist" aria-label="Modo da demonstração" ref={tabList}>
+          <button id="stage-tab-dictation" type="button" aria-controls="stage-panel" {...tabProps("dictation")}>Ditado</button>
+          <button id="stage-tab-meeting" type="button" aria-controls="stage-panel" {...tabProps("meeting")}>Reunião</button>
         </div>
         {mode === "dictation" ? (
-          <div id="stage-panel-dictation" className="dictation-view" role="tabpanel" aria-labelledby="stage-tab-dictation">
+          <div id="stage-panel" className="dictation-view" role="tabpanel" aria-labelledby="stage-tab-dictation">
             <div className="shortcut-line"><span>Atalho padrão</span><div>{shortcut.default.map((chave, index) => <Fragment key={chave}>{index > 0 ? <b>+</b> : null}<kbd>{chave}</kbd></Fragment>)}</div></div>
             <div className={`dictation-orb ${active ? "active" : ""}`}><Mic aria-hidden="true" /></div>
             <svg ref={waveform} className={`waveform ${active ? "is-active" : ""}`} viewBox={`0 0 ${WAVEFORM_BARS * BAR_SLOT} ${WAVE_HEIGHT}`} role="img" aria-label={active ? "Forma de onda animada, ditado em andamento" : "Forma de onda em repouso"}>
@@ -116,7 +120,7 @@ export function InteractiveStage() {
             <p className="dictation-copy">{active ? "A documentação precisa ser clara desde o primeiro clique." : "Segure para falar. Solte para colar no aplicativo em foco."}</p>
           </div>
         ) : (
-          <div id="stage-panel-meeting" className="meeting-view" role="tabpanel" aria-labelledby="stage-tab-meeting">
+          <div id="stage-panel" className="meeting-view" role="tabpanel" aria-labelledby="stage-tab-meeting">
             <div className="meeting-toolbar"><span><i className="meeting-dot" />Reunião de lançamento</span><span className="mono">00:{String(step * 8).padStart(2, "0")}</span></div>
             <div className="transcript-list">
               {transcript.map((line, index) => <div className={`transcript-row ${index >= step && active ? "is-pending" : ""}`} key={line.time}><time>{line.time}</time><p><strong className={line.tone}>{line.speaker}</strong>{line.text}</p></div>)}
@@ -127,7 +131,7 @@ export function InteractiveStage() {
         <div className="stage-controls">
           <button type="button" className="stage-primary" onClick={() => setActive((value) => !value)}>{active ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}{active ? "Pausar" : mode === "dictation" ? "Experimentar ditado" : "Simular reunião"}</button>
           <button type="button" onClick={reset}><RotateCcw aria-hidden="true" />Reiniciar</button>
-          <span><Search aria-hidden="true" />Busca local na Biblioteca</span>
+          <span className="stage-note"><Search aria-hidden="true" />Busca local na Biblioteca</span>
         </div>
       </div>
     </div>

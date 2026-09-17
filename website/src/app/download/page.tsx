@@ -33,32 +33,39 @@ export default function DownloadPage() {
   return (
     <PageTransition>
       <main id="conteudo" className="download-page shell">
+        {/* Two columns so the fold carries the choice, not just the title. */}
         <header className="download-head">
-          <h1>Download do ISPer para Windows.</h1>
-          <p className="section-lead">
-            Escolha a variante que combina com seu hardware. CPU e CUDA são os caminhos verificados no repositório; DirectML/AMD ainda não é anunciado como backend distribuído.
-          </p>
-          <ul className="hero-proof">
-            <li><ShieldCheck aria-hidden="true" />{currentRelease.tag} · canal {currentRelease.channel}</li>
-            {published ? <li>Publicada em {published}</li> : null}
-            <li><a className="text-link" href={releaseLinks.current}>Ver release no GitHub <ArrowRight aria-hidden="true" /></a></li>
-          </ul>
+          <div>
+            <h1>Download do ISPer para Windows.</h1>
+            <p className="section-lead">
+              Escolha a variante que combina com seu hardware. CPU e CUDA são os caminhos verificados no repositório; DirectML/AMD ainda não é anunciado como backend distribuído.
+            </p>
+          </div>
+          <dl className="release-meta">
+            <div><dt>Versão</dt><dd>{currentRelease.tag}</dd></div>
+            <div><dt>Canal</dt><dd>{currentRelease.channel === "stable" ? "estável" : "prévia"}</dd></div>
+            {published ? <div><dt>Publicada</dt><dd>{published}</dd></div> : null}
+            <a className="text-link" href={releaseLinks.current}>Ver release no GitHub <ArrowRight aria-hidden="true" /></a>
+          </dl>
         </header>
 
-        <DownloadSelector assets={downloadVariants} />
-
-        {/* The scariest second of the funnel. The old page named the risk and left
-            the reader alone in front of the dialog. */}
-        <section className="notice notice-warn" aria-labelledby="smartscreen">
-          <h2 id="smartscreen"><ShieldAlert aria-hidden="true" />O Windows vai avisar na primeira execução</h2>
-          <p>
-            Esta release ainda não tem assinatura Authenticode, então o SmartScreen aparece ao abrir o instalador. Isso é esperado. Confira o SHA-256 acima e siga:
-          </p>
-          <ol className="notice-steps">
-            {smartScreenSteps.map((step) => <li key={step}>{step}</li>)}
-          </ol>
-          <Link className="text-link" href="/docs/referencia/releases/">Como a release é assinada e publicada <ArrowRight aria-hidden="true" /></Link>
-        </section>
+        <DownloadSelector
+          assets={downloadVariants}
+          notice={
+            /* What you are about to see, before "click here" — this used to sit
+               below the button that triggers the dialog. */
+            <section className="notice notice-warn" aria-labelledby="smartscreen">
+              <h2 id="smartscreen"><ShieldAlert aria-hidden="true" />O Windows vai avisar na primeira execução</h2>
+              <p>
+                Esta release ainda não tem assinatura Authenticode, então o SmartScreen aparece ao abrir o instalador. Isso é esperado.
+              </p>
+              <ol className="notice-steps">
+                {smartScreenSteps.map((step) => <li key={step}>{step}</li>)}
+              </ol>
+              <Link className="text-link" href="/docs/referencia/releases/">Como a release é assinada e publicada <ArrowRight aria-hidden="true" /></Link>
+            </section>
+          }
+        />
 
         <div className="download-grid">
           <section className="panel">
