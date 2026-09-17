@@ -2,35 +2,33 @@
 
 import { useEffect } from "react";
 import Lenis from "lenis";
+import { registerLenis } from "./scroll-engine";
 
-export function SmoothScrollProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function SmoothScrollProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-
-    if (prefersReducedMotion) return;
+    // Touch devices keep native momentum; reduced motion keeps native scrolling entirely.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (window.matchMedia("(pointer: coarse)").matches) return;
 
     const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      duration: 1.05,
+      easing: (t) => 1 - Math.pow(1 - t, 3.2),
       smoothWheel: true,
+      syncTouch: false,
+      anchors: { offset: -96 },
     });
 
-    let rafId: number;
-    function raf(time: number) {
+    registerLenis(lenis);
+
+    let frame = requestAnimationFrame(function raf(time: number) {
       lenis.raf(time);
-      rafId = requestAnimationFrame(raf);
-    }
-    rafId = requestAnimationFrame(raf);
+      frame = requestAnimationFrame(raf);
+    });
 
     return () => {
-      cancelAnimationFrame(rafId);
+      cancelAnimationFrame(frame);
       lenis.destroy();
+      registerLenis(null);
     };
   }, []);
 

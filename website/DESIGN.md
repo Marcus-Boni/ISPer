@@ -50,6 +50,15 @@ spacing:
   md: "16px"
   lg: "32px"
   section: "clamp(4rem, 9vw, 7rem)"
+shadows:
+  raised: "0 1px 2px rgba(0,0,0,0.32), 0 12px 28px -18px rgba(0,0,0,0.8)"
+  floating: "0 2px 6px rgba(0,0,0,0.3), 0 34px 70px -42px rgba(0,0,0,0.92)"
+  accent: "0 2px 5px rgba(0,0,0,0.28), 0 18px 34px -22px rgba(240,126,114,0.7)"
+motion:
+  easeOut: "cubic-bezier(0.16, 1, 0.3, 1)"
+  easeSoft: "cubic-bezier(0.32, 0.72, 0, 1)"
+  fast: "140ms"
+  mid: "260ms"
 components:
   button-primary:
     backgroundColor: "{colors.terracotta}"
@@ -120,11 +129,23 @@ Below 980px the landing becomes one column. Below 640px primary actions span the
 
 ## Elevation & Depth
 
-Depth is mainly tonal. Panels move from warm-void to panel and panel-raised; 1px warm borders define structure. Broad soft shadows belong to floating product windows, download focus and the final CTA. The sticky header uses 14px backdrop blur only after scrolling.
+Depth is mainly tonal. Panels move from warm-void to panel and panel-raised; 1px warm borders define structure. Broad soft shadows belong to floating product windows, download focus and the final CTA. The sticky header is transparent at the top of the page and only takes its border, tint and 14px backdrop blur after scrolling.
+
+Every shadow carries an offset as well as a blur; a zero-offset coloured halo is decoration, not elevation. Demonstration surfaces nested inside a card — the typed note, the search result, the command field — are recessed rather than raised, so they read as the application's own chrome instead of a second card.
 
 ## Shapes
 
-Cards and major panels use 12–16px radii. Buttons and fields use 8–12px. Full pills are limited to compact badges, chart switches and speaker labels. Borders and shadows are not stacked unless the shadow communicates a genuinely floating layer.
+Radii come from the `rounded` scale only: 16px for cards and major panels, 12px for buttons, fields and inner surfaces, 8px for the smallest controls and focus rings. Buttons and fields use 8–12px. Full pills are limited to compact badges, chart switches and speaker labels. Borders and shadows are not stacked unless the shadow communicates a genuinely floating layer.
+
+## Motion
+
+Lenis owns wheel smoothing on pointer devices and is the single scroll source GSAP's ScrollTrigger listens to; touch and reduced-motion users keep native scrolling. Three registers, and no more:
+
+1. **Arrival** — the landing headline wipes up line by line behind its own mask, and the rest of the hero follows it once.
+2. **The settle** — the hero's product window is sticky while the copy scrolls past it, and a single scrubbed timeline squares its perspective as the hero leaves. This is the page's one orchestrated scroll moment.
+3. **Entrances** — sections differ by role: headings and their supporting line lead, grids stagger their own items, and the shortcut keys press in.
+
+Motion never hides content it cannot restore. Anything already on screen animates from a visible state, and a failsafe clears every from-state if the scroll layer stops reporting.
 
 ## Components
 

@@ -22,10 +22,11 @@ export function CopyCommand() {
     <div className="command-card">
       <span className="command-label">Rodar pelo código · CPU</span>
       <code>{command}</code>
-      <button type="button" className="copy-button" onClick={copy} aria-label="Copiar comando">
+      <button type="button" className="copy-button" data-copied={copied} onClick={copy} aria-label="Copiar comando">
         {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
         {copied ? "Copiado" : "Copiar"}
       </button>
+      <span className="visually-hidden" role="status">{copied ? "Comando copiado para a área de transferência." : ""}</span>
     </div>
   );
 }

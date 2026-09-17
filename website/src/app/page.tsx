@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ArrowRight, AudioLines, BookOpen, BrainCircuit, Check, Code2, Download, Keyboard, LockKeyhole, Mic2, Search, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowRight, AudioLines, BookOpen, BrainCircuit, Check, Code2, Cpu, Download, Keyboard, LockKeyhole, Mic2, Search, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { CopyCommand } from "@/components/landing/copy-command";
 import { InteractiveStage } from "@/components/landing/interactive-stage";
 import { RevealEffects } from "@/components/landing/reveal-effects";
@@ -34,53 +34,59 @@ export default function Home() {
 
       <section className="hero shell">
         <div className="hero-copy">
-          <div className="hero-proof"><span><ShieldCheck aria-hidden="true" />Open source MIT</span><span>Windows · CPU e CUDA</span></div>
-          <h1>Suas palavras.<br /><em>No seu computador.</em></h1>
+          <h1>
+            <span className="hero-line-mask"><span className="hero-line">Suas palavras.</span></span>
+            <span className="hero-line-mask"><span className="hero-line"><em>No seu computador.</em></span></span>
+          </h1>
           <p className="hero-lead">Dite em qualquer aplicativo e transcreva reuniões com IA local. Sem mensalidade e sem enviar seu áudio para uma API.</p>
           <div className="hero-actions">
-            <Link className="button button-primary button-large" href="/download/"><Download aria-hidden="true" />Escolher instalador <span>{siteConfig.currentVersion}</span></Link>
+            <Link className="button button-primary button-large" href="/download/"><Download aria-hidden="true" />Escolher instalador<span className="button-tag">{siteConfig.currentVersion}</span></Link>
             <Link className="button button-secondary button-large" href="/docs/primeiros-passos/instalacao/"><BookOpen aria-hidden="true" />Ver instalação</Link>
           </div>
-          <p className="hero-note">Sem bot na chamada · instalador x64 · CPU ou CUDA para NVIDIA</p>
+          <ul className="hero-proof">
+            <li><ShieldCheck aria-hidden="true" />Open source MIT</li>
+            <li><Cpu aria-hidden="true" />Instalador x64 · CPU ou CUDA para NVIDIA</li>
+            <li><Users aria-hidden="true" />Sem bot na chamada</li>
+          </ul>
           <CopyCommand />
         </div>
         <div className="hero-stage"><InteractiveStage /></div>
       </section>
 
       <section className="trust-strip" aria-label="Características essenciais">
-        <div className="shell trust-grid"><span><LockKeyhole />Transcrição local</span><span><Mic2 />Ditado em qualquer app</span><span><Users />Falantes separados</span><span><Search />Histórico pesquisável</span></div>
+        <div className="shell trust-grid"><span><LockKeyhole aria-hidden="true" />Transcrição local</span><span><Mic2 aria-hidden="true" />Ditado em qualquer app</span><span><Users aria-hidden="true" />Falantes separados</span><span><Search aria-hidden="true" />Histórico pesquisável</span></div>
       </section>
 
       <section id="recursos" className="section shell" data-reveal>
         <div className="section-heading"><h2>Um fluxo contínuo entre falar, registrar e encontrar.</h2><p>O ISPer vive na bandeja do Windows. Você chama quando precisa e volta ao trabalho sem trocar de contexto.</p></div>
         <div className="bento-grid">
-          <article className="feature feature-wide feature-dictation"><div className="feature-copy"><Keyboard /><h3>Fale onde o cursor estiver</h3><p>Segure o atalho global, fale e solte. O texto é colado no campo em foco e seu clipboard anterior é restaurado.</p><div className="app-row"><span>Teams</span><span>Word</span><span>Terminal</span><span>Notion</span><span>WhatsApp</span></div></div><div className="typed-note"><span className="caret" />A próxima versão entra em homologação na sexta-feira.</div></article>
-          <article className="feature feature-meeting"><AudioLines /><h3>Reuniões sem um bot na sala</h3><p>O loopback captura a chamada; o microfone identifica você. A diarização local organiza o restante por participante.</p><div className="speaker-stack"><span className="p1">Participante 1</span><span className="p2">Participante 2</span><span className="me">Eu</span></div></article>
-          <article className="feature feature-intelligence"><BrainCircuit /><h3>IA sob sua escolha</h3><p>Resumos opcionais com Groq, Gemini ou Claude. Se a API falhar, o texto original continua preservado.</p><ul><li><Check />Transcrição e diarização locais</li><li><Check />Chaves no Credential Manager</li><li><Check />Revisão antes de usar</li></ul></article>
-          <article className="feature feature-wide feature-search"><div><Search /><h3>Encontre pelo sentido, não só pela palavra.</h3><p>A busca semântica percorre reuniões e ditados no SQLite. Use Gemini ou um endpoint compatível com OpenAI, incluindo Ollama local.</p></div><div className="search-demo"><div><Search /><span>quando decidimos o prazo?</span><kbd>Enter</kbd></div><p><strong>Reunião de lançamento</strong><mark>“A próxima versão entra em homologação na sexta-feira.”</mark></p></div></article>
+          <article className="feature feature-wide feature-dictation" data-reveal-item><div className="feature-copy"><span className="feature-icon"><Keyboard aria-hidden="true" /></span><h3>Fale onde o cursor estiver</h3><p>Segure o atalho global, fale e solte. O texto é colado no campo em foco e seu clipboard anterior é restaurado.</p><div className="app-row"><span>Teams</span><span>Word</span><span>Terminal</span><span>Notion</span><span>WhatsApp</span></div></div><div className="typed-note"><span className="caret" />A próxima versão entra em homologação na sexta-feira.</div></article>
+          <article className="feature feature-meeting" data-reveal-item><span className="feature-icon"><AudioLines aria-hidden="true" /></span><h3>Reuniões sem um bot na sala</h3><p>O loopback captura a chamada; o microfone identifica você. A diarização local organiza o restante por participante.</p><div className="speaker-stack"><span className="p1">Participante 1</span><span className="p2">Participante 2</span><span className="me">Eu</span></div></article>
+          <article className="feature feature-intelligence" data-reveal-item><span className="feature-icon"><BrainCircuit aria-hidden="true" /></span><h3>IA sob sua escolha</h3><p>Resumos opcionais com Groq, Gemini ou Claude. Se a API falhar, o texto original continua preservado.</p><ul className="feature-list"><li><Check aria-hidden="true" />Transcrição e diarização locais</li><li><Check aria-hidden="true" />Chaves no Credential Manager</li><li><Check aria-hidden="true" />Revisão antes de usar</li></ul></article>
+          <article className="feature feature-wide feature-search" data-reveal-item><div className="feature-copy"><span className="feature-icon"><Search aria-hidden="true" /></span><h3>Encontre pelo sentido, não só pela palavra.</h3><p>A busca semântica percorre reuniões e ditados no SQLite. Use Gemini ou um endpoint compatível com OpenAI, incluindo Ollama local.</p></div><div className="search-demo"><div className="search-demo-field"><Search aria-hidden="true" /><span>quando decidimos o prazo?</span><kbd>Enter</kbd></div><p><strong>Reunião de lançamento</strong><mark>“A próxima versão entra em homologação na sexta-feira.”</mark></p></div></article>
         </div>
       </section>
 
       <section className="stage-section" data-reveal>
-        <div className="shell stage-section-grid"><div><h2>Uma biblioteca que se torna memória de trabalho.</h2><p>Reuniões, ditados, resumos e momentos marcados ficam organizados localmente. Pesquise, revise os falantes e volte ao ponto exato da conversa.</p><Link className="text-link" href="/docs/busca-semantica/configuracao/">Entender a busca semântica <ArrowRight /></Link></div><div className="library-card"><div className="library-head"><span>Biblioteca</span><div><Search />buscar no título, resumo e transcript…</div></div><div className="library-list"><article><time>Hoje · 14:32</time><strong>Planejamento do lançamento</strong><p>3 participantes · 38 min · resumo pronto</p></article><article><time>Ontem · 09:10</time><strong>Revisão da documentação</strong><p>2 participantes · 24 min · 2 momentos</p></article><article><time>11 set · 16:45</time><strong>Notas por ditado</strong><p>12 trechos · processados localmente</p></article></div></div></div>
+        <div className="shell stage-section-grid"><div><h2>Uma biblioteca que se torna memória de trabalho.</h2><p className="section-lead">Reuniões, ditados, resumos e momentos marcados ficam organizados localmente. Pesquise, revise os falantes e volte ao ponto exato da conversa.</p><Link className="text-link" href="/docs/busca-semantica/configuracao/">Entender a busca semântica <ArrowRight aria-hidden="true" /></Link></div><div className="library-card" data-reveal-item><div className="library-head"><span>Biblioteca</span><div><Search aria-hidden="true" />buscar no título, resumo e transcript…</div></div><div className="library-list"><article><time>Hoje · 14:32</time><strong>Planejamento do lançamento</strong><p>3 participantes · 38 min · resumo pronto</p></article><article><time>Ontem · 09:10</time><strong>Revisão da documentação</strong><p>2 participantes · 24 min · 2 momentos</p></article><article><time>11 set · 16:45</time><strong>Notas por ditado</strong><p>12 trechos · processados localmente</p></article></div></div></div>
       </section>
 
       <section id="benchmarks" className="section shell" data-reveal>
-        <div className="section-heading benchmark-heading"><div><h2>Desempenho que você consegue auditar.</h2><p>Mostramos o que foi medido, o que é cálculo e o que ainda precisa de benchmark. Sem transformar estimativa em promessa.</p></div><Link className="text-link" href="/docs/referencia/benchmarks/">Ver metodologia <ArrowRight /></Link></div>
-        <BenchmarkChart />
-        <div className="comparison-wrap"><table className="comparison-table"><caption>Comparação de arquitetura e privacidade</caption><thead><tr><th>Critério</th><th className="isper-col">ISPer local</th><th>API de transcrição</th><th>Notetaker corporativo</th></tr></thead><tbody><tr><th>Áudio enviado para transcrever</th><td className="isper-col">Não</td><td>Sim</td><td>Sim</td></tr><tr><th>Mensalidade obrigatória</th><td className="isper-col">Não</td><td>Por uso</td><td>Geralmente</td></tr><tr><th>Bot entra na reunião</th><td className="isper-col">Não</td><td>Não se aplica</td><td>Frequentemente</td></tr><tr><th>Funciona sem internet após configurar</th><td className="isper-col">Transcrição: sim</td><td>Não</td><td>Não</td></tr><tr><th>Resumo</th><td className="isper-col">Provider opcional</td><td>Conforme API</td><td>Incluso no serviço</td></tr></tbody></table></div>
+        <div className="section-heading benchmark-heading"><div><h2>Desempenho que você consegue auditar.</h2><p className="section-lead">Mostramos o que foi medido, o que é cálculo e o que ainda precisa de benchmark. Sem transformar estimativa em promessa.</p></div><Link className="text-link" href="/docs/referencia/benchmarks/">Ver metodologia <ArrowRight aria-hidden="true" /></Link></div>
+        <div data-reveal-item><BenchmarkChart /></div>
+        <div className="comparison-wrap" data-reveal-item><table className="comparison-table"><caption>Comparação de arquitetura e privacidade</caption><thead><tr><th>Critério</th><th className="isper-col">ISPer local</th><th>API de transcrição</th><th>Notetaker corporativo</th></tr></thead><tbody><tr><th>Áudio enviado para transcrever</th><td className="isper-col">Não</td><td>Sim</td><td>Sim</td></tr><tr><th>Mensalidade obrigatória</th><td className="isper-col">Não</td><td>Por uso</td><td>Geralmente</td></tr><tr><th>Bot entra na reunião</th><td className="isper-col">Não</td><td>Não se aplica</td><td>Frequentemente</td></tr><tr><th>Funciona sem internet após configurar</th><td className="isper-col">Transcrição: sim</td><td>Não</td><td>Não</td></tr><tr><th>Resumo</th><td className="isper-col">Provider opcional</td><td>Conforme API</td><td>Incluso no serviço</td></tr></tbody></table></div>
       </section>
 
       <section className="shortcut-section" data-reveal>
-        <div className="shell shortcut-grid"><div><h2>O atalho desaparece. A ideia fica.</h2><p>O padrão é <strong>Ctrl + Alt + Espaço</strong>. Se houver conflito, o ISPer tenta combinações alternativas — e você pode gravar a sua nas Configurações.</p><Link className="text-link" href="/docs/solucao-de-problemas/atalhos/">Configurar atalhos <ArrowRight /></Link></div><div className="key-combo" aria-label="Ctrl mais Alt mais Espaço"><kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd>Espaço</kbd></div></div>
+        <div className="shell shortcut-grid"><div><h2>O atalho desaparece. A ideia fica.</h2><p className="section-lead">O padrão é <strong>Ctrl + Alt + Espaço</strong>. Se houver conflito, o ISPer tenta combinações alternativas — e você pode gravar a sua nas Configurações.</p><Link className="text-link" href="/docs/solucao-de-problemas/atalhos/">Configurar atalhos <ArrowRight aria-hidden="true" /></Link></div><div className="key-combo" aria-label="Ctrl mais Alt mais Espaço"><kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd>Espaço</kbd></div></div>
       </section>
 
       <section className="section shell" data-reveal>
         <div className="section-heading"><h2>Perguntas antes do primeiro ditado.</h2><p>As respostas curtas estão aqui. Os detalhes operacionais ficam na documentação versionada.</p></div>
-        <div className="faq-list">{faq.map(([question, answer]) => <details key={question}><summary>{question}<span>+</span></summary><p>{answer}</p></details>)}</div>
+        <div className="faq-list">{faq.map(([question, answer]) => <details key={question} data-reveal-item><summary>{question}<i aria-hidden="true" /></summary><p>{answer}</p></details>)}</div>
       </section>
 
-      <section className="final-cta shell" data-reveal><div><Sparkles /><h2>Transforme fala em trabalho pronto.</h2><p>Baixe o ISPer, escolha um modelo e faça seu primeiro ditado em poucos minutos.</p></div><div className="final-actions"><Link className="button button-primary button-large" href="/download/"><Download />Escolher instalador</Link><a className="button button-secondary button-large" href={siteConfig.repository}><Code2 />Ver código</a></div></section>
+      <section className="final-cta shell" data-reveal><div><Sparkles aria-hidden="true" /><h2>Transforme fala em trabalho pronto.</h2><p className="section-lead">Baixe o ISPer, escolha um modelo e faça seu primeiro ditado em poucos minutos.</p></div><div className="final-actions"><Link className="button button-primary button-large" href="/download/"><Download aria-hidden="true" />Escolher instalador</Link><a className="button button-secondary button-large" href={siteConfig.repository}><Code2 aria-hidden="true" />Ver código</a></div></section>
     </main>
   );
 }

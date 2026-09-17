@@ -4,21 +4,22 @@ import { useState } from "react";
 import AreaChart, { Area } from "@/components/charts/area-chart";
 import { Grid } from "@/components/charts/grid";
 import { ChartTooltip } from "@/components/charts/tooltip/chart-tooltip";
+import { XAxis } from "@/components/charts/x-axis";
 
 const timeData = [
-  { date: new Date("2026-01-01"), local: .62, cloud: 2.8 },
-  { date: new Date("2026-02-01"), local: .65, cloud: 3.2 },
-  { date: new Date("2026-03-01"), local: .59, cloud: 2.5 },
-  { date: new Date("2026-04-01"), local: .61, cloud: 3.8 },
-  { date: new Date("2026-05-01"), local: .6, cloud: 3.1 },
+  { date: new Date(2026, 0, 1), local: .62, cloud: 2.8 },
+  { date: new Date(2026, 1, 1), local: .65, cloud: 3.2 },
+  { date: new Date(2026, 2, 1), local: .59, cloud: 2.5 },
+  { date: new Date(2026, 3, 1), local: .61, cloud: 3.8 },
+  { date: new Date(2026, 4, 1), local: .6, cloud: 3.1 },
 ];
 
 const costData = [
-  { date: new Date("2026-01-01"), local: 0, cloud: 36 },
-  { date: new Date("2026-02-01"), local: 0, cloud: 72 },
-  { date: new Date("2026-03-01"), local: 0, cloud: 108 },
-  { date: new Date("2026-04-01"), local: 0, cloud: 144 },
-  { date: new Date("2026-05-01"), local: 0, cloud: 180 },
+  { date: new Date(2026, 0, 1), local: 0, cloud: 36 },
+  { date: new Date(2026, 1, 1), local: 0, cloud: 72 },
+  { date: new Date(2026, 2, 1), local: 0, cloud: 108 },
+  { date: new Date(2026, 3, 1), local: 0, cloud: 144 },
+  { date: new Date(2026, 4, 1), local: 0, cloud: 180 },
 ];
 
 export function BenchmarkChart() {
@@ -31,11 +32,13 @@ export function BenchmarkChart() {
         <div><h3>{tab === "tempo" ? "Tempo para 10,4 s de áudio" : "Tarifa acumulada de transcrição"}</h3><p>{tab === "tempo" ? "Medição local publicada no README; nuvem é cenário ilustrativo." : "Cenário ilustrativo de 600 min/mês a R$ 0,06/min."}</p></div>
         <div className="chart-tabs" role="tablist" aria-label="Métrica do gráfico"><button id="chart-tab-time" type="button" role="tab" aria-selected={tab === "tempo"} aria-controls="benchmark-chart-panel" onClick={() => setTab("tempo")}>Tempo</button><button id="chart-tab-cost" type="button" role="tab" aria-selected={tab === "custo"} aria-controls="benchmark-chart-panel" onClick={() => setTab("custo")}>Custo</button></div>
       </div>
+      <ul className="chart-legend"><li className="is-local">ISPer local</li><li className="is-cloud">Cenário nuvem</li><li className="chart-unit">{tab === "tempo" ? "segundos" : "reais acumulados"}</li></ul>
       <div id="benchmark-chart-panel" className="chart-canvas" role="tabpanel" aria-labelledby={tab === "tempo" ? "chart-tab-time" : "chart-tab-cost"} aria-label={tab === "tempo" ? "Gráfico comparativo de tempo" : "Gráfico comparativo de custo acumulado"}>
-        <AreaChart data={data} aspectRatio="2 / 1" animationDuration={700} margin={{ top: 24, right: 24, bottom: 30, left: 24 }}>
+        <AreaChart data={data} aspectRatio="2.6 / 1" animationDuration={700} margin={{ top: 24, right: 24, bottom: 30, left: 24 }}>
           <Grid horizontal vertical={false} stroke="var(--line-2)" strokeOpacity={.45} />
           <Area dataKey="cloud" stroke="var(--muted)" fill="var(--muted)" fillOpacity={.12} />
           <Area dataKey="local" stroke="var(--accent)" fill="var(--accent)" fillOpacity={.28} showMarkers />
+          <XAxis numTicks={5} />
           <ChartTooltip showDatePill={false} rows={(point) => [
             { label: "ISPer local", value: unit === "s" ? `${Number(point.local).toFixed(2)} s` : `R$ ${Number(point.local).toFixed(2)}`, color: "var(--accent)" },
             { label: "Cenário nuvem", value: unit === "s" ? `${Number(point.cloud).toFixed(2)} s` : `R$ ${Number(point.cloud).toFixed(2)}`, color: "var(--muted)" },
