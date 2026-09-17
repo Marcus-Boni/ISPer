@@ -148,7 +148,7 @@ export function DocSearch({ items, inputId = "docs-search" }: { items: SearchIte
         autoComplete="off"
         role="combobox"
         aria-expanded={open}
-        aria-controls={listId}
+        aria-controls={open ? listId : undefined}
         aria-autocomplete="list"
         aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined}
         className="doc-search-input"

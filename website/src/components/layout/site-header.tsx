@@ -31,9 +31,17 @@ export function SiteHeader() {
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
     document.body.dataset.menuOpen = "true";
     window.addEventListener("keydown", onKey);
+
+    // Widening past the breakpoint takes the close control away with it, so the
+    // menu closes itself rather than leaving the page locked behind two navs.
+    const desktop = window.matchMedia("(min-width: 981px)");
+    const onBreakpoint = (event: MediaQueryListEvent) => event.matches && setOpen(false);
+    desktop.addEventListener("change", onBreakpoint);
+
     return () => {
       delete document.body.dataset.menuOpen;
       window.removeEventListener("keydown", onKey);
+      desktop.removeEventListener("change", onBreakpoint);
     };
   }, [open]);
 

@@ -18,5 +18,16 @@ export function RouteLink({ href, ...props }: RouteLinkProps) {
   const pathname = usePathname();
   const target = typeof href === "string" ? href : (href.pathname ?? "");
 
-  return <Link href={href} transitionTypes={transitionTypesFor(pathname, target)} {...props} />;
+  // Next's own scroll restoration would race the anchor seek and win, landing
+  // the reader at the top with the section in the address bar.
+  const hasHash = target.includes("#");
+
+  return (
+    <Link
+      href={href}
+      scroll={hasHash ? false : undefined}
+      transitionTypes={transitionTypesFor(pathname, target)}
+      {...props}
+    />
+  );
 }
