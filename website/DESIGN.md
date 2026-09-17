@@ -177,6 +177,14 @@ Motion never hides content it cannot restore. Anything already on screen animate
 - Mobile navigation uses an explicit menu control.
 - Documentation uses a sticky desktop tree and a collapsed mobile disclosure.
 
+### Documentation rails
+
+Both rails are sticky columns offset by `--header-h`, so nothing they hold can end up beneath the header. Within a rail only the list scrolls: the search field and the section title stay put, because a reader mid-scroll should not lose the control they were reaching for. A list that genuinely overflows is masked at both edges to say there is more; one that fits is left alone rather than dimmed for symmetry.
+
+Smooth scrolling releases the wheel to any nested scroller that still has room, and those scrollers contain their own overscroll so reaching the end of a list does not carry on into the page.
+
+Heading anchors are slugged with the same implementation that renders the ids. Two slug functions for one document is a broken link waiting to happen, and in Portuguese it is most of them.
+
 ### Interactive App Stage
 
 The waveform is centred on its own midline and scales about that axis, so it opens symmetrically the way an audio meter does. At rest it collapses toward the line — an honest "not listening" state — and the resting height is a CSS transition the animation library hands back to when recording stops.

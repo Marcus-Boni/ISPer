@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import GithubSlugger from "github-slugger";
 
 const DOCS_ROOT = path.join(process.cwd(), "content", "docs");
 
@@ -38,17 +39,6 @@ export type DocNavItem = {
   section: string;
   items: Array<Pick<DocPage, "slug" | "href" | "frontmatter">>;
 };
-
-function slugify(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
-}
 
 function readFiles(dir: string): string[] {
   if (!fs.existsSync(dir)) {
@@ -100,14 +90,10 @@ function parseMarkdown(body: string) {
   const lines = body.replace(/\r\n/g, "\n").split("\n");
   const blocks: DocBlock[] = [];
   const headings: DocHeading[] = [];
-  const usedIds = new Map<string, number>();
-
-  const uniqueId = (text: string) => {
-    const base = slugify(text);
-    const count = usedIds.get(base) ?? 0;
-    usedIds.set(base, count + 1);
-    return count === 0 ? base : `${base}-${count + 1}`;
-  };
+  // One slugger per document, walked in document order, exactly as rehype-slug
+  // does — otherwise repeated headings would disagree on their suffix.
+  const slugger = new GithubSlugger();
+  const uniqueId = (text: string) => slugger.slug(text);
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];

@@ -40,28 +40,28 @@ function DocumentationNav({ nav, current }: { nav: DocNavItem[]; current?: DocPa
 
 export function DocsLayout({ nav, searchIndex, current, previous, next, children }: DocsLayoutProps) {
   return (
-    <main id="conteudo" className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
+    <main id="conteudo" className="docs-shell min-h-screen px-4 sm:px-6 lg:px-8">
       <details className="docs-mobile-nav mx-auto mb-2 max-w-7xl rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 lg:hidden">
         <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold text-[var(--ink)]"><Menu aria-hidden="true" className="h-4 w-4 text-[var(--accent)]" />Documentação</summary>
         <div className="mt-4"><DocSearch items={searchIndex} inputId="docs-search-mobile" /></div>
-        <div className="mt-5 max-h-[62vh] overflow-y-auto pr-2"><DocumentationNav nav={nav} current={current} /></div>
+        <div className="docs-nav-scroll mt-5 max-h-[62vh]"><DocumentationNav nav={nav} current={current} /></div>
       </details>
-      <div className="mx-auto grid max-w-7xl gap-8 py-8 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)_240px]">
-        <aside className="hidden lg:sticky lg:top-24 lg:block lg:h-[calc(100vh-7rem)] lg:overflow-auto">
-          <div className="mb-4">
-            <DocSearch items={searchIndex} inputId="docs-search-desktop" />
-          </div>
-          <div className="rounded-xl border border-[var(--line)] bg-[var(--panel)]/82 p-4 shadow-2xl shadow-black/20 backdrop-blur-xl">
-            <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+      <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)_240px]">
+        <aside className="docs-sidebar hidden lg:flex">
+          <DocSearch items={searchIndex} inputId="docs-search-desktop" />
+          <div className="docs-sidebar-card">
+            <div className="docs-sidebar-title">
               <Menu aria-hidden="true" className="h-4 w-4 text-[var(--accent)]" />
               Documentação
             </div>
-            <DocumentationNav nav={nav} current={current} />
+            <div className="docs-nav-scroll">
+              <DocumentationNav nav={nav} current={current} />
+            </div>
           </div>
         </aside>
 
         <section className="min-w-0">
-          <div className="mb-8 flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
+          <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
             <Link href="/docs" className="inline-flex items-center gap-2 hover:text-[var(--ink)]">
               <BookOpen aria-hidden="true" className="h-4 w-4" />
               Docs

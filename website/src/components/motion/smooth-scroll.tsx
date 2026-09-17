@@ -20,6 +20,9 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
       smoothWheel: true,
       syncTouch: false,
       anchors: { offset: -96 },
+      // Nested scrollers — the docs sidebar, code blocks, wide tables — take the
+      // wheel natively while they still have room, then hand it back to the page.
+      allowNestedScroll: true,
     });
 
     lenisRef.current = lenis;

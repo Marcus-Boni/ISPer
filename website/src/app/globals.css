@@ -1819,6 +1819,89 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 .chart-placeholder { min-height: 27rem; background: linear-gradient(100deg, var(--panel) 20%, var(--panel-2) 42%, var(--panel) 64%); background-size: 220% 100%; animation: chart-loading 1.4s ease-in-out infinite; }
 @keyframes chart-loading { to { background-position-x: -220%; } }
 
+/* ---------------------------------------------------------------------------
+   Documentation shell
+
+   Both rails are sticky columns that must clear the sticky header, and both
+   clip their own list rather than the page. Only the list scrolls: the search
+   field and the section title stay put, so the reader never loses the control
+   they were reaching for.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --docs-rail-top: calc(var(--header-h) + 1.5rem);
+  --docs-rail-height: calc(100svh - var(--header-h) - 3rem);
+}
+
+.docs-shell {
+  padding-block: 1.75rem 4rem;
+}
+
+.docs-sidebar {
+  position: sticky;
+  top: var(--docs-rail-top);
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: var(--docs-rail-height);
+}
+
+.docs-sidebar-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: rgba(30, 26, 24, 0.82);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-raised);
+}
+
+.docs-sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  padding: 0.85rem 1rem;
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.docs-toc {
+  position: sticky;
+  top: var(--docs-rail-top);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: var(--docs-rail-height);
+}
+
+/* The one scrolling region in each rail. `overscroll-behavior` stops a flick at
+   the end of the list from carrying on into the page, and the mask says there
+   is more above or below instead of letting entries end on a hard cut. */
+.docs-nav-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.85rem 1rem;
+  scrollbar-gutter: stable;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 1.15rem, #000 calc(100% - 1.15rem), transparent 100%);
+}
+
+/* The contents list usually fits, and a mask on a list that never scrolls just
+   dims its first and last entry for no reason. */
+.docs-toc .docs-nav-scroll {
+  padding: 0.25rem 0 0.85rem;
+  mask-image: none;
+}
+
+.docs-mobile-nav .docs-nav-scroll {
+  padding: 0 0.5rem 0 0;
+  mask-image: none;
+}
+
 .docs-prose { min-width: 0; max-width: 47.5rem; color: var(--ink-2); overflow-wrap: anywhere; }
 .docs-prose h1 { margin: 0 0 1.5rem; color: var(--ink); font: 550 clamp(2.65rem,5vw,4.6rem)/1.02 var(--font-display); letter-spacing: -.03em; text-wrap: balance; }
 .docs-prose h2 { margin: 3.6rem 0 1.1rem; scroll-margin-top: 6.25rem; color: var(--ink); font: 550 2rem/1.12 var(--font-display); letter-spacing: -.02em; }
