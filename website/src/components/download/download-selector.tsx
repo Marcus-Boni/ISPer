@@ -1,13 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Copy, Cpu, Download, MonitorCog } from "lucide-react";
+import { Check, Copy, Cpu, Download, FileCheck2, MonitorCog, TriangleAlert } from "lucide-react";
 import type { ReleaseAsset, ReleaseVariant } from "@/lib/releases";
 import { formatBytes } from "@/lib/releases";
 
+const variantCopy: Record<ReleaseVariant, { title: string; pitch: string }> = {
+  cpu: {
+    title: "Windows x64 · CPU",
+    pitch: "Funciona em qualquer PC com Windows 10 ou 11. Comece por aqui se não tiver certeza.",
+  },
+  cuda: {
+    title: "Windows x64 · CUDA",
+    pitch: "Acelera os modelos Whisper maiores usando uma GPU NVIDIA compatível.",
+  },
+};
+
+type CopyState = "idle" | "copied" | "failed";
+
 export function DownloadSelector({ assets }: { assets: ReleaseAsset[] }) {
   const [variant, setVariant] = useState<ReleaseVariant>("cpu");
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<CopyState>("idle");
 
   const selected = useMemo(
     () => assets.find((asset) => asset.variant === variant) ?? assets[0],
@@ -16,91 +29,95 @@ export function DownloadSelector({ assets }: { assets: ReleaseAsset[] }) {
 
   async function copyChecksum() {
     if (!selected?.sha256) return;
-    await navigator.clipboard.writeText(selected.sha256);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    try {
+      await navigator.clipboard.writeText(selected.sha256);
+      setCopyState("copied");
+    } catch {
+      // Clipboard access is refused in plenty of ordinary situations. The hash is
+      // on screen either way, so say what happened instead of failing silently.
+      setCopyState("failed");
+    }
+    window.setTimeout(() => setCopyState("idle"), 2600);
   }
 
   if (!selected) return null;
 
   return (
-    <div className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-6 shadow-[0_30px_90px_-55px_rgba(0,0,0,0.9)]">
-      <div className="flex flex-col gap-3 sm:flex-row" role="group" aria-label="Variante do instalador">
-        {assets.map((asset) => (
-          <button
-            key={asset.variant}
-            type="button"
-            aria-pressed={selected.variant === asset.variant}
-            onClick={() => setVariant(asset.variant)}
-            className={`flex-1 rounded-2xl border p-4 text-left transition-colors ${
-              selected.variant === asset.variant
-                ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                : "border-[var(--line)] bg-[var(--panel-2)] hover:border-[var(--line-2)]"
-            }`}
-          >
-            <span className="flex items-center gap-2 font-semibold">
-              {asset.variant === "cuda" ? (
-                <MonitorCog aria-hidden="true" className="h-5 w-5 text-[var(--info)]" />
-              ) : (
-                <Cpu aria-hidden="true" className="h-5 w-5 text-[var(--accent-2)]" />
-              )}
-              {asset.variant === "cuda" ? "Windows x64 CUDA" : "Windows x64 CPU"}
-            </span>
-            <span className="mt-2 block text-sm text-[var(--muted)]">
-              {asset.variant === "cuda"
-                ? "Para GPU NVIDIA compatível e driver atualizado."
-                : "Opção mais compatível para começar."}
-            </span>
-          </button>
-        ))}
+    <div className="download-panel">
+      {/* Both variants stay on screen: choosing between 9,8 MB and 422,8 MB should
+          not require remembering the card that disappeared. */}
+      <div className="variant-grid" role="group" aria-label="Variante do instalador">
+        {assets.map((asset) => {
+          const isSelected = selected.variant === asset.variant;
+          return (
+            <button
+              key={asset.variant}
+              type="button"
+              aria-pressed={isSelected}
+              onClick={() => setVariant(asset.variant)}
+              className={`variant-card ${isSelected ? "is-selected" : ""}`}
+            >
+              <span className="variant-head">
+                {asset.variant === "cuda" ? <MonitorCog aria-hidden="true" /> : <Cpu aria-hidden="true" />}
+                <span className="variant-title">{variantCopy[asset.variant].title}</span>
+                <span className="variant-check" aria-hidden="true">
+                  <Check />
+                </span>
+              </span>
+              <span className="variant-size">{formatBytes(asset.sizeBytes)}</span>
+              <span className="variant-pitch">{variantCopy[asset.variant].pitch}</span>
+              <span className="variant-reqs">
+                {asset.requirements.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--bg-2)] p-5">
-        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
-          <div>
-            <p className="text-sm text-[var(--muted)]">Instalador oficial</p>
-            <h2 className="mt-1 break-words font-mono text-lg font-semibold text-[var(--ink)]">
-              {selected.name}
-            </h2>
-            <p className="mt-2 text-sm text-[var(--ink-2)]">{formatBytes(selected.sizeBytes)}</p>
-          </div>
-          <a
-            href={selected.downloadUrl}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent-2)]"
-          >
-            <Download aria-hidden="true" className="h-5 w-5" />
-            Baixar .exe
-          </a>
+      <div className="download-row">
+        <div>
+          <p className="download-kicker">Instalador selecionado</p>
+          <p className="download-file">{selected.name}</p>
+          <p className="download-size">{formatBytes(selected.sizeBytes)} · Windows {selected.arch}</p>
         </div>
+        <a className="button button-primary button-large" href={selected.downloadUrl}>
+          <Download aria-hidden="true" />
+          Baixar instalador
+        </a>
+      </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div>
-            <h3 className="font-semibold">Requisitos</h3>
-            <ul className="mt-3 space-y-2 text-sm text-[var(--ink-2)]">
-              {selected.requirements.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <Check aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-[var(--good)]" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold">Integridade</h3>
-            <p className="mt-3 text-sm leading-6 text-[var(--ink-2)]">
-              SHA-256: {selected.sha256 ? "verificado" : "pendente no snapshot local"}
+      {/* The page asks the reader to verify the download, so it has to show the
+          thing they are verifying against, not just a button that writes it away. */}
+      <div className="integrity">
+        <p className="integrity-head">
+          <FileCheck2 aria-hidden="true" />
+          SHA-256 deste arquivo
+        </p>
+        {selected.sha256 ? (
+          <>
+            <code className="integrity-hash">{selected.sha256}</code>
+            <div className="integrity-actions">
+              <button type="button" className="copy-button" data-copied={copyState === "copied"} onClick={copyChecksum}>
+                {copyState === "copied" ? <Check aria-hidden="true" /> : copyState === "failed" ? <TriangleAlert aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                {copyState === "copied" ? "Copiado" : copyState === "failed" ? "Não foi possível copiar" : "Copiar"}
+              </button>
+              {selected.checksumSource ? (
+                <a href={selected.checksumSource} className="text-link">
+                  Abrir SHA256SUMS.txt
+                </a>
+              ) : null}
+            </div>
+            <p className="integrity-note" role="status">
+              {copyState === "failed"
+                ? "O navegador bloqueou a área de transferência. Selecione o texto acima e copie manualmente."
+                : "Compare com o valor do arquivo baixado antes de instalar em ambiente controlado."}
             </p>
-            <button
-              type="button"
-              onClick={copyChecksum}
-              disabled={!selected.sha256}
-              className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-55"
-            >
-              <Copy aria-hidden="true" className="h-4 w-4" />
-              {copied ? "Copiado" : "Copiar checksum"}
-            </button>
-          </div>
-        </div>
+          </>
+        ) : (
+          <p className="integrity-note">Soma ainda pendente no snapshot local desta release.</p>
+        )}
       </div>
     </div>
   );

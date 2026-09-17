@@ -42,7 +42,9 @@ export function RevealEffects() {
           .from(".hero-proof li, .command-card > *", { y: 12, opacity: 0, duration: 0.6, stagger: 0.05 }, 0.62)
           .from(".trust-grid > *", { y: 10, opacity: 0, duration: 0.6, stagger: 0.05 }, 0.78);
 
-        /* 2. The one scrubbed moment: the app window settles square as the hero leaves. */
+        /* 2. The one scrubbed moment: the app window settles square as the hero
+              leaves, and the stage plays the two things the page is about to
+              explain while it holds. The reader can take it over at any point. */
         const media = gsap.matchMedia();
         media.add("(min-width: 1081px)", () => {
           gsap.to(".hero-stage .app-window", {
@@ -59,6 +61,40 @@ export function RevealEffects() {
               invalidateOnRefresh: true,
             },
           });
+
+          let released = false;
+          const onReleased = () => { released = true; };
+          window.addEventListener("isper:stage-released", onReleased);
+
+          let current = "";
+          const drive = (mode: "dictation" | "meeting", active: boolean) => {
+            if (released) return;
+            const next = `${mode}:${active}`;
+            if (next === current) return;
+            current = next;
+            window.dispatchEvent(new CustomEvent("isper:stage", { detail: { mode, active } }));
+          };
+
+          const beats: Array<[number, "dictation" | "meeting", boolean]> = [
+            [0, "dictation", false],
+            [0.28, "dictation", true],
+            [0.66, "meeting", true],
+          ];
+
+          ScrollTrigger.create({
+            trigger: ".hero",
+            start: "top top",
+            end: "bottom 42%",
+            invalidateOnRefresh: true,
+            onUpdate: (self) => {
+              const beat = [...beats].reverse().find(([at]) => self.progress >= at);
+              if (beat) drive(beat[1], beat[2]);
+            },
+            onLeave: () => drive("meeting", false),
+            onLeaveBack: () => drive("dictation", false),
+          });
+
+          return () => window.removeEventListener("isper:stage-released", onReleased);
         });
 
         /* 3. Section entrances, one register per section role. */

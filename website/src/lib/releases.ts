@@ -40,16 +40,25 @@ export function getAssetByVariant(variant: ReleaseVariant) {
   return downloadVariants.find((asset) => asset.variant === variant);
 }
 
+/**
+ * Decimal units, because the reader is comparing this against what GitHub and
+ * the browser report for the same file. Dividing by 1024 and writing "MB" names
+ * the wrong unit, and this is the page whose whole subject is byte-exact checks.
+ */
 export function formatBytes(sizeBytes: number | null) {
   if (!sizeBytes) return "Tamanho pendente de verificação";
-  const units = ["B", "KB", "MB", "GB"];
+  const units = ["B", "kB", "MB", "GB"];
   let value = sizeBytes;
   let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
+  while (value >= 1000 && unit < units.length - 1) {
+    value /= 1000;
     unit += 1;
   }
-  return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+  const formatted = value.toLocaleString("pt-BR", {
+    minimumFractionDigits: unit === 0 ? 0 : 1,
+    maximumFractionDigits: unit === 0 ? 0 : 1,
+  });
+  return `${formatted} ${units[unit]}`;
 }
 
 export const releaseIntegrityNotice =

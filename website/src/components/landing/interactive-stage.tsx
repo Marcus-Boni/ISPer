@@ -31,7 +31,27 @@ export function InteractiveStage() {
   const [mode, setMode] = useState<"dictation" | "meeting">("dictation");
   const [active, setActive] = useState(false);
   const [step, setStep] = useState(0);
+  const [driven, setDriven] = useState(false);
   const waveform = useRef<SVGSVGElement>(null);
+
+  /**
+   * The motion layer owns scroll, so it drives the stage by event rather than by
+   * prop — this component sits under a server component and there is nothing to
+   * thread a prop through. A click anywhere in the stage takes control back for
+   * good: a reader who is operating the demo should not have the page argue.
+   */
+  useEffect(() => {
+    const onDrive = (event: Event) => {
+      const detail = (event as CustomEvent<{ mode: "dictation" | "meeting"; active: boolean }>).detail;
+      if (!detail) return;
+      setDriven(true);
+      setMode(detail.mode);
+      setActive(detail.active);
+      setStep(0);
+    };
+    window.addEventListener("isper:stage", onDrive);
+    return () => window.removeEventListener("isper:stage", onDrive);
+  }, []);
 
   useEffect(() => {
     if (!active || !waveform.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -64,8 +84,15 @@ export function InteractiveStage() {
 
   const reset = () => { setActive(false); setStep(0); };
 
+  /** Any deliberate interaction ends the scroll-driven sequence. */
+  const takeOver = () => {
+    if (!driven) return;
+    setDriven(false);
+    window.dispatchEvent(new CustomEvent("isper:stage-released"));
+  };
+
   return (
-    <div className="app-stage" aria-label="Demonstração interativa do ISPer">
+    <div className="app-stage" aria-label="Demonstração interativa do ISPer" onClickCapture={takeOver} onKeyDownCapture={takeOver}>
       <div className="stage-caption"><span>Demonstração</span><span>Conteúdo fictício · nenhum áudio é capturado</span></div>
       <div className="app-window">
         <div className="app-titlebar">

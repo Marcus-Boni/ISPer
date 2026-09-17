@@ -142,7 +142,9 @@ Radii come from the `rounded` scale only: 16px for cards and major panels, 12px 
 Lenis owns wheel smoothing on pointer devices and is the single scroll source GSAP's ScrollTrigger listens to; touch and reduced-motion users keep native scrolling. Three registers, and no more:
 
 1. **Arrival** — the landing headline wipes up line by line behind its own mask, and the rest of the hero follows it once.
-2. **The settle** — the hero's product window is sticky while the copy scrolls past it, and a single scrubbed timeline squares its perspective as the hero leaves. This is the page's one orchestrated scroll moment.
+2. **The settle** — the hero's product window is sticky while the copy scrolls past it, and a single scrubbed timeline squares its perspective as the hero leaves. This is the page's one orchestrated scroll moment. It needs runway: the hero runs past one viewport so the stage has somewhere to hold, and the stage's column stretches to the full row so the sticky child has slack. At exactly one viewport the column was 84px taller than the stage, which is a twitch, not a moment.
+
+   While it holds, the stage plays the two things the page is about to explain — dictation, then a meeting — driven by scroll progress rather than a timer. The motion layer dispatches the state and the component owns its own UI; any deliberate click or keypress inside the stage ends the sequence for good, because a reader operating the demo should not have the page argue with them.
 3. **Entrances** — sections differ by role: headings and their supporting line lead, grids stagger their own items, and the shortcut keys press in.
 4. **Navigation** — React's `<ViewTransition>` animates route changes. Content travels and the header does not: it is the reader's spatial anchor, so it holds its `view-transition-name` and its animation is suppressed. Going deeper slides left, coming back slides right, and moves between siblings lift in place instead, because a slide would claim a journey that did not happen. Direction is derived from route depth rather than hand-tagged per link, so the same header link reads correctly from every page.
 
@@ -151,6 +153,12 @@ Old content leaves in 150ms so it stops competing for attention; new content arr
 Motion never hides content it cannot restore. Anything already on screen animates from a visible state, and a failsafe clears every from-state if the scroll layer stops reporting.
 
 ## Components
+
+### Download selection
+
+Both installer variants stay on screen with their size and requirements. A 9,8 MB choice and a 422,8 MB choice cannot be compared from memory, and the difference between them is the most decision-relevant fact on the page. Selecting raises a card rather than erasing the other, and carries a check so the state is never held by colour alone.
+
+The page asks the reader to verify what they downloaded, so it shows the hash it is asking about, beside a link to the signed list — not a button that writes the value somewhere they cannot see. The unsigned-binary warning names the SmartScreen dialog and gives the literal steps through it; a warning without a recovery path just leaves the reader stuck at the scariest moment.
 
 ### Buttons
 
