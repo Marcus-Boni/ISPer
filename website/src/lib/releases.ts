@@ -62,7 +62,7 @@ export function formatBytes(sizeBytes: number | null) {
 }
 
 export const releaseIntegrityNotice =
-  "Dados conferidos na release pública v0.15.0 em 16/09/2026. Compare o arquivo baixado com SHA256SUMS.txt antes de instalar em ambientes controlados.";
+  "Dados conferidos na release pública v0.15.0 em 16/09/2026.";
 
 export const sourceInstallSteps = [
   "Instale Rust stable, Visual Studio Build Tools com C++ e Git.",

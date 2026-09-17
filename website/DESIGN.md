@@ -102,7 +102,9 @@ The palette is dark and warm rather than blue-black. Terracotta marks action and
 
 **The Scarce Coral Rule.** Terracotta is reserved for primary actions, active controls, recording state and the key phrase. Large surfaces remain neutral.
 
-The rule is easiest to break in documentation, where a marker on every bullet and a colour on every inline code token spend it on ordinary prose — so by the time a real control appears the colour no longer signals anything. In the docs, terracotta belongs to the active navigation item and the active contents entry, and nothing else.
+**One name per thing.** The provedor is the only part of the system that can carry text off the machine, so it has one spelling everywhere — "provedor", never "provider". Two names for the load-bearing noun in a privacy claim reads as a draft, and that is the sentence an evaluator screenshots. English identifiers survive only where they name a literal CLI value or app control, inside code formatting.
+
+The Scarce Coral Rule is easiest to break in documentation, where a marker on every bullet and a colour on every inline code token spend it on ordinary prose — so by the time a real control appears the colour no longer signals anything. In the docs, terracotta belongs to the active navigation item and the active contents entry, and nothing else.
 
 **The Named Speaker Rule.** Speaker color always appears with a textual speaker name. Color never carries identity alone.
 
@@ -119,6 +121,8 @@ benchmarks and the close keep the headline.
 
 **Body Font:** Hanken Grotesk with system-ui fallback.
 **Code Font:** Cascadia Mono with JetBrains Mono and Consolas fallbacks.
+
+Only the sections that carry the argument take the headline step — the thesis, the audited numbers, and the close. Everything else takes the section step. When five of seven headlines shared one size the page had a single volume, and a reader could not tell which section mattered.
 
 Fraunces supplies the product's human, editorial voice. Hanken Grotesk keeps controls and long-form documentation calm. Monospace is reserved for commands, paths, timestamps and checksums.
 
@@ -167,7 +171,7 @@ Motion never hides content it cannot restore. Anything already on screen animate
 
 Both installer variants stay on screen with their size and requirements. A 9,8 MB choice and a 422,8 MB choice cannot be compared from memory, and the difference between them is the most decision-relevant fact on the page. Selecting raises a card rather than erasing the other, and carries a check so the state is never held by colour alone.
 
-The page asks the reader to verify what they downloaded, so it shows the hash it is asking about, beside a link to the signed list — not a button that writes the value somewhere they cannot see. The unsigned-binary warning names the SmartScreen dialog and gives the literal steps through it; a warning without a recovery path just leaves the reader stuck at the scariest moment.
+The page asks the reader to verify what they downloaded, so it shows both halves of that check as numbered steps: the PowerShell command that produces a hash for the file they just saved, and the published hash to compare it against. An instruction to compare a checksum without the command that produces one is an instruction nobody can follow, and this is a Windows-only product, so the command is the Windows one. The signed list opens in its own tab, because it should not replace the value being compared against. The unsigned-binary warning names the SmartScreen dialog and gives the literal steps through it; a warning without a recovery path just leaves the reader stuck at the scariest moment.
 
 ### Buttons
 
@@ -212,7 +216,7 @@ Heading anchors are slugged with the same implementation that renders the ids. T
 
 The waveform is centred on its own midline and scales about that axis, so it opens symmetrically the way an audio meter does. At rest it collapses toward the line — an honest "not listening" state — and the resting height is a CSS transition the animation library hands back to when recording stops.
 
-The stage reproduces real ISPer states with synthetic content. It exposes dictation and meeting modes, speaker colors, waveform, keyboard shortcut and optional summary boundary without requesting microphone access.
+The stage reproduces real ISPer states with synthetic content, and the states have to be true to themselves: the meeting transcript fills and then holds rather than wrapping, because a recording clock that counts back to zero while the chip still reads "gravando reunião" tells the reader the whole thing is theatre — on a page whose thesis is that its numbers can be audited. It exposes dictation and meeting modes, speaker colors, waveform, keyboard shortcut and optional summary boundary without requesting microphone access.
 
 ## Do's and Don'ts
 

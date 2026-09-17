@@ -79,9 +79,15 @@ export function InteractiveStage() {
     return () => cancel();
   }, [active]);
 
+  /**
+   * The transcript fills one line at a time and then holds. It used to wrap back
+   * to zero, which reset the clock too — a recording timer counting down to
+   * 00:00 while the chip still read "gravando reunião" is the one detail that
+   * tells a reader the state is theatre.
+   */
   useEffect(() => {
     if (!active) return;
-    const timer = window.setInterval(() => setStep((value) => (value + 1) % (transcript.length + 1)), 1500);
+    const timer = window.setInterval(() => setStep((value) => Math.min(value + 1, transcript.length)), 1500);
     return () => window.clearInterval(timer);
   }, [active]);
 
@@ -121,7 +127,7 @@ export function InteractiveStage() {
           </div>
         ) : (
           <div id="stage-panel" className="meeting-view" role="tabpanel" aria-labelledby="stage-tab-meeting">
-            <div className="meeting-toolbar"><span><i className="meeting-dot" />Reunião de lançamento</span><span className="mono">00:{String(step * 8).padStart(2, "0")}</span></div>
+            <div className="meeting-toolbar"><span><i className="meeting-dot" />Reunião de lançamento</span><span className="mono">00:{String(Math.min(step * 8, 24)).padStart(2, "0")}</span></div>
             <div className="transcript-list">
               {transcript.map((line, index) => <div className={`transcript-row ${index >= step && active ? "is-pending" : ""}`} key={line.time}><time>{line.time}</time><p><strong className={line.tone}>{line.speaker}</strong>{line.text}</p></div>)}
             </div>

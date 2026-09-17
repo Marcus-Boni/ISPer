@@ -17,7 +17,7 @@ Ao encerrar, o ISPer salva:
 
 - Markdown em `Documentos\ISPer\Reunioes\*.md`.
 - Histórico e segmentos no SQLite local.
-- Resumo, título e itens de ação quando um provider de IA estiver configurado.
+- Resumo, título e itens de ação quando um provedor de IA estiver configurado.
 
 ## Captura do sistema
 

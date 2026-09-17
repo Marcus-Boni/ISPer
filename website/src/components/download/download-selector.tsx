@@ -17,30 +17,34 @@ const variantCopy: Record<ReleaseVariant, { title: string; pitch: string }> = {
 };
 
 type CopyState = "idle" | "copied" | "failed";
+type CopyTarget = "hash" | "command";
 
 export function DownloadSelector({ assets, notice }: { assets: ReleaseAsset[]; notice?: React.ReactNode }) {
   const [variant, setVariant] = useState<ReleaseVariant>("cpu");
-  const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [copyState, setCopyState] = useState<Record<CopyTarget, CopyState>>({ hash: "idle", command: "idle" });
 
   const selected = useMemo(
     () => assets.find((asset) => asset.variant === variant) ?? assets[0],
     [assets, variant],
   );
 
-  async function copyChecksum() {
-    if (!selected?.sha256) return;
+  async function copy(target: CopyTarget, value: string) {
+    let result: CopyState;
     try {
-      await navigator.clipboard.writeText(selected.sha256);
-      setCopyState("copied");
+      await navigator.clipboard.writeText(value);
+      result = "copied";
     } catch {
-      // Clipboard access is refused in plenty of ordinary situations. The hash is
-      // on screen either way, so say what happened instead of failing silently.
-      setCopyState("failed");
+      // Clipboard access is refused in plenty of ordinary situations. Both values
+      // are on screen either way, so say what happened instead of failing silently.
+      result = "failed";
     }
-    window.setTimeout(() => setCopyState("idle"), 2600);
+    setCopyState((state) => ({ ...state, [target]: result }));
+    window.setTimeout(() => setCopyState((state) => ({ ...state, [target]: "idle" })), 2600);
   }
 
   if (!selected) return null;
+
+  const hashCommand = `Get-FileHash .\\${selected.name} -Algorithm SHA256`;
 
   return (
     <div className="download-panel">
@@ -94,31 +98,44 @@ export function DownloadSelector({ assets, notice }: { assets: ReleaseAsset[]; n
         {notice}
       </div>
 
-      {/* The page asks the reader to verify the download, so it has to show the
-          thing they are verifying against, not just a button that writes it away. */}
+      {/* Telling someone to compare a checksum without giving them the command
+          that produces one is an instruction they cannot follow. This is a
+          Windows-only product, so the command is the PowerShell one. */}
       <div className="integrity">
         <p className="integrity-head">
           <FileCheck2 aria-hidden="true" />
-          SHA-256 deste arquivo
+          Conferir o que você baixou
         </p>
         {selected.sha256 ? (
           <>
-            <code className="integrity-hash">{selected.sha256}</code>
-            <div className="integrity-actions">
-              <button type="button" className="copy-button" data-copied={copyState === "copied"} onClick={copyChecksum}>
-                {copyState === "copied" ? <Check aria-hidden="true" /> : copyState === "failed" ? <TriangleAlert aria-hidden="true" /> : <Copy aria-hidden="true" />}
-                {copyState === "copied" ? "Copiado" : copyState === "failed" ? "Não foi possível copiar" : "Copiar"}
-              </button>
-              {selected.checksumSource ? (
-                <a href={selected.checksumSource} className="text-link">
-                  Abrir SHA256SUMS.txt
-                </a>
-              ) : null}
-            </div>
+            <ol className="integrity-steps">
+              <li>
+                <span className="integrity-label">1 · Rode no PowerShell, na pasta do download</span>
+                <code className="integrity-value">{hashCommand}</code>
+                <button type="button" className="copy-button" data-copied={copyState.command === "copied"} onClick={() => copy("command", hashCommand)}>
+                  {copyState.command === "copied" ? <Check aria-hidden="true" /> : copyState.command === "failed" ? <TriangleAlert aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                  {copyState.command === "copied" ? "Copiado" : copyState.command === "failed" ? "Não foi possível copiar" : "Copiar comando"}
+                </button>
+              </li>
+              <li>
+                <span className="integrity-label">2 · Compare com este valor</span>
+                <code className="integrity-value integrity-hash">{selected.sha256}</code>
+                <button type="button" className="copy-button" data-copied={copyState.hash === "copied"} onClick={() => copy("hash", selected.sha256 ?? "")}>
+                  {copyState.hash === "copied" ? <Check aria-hidden="true" /> : copyState.hash === "failed" ? <TriangleAlert aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                  {copyState.hash === "copied" ? "Copiado" : copyState.hash === "failed" ? "Não foi possível copiar" : "Copiar soma"}
+                </button>
+              </li>
+            </ol>
+            {selected.checksumSource ? (
+              <a href={selected.checksumSource} className="text-link" target="_blank" rel="noreferrer noopener">
+                Abrir SHA256SUMS.txt
+                <span className="visually-hidden">(abre em nova aba)</span>
+              </a>
+            ) : null}
             <p className="integrity-note" role="status">
-              {copyState === "failed"
-                ? "O navegador bloqueou a área de transferência. Selecione o texto acima e copie manualmente."
-                : "Compare com o valor do arquivo baixado antes de instalar em ambiente controlado."}
+              {copyState.hash === "failed" || copyState.command === "failed"
+                ? "O navegador bloqueou a área de transferência. Selecione o texto e copie manualmente."
+                : "Se as duas linhas forem iguais, o arquivo é o publicado na release."}
             </p>
           </>
         ) : (

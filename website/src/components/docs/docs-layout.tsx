@@ -76,6 +76,8 @@ export function DocsLayout({ nav, searchIndex, current, previous, next, children
             ) : null}
           </nav>
 
+          {current ? <OnThisPage headings={current.headings} variant="inline" /> : null}
+
           {children}
 
           {current ? (

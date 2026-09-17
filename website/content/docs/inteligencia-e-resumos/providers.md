@@ -1,6 +1,6 @@
 ---
 title: "Inteligência e resumos"
-description: "Conecte Groq, Gemini, Claude ou outro provider compatível para gerar resumos e insights."
+description: "Conecte Groq, Gemini, Claude ou outro provedor compatível para gerar resumos e insights."
 section: "Inteligência e Resumos"
 order: 60
 ---
@@ -9,9 +9,9 @@ order: 60
 
 O ISPer transcreve localmente. A camada de inteligência é opcional e trabalha sobre texto: resumo, decisões, pontos principais, action items, título automático e insights ao vivo.
 
-## Providers disponíveis
+## Provedores disponíveis
 
-O README do projeto documenta providers `groq`, `gemini` e `claude` para resumo. A chave fica no Credential Manager do Windows, não em arquivo de configuração do projeto.
+O README do projeto documenta os provedores `groq`, `gemini` e `claude` para resumo. A chave fica no Credential Manager do Windows, não em arquivo de configuração do projeto.
 
 ```powershell
 cargo run --release -p isper-cli -- llm use groq
@@ -21,14 +21,14 @@ cargo run --release -p isper-cli -- llm test
 
 ## O que é enviado
 
-Somente o texto do transcript ou do ditado polido é enviado ao provider configurado. O áudio permanece local.
+Somente o texto do transcript ou do ditado polido é enviado ao provedor configurado. O áudio permanece local.
 
 > [!WARNING/Atenção]
-> Antes de usar providers de nuvem, confirme se a política da sua organização permite enviar transcrições para esse serviço.
+> Antes de usar provedores de nuvem, confirme se a política da sua organização permite enviar transcrições para esse serviço.
 
-## Sem provider
+## Sem provedor
 
-Sem provider configurado, ditado, reuniões, Biblioteca, exportações e transcrição continuam funcionando. Apenas os recursos de resumo, polimento e insights ficam indisponíveis.
+Sem provedor configurado, ditado, reuniões, Biblioteca, exportações e transcrição continuam funcionando. Apenas os recursos de resumo, polimento e insights ficam indisponíveis.
 
 ## Insights ao vivo
 

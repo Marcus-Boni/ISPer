@@ -19,4 +19,4 @@ Com Gemini, OpenAI, Mistral ou outro endpoint remoto, os trechos necessários à
 
 ## Troca de modelo
 
-Ao trocar provider, modelo ou dimensão, reconstrua o índice. O ISPer evita comparar vetores incompatíveis, mas a decisão sobre qual provedor pode receber o texto continua sendo sua.
+Ao trocar provedor, modelo ou dimensão, reconstrua o índice. O ISPer evita comparar vetores incompatíveis, mas a decisão sobre qual provedor pode receber o texto continua sendo sua.

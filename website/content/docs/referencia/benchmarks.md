@@ -22,4 +22,4 @@ O README registra 10,4 segundos de áudio transcritos em 0,6 segundo numa RTX 40
 
 Os valores de serviço em nuvem e economia exibidos na landing são identificados como cenários. Eles não são atribuídos a um fornecedor e não substituem cotação atualizada.
 
-O custo local de API de transcrição é R$ 0,00. Hardware, energia e providers opcionais de resumo continuam fora desse valor.
+O custo local de API de transcrição é R$ 0,00. Hardware, energia e provedores opcionais de resumo continuam fora desse valor.

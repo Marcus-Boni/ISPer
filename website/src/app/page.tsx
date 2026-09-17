@@ -33,7 +33,7 @@ const comparison: Array<{ criterion: string; cells: Array<{ text: string; verdic
   { criterion: "Funciona sem internet após configurar", cells: [
     { text: "Transcrição: sim", verdict: "good" }, { text: "Não", verdict: "bad" }, { text: "Não", verdict: "bad" }] },
   { criterion: "Resumo", cells: [
-    { text: "Provider opcional", verdict: "neutral" }, { text: "Conforme API", verdict: "neutral" }, { text: "Incluso no serviço", verdict: "neutral" }] },
+    { text: "Provedor opcional", verdict: "neutral" }, { text: "Conforme API", verdict: "neutral" }, { text: "Incluso no serviço", verdict: "neutral" }] },
 ];
 
 const faq = [
@@ -86,7 +86,7 @@ export default function Home() {
         <div data-reveal-item><AudioBoundary /></div>
       </section>
 
-      <section id="recursos" className="section shell" data-reveal>
+      <section id="recursos" className="section shell section-quiet" data-reveal>
         <div className="section-heading"><h2>Um fluxo contínuo entre falar, registrar e encontrar.</h2><p>O ISPer vive na bandeja do Windows. Você chama quando precisa e volta ao trabalho sem trocar de contexto.</p></div>
         <div className="bento-grid">
           <article className="feature feature-wide feature-dictation" data-reveal-item><div className="feature-copy"><span className="feature-icon"><Keyboard aria-hidden="true" /></span><h3>Fale onde o cursor estiver</h3><p>Segure o atalho global, fale e solte. O texto é colado no campo em foco e seu clipboard anterior é restaurado.</p><div className="app-row"><span>Teams</span><span>Word</span><span>Terminal</span><span>Notion</span><span>WhatsApp</span></div></div><div className="typed-note"><span className="caret" />A próxima versão entra em homologação na sexta-feira.</div></article>
@@ -96,7 +96,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="stage-section" data-reveal>
+      <section className="stage-section section-quiet" data-reveal>
         <div className="shell stage-section-grid"><div><h2>Uma biblioteca que se torna memória de trabalho.</h2><p className="section-lead">Reuniões, ditados, resumos e momentos marcados ficam organizados localmente. Pesquise, revise os falantes e volte ao ponto exato da conversa.</p><Link className="text-link" transitionTypes={["nav-forward"]} href="/docs/busca-semantica/configuracao/">Entender a busca semântica <ArrowRight aria-hidden="true" /></Link></div><div className="library-card" data-reveal-item><div className="library-head"><span>Biblioteca</span><div><Search aria-hidden="true" />buscar no título, resumo e transcript…</div></div><div className="library-list"><article><time>Hoje · 14:32</time><strong>Planejamento do lançamento</strong><p>3 participantes · 38 min · resumo pronto</p></article><article><time>Ontem · 09:10</time><strong>Revisão da documentação</strong><p>2 participantes · 24 min · 2 momentos</p></article><article><time>11 set · 16:45</time><strong>Notas por ditado</strong><p>12 trechos · processados localmente</p></article></div></div></div>
       </section>
 

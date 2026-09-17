@@ -9,7 +9,7 @@ order: 70
 
 A busca semântica transforma reuniões e ditados em vetores guardados no SQLite local. Ela encontra trechos pelo sentido, mesmo quando a palavra exata não aparece.
 
-## Providers
+## Provedores
 
 O ISPer aceita Gemini para embeddings e endpoints compatíveis com OpenAI. Para uso local, o README recomenda Ollama com modelos como `nomic-embed-text` ou `bge-m3`.
 
@@ -32,7 +32,7 @@ Cada reunião salva e cada ditado colado pode ser indexado em segundo plano. O b
 - Vetores de modelos diferentes não são comparáveis.
 - Trocar o modelo exige reindexação.
 - Com Ollama local, texto e vetores permanecem na máquina.
-- Com provider de nuvem, o texto necessário para gerar embeddings é enviado ao serviço.
+- Com provedor de nuvem, o texto necessário para gerar embeddings é enviado ao serviço.
 
 ## Uso na Biblioteca
 

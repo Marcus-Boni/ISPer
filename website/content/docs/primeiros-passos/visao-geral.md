@@ -23,6 +23,6 @@ Ditados e reuniões ficam no SQLite local e na Biblioteca. A busca textual não 
 
 ## Inteligência opcional
 
-Resumos e insights usam Groq, Gemini ou Claude somente quando você configura um provider. Nesse fluxo, o texto necessário é enviado; a transcrição do áudio continua local.
+Resumos e insights usam Groq, Gemini ou Claude somente quando você configura um provedor. Nesse fluxo, o texto necessário é enviado; a transcrição do áudio continua local.
 
 Comece pelo guia de instalação e faça um ditado curto antes de configurar recursos adicionais.
