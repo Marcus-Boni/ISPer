@@ -18,6 +18,9 @@
   --ink: #ece7e1;
   --ink-2: #d3cbc3;
   --muted: #a79e96;
+  /* Quietest ink. Clears 4.5:1 on --bg (5.04) and --panel (4.71) only; on the
+     raised --panel-2 it lands at 4.34, so text on a raised surface takes
+     --muted instead. */
   --muted-2: #8d847c;
   --accent: #f07e72;
   --accent-2: #f79f94;
@@ -1098,6 +1101,7 @@ section[id],
 }
 
 .comparison-wrap {
+  position: relative;
   margin-top: 1.25rem;
   overflow: auto;
   border-radius: var(--r-lg);
@@ -1262,6 +1266,7 @@ section[id],
    one under "Funciona sem internet". The word cannot carry that on its own, so
    each cell states its own verdict with a glyph and a screen-reader label. */
 .verdict {
+  position: relative;
   display: inline-flex;
   align-items: baseline;
   gap: 0.45rem;
@@ -1289,7 +1294,7 @@ section[id],
 
 .verdict-neutral {
   --verdict-glyph: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M5 12h14' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round'/></svg>");
-  color: var(--muted-2);
+  color: var(--muted);
 }
 
 .shortcut-section {
@@ -2005,7 +2010,7 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
   top: 50%;
   translate: 0 -50%;
   pointer-events: none;
-  color: var(--muted-2);
+  color: var(--muted);
   font-size: 0.65rem;
 }
 
@@ -2331,7 +2336,7 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
   display: grid;
   gap: 0.3rem;
   margin-top: 0.25rem;
-  color: var(--muted-2);
+  color: var(--muted);
   font-size: 0.82rem;
 }
 
@@ -2679,7 +2684,7 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 .markdown-alert-tip .markdown-alert-title { color: var(--good); }
 .markdown-alert-warning, .markdown-alert-caution { border-color: rgba(232,193,90,.42); background: rgba(232,193,90,.08); }
 .markdown-alert-warning .markdown-alert-title, .markdown-alert-caution .markdown-alert-title { color: var(--warn); }
-.doc-table-wrap { overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--line); border-radius: .75rem; }
+.doc-table-wrap { position: relative; overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--line); border-radius: .75rem; }
 .doc-table-wrap table { width: 100%; min-width: 35rem; border-collapse: collapse; }
 .doc-table-wrap th, .doc-table-wrap td { padding: .75rem .9rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .doc-table-wrap th { background: var(--panel-2); color: var(--ink); font-size: .8rem; }
