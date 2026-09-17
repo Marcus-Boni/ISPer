@@ -57,20 +57,13 @@ export function OnThisPage({ headings }: { headings: DocHeading[] }) {
   }
 
   return (
-    <nav aria-label="Nesta página" className="hidden xl:block">
-      <div className="docs-toc pl-6">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-2)]">Nesta página</p>
-        <ol className="docs-nav-scroll space-y-2 text-sm">
+    <nav aria-label="Nesta página" className="docs-toc-rail">
+      <div className="docs-toc">
+        <p className="docs-nav-group">Nesta página</p>
+        <ol className="docs-nav-scroll docs-toc-items">
           {headings.map((heading) => (
-            <li key={heading.id} className={heading.depth === 3 ? "pl-4" : undefined}>
-              <Link
-                href={`#${heading.id}`}
-                className={`block border-l pl-3 leading-relaxed transition ${
-                  active === heading.id
-                    ? "border-[var(--accent)] text-[var(--ink)]"
-                    : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-2)] hover:text-[var(--ink-2)]"
-                }`}
-              >
+            <li key={heading.id} data-depth={heading.depth}>
+              <Link href={`#${heading.id}`} aria-current={active === heading.id ? "location" : undefined}>
                 {heading.text}
               </Link>
             </li>

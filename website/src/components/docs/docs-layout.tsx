@@ -24,12 +24,12 @@ function DocumentationNav({ nav, current }: { nav: DocNavItem[]; current?: DocPa
   return (
     <nav aria-label="Documentação">
       {nav.map((group) => (
-        <div key={group.section} className="mb-5 last:mb-0">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-2)]">{group.section}</p>
-          <ol className="space-y-1">
+        <div key={group.section} className="docs-nav-block">
+          <p className="docs-nav-group">{group.section}</p>
+          <ol className="docs-nav-items">
             {group.items.map((item) => {
               const isActive = current?.slug === item.slug;
-              return <li key={item.slug}><Link href={item.href} aria-current={isActive ? "page" : undefined} className={`block rounded-lg px-3 py-2 text-sm leading-relaxed transition ${isActive ? "bg-[rgba(240,126,114,0.14)] text-[var(--ink)]" : "text-[var(--muted)] hover:bg-[var(--panel-2)] hover:text-[var(--ink-2)]"}`}>{item.frontmatter.title}</Link></li>;
+              return <li key={item.slug}><Link href={item.href} aria-current={isActive ? "page" : undefined}>{item.frontmatter.title}</Link></li>;
             })}
           </ol>
         </div>
@@ -40,18 +40,18 @@ function DocumentationNav({ nav, current }: { nav: DocNavItem[]; current?: DocPa
 
 export function DocsLayout({ nav, searchIndex, current, previous, next, children }: DocsLayoutProps) {
   return (
-    <main id="conteudo" className="docs-shell min-h-screen px-4 sm:px-6 lg:px-8">
-      <details className="docs-mobile-nav mx-auto mb-2 max-w-7xl rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 lg:hidden">
-        <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold text-[var(--ink)]"><Menu aria-hidden="true" className="h-4 w-4 text-[var(--accent)]" />Documentação</summary>
-        <div className="mt-4"><DocSearch items={searchIndex} inputId="docs-search-mobile" /></div>
-        <div className="docs-nav-scroll mt-5 max-h-[62vh]"><DocumentationNav nav={nav} current={current} /></div>
+    <main id="conteudo" className="docs-shell">
+      <details className="docs-mobile-nav">
+        <summary><Menu aria-hidden="true" />Documentação<i aria-hidden="true" /></summary>
+        <div className="docs-mobile-search"><DocSearch items={searchIndex} inputId="docs-search-mobile" /></div>
+        <div className="docs-nav-scroll"><DocumentationNav nav={nav} current={current} /></div>
       </details>
-      <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)_240px]">
-        <aside className="docs-sidebar hidden lg:flex">
+      <div className="docs-grid">
+        <aside className="docs-sidebar">
           <DocSearch items={searchIndex} inputId="docs-search-desktop" />
           <div className="docs-sidebar-card">
             <div className="docs-sidebar-title">
-              <Menu aria-hidden="true" className="h-4 w-4 text-[var(--accent)]" />
+              <Menu aria-hidden="true" />
               Documentação
             </div>
             <div className="docs-nav-scroll">
@@ -60,45 +60,41 @@ export function DocsLayout({ nav, searchIndex, current, previous, next, children
           </div>
         </aside>
 
-        <section className="min-w-0">
-          <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
-            <Link href="/docs" className="inline-flex items-center gap-2 hover:text-[var(--ink)]">
-              <BookOpen aria-hidden="true" className="h-4 w-4" />
-              Docs
+        <section className="docs-body">
+          <nav className="docs-crumbs" aria-label="Trilha">
+            <Link href="/docs/">
+              <BookOpen aria-hidden="true" />
+              Documentação
             </Link>
             {current ? (
               <>
-                <ChevronRight aria-hidden="true" className="h-4 w-4 text-[var(--muted-2)]" />
-                <span className="text-[var(--ink-2)]">{current.frontmatter.title}</span>
+                <ChevronRight aria-hidden="true" />
+                <span>{current.frontmatter.section}</span>
+                <ChevronRight aria-hidden="true" />
+                <span aria-current="page">{current.frontmatter.title}</span>
               </>
             ) : null}
-          </div>
+          </nav>
 
           {children}
 
           {current ? (
-            <div className="mt-12 grid gap-4 border-t border-[var(--line)] pt-6 sm:grid-cols-2">
+            <nav className="docs-pager" aria-label="Navegação entre guias">
               {previous ? (
-                <Link href={previous.href} className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 transition hover:border-[var(--line-2)] hover:bg-[var(--panel-2)]">
-                  <span className="mb-2 flex items-center gap-2 text-xs text-[var(--muted)]">
-                    <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-                    Anterior
-                  </span>
-                  <span className="font-semibold text-[var(--ink)]">{previous.frontmatter.title}</span>
+                <Link href={previous.href} className="docs-pager-link">
+                  <span className="docs-pager-kicker"><ArrowLeft aria-hidden="true" />Anterior</span>
+                  <span className="docs-pager-title">{previous.frontmatter.title}</span>
                 </Link>
               ) : (
                 <div />
               )}
               {next ? (
-                <Link href={next.href} className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 text-right transition hover:border-[var(--line-2)] hover:bg-[var(--panel-2)]">
-                  <span className="mb-2 flex items-center justify-end gap-2 text-xs text-[var(--muted)]">
-                    Próximo
-                    <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                  </span>
-                  <span className="font-semibold text-[var(--ink)]">{next.frontmatter.title}</span>
+                <Link href={next.href} className="docs-pager-link is-next">
+                  <span className="docs-pager-kicker">Próximo<ArrowRight aria-hidden="true" /></span>
+                  <span className="docs-pager-title">{next.frontmatter.title}</span>
                 </Link>
               ) : null}
-            </div>
+            </nav>
           ) : null}
         </section>
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, AudioLines, BookOpen, BrainCircuit, Check, Code2, Cpu, Download, Keyboard, LockKeyhole, Mic2, Search, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { CopyCommand } from "@/components/landing/copy-command";
 import { InteractiveStage } from "@/components/landing/interactive-stage";
+import { AudioBoundary } from "@/components/landing/audio-boundary";
 import { RevealEffects } from "@/components/landing/reveal-effects";
 import { PageTransition } from "@/components/motion/page-transition";
 import { shortcut, siteConfig } from "@/lib/site";
@@ -80,6 +81,11 @@ export default function Home() {
         <div className="shell trust-grid"><span><LockKeyhole aria-hidden="true" />Transcrição local</span><span><Mic2 aria-hidden="true" />Ditado em qualquer app</span><span><Users aria-hidden="true" />Falantes separados</span><span><Search aria-hidden="true" />Histórico pesquisável</span></div>
       </section>
 
+      <section className="section shell boundary-section" data-reveal>
+        <div className="section-heading"><h2>O áudio não atravessa esta linha.</h2><p>A transcrição inteira acontece no seu hardware. A única coisa que sai é o texto de um resumo, e só depois que você configura um provedor.</p></div>
+        <div data-reveal-item><AudioBoundary /></div>
+      </section>
+
       <section id="recursos" className="section shell" data-reveal>
         <div className="section-heading"><h2>Um fluxo contínuo entre falar, registrar e encontrar.</h2><p>O ISPer vive na bandeja do Windows. Você chama quando precisa e volta ao trabalho sem trocar de contexto.</p></div>
         <div className="bento-grid">
@@ -104,7 +110,7 @@ export default function Home() {
         <div className="shell shortcut-grid"><div><h2>O atalho desaparece. A ideia fica.</h2><p className="section-lead">O padrão é <strong>{shortcut.default.join(" + ")}</strong>. Se houver conflito, o ISPer tenta alternativas como {shortcut.fallback.join(" + ")} — e você pode gravar a sua nas Configurações.</p><Link className="text-link" transitionTypes={["nav-forward"]} href="/docs/solucao-de-problemas/atalhos/">Configurar atalhos <ArrowRight aria-hidden="true" /></Link></div><div className="key-combo" aria-label={shortcut.default.join(" mais ")}>{shortcut.default.map((chave, index) => <Fragment key={chave}>{index > 0 ? <span>+</span> : null}<kbd>{chave}</kbd></Fragment>)}</div></div>
       </section>
 
-      <section className="section shell" data-reveal>
+      <section className="section shell section-quiet" data-reveal>
         <div className="section-heading"><h2>Perguntas antes do primeiro ditado.</h2><p>As respostas curtas estão aqui. Os detalhes operacionais ficam na documentação versionada.</p></div>
         <div className="faq-list">{faq.map(([question, answer]) => <details key={question} data-reveal-item><summary>{question}<i aria-hidden="true" /></summary><p>{answer}</p></details>)}</div>
       </section>

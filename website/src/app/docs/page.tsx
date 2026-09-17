@@ -24,35 +24,25 @@ export default function DocsIndexPage() {
   return (
     <PageTransition>
     <DocsLayout nav={nav} searchIndex={searchIndex}>
-      <div className="max-w-3xl">
-        <BookOpen aria-hidden="true" className="h-8 w-8 text-[var(--accent)]" />
-        <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-[var(--ink)] sm:text-5xl">
-          Documentação oficial do ISPer.
-        </h1>
-        <p className="mt-5 text-lg leading-8 text-[var(--ink-2)]">
-          Guias versionados para instalar, ditar, gravar reuniões, configurar IA opcional e resolver problemas comuns.
-        </p>
+      <div className="docs-index-head">
+        <BookOpen aria-hidden="true" />
+        <h1>Documentação oficial do ISPer.</h1>
+        <p>Guias versionados para instalar, ditar, gravar reuniões, configurar IA opcional e resolver problemas comuns.</p>
       </div>
 
-      <div className="mt-10 grid gap-5 lg:grid-cols-2">
+      <div className="docs-index-grid">
         {sections.map(({ section, docs: sectionDocs }) => (
-          <section key={section} className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5">
-            <h2 className="font-display text-2xl font-semibold text-[var(--ink)]">{section}</h2>
-            <div className="mt-4 space-y-3">
+          <section key={section} className="docs-index-group">
+            <h2>{section}</h2>
+            <div className="docs-index-items">
               {sectionDocs.map((doc) =>
                 doc ? (
-                  <Link
-                    key={doc.slug}
-                    href={doc.href}
-                    className="group block rounded-xl border border-[var(--line)] bg-[var(--panel-2)] p-4 transition hover:border-[var(--accent)]"
-                  >
-                    <span className="flex items-center justify-between gap-4 font-semibold text-[var(--ink)]">
+                  <Link key={doc.slug} href={doc.href} className="docs-index-card">
+                    <span className="docs-index-title">
                       {doc.frontmatter.title}
-                      <ArrowRight aria-hidden="true" className="h-4 w-4 text-[var(--muted)] group-hover:text-[var(--accent)]" />
+                      <ArrowRight aria-hidden="true" />
                     </span>
-                    <span className="mt-2 block text-sm leading-6 text-[var(--muted)]">
-                      {doc.frontmatter.description}
-                    </span>
+                    <span className="docs-index-text">{doc.frontmatter.description}</span>
                   </Link>
                 ) : null,
               )}

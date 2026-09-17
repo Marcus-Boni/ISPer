@@ -102,9 +102,18 @@ The palette is dark and warm rather than blue-black. Terracotta marks action and
 
 **The Scarce Coral Rule.** Terracotta is reserved for primary actions, active controls, recording state and the key phrase. Large surfaces remain neutral.
 
+The rule is easiest to break in documentation, where a marker on every bullet and a colour on every inline code token spend it on ordinary prose — so by the time a real control appears the colour no longer signals anything. In the docs, terracotta belongs to the active navigation item and the active contents entry, and nothing else.
+
 **The Named Speaker Rule.** Speaker color always appears with a textual speaker name. Color never carries identity alone.
 
 ## Typography
+
+The scale runs display → headline → **section** → title → body → label. The
+section step exists because without it every headline arrived at one volume:
+six H2s at the same size meant the FAQ shouted as loudly as the closing call,
+and nothing on the page could be second-loudest. Supporting sections — the
+shortcut detail, the FAQ — take the section step; the thesis, the library, the
+benchmarks and the close keep the headline.
 
 **Display Font:** Fraunces with Georgia fallback.
 
@@ -184,6 +193,12 @@ The page asks the reader to verify what they downloaded, so it shows the hash it
 - Desktop navigation remains quiet until hover.
 - Mobile navigation uses an explicit menu control.
 - Documentation uses a sticky desktop tree and a collapsed mobile disclosure.
+
+### The audio boundary
+
+The product's irreducible claim is that audio never leaves the machine, and a claim of that weight cannot live only in prose inside a collapsed disclosure. The landing draws it: capture, transcription and storage sit inside a bounded region labelled as the reader's own computer, and the single dashed line that crosses the boundary carries text, only to a provider the reader configured, and is labelled as such.
+
+It is geometry, not illustration — boxes, arrows and a boundary, authored twice so that a horizontal flow is never squeezed into a phone. Both variants are decorative to assistive technology; the figure's caption states the same flow in a sentence.
 
 ### Documentation rails
 
