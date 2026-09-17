@@ -14,6 +14,24 @@ const BenchmarkPanel = dynamic(() => import("@/components/landing/benchmark-pane
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
+type Verdict = "good" | "bad" | "neutral";
+
+const verdictLabel: Record<Verdict, string> = { good: "A favor", bad: "Contra", neutral: "Depende" };
+
+/** The verdict is stated per cell because the same word flips meaning by row. */
+const comparison: Array<{ criterion: string; cells: Array<{ text: string; verdict: Verdict }> }> = [
+  { criterion: "Áudio enviado para transcrever", cells: [
+    { text: "Não", verdict: "good" }, { text: "Sim", verdict: "bad" }, { text: "Sim", verdict: "bad" }] },
+  { criterion: "Mensalidade obrigatória", cells: [
+    { text: "Não", verdict: "good" }, { text: "Por uso", verdict: "bad" }, { text: "Geralmente", verdict: "bad" }] },
+  { criterion: "Bot entra na reunião", cells: [
+    { text: "Não", verdict: "good" }, { text: "Não se aplica", verdict: "neutral" }, { text: "Frequentemente", verdict: "bad" }] },
+  { criterion: "Funciona sem internet após configurar", cells: [
+    { text: "Transcrição: sim", verdict: "good" }, { text: "Não", verdict: "bad" }, { text: "Não", verdict: "bad" }] },
+  { criterion: "Resumo", cells: [
+    { text: "Provider opcional", verdict: "neutral" }, { text: "Conforme API", verdict: "neutral" }, { text: "Incluso no serviço", verdict: "neutral" }] },
+];
+
 const faq = [
   ["O áudio sai do meu computador?", "A transcrição e a diarização rodam no Windows. Se você ativar um provedor de IA para resumos, o texto necessário é enviado ao provedor escolhido; o áudio não é enviado para transcrição."],
   ["Preciso de uma GPU NVIDIA?", "Não. A edição CPU funciona sem GPU dedicada. A edição CUDA acelera modelos maiores em hardware NVIDIA compatível."],
@@ -76,7 +94,7 @@ export default function Home() {
       <section id="benchmarks" className="section shell" data-reveal>
         <div className="section-heading benchmark-heading"><div><h2>Desempenho que você consegue auditar.</h2><p className="section-lead">Mostramos o que foi medido, o que é cálculo e o que ainda precisa de benchmark. Sem transformar estimativa em promessa.</p></div><Link className="text-link" transitionTypes={["nav-forward"]} href="/docs/referencia/benchmarks/">Ver metodologia <ArrowRight aria-hidden="true" /></Link></div>
         <div data-reveal-item><BenchmarkPanel /></div>
-        <div className="comparison-wrap" data-reveal-item><table className="comparison-table"><caption>Comparação de arquitetura e privacidade</caption><thead><tr><th>Critério</th><th className="isper-col">ISPer local</th><th>API de transcrição</th><th>Notetaker corporativo</th></tr></thead><tbody><tr><th>Áudio enviado para transcrever</th><td className="isper-col">Não</td><td>Sim</td><td>Sim</td></tr><tr><th>Mensalidade obrigatória</th><td className="isper-col">Não</td><td>Por uso</td><td>Geralmente</td></tr><tr><th>Bot entra na reunião</th><td className="isper-col">Não</td><td>Não se aplica</td><td>Frequentemente</td></tr><tr><th>Funciona sem internet após configurar</th><td className="isper-col">Transcrição: sim</td><td>Não</td><td>Não</td></tr><tr><th>Resumo</th><td className="isper-col">Provider opcional</td><td>Conforme API</td><td>Incluso no serviço</td></tr></tbody></table></div>
+        <div className="comparison-wrap" data-reveal-item><table className="comparison-table"><caption>Comparação de arquitetura e privacidade</caption><thead><tr><th scope="col">Critério</th><th scope="col" className="isper-col">ISPer local</th><th scope="col">API de transcrição</th><th scope="col">Notetaker corporativo</th></tr></thead><tbody>{comparison.map((row) => <tr key={row.criterion}><th scope="row">{row.criterion}</th>{row.cells.map((cell, index) => <td key={`${row.criterion}-${index}`} className={index === 0 ? "isper-col" : undefined}><span className={`verdict verdict-${cell.verdict}`}><span className="visually-hidden">{verdictLabel[cell.verdict]}: </span>{cell.text}</span></td>)}</tr>)}</tbody></table></div>
       </section>
 
       <section className="shortcut-section" data-reveal>

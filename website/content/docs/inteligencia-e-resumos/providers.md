@@ -23,7 +23,7 @@ cargo run --release -p isper-cli -- llm test
 
 Somente o texto do transcript ou do ditado polido é enviado ao provider configurado. O áudio permanece local.
 
-> [!WARNING]
+> [!WARNING/Atenção]
 > Antes de usar providers de nuvem, confirme se a política da sua organização permite enviar transcrições para esse serviço.
 
 ## Sem provider

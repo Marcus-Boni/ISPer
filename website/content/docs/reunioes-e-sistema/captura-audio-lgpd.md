@@ -23,7 +23,7 @@ Ao encerrar, o ISPer salva:
 
 O ISPer usa loopback para capturar participantes. Em Configurações > Reuniões, a opção "Só o Microsoft Teams" usa loopback de processo para priorizar o Teams quando possível.
 
-> [!NOTE]
+> [!NOTE/Observação]
 > Sem bot, sem API do Teams e sem olhar janelas: a detecção de chamada usa sessões de áudio do Windows.
 
 ## Privacidade e consentimento

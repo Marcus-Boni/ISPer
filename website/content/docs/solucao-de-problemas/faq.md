@@ -1,7 +1,7 @@
 ---
 title: "Solução de problemas e FAQ"
 description: "Correções rápidas para CUDA, microfone, atalhos globais, modelos e atualizações."
-section: "Solução de Problemas & FAQ"
+section: "Solução de Problemas"
 order: 80
 ---
 

@@ -1258,6 +1258,40 @@ section[id],
     inset -1px 0 0 rgba(132, 194, 151, 0.18);
 }
 
+/* "Não" is the good answer under "Áudio enviado para transcrever" and the bad
+   one under "Funciona sem internet". The word cannot carry that on its own, so
+   each cell states its own verdict with a glyph and a screen-reader label. */
+.verdict {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.verdict::before {
+  content: "";
+  align-self: center;
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: none;
+  background: currentcolor;
+  mask: var(--verdict-glyph) center / contain no-repeat;
+}
+
+.verdict-good {
+  --verdict-glyph: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M20 6 9 17l-5-5' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  color: var(--good);
+}
+
+.verdict-bad {
+  --verdict-glyph: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M18 6 6 18M6 6l12 12' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round'/></svg>");
+  color: var(--warn);
+}
+
+.verdict-neutral {
+  --verdict-glyph: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M5 12h14' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round'/></svg>");
+  color: var(--muted-2);
+}
+
 .shortcut-section {
   background: rgba(240, 126, 114, 0.06);
 }
@@ -1926,6 +1960,149 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 .chart-placeholder { min-height: 27rem; background: linear-gradient(100deg, var(--panel) 20%, var(--panel-2) 42%, var(--panel) 64%); background-size: 220% 100%; animation: chart-loading 1.4s ease-in-out infinite; }
 @keyframes chart-loading { to { background-position-x: -220%; } }
 
+/* Docs search combobox */
+
+.doc-search {
+  position: relative;
+}
+
+.doc-search-icon {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  translate: 0 -50%;
+  pointer-events: none;
+  color: var(--muted);
+}
+
+.doc-search-input {
+  width: 100%;
+  height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  padding: 0 4.5rem 0 2.25rem;
+  color: var(--ink);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.doc-search-input::placeholder {
+  color: var(--muted);
+}
+
+.doc-search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(240, 126, 114, 0.22);
+}
+
+.doc-search-hint {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  translate: 0 -50%;
+  pointer-events: none;
+  color: var(--muted-2);
+  font-size: 0.65rem;
+}
+
+.doc-search:focus-within .doc-search-hint,
+.doc-search:has(.doc-search-clear) .doc-search-hint {
+  display: none;
+}
+
+.doc-search-clear {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  translate: 0 -50%;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.doc-search-clear:hover {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.doc-search-clear svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+/* Bounded by the viewport rather than a fixed 24rem, and opaque to the nav it
+   used to be cut against. */
+.doc-search-results {
+  position: absolute;
+  inset: calc(100% + 0.4rem) 0 auto;
+  z-index: 30;
+  max-height: min(70vh, 32rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-floating);
+}
+
+.doc-search-results a {
+  display: grid;
+  gap: 0.15rem;
+  border-bottom: 1px solid var(--line);
+  padding: 0.75rem 1rem;
+  text-decoration: none;
+}
+
+.doc-search-results li:last-child a {
+  border-bottom: 0;
+}
+
+.doc-search-results a:hover,
+.doc-search-results a.is-active {
+  background: var(--panel-2);
+}
+
+.doc-search-results a.is-active {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.result-section {
+  color: var(--accent-2);
+  font-size: 0.72rem;
+}
+
+.result-title {
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.result-text {
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.doc-search-empty {
+  padding: 1rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
 /* ---------------------------------------------------------------------------
    Documentation shell
 
@@ -2026,8 +2203,10 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
   margin-bottom: clamp(2rem, 4vw, 3rem);
 }
 
-.download-head h1 {
+.download-head h1,
+.docs-prose h1 {
   margin: 0;
+  color: var(--ink);
   font-family: var(--font-display);
   font-size: clamp(2.6rem, 5vw, 4.1rem);
   font-weight: 700;
@@ -2377,7 +2556,7 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 }
 
 .docs-prose { min-width: 0; max-width: 47.5rem; color: var(--ink-2); overflow-wrap: anywhere; }
-.docs-prose h1 { margin: 0 0 1.5rem; color: var(--ink); font: 550 clamp(2.65rem,5vw,4.6rem)/1.02 var(--font-display); letter-spacing: -.03em; text-wrap: balance; }
+.docs-prose h1 { margin-bottom: 1.5rem; }
 .docs-prose h2 { margin: 3.6rem 0 1.1rem; scroll-margin-top: 6.25rem; color: var(--ink); font: 550 2rem/1.12 var(--font-display); letter-spacing: -.02em; }
 .docs-prose h3 { margin: 2.4rem 0 .75rem; scroll-margin-top: 6.25rem; color: var(--ink); font-size: 1.25rem; }
 .docs-prose p { margin: 1.1rem 0 0; line-height: 1.8; }
@@ -2392,9 +2571,103 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 .docs-prose li::marker { color: var(--accent); }
 .docs-prose a { color: var(--accent-2); font-weight: 620; text-decoration: underline; text-decoration-color: rgba(240,126,114,.45); text-underline-offset: 4px; }
 .docs-prose :not(pre) > code { padding: .12rem .38rem; border: 1px solid var(--line); border-radius: .32rem; background: var(--bg-2); color: var(--accent-2); font: .9em var(--font-mono); }
-.docs-prose figure[data-rehype-pretty-code-figure] { margin: 1.5rem 0; }
+.docs-prose figure[data-rehype-pretty-code-figure] { margin: 0; }
+/* A code block and its copy control. */
+.doc-code {
+  position: relative;
+  margin: 1.5rem 0;
+}
+
+.doc-code-copy {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.doc-code:hover .doc-code-copy,
+.doc-code-copy:focus-visible {
+  opacity: 1;
+}
+
+.doc-code-copy:hover {
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+
+.doc-code-copy[data-state="copied"] {
+  opacity: 1;
+  border-color: rgba(132, 194, 151, 0.5);
+  color: var(--good);
+}
+
+.doc-code-copy svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+/* Touch has no hover, so the control is simply always there. */
+@media (hover: none) {
+  .doc-code-copy { opacity: 1; }
+}
+
+/* Heading anchors appear on hover or focus, never as permanent clutter. */
+.docs-prose h2,
+.docs-prose h3 {
+  position: relative;
+}
+
+.heading-anchor {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  border-radius: var(--r-sm);
+  color: var(--muted-2);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.heading-anchor svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.docs-prose h2:hover .heading-anchor,
+.docs-prose h3:hover .heading-anchor {
+  opacity: 1;
+}
+
+.heading-anchor:hover {
+  color: var(--accent-2);
+}
+
 .docs-prose pre { max-width: 100%; overflow-x: auto; margin: 0; padding: 1.1rem; border: 1px solid var(--line); border-radius: .75rem; background: #100e0d; }
 .docs-prose pre code { display: grid; min-width: max-content; font: .75rem/1.75 var(--font-mono); }
+.doc-quote {
+  margin: 1.5rem 0;
+  border-left: 2px solid var(--line-2);
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.doc-quote p {
+  margin: 0;
+}
+
 .doc-callout { margin: 1.5rem 0; padding: 1rem 1.1rem; border: 1px solid rgba(124,196,240,.38); border-radius: .75rem; background: rgba(124,196,240,.08); color: var(--ink-2); }
 .doc-callout p { margin: 0; }
 .doc-callout p:first-child { color: var(--info); font-weight: 650; }

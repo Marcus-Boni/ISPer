@@ -35,5 +35,5 @@ O ISPer cola o resultado com `Ctrl + V` e restaura o clipboard anterior em segui
 
 Comandos como `nova linha`, `novo parágrafo`, `ponto final`, `vírgula`, `abre parênteses`, `fecha aspas` e `apagar isso` são tratados localmente. Eles ajustam pontuação e formatação sem depender de API.
 
-> [!TIP]
+> [!TIP/Dica]
 > Use o dicionário pessoal para termos como nomes de clientes, siglas e produtos. Ele vira contexto para o Whisper e também ajuda a corrigir grafias próximas.

@@ -23,5 +23,5 @@ No ISPer, escolha o provider compatível com OpenAI, use a base `http://localhos
 
 Depois de trocar o modelo de embeddings, use **Indexar tudo**. Vetores gerados por modelos diferentes não são comparados entre si.
 
-> [!WARNING]
+> [!WARNING/Atenção]
 > Esta configuração mantém os embeddings locais. Ela não transforma o Ollama em provider de resumo na versão documentada.

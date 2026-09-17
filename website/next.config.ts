@@ -15,7 +15,9 @@ const withMDX = createMDX({
   options: {
     remarkPlugins: [
       "remark-gfm",
-      "remark-github-blockquote-alert",
+      // legacyTitle lets each alert carry its own Portuguese title instead of
+      // GitHub's hardcoded English NOTE / WARNING / TIP.
+      ["remark-github-blockquote-alert", { legacyTitle: true }],
       "remark-frontmatter",
       ["remark-mdx-frontmatter", { name: "metadata" }],
     ],

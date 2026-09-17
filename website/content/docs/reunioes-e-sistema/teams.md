@@ -19,7 +19,7 @@ Se o Teams não estiver aberto, o aplicativo avisa e usa o áudio geral do siste
 
 O ISPer observa as sessões de áudio do Windows. Você pode escolher entre receber um aviso, gravar automaticamente ou não detectar chamadas.
 
-> [!NOTE]
+> [!NOTE/Observação]
 > A detecção usa o estado de áudio local. Ela não lê a lista de participantes, o chat ou o conteúdo da reunião.
 
 ## Fones e microfone

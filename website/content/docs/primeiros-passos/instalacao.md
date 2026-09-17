@@ -9,7 +9,7 @@ order: 10
 
 O ISPer é um aplicativo desktop para Windows. Ele roda a transcrição no próprio computador com `whisper.cpp`, guarda histórico local em SQLite e usa provedores externos apenas quando você ativa recursos de inteligência por API.
 
-> [!NOTE]
+> [!NOTE/Observação]
 > O áudio das reuniões e ditados não precisa sair do computador para ser transcrito. Recursos como resumo por IA ou embeddings em nuvem enviam texto ao provedor escolhido apenas quando configurados por você.
 
 ## Antes de instalar

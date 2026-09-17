@@ -38,5 +38,5 @@ cargo run --release -p isper-cli -- models download ggml-large-v3-turbo-q5_0.bin
 | Small | Ditado geral em português | Bom equilíbrio para CPU. |
 | Large v3 Turbo Q5 | Reuniões e qualidade maior | Recomendado com GPU NVIDIA. |
 
-> [!WARNING]
+> [!WARNING/Atenção]
 > Um modelo maior não corrige microfone ruim, ruído constante ou fala distante. Em reuniões, configure a captura do sistema e o microfone com cuidado.

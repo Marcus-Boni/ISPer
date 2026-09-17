@@ -20,5 +20,5 @@ Use o instalador CUDA somente em uma máquina com GPU NVIDIA compatível. Em out
 
 O Large v3 Turbo q5 é a escolha recomendada com GPU no catálogo atual. Se houver falta de memória, use Small ou Medium q5.
 
-> [!NOTE]
+> [!NOTE/Observação]
 > O DirectML não é um backend distribuído nesta versão. Em GPU AMD, use a variante CPU.
