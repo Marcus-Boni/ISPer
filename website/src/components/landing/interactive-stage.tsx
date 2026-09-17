@@ -1,7 +1,9 @@
 "use client";
 
 import { BookOpen, Mic, Pause, Play, RotateCcw, Search, Settings, Sparkles } from "lucide-react";
+import { Fragment } from "react";
 import { useEffect, useRef, useState } from "react";
+import { shortcut, siteConfig } from "@/lib/site";
 
 const WAVEFORM_BARS = 28;
 const BAR_SLOT = 13;
@@ -96,7 +98,7 @@ export function InteractiveStage() {
       <div className="stage-caption"><span>Demonstração</span><span>Conteúdo fictício · nenhum áudio é capturado</span></div>
       <div className="app-window">
         <div className="app-titlebar">
-          <div className="app-brand">ISPer<span>.</span><small>v0.15.0</small></div>
+          <div className="app-brand">ISPer<span>.</span><small>{siteConfig.currentVersion}</small></div>
           <div className={`app-state ${active ? "active" : ""}`}><i />{active ? (mode === "dictation" ? "ouvindo" : "gravando reunião") : "pronto"}</div>
           <div className="app-tools"><button type="button" aria-label="Biblioteca"><BookOpen /></button><button type="button" aria-label="Configurações"><Settings /></button></div>
         </div>
@@ -106,7 +108,7 @@ export function InteractiveStage() {
         </div>
         {mode === "dictation" ? (
           <div id="stage-panel-dictation" className="dictation-view" role="tabpanel" aria-labelledby="stage-tab-dictation">
-            <div className="shortcut-line"><span>Atalho configurável</span><div><kbd>Ctrl</kbd><b>+</b><kbd>Shift</kbd><b>+</b><kbd>Espaço</kbd></div></div>
+            <div className="shortcut-line"><span>Atalho padrão</span><div>{shortcut.default.map((chave, index) => <Fragment key={chave}>{index > 0 ? <b>+</b> : null}<kbd>{chave}</kbd></Fragment>)}</div></div>
             <div className={`dictation-orb ${active ? "active" : ""}`}><Mic aria-hidden="true" /></div>
             <svg ref={waveform} className={`waveform ${active ? "is-active" : ""}`} viewBox={`0 0 ${WAVEFORM_BARS * BAR_SLOT} ${WAVE_HEIGHT}`} role="img" aria-label={active ? "Forma de onda animada, ditado em andamento" : "Forma de onda em repouso"}>
               {waveformBars.map((bar) => <rect key={bar.x} x={bar.x} y={bar.y} width={BAR_WIDTH} height={bar.height} rx={BAR_WIDTH / 2} />)}

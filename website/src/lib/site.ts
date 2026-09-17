@@ -12,6 +12,16 @@ export const siteConfig = {
   license: "MIT",
 } as const;
 
+/**
+ * content/docs/solucao-de-problemas/atalhos.md is the source: Ctrl+Alt+Espaço is
+ * the default and Ctrl+Shift+Espaço is the fallback the app tries when the
+ * default is already taken. Both places that render it read from here.
+ */
+export const shortcut = {
+  default: ["Ctrl", "Alt", "Espaço"],
+  fallback: ["Ctrl", "Shift", "Espaço"],
+} as const;
+
 export const navItems = [
   { label: "Recursos", href: "/#recursos" },
   { label: "Benchmarks", href: "/#benchmarks" },

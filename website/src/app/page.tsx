@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
+import { Fragment } from "react";
 import Link from "next/link";
 import { ArrowRight, AudioLines, BookOpen, BrainCircuit, Check, Code2, Cpu, Download, Keyboard, LockKeyhole, Mic2, Search, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { CopyCommand } from "@/components/landing/copy-command";
 import { InteractiveStage } from "@/components/landing/interactive-stage";
 import { RevealEffects } from "@/components/landing/reveal-effects";
 import { PageTransition } from "@/components/motion/page-transition";
-import { siteConfig } from "@/lib/site";
+import { shortcut, siteConfig } from "@/lib/site";
 
 const BenchmarkPanel = dynamic(() => import("@/components/landing/benchmark-panel").then((module) => module.BenchmarkPanel), {
   loading: () => <div className="benchmark-panel chart-placeholder" aria-label="Carregando a comparação de desempenho" />,
@@ -98,7 +99,7 @@ export default function Home() {
       </section>
 
       <section className="shortcut-section" data-reveal>
-        <div className="shell shortcut-grid"><div><h2>O atalho desaparece. A ideia fica.</h2><p className="section-lead">O padrão é <strong>Ctrl + Alt + Espaço</strong>. Se houver conflito, o ISPer tenta combinações alternativas — e você pode gravar a sua nas Configurações.</p><Link className="text-link" transitionTypes={["nav-forward"]} href="/docs/solucao-de-problemas/atalhos/">Configurar atalhos <ArrowRight aria-hidden="true" /></Link></div><div className="key-combo" aria-label="Ctrl mais Alt mais Espaço"><kbd>Ctrl</kbd><span>+</span><kbd>Alt</kbd><span>+</span><kbd>Espaço</kbd></div></div>
+        <div className="shell shortcut-grid"><div><h2>O atalho desaparece. A ideia fica.</h2><p className="section-lead">O padrão é <strong>{shortcut.default.join(" + ")}</strong>. Se houver conflito, o ISPer tenta alternativas como {shortcut.fallback.join(" + ")} — e você pode gravar a sua nas Configurações.</p><Link className="text-link" transitionTypes={["nav-forward"]} href="/docs/solucao-de-problemas/atalhos/">Configurar atalhos <ArrowRight aria-hidden="true" /></Link></div><div className="key-combo" aria-label={shortcut.default.join(" mais ")}>{shortcut.default.map((chave, index) => <Fragment key={chave}>{index > 0 ? <span>+</span> : null}<kbd>{chave}</kbd></Fragment>)}</div></div>
       </section>
 
       <section className="section shell" data-reveal>

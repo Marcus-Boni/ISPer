@@ -5,6 +5,9 @@ import { usePathname } from "next/navigation";
 import Lenis from "lenis";
 import { registerLenis } from "./scroll-engine";
 
+/** Clears the sticky header when an anchor is the destination. */
+const HEADER_OFFSET = 96;
+
 export function SmoothScrollProvider({ children }: { children: React.ReactNode }) {
   const lenisRef = useRef<Lenis | null>(null);
   const pathname = usePathname();
@@ -19,7 +22,7 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
       easing: (t) => 1 - Math.pow(1 - t, 3.2),
       smoothWheel: true,
       syncTouch: false,
-      anchors: { offset: -96 },
+      anchors: { offset: -HEADER_OFFSET },
       // Nested scrollers — the docs sidebar, code blocks, wide tables — take the
       // wheel natively while they still have room, then hand it back to the page.
       allowNestedScroll: true,
@@ -41,10 +44,39 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
-  // A new route starts at its top. Lenis holds its own scroll value, so the
-  // router's reset has to be mirrored here or the next wheel event snaps back.
+  /**
+   * A new route starts at its top, and Lenis holds its own scroll value, so the
+   * router's reset has to be mirrored here or the next wheel event snaps back.
+   *
+   * Unless the navigation asked for an anchor. Lenis's own `anchors` option only
+   * sees real anchor clicks, not client navigations, so a cross-route link like
+   * `/#recursos` arrives here with the hash in the URL and would otherwise be
+   * reset to the top — the address bar claiming a section the reader never saw.
+   */
   useEffect(() => {
-    lenisRef.current?.scrollTo(0, { immediate: true, force: true });
+    const lenis = lenisRef.current;
+    if (!lenis) return;
+
+    const hash = window.location.hash.slice(1);
+    if (!hash) {
+      lenis.scrollTo(0, { immediate: true, force: true });
+      return;
+    }
+
+    let frame = 0;
+    let attempts = 0;
+    const seek = () => {
+      const target = document.getElementById(decodeURIComponent(hash));
+      if (target) {
+        lenis.scrollTo(target, { offset: -HEADER_OFFSET, immediate: true, force: true });
+        return;
+      }
+      // The incoming route may not have painted yet; give it a few frames.
+      if (attempts++ < 20) frame = requestAnimationFrame(seek);
+      else lenis.scrollTo(0, { immediate: true, force: true });
+    };
+    frame = requestAnimationFrame(seek);
+    return () => cancelAnimationFrame(frame);
   }, [pathname]);
 
   return <>{children}</>;
