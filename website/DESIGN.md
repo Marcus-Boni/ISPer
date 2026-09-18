@@ -198,6 +198,10 @@ The page asks the reader to verify what they downloaded, so it shows both halves
 - Mobile navigation uses an explicit menu control.
 - Documentation uses a sticky desktop tree and a collapsed mobile disclosure.
 
+Anchors come to rest one header-and-a-half below the top of the viewport, and that distance is declared exactly once, as `scroll-padding-top` on the scrollport. Repeating it per target as `scroll-margin-top` does not reinforce it: the browser and Lenis each subtract *both*, which rested every anchor a full header too low. The scrollport is also the only one of the two that reaches focus and find-in-page.
+
+A cross-route anchor cannot trust a single measurement. The incoming page is still growing when it commits — a dynamic import resolves, a font swaps, the reveal effects release their from-states — and a smooth-scroll library clamps to the document height it measured last, which is still the outgoing page's. So measure, correct, and keep correcting until two consecutive frames agree. Then stop — and stop at once if the reader scrolls, because from that moment the scroll is theirs.
+
 ### The audio boundary
 
 The product's irreducible claim is that audio never leaves the machine, and a claim of that weight cannot live only in prose inside a collapsed disclosure. The landing draws it: capture, transcription and storage sit inside a bounded region labelled as the reader's own computer, and the single dashed line that crosses the boundary carries text, only to a provider the reader configured, and is labelled as such.

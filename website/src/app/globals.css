@@ -70,8 +70,11 @@
 
 html {
   scroll-behavior: smooth;
-  /* Anchors carry their own scroll-margin; this covers focus and find-in-page,
-     which the sticky header would otherwise cover. */
+  /* The single place the header's height is subtracted from a scroll target.
+     Anchors, find-in-page and focus all honour it, and Lenis reads it too
+     (`lenis.mjs:783`). Targets used to repeat the same offset as their own
+     scroll-margin, and browser and Lenis alike subtract *both* of them, which
+     rested every anchor a full header below the heading it was aiming at. */
   scroll-padding-top: calc(var(--header-h) + 1.5rem);
 
   /* Firefox */
@@ -172,13 +175,6 @@ body[data-menu-open] {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-/* Sticky header would otherwise cover the heading an anchor jumps to. */
-:target,
-section[id],
-[id] > h2 {
-  scroll-margin-top: calc(var(--header-h) + 1.5rem);
 }
 
 /* Element resets belong in @layer base. Unlayered rules beat every layered one
@@ -3327,8 +3323,8 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 
 .docs-prose { min-width: 0; max-width: 64ch; color: var(--ink-2); overflow-wrap: anywhere; }
 .docs-prose h1 { margin-bottom: 1.5rem; }
-.docs-prose h2 { margin: 3.6rem 0 1.1rem; scroll-margin-top: 6.25rem; color: var(--ink); font: 550 2rem/1.12 var(--font-display); letter-spacing: -.02em; }
-.docs-prose h3 { margin: 2.4rem 0 .75rem; scroll-margin-top: 6.25rem; color: var(--ink); font-size: 1.25rem; }
+.docs-prose h2 { margin: 3.6rem 0 1.1rem; color: var(--ink); font: 550 2rem/1.12 var(--font-display); letter-spacing: -.02em; }
+.docs-prose h3 { margin: 2.4rem 0 .75rem; color: var(--ink); font-size: 1.25rem; }
 .docs-prose p { margin: 1.1rem 0 0; line-height: 1.8; }
 /* Tailwind preflight clears list-style, so markers have to be asked for again.
    The previous `display: grid` also reserved the marker gutter without drawing

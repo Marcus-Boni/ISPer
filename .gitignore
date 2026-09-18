@@ -31,3 +31,6 @@ apps/isper-app/src-tauri/resources/
 
 # Estado de ferramentas locais de desenvolvimento (nada do projeto)
 /.omx/
+
+# Capturas, logs de console e evidências geradas pelo Playwright durante auditorias
+/.playwright-mcp/
