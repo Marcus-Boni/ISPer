@@ -432,6 +432,13 @@ cargo test --release -p isper-core --test pipeline -- --ignored   # com modelos
 - **Voz real.** Tudo acima foi medido em voz sintética. O corpus certo é uma
   reunião real com um trecho corrigido à mão — a infraestrutura
   (`--reference`, `--reference-turns`) já espera por ele.
+- **Memória e disco do passe final crescem com a duração.** Cada canal vai a
+  disco em PCM 16 bits (115 MB/h, dois canais) e é lido de volta inteiro em
+  f32 (230 MB/h), e o `sherpa-rs` copia o buffer mais uma vez para diarizar.
+  Para 2 h: ~0,46 GB em `%TEMP%` e ~0,9 GB de pico de RAM. Rodou sem
+  problema até 19 min (o maior corpus medido); as 2 h são extrapolação, não
+  medição. Se um dia apertar, o caminho é processar a diarização em blocos
+  longos com sobreposição, não carregar tudo.
 - **Diarização é o gargalo**: 55 s para 190 s de áudio (0,29× tempo real), mais
   que o dobro do ASR. O `sherpa-rs` 0.6 fixa `num_threads: 1` na configuração
   de diarização e não expõe o parâmetro; subir isso exige PR no crate ou
