@@ -4,8 +4,8 @@
 .DESCRIPTION
   Inicia uma reunião, toca fixtures\duas-vozes-16k.wav nos alto-falantes (o loopback
   captura), confere transcrição ao vivo e legendas no indicador, marca momentos pelo
-  comando (com debounce) e pelo atalho global, encerra, e confere banco, Markdown,
-  DOCX e Biblioteca. No fim apaga a reunião de teste e os arquivos gerados (salvo
+  comando (com debounce) e pelo atalho global, encerra, espera o passe final
+  substituir a transcrição, e confere banco, Markdown, DOCX e Biblioteca. No fim apaga a reunião de teste e os arquivos gerados (salvo
   -KeepMeeting) e relança o app limpo. Leva ~2 min (+ título/resumo por IA, se houver
   provider configurado).
 
@@ -94,7 +94,29 @@ Check ($rows.Count -eq $before + 1) "uma reuniao nova no historico ($before -> $
 $row = $rows[0]
 $det = Invoke-Isper 'get_meeting' "{ id: $($row.id) }"
 Check ($row.moments -eq 2 -and @($det.moments).Count -eq 2) "momentos no banco: lista=$($row.moments), detalhe=$(@($det.moments).Count)"
-Check (@($det.segments).Count -gt 0) "$(@($det.segments).Count) segmentos transcritos"
+$aoVivo = @($det.segments)
+Check ($aoVivo.Count -gt 0) "$($aoVivo.Count) segmentos transcritos ao vivo"
+$textoAoVivo = ($aoVivo | ForEach-Object { $_.text }) -join ' '
+
+# Passe final: refaz a transcricao sobre o audio inteiro em segundo plano e
+# substitui a do ao vivo. Enquanto roda, home_status aponta a reuniao.
+$finalOk = $false
+for ($i = 0; $i -lt 90; $i++) {
+  Start-Sleep -Seconds 2
+  $s = Invoke-Isper 'home_status'
+  if ($null -eq $s.diarizing_meeting) { $finalOk = $true; break }
+}
+Check $finalOk "passe final terminou (apos $(($i + 1) * 2) s)"
+$det = Invoke-Isper 'get_meeting' "{ id: $($row.id) }"
+$final = @($det.segments)
+Check ($final.Count -gt 0) "$($final.Count) falas na transcricao final"
+$textoFinal = ($final | ForEach-Object { $_.text }) -join ' '
+Check ($textoFinal.Trim().Length -gt 0) "transcricao final tem texto ($($textoFinal.Length) chars)"
+# O passe final reconstroi as falas do zero: contagem e/ou texto mudam. Se
+# sairem identicos, ou ele nao rodou, ou nao substituiu.
+Check (($final.Count -ne $aoVivo.Count) -or ($textoFinal -ne $textoAoVivo)) "a transcricao final substituiu a do ao vivo"
+Check (@($det.moments).Count -eq 2) "momentos preservados pelo passe final"
+
 $md = Get-Content $det.meeting.md_path -Raw -Encoding UTF8
 $bullets = @(($md -split "`n") | Where-Object { $_ -match '^- \*\*\[\d\d:\d\d\]\*\* ' })
 Check (($md -match '## Momentos marcados') -and $bullets.Count -eq 2) "Markdown com a secao 'Momentos marcados' e 2 itens"
@@ -110,13 +132,13 @@ Remove-Item $tmp, "$tmp.zip" -Recurse -Force -ErrorAction SilentlyContinue
 Invoke-Isper 'open_library_window' "{ meeting: $($row.id) }" | Out-Null
 $lib = $null
 for ($i = 0; $i -lt 10; $i++) {
-  # A Biblioteca abre, seleciona a reunião e pode re-renderizar quando a diarização termina.
+  # A Biblioteca abre e seleciona a reunião (o passe final já terminou acima).
   Start-Sleep -Seconds 2
   $lib = EvJson 'library.html' 'JSON.stringify({ chips: document.querySelectorAll(".moments > *").length, starred: document.querySelectorAll(".seg.star").length, title: (document.querySelector("#detail h2, #detail .title") || {}).textContent, errors: window.__isperErrors || [] })'
   if ($lib -and $lib.chips -ge 2 -and $lib.starred -ge 1) { break }
 }
 # Dois momentos viram dois chips; os parágrafos destacados são 1 ou 2 conforme as
-# marcas caiam no mesmo parágrafo (antes da diarização, "Participantes" é um só).
+# marcas caiam no mesmo parágrafo ou em dois.
 $libErrors = if ($lib) { @($lib.errors).Count } else { -1 }
 Check ($null -ne $lib -and $lib.chips -eq 2 -and $lib.starred -in 1, 2 -and $libErrors -eq 0) "Biblioteca: chips=$($lib.chips) (esperado 2), paragrafos destacados=$($lib.starred) (esperado 1 ou 2), erros de JS=$libErrors"
 

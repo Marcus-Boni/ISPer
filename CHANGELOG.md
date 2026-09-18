@@ -11,6 +11,8 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-18
+
 ### Adicionado
 - **Passe final da reunião** — ao encerrar, o ISPer refaz a transcrição sobre
   o áudio inteiro em segundo plano e substitui a que apareceu ao vivo. Corte
@@ -63,7 +65,10 @@ bata com ela.
   *temperature fallback* não tem candidato para escolher.
 - Idioma "pt-br" chegava cru ao whisper.cpp, que só conhece códigos de duas
   letras — a inferência inteira falhava. Agora é reduzido a "pt".
-- Os logs do whisper.cpp e do ggml passam pelo `tracing` em vez do stderr.
+- Os logs do whisper.cpp e do ggml passam pelo `tracing` em vez do stderr, e
+  ficam em WARN por padrão: em INFO eles eram 42% do arquivo de log (carga do
+  modelo, buffers, uma linha por região de fala do VAD) e enterravam o que
+  interessa. `RUST_LOG=whisper_rs=info` traz tudo de volta.
 
 ### Alterado
 - O motor carrega o modelo com alinhamento DTW (timestamps por token bem mais
@@ -71,6 +76,8 @@ bata com ela.
 - Os parâmetros do pipeline saíram do código para estruturas serializáveis
   (`DecodeConfig`, `VadOptions`, `WindowOptions`, `AlignOptions`,
   `ChunkOptions`, `DiarizeOptions`) — é o que o `bench` grava e edita.
+- `tools/e2e/meeting.ps1` espera o passe final terminar e confere que ele
+  substituiu a transcrição do ao vivo, preservando os momentos marcados.
 
 ## [0.15.0] - 2026-09-13
 
