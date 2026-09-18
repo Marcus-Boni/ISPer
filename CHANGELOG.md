@@ -70,6 +70,13 @@ bata com ela.
   modelo, buffers, uma linha por região de fala do VAD) e enterravam o que
   interessa. `RUST_LOG=whisper_rs=info` traz tudo de volta.
 
+### Segurança
+- `rustls` 0.23.43 → 0.23.45 (RUSTSEC-2026-0285): a versão anterior aceitava
+  mensagens de handshake TLS 1.3 no nível de criptografia errado. Chega até
+  aqui como dependência transitiva do atualizador e do cliente HTTP; o
+  handshake continua autenticado, então não dá para alterar a conexão — mas a
+  correção é de graça.
+
 ### Alterado
 - O motor carrega o modelo com alinhamento DTW (timestamps por token bem mais
   precisos, +37 MB de VRAM medidos com `large-v3-turbo-q5_0`).
