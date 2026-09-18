@@ -7,7 +7,7 @@
 
 ---
 
-## Estado atual — 13/09/2026 · v0.15.0 (fases 7.1 a 7.4; 7.3 e 7.4 com 3 de 4)
+## Estado atual — 18/09/2026 · v0.16.0 (fases 7.1 a 7.4; 7.3 e 7.4 com 3 de 4; F4 revisada a fundo)
 
 | Fase | Estado | Resumo |
 |---|---|---|
@@ -15,12 +15,12 @@
 | F1 Núcleo no terminal | ✅ | |
 | F2 MVP de ditado | ✅ | validado no caso de uso real |
 | F3 Polimento premium | ✅ | |
-| F4 Notetaker Teams | ✅ | validado em reunião real (07/09); detecção de chamada entregue em 10/09 (validar numa chamada real) |
+| F4 Notetaker Teams | ✅ | validado em reunião real (07/09); detecção de chamada entregue em 10/09 (validar numa chamada real); **auditoria completa do pipeline em 18/09** — passe final, VAD, falante por palavra e a causa do "Participante 255" (v0.16.0) |
 | F5 Inteligência | ✅ | resumo, título, polimento, insights ao vivo e busca semântica (Gemini ou Ollama local) — 10/09 |
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
 | F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (13/09; criptografia em repouso adiada com decisão registrada); 7.5 com 2 itens entregues; 7.6 não começada |
 
-**82 itens entregues · 14 em aberto** (2 deles de estudo pessoal). Ordem sugerida: 7.5 → 7.6, enquanto a candidatura à SignPath tramita.
+**86 itens entregues · 14 em aberto** (2 deles de estudo pessoal). Ordem sugerida: validar a v0.16.0 numa reunião real (é o único jeito de medir a qualidade em voz de verdade) → 7.5 → 7.6, enquanto a candidatura à SignPath tramita.
 
 ---
 
@@ -163,9 +163,11 @@ A jogada: **não precisa de bot nem API paga** — captura-se o áudio que sai d
 
 - [x] Capturar áudio do sistema com o crate `wasapi` em paralelo ao mic — com três defesas descobertas na prática (o loopback do cpal estagna neste endpoint USB): **keepalive** de silêncio integrado (o endpoint nunca suspende), **drenagem completa** (GetBuffer devolve 1 pacote de ~10 ms por chamada) e **watchdog por bytes** (reabre o cliente se ficar 1 s sem dados). Validado: 20/20 s capturados com stream contínuo, transcrição do WAV capturado perfeita
 - [x] (Avançado) Loopback **por processo** (01/09): `LoopbackSource::Process` usa `new_application_loopback_client(pid, include_tree=true)` do `wasapi` — acha o processo-raiz do Teams (`ms-teams.exe`/`Teams.exe`, filhos WebView2 inclusos); se não estiver rodando, cai para o sistema e avisa no pill. Configurável em Configurações → Reuniões e na CLI (`--source teams|process:<exe>`)
-- [x] Transcrição contínua em blocos (~20 s, cortados no ponto mais silencioso p/ não partir palavra) com timestamps pelo **relógio da reunião** (o loopback não entrega amostras nas pausas — contar amostras derraparia)
+- [x] Transcrição contínua em blocos (~20 s) com timestamps pelo **relógio da reunião** (o loopback não entrega amostras nas pausas — contar amostras derraparia). **Revisto em 18/09**: o corte era "a janela de 100 ms de menor energia do último 1,5 s", e menor energia existe no meio de uma palavra — era daí que saía `manual` → `anual`. Agora o ponto tem de ser silêncio de verdade (abaixo de 15% do volume do bloco e de um piso absoluto); sem silêncio, o buffer segue até 32 s e o corte forçado é contado
 - [x] Separação básica de falantes: canal do mic = "Eu", loopback = "Participantes", intercalados por timestamp
-- [x] Diarização real (01/09): crate `isper-diarize` (sherpa-onnx via `sherpa-rs` com binários pré-compilados; pyannote segmentation 3.0 + 3D-Speaker ERes2Net, ~45 MB baixados pelo gerenciador). Roda ao encerrar sobre o áudio concatenado dos participantes; o core guarda o mapa bloco→relógio para casar os turnos com os segmentos do Whisper → "Participante 1, 2, 3…". Número de falantes descoberto por agrupamento (threshold padrão 0.3, ajustável via `ISPER_DIARIZE_THRESHOLD`; `isper-cli diarize <wav>` calibra offline). Validado na fixture Maria→Zira→Maria: a 0.2 separou as duas vozes corretamente; rótulos renumerados por ordem de aparição. Calibração final com vozes reais pendente
+- [x] Diarização real (01/09): crate `isper-diarize` (sherpa-onnx via `sherpa-rs` com binários pré-compilados; pyannote segmentation 3.0 + 3D-Speaker ERes2Net, ~45 MB baixados pelo gerenciador). **Revista em 18/09**: rodava sobre o áudio *concatenado* (só os blocos não silenciosos, emendados) com limiar 0,3. Medindo a mesma reunião de 3 falantes em duas durações, o agrupamento do sherpa (ligação completa sobre distância de cosseno) cria grupos proporcionais à DURAÇÃO: 7 grupos aos 3 min e **34 aos 19 min** — extrapolando para 2 h, ~200, que é o "Participante 255" relatado (o `u8` era o sintoma). Agora: áudio contínuo no relógio da reunião, limiar 0,5 (o default do próprio sherpa-onnx), absorção de grupos com menos de `max(6 s, 2% da fala)`, recusa de publicar contagem implausível e o campo **"quantos participantes"** em Configurações — a única coisa que se manteve estável na reunião longa. `isper-cli diarize <wav> --speakers N --threshold T` calibra offline
+- [x] **Passe final** (18/09): ao encerrar, o áudio inteiro dos dois canais é retranscrito em segundo plano com VAD Silero, busca em feixe, contexto entre trechos e falante **palavra a palavra**, substituindo a transcrição do ao vivo. No corpus de regressão (190 s, 3 falantes): WER 8,45% → 5,28%, CER 6,85% → 4,16%, DER 28,1% → 20,6%, a 0,43× tempo real. Desligável em Configurações → Reuniões → Avançado. Arquitetura e medições em [`docs/transcription-pipeline.md`](docs/transcription-pipeline.md)
+- [x] **Benchmark reproduzível** (18/09): `isper-cli bench` roda o pipeline sobre um WAV e grava relatório JSON com todos os parâmetros, transcrição bruta, normalizada, com falantes e palavras com horário; com `--reference`/`--reference-turns` calcula WER, CER e DER. `isper-cli compare` põe duas rodadas lado a lado. Corpus gerado por `cargo run -p isper-cli --bin mkfixture` a partir de um roteiro versionado (o áudio não entra no Git)
 - [x] Biblioteca de reuniões: SQLite (`%APPDATA%\ISPer\isper.db`) + exportar Markdown (`Documentos\ISPer\Reunioes\`)
 - [x] Detectar reunião ativa → "Gravar transcrição?" (10/09): em vez de olhar janelas, o ISPer sonda as **sessões de áudio do WASAPI** — em chamada, o Teams (ou um filho WebView2) mantém o microfone aberto. `isper_core::calls` (`probe` + `CallTracker` com histerese: ~8 s para começar, ~24 s para terminar; só reprodução exige o dobro). Aviso por toast (clicar grava), banner no Início e indicador; fim da chamada com gravação ligada pergunta se encerra. Modos: avisar (padrão) · gravar automaticamente (e encerrar sozinho) · desligado
 - [x] Validado em reunião real do Teams (07/09) — a rodada de 07/09 (instância única, Biblioteca, indicador) e a diarização em segundo plano saíram dessa primeira reunião
@@ -283,4 +285,4 @@ Whisper (MIT) · whisper.cpp (MIT) · whisper-rs (Unlicense) · Tauri (MIT/Apach
 
 ---
 
-**Próximo passo:** 7.5 — experiência premium (onboarding, tema, desfazer, acessibilidade, i18n), enquanto a candidatura à SignPath tramita (enviada em 13/09; o segredo `TAURI_SIGNING_PRIVATE_KEY` já está no repositório). Vale uma release 0.15.0 antes: as fases 7.3 e 7.4 mudam o que o usuário vê (retenção, backup, diagnóstico exportado, release compilada no CI). Continuam com quem tem a máquina: rodar o soak de 2 h (`tools/e2e/soak.ps1 -Minutes 120`), ativar o repositório no Coveralls e validar a detecção de chamada e os insights ao vivo numa reunião real do Teams.
+**Próximo passo:** validar a v0.16.0 numa reunião real e produzir um trecho de referência corrigido à mão — todo o ganho medido até aqui está em voz sintética, que pega regressão mas não mede qualidade absoluta. Depois, 7.5 — experiência premium (onboarding, tema, desfazer, acessibilidade, i18n), enquanto a candidatura à SignPath tramita (enviada em 13/09; o segredo `TAURI_SIGNING_PRIVATE_KEY` já está no repositório). Vale uma release 0.15.0 antes: as fases 7.3 e 7.4 mudam o que o usuário vê (retenção, backup, diagnóstico exportado, release compilada no CI). Continuam com quem tem a máquina: rodar o soak de 2 h (`tools/e2e/soak.ps1 -Minutes 120`), ativar o repositório no Coveralls e validar a detecção de chamada e os insights ao vivo numa reunião real do Teams.

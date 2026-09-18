@@ -78,6 +78,38 @@ pub const WHISPER_CATALOG: &[ModelInfo] = &[
     },
 ];
 
+/// Modelo de VAD (Silero v5.1.2 em ggml) que o whisper.cpp usa para achar os
+/// trechos de fala. São 0,9 MB — cabem junto dos modelos Whisper sem pesar.
+///
+/// É o que permite cortar o áudio da reunião no silêncio, em vez de no ponto
+/// de menor energia (ver `isper_core::vad`).
+pub const VAD_FILE: &str = "ggml-silero-v5.1.2.bin";
+const VAD_URL: &str =
+    "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin";
+/// Tamanho aproximado do modelo de VAD, para a UI.
+pub const VAD_APPROX_MB: u32 = 1;
+
+/// Caminho do modelo de VAD (exista ele ou não).
+pub fn vad_path() -> Result<PathBuf> {
+    Ok(models_dir()?.join(VAD_FILE))
+}
+
+/// O modelo de VAD já está instalado?
+pub fn vad_installed() -> bool {
+    vad_path().map(|p| p.exists()).unwrap_or(false)
+}
+
+/// Baixa o modelo de VAD, se ainda não estiver lá. Devolve o caminho.
+pub fn download_vad(on_progress: &mut dyn FnMut(u64, u64)) -> Result<PathBuf> {
+    let dest = vad_path()?;
+    if dest.exists() {
+        return Ok(dest);
+    }
+    tracing::info!("baixando {VAD_FILE}");
+    download_asset(VAD_URL, &dest, None, None, on_progress)?;
+    Ok(dest)
+}
+
 const HF_REPO: &str = "ggerganov/whisper.cpp";
 
 pub fn catalog_entry(file: &str) -> Option<&'static ModelInfo> {

@@ -16,6 +16,7 @@ mod calls;
 mod config;
 mod data;
 mod dictation;
+mod final_pass;
 mod home;
 mod insights;
 mod library;
@@ -54,7 +55,13 @@ pub(crate) fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGua
     use tracing_subscriber::EnvFilter;
     use tracing_subscriber::prelude::*;
     // `info` por padrão; `RUST_LOG=debug` (ou `isper_core=trace`) para investigar.
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    //
+    // O whisper.cpp e o ggml falam pelo `tracing` (ver `isper_core::engine`),
+    // e falam MUITO: carga do modelo, buffers, uma linha por região de fala do
+    // VAD. Numa reunião de duas horas isso enterra o que interessa, então eles
+    // ficam em WARN — `RUST_LOG=whisper_rs=info` traz tudo de volta.
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,whisper_rs=warn"));
     let stdout = tracing_subscriber::fmt::layer()
         .with_target(false)
         .compact();

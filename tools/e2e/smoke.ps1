@@ -38,6 +38,13 @@ Check ($s.version -eq $st.version) "Configuracoes: versao $($s.version) (igual a
 $errs = Get-JsErrors 'settings.html'
 Check (@($errs).Count -eq 0) "Configuracoes sem erros de JS$(Format-JsErrors $errs)"
 
+# Campos do passe final (v0.16.0): existem na tela, carregam o valor atual e
+# voltam do backend depois de salvar. Sem isto, um id trocado no HTML passa
+# despercebido — a tela abre sem erro de JS e simplesmente nao salva nada.
+$campos = EvJson 'settings.html' 'JSON.stringify({ spk: !!document.getElementById("speakers"), fin: !!document.getElementById("finalpass"), thr: !!document.getElementById("diarthr"), spkVal: (document.getElementById("speakers")||{}).value, finVal: (document.getElementById("finalpass")||{}).checked })'
+Check ($campos.spk -and $campos.fin -and $campos.thr) "Configuracoes tem os campos do passe final (participantes, passe final, limiar)"
+Check ($campos.spkVal -eq [string]$s.meeting_speakers -and $campos.finVal -eq ($s.final_pass -ne $false)) "campos do passe final carregados do backend (participantes=$($campos.spkVal), passe final=$($campos.finVal))"
+
 # Indicador: mostra, troca para legendas, volta ao modo original.
 $original = if ($st.overlay_captions) { 'captions' } elseif ((Invoke-Isper 'overlay_prefs').mini) { 'mini' } else { 'normal' }
 Invoke-Isper 'show_indicator_cmd' | Out-Null

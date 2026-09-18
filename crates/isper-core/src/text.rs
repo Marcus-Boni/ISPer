@@ -533,6 +533,8 @@ mod tests {
             end_secs: 1.0,
             text: text.into(),
             no_speech_prob: p,
+            avg_logprob: 0.0,
+            words: Vec::new(),
         }
     }
 

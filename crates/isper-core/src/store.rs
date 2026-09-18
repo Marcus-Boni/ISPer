@@ -472,6 +472,42 @@ impl MeetingStore {
         Ok(changed)
     }
 
+    /// Troca TODOS os segmentos da reunião pelos do passe final.
+    ///
+    /// O ao vivo grava enquanto a reunião acontece; o passe final refaz o
+    /// mesmo áudio inteiro depois, com VAD, beam search e falante por
+    /// palavra. Quando ele termina, a transcrição oficial é a dele — numa
+    /// transação, para a Biblioteca nunca ver meia reunião.
+    ///
+    /// Devolve quantos segmentos ficaram no lugar.
+    pub fn replace_segments(
+        &self,
+        meeting_id: i64,
+        segments: &[(String, f32, f32, String)],
+    ) -> Result<usize> {
+        if segments.is_empty() {
+            return Err(IsperError::Schema(
+                "passe final sem segmentos — a transcrição ao vivo foi mantida".into(),
+            ));
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "DELETE FROM segments WHERE meeting_id = ?1",
+            params![meeting_id],
+        )?;
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO segments (meeting_id, speaker, start_secs, end_secs, text)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+            )?;
+            for (speaker, start, end, text) in segments {
+                stmt.execute(params![meeting_id, speaker, start, end, text])?;
+            }
+        }
+        tx.commit()?;
+        Ok(segments.len())
+    }
+
     /// Renomeia um falante em todos os segmentos da reunião ("Participante 1"
     /// → "Tatiana"). Devolve quantos segmentos mudaram.
     pub fn rename_speaker(&self, meeting_id: i64, from: &str, to: &str) -> Result<usize> {
@@ -1048,8 +1084,9 @@ mod tests {
                 seg(Speaker::Others, 4.5, "Tudo bem?"),
             ],
             duration_secs: 6.0,
-            others_audio: crate::meeting::OthersAudio::empty(),
-            others_blocks: Vec::new(),
+            others_audio: crate::meeting::ChannelAudio::empty(),
+            me_audio: crate::meeting::ChannelAudio::empty(),
+            forced_cuts: 0,
         }
     }
 
@@ -1301,6 +1338,46 @@ mod tests {
             store.speakers(id).unwrap(),
             vec!["Eu", "Participante 1", "Participante 2"]
         );
+    }
+
+    #[test]
+    fn passe_final_troca_a_transcricao_inteira_ou_nao_troca_nada() {
+        let store = temp_store("replace");
+        let id = store
+            .save("Reunião", "09/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        let segmentos = |store: &MeetingStore| {
+            store
+                .get_meeting(id)
+                .unwrap()
+                .expect("a reunião existe")
+                .segments
+        };
+        assert!(!segmentos(&store).is_empty());
+
+        let finais = vec![
+            ("Eu".to_string(), 0.0f32, 2.0f32, "Bom dia.".to_string()),
+            (
+                "Participante 1".to_string(),
+                2.5,
+                6.0,
+                "Bom dia, Ana.".to_string(),
+            ),
+        ];
+        assert_eq!(store.replace_segments(id, &finais).unwrap(), 2);
+        let depois = segmentos(&store);
+        assert_eq!(depois.len(), 2);
+        assert_eq!(depois[0].text, "Bom dia.");
+        assert_eq!(
+            store.speakers(id).unwrap(),
+            vec!["Eu", "Participante 1"],
+            "os rótulos vêm do passe final"
+        );
+
+        // Passe final vazio não apaga a transcrição que existe: a do ao vivo
+        // é sempre melhor que nenhuma.
+        assert!(store.replace_segments(id, &[]).is_err());
+        assert_eq!(segmentos(&store).len(), 2);
     }
 
     #[test]

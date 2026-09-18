@@ -4,20 +4,28 @@
 //! (Fase 1) e, futuramente, pelo app Tauri (Fase 2). Manter o motor separado
 //! da UI é o que permite testá-lo sozinho e evoluir o projeto sem reescrever.
 
+pub mod align;
 pub mod audio;
 pub mod calls;
+pub mod chunk;
+pub mod context;
 pub mod embed;
 pub mod engine;
 pub mod export;
 pub mod loopback;
 pub mod meeting;
+pub mod metrics;
 pub mod panics;
+pub mod pipeline;
+pub mod profile;
 pub mod recorder;
 pub mod store;
 pub mod text;
+pub mod vad;
 
 pub use audio::RawAudio;
-pub use engine::{Transcript, TranscriptSegment, WhisperEngine};
+pub use engine::{EngineOptions, Transcript, TranscriptSegment, WhisperEngine, Word};
+pub use profile::{DecodeConfig, TranscriptionProfile};
 
 /// O Whisper só aceita áudio em 16 kHz, mono, f32. Tudo converge para cá.
 pub const WHISPER_SAMPLE_RATE: u32 = 16_000;

@@ -2,6 +2,9 @@
 //!
 //! Uso:
 //!   isper-cli rec 5                     # grava 5 s do microfone e transcreve
+//!   isper-cli bench reuniao.wav --config baseline   # mede o pipeline (antes)
+//!   isper-cli bench reuniao.wav --config final      # …e depois
+//!   isper-cli compare a.report.json b.report.json   # tabela antes/depois
 //!   isper-cli file fala.wav             # transcreve um arquivo WAV
 //!   isper-cli meeting 30 --source teams # reunião: mic + só o áudio do Teams
 //!   isper-cli models list|download|remove
@@ -14,6 +17,8 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
+
+mod bench;
 use isper_core::loopback::LoopbackSource;
 use isper_core::meeting::{self, MeetingOptions};
 use isper_core::{WhisperEngine, audio, store::MeetingStore};
@@ -51,7 +56,62 @@ enum Cmd {
         source: String,
     },
     /// Identifica os falantes de um WAV (calibração da diarização)
-    Diarize { path: PathBuf },
+    Diarize {
+        path: PathBuf,
+        /// Número de participantes, se conhecido (muda o agrupamento de
+        /// "descubra quantos" para "corte em exatamente N")
+        #[arg(long)]
+        speakers: Option<u32>,
+        /// Limiar do agrupamento (padrão: 0.5, o do sherpa-onnx)
+        #[arg(long)]
+        threshold: Option<f32>,
+    },
+    /// Roda o pipeline inteiro sobre um WAV e grava relatório + transcrições
+    Bench {
+        /// Áudio da reunião (WAV, qualquer taxa/canais)
+        audio: PathBuf,
+        /// `baseline`, `final` ou o caminho de um JSON de configuração
+        #[arg(long, default_value = "final")]
+        config: String,
+        /// Nome dos arquivos de saída (padrão: o da configuração)
+        #[arg(long)]
+        name: Option<String>,
+        /// Pasta de saída
+        #[arg(long, default_value = "bench")]
+        out: PathBuf,
+        /// Glossário: `.json` de MeetingContext ou `.txt` (um termo por linha)
+        #[arg(long)]
+        glossary: Option<PathBuf>,
+        /// Não roda a diarização (mais rápido quando só o texto importa)
+        #[arg(long)]
+        no_diarize: bool,
+        /// Número de participantes, se conhecido
+        #[arg(long)]
+        speakers: Option<u32>,
+        /// Limiar do agrupamento da diarização
+        #[arg(long)]
+        diarize_threshold: Option<f32>,
+        /// Transcrição corrigida à mão, para calcular WER e CER
+        #[arg(long)]
+        reference: Option<PathBuf>,
+        /// Turnos de referência (início<TAB>fim<TAB>falante), para calcular DER
+        #[arg(long)]
+        reference_turns: Option<PathBuf>,
+    },
+    /// Compara dois relatórios de `bench` lado a lado
+    Compare { before: PathBuf, after: PathBuf },
+    /// WER/CER entre dois arquivos de texto
+    Score {
+        /// Transcrição de referência (corrigida à mão)
+        #[arg(long)]
+        reference: PathBuf,
+        /// Transcrição a avaliar
+        #[arg(long)]
+        hypothesis: PathBuf,
+        /// Ignorar acentos na comparação
+        #[arg(long)]
+        strip_accents: bool,
+    },
     /// Gerencia os modelos Whisper (Fase 3)
     #[command(subcommand)]
     Models(ModelsCmd),
@@ -93,38 +153,90 @@ enum LlmCmd {
 }
 
 fn main() -> anyhow::Result<()> {
+    // O whisper.cpp e o ggml agora falam pelo `tracing` (ver
+    // `isper_core::engine`): úteis ao depurar, ruído no uso normal. Ficam em
+    // WARN, e `RUST_LOG=whisper_rs=info` traz tudo de volta.
     tracing_subscriber::fmt()
         .with_target(false)
         .compact()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,whisper_rs=warn")),
+        )
         .init();
     let cli = Cli::parse();
 
     match &cli.cmd {
         Cmd::Meeting { seconds, source } => run_meeting(&cli, *seconds, source),
-        Cmd::Diarize { path } => run_diarize(path),
+        Cmd::Diarize {
+            path,
+            speakers,
+            threshold,
+        } => run_diarize(path, *speakers, *threshold),
+        Cmd::Bench { .. } => run_bench(&cli),
+        Cmd::Compare { before, after } => bench::compare(before, after),
+        Cmd::Score {
+            reference,
+            hypothesis,
+            strip_accents,
+        } => bench::score(reference, hypothesis, *strip_accents),
         Cmd::Models(cmd) => run_models(cmd),
         Cmd::Llm(cmd) => run_llm(cmd),
         _ => run_dictation(&cli),
     }
 }
 
-/// Roda só a diarização num WAV — útil para calibrar `ISPER_DIARIZE_THRESHOLD`.
-fn run_diarize(path: &Path) -> anyhow::Result<()> {
+fn run_bench(cli: &Cli) -> anyhow::Result<()> {
+    let Cmd::Bench {
+        audio,
+        config,
+        name,
+        out,
+        glossary,
+        no_diarize,
+        speakers,
+        diarize_threshold,
+        reference,
+        reference_turns,
+    } = &cli.cmd
+    else {
+        unreachable!("run_bench só é chamado para Cmd::Bench")
+    };
+    bench::run(&bench::BenchArgs {
+        audio: audio.clone(),
+        config: config.clone(),
+        name: name.clone(),
+        out_dir: out.clone(),
+        model: resolve_model(cli)?,
+        lang: cli.lang.clone(),
+        glossary: glossary.clone(),
+        diarize: !no_diarize,
+        speakers: *speakers,
+        diarize_threshold: *diarize_threshold,
+        reference: reference.clone(),
+        reference_turns: reference_turns.clone(),
+    })?;
+    Ok(())
+}
+
+/// Roda só a diarização num WAV — útil para calibrar o limiar do agrupamento.
+fn run_diarize(path: &Path, speakers: Option<u32>, threshold: Option<f32>) -> anyhow::Result<()> {
     let raw = audio::load_wav(path).with_context(|| format!("falha ao ler {}", path.display()))?;
     let secs = raw.duration_secs();
     let samples = raw.into_whisper_input()?;
-    println!(
-        "diarizando {:.1}s (threshold {})...",
-        secs,
-        std::env::var("ISPER_DIARIZE_THRESHOLD")
-            .unwrap_or_else(|_| isper_diarize::DEFAULT_THRESHOLD.to_string())
-    );
-    let started = std::time::Instant::now();
-    let turns = isper_diarize::diarize(&samples)?;
-    let mut speakers: Vec<usize> = turns.iter().map(|t| t.speaker).collect();
-    speakers.sort_unstable();
-    speakers.dedup();
-    for t in &turns {
+    let mut opts = isper_diarize::DiarizeOptions::from_env();
+    if let Some(t) = threshold {
+        opts.threshold = t;
+    }
+    if speakers.is_some() {
+        opts.num_speakers = speakers;
+    }
+    match opts.num_speakers {
+        Some(n) => println!("diarizando {secs:.1}s com {n} falante(s) conhecido(s)..."),
+        None => println!("diarizando {:.1}s (limiar {})...", secs, opts.threshold),
+    }
+    let out = isper_diarize::diarize_with(&samples, &opts)?;
+    for t in &out.turns {
         println!(
             "[{:>6.1}s -> {:>6.1}s] Participante {}",
             t.start,
@@ -132,12 +244,20 @@ fn run_diarize(path: &Path) -> anyhow::Result<()> {
             t.speaker + 1
         );
     }
+    let m = &out.metrics;
     println!(
-        "{} turno(s), {} falante(s) em {:.1}s",
-        turns.len(),
-        speakers.len(),
-        started.elapsed().as_secs_f32()
+        "{} grupo(s) bruto(s) → {} falante(s) ({} absorvido(s)) · {} turno(s) · mediana {:.1}s · curtos {} · {:.1}s",
+        m.raw_clusters,
+        m.speakers,
+        m.absorbed_clusters,
+        m.turns,
+        m.median_turn_secs,
+        m.very_short_turns,
+        m.elapsed_secs
     );
+    for w in &out.warnings {
+        println!("AVISO: {w}");
+    }
     Ok(())
 }
 
@@ -171,7 +291,10 @@ fn run_dictation(cli: &Cli) -> anyhow::Result<()> {
         Cmd::File { path } => {
             audio::load_wav(path).with_context(|| format!("falha ao ler {}", path.display()))?
         }
-        Cmd::Meeting { .. } | Cmd::Diarize { .. } | Cmd::Models(_) | Cmd::Llm(_) => unreachable!(),
+        outro => unreachable!(
+            "run_dictation não trata {}",
+            std::any::type_name_of_val(outro)
+        ),
     };
 
     println!(
@@ -238,15 +361,29 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
         let outcome = result
             .others_audio_f32()
             .map_err(|e| e.to_string())
-            .and_then(|audio| isper_diarize::diarize(&audio).map_err(|e| e.to_string()));
+            .and_then(|audio| {
+                isper_diarize::diarize_with(&audio, &isper_diarize::DiarizeOptions::from_env())
+                    .map_err(|e| e.to_string())
+            });
         match outcome {
-            Ok(turns) => {
-                let t: Vec<(f32, f32, usize)> =
-                    turns.iter().map(|t| (t.start, t.end, t.speaker)).collect();
+            Ok(out) => {
+                for w in &out.warnings {
+                    println!("  AVISO: {w}");
+                }
+                let t: Vec<isper_core::align::SpeakerTurn> = out
+                    .turns
+                    .iter()
+                    .map(|t| isper_core::align::SpeakerTurn {
+                        start_secs: t.start,
+                        end_secs: t.end,
+                        speaker: t.speaker,
+                    })
+                    .collect();
                 result.apply_speaker_turns(&t);
                 println!(
-                    "  {} participante(s) identificado(s)",
-                    result.distinct_participants()
+                    "  {} participante(s) identificado(s) de {} grupo(s) bruto(s)",
+                    result.distinct_participants(),
+                    out.metrics.raw_clusters
                 );
             }
             Err(e) => println!("diarização falhou (rótulos genéricos mantidos): {e}"),
