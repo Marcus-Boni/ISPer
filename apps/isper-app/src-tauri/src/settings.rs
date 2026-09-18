@@ -41,6 +41,12 @@ pub(crate) struct SettingsDto {
     emb_key_present: bool,
     /// Retenção de reuniões e ditados, em dias (0 = para sempre).
     retention_days: u32,
+    /// Passe final ligado (refaz a transcrição ao encerrar a reunião).
+    final_pass: bool,
+    /// Participantes conhecidos da reunião (0 = descobrir pelo agrupamento).
+    meeting_speakers: u32,
+    /// Limiar do agrupamento de falantes (0 = o padrão do projeto).
+    diarize_threshold: f32,
 }
 
 #[derive(serde::Deserialize)]
@@ -334,6 +340,9 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         emb_base_url: emb.base_url,
         emb_key_present,
         retention_days: cfg.retention_days,
+        final_pass: cfg.final_pass,
+        meeting_speakers: cfg.meeting_speakers,
+        diarize_threshold: cfg.diarize_threshold,
     })
 }
 
