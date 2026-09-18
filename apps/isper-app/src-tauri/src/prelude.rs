@@ -11,6 +11,7 @@ pub(crate) use tauri::{AppHandle, Emitter, Manager};
 pub(crate) use crate::calls::*;
 pub(crate) use crate::data::*;
 pub(crate) use crate::dictation::*;
+pub(crate) use crate::final_pass;
 pub(crate) use crate::home::*;
 pub(crate) use crate::insights::*;
 pub(crate) use crate::library::*;

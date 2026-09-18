@@ -85,6 +85,15 @@ pub(crate) struct SettingsPatch {
     emb_base_url: Option<String>,
     #[serde(default)]
     retention_days: Option<u32>,
+    /// Avançado — passe final ligado (padrão) ou não.
+    #[serde(default)]
+    final_pass: Option<bool>,
+    /// Avançado — quantos participantes a reunião tem (0 = descobrir).
+    #[serde(default)]
+    meeting_speakers: Option<u32>,
+    /// Avançado — limiar do agrupamento de falantes (0 = padrão do projeto).
+    #[serde(default)]
+    diarize_threshold: Option<f32>,
 }
 
 pub(crate) fn default_true() -> bool {
@@ -364,6 +373,12 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         insights_interval_min: patch.insights_interval_min.unwrap_or_default(),
         overlay_pinned: previous.overlay_pinned,
         retention_days: patch.retention_days.unwrap_or_default(),
+        // Avançado: o que a tela não mandar mantém o valor atual.
+        final_pass: patch.final_pass.unwrap_or(previous.final_pass),
+        meeting_speakers: patch.meeting_speakers.unwrap_or(previous.meeting_speakers),
+        diarize_threshold: patch
+            .diarize_threshold
+            .unwrap_or(previous.diarize_threshold),
         config_version: config::CONFIG_VERSION,
     };
     // Caixa, espaços, vazios e valores fora das listas: a mesma regra única

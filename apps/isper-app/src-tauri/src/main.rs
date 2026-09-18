@@ -16,6 +16,7 @@ mod calls;
 mod config;
 mod data;
 mod dictation;
+mod final_pass;
 mod home;
 mod insights;
 mod library;

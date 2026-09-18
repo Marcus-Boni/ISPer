@@ -11,6 +11,67 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **Passe final da reunião** — ao encerrar, o ISPer refaz a transcrição sobre
+  o áudio inteiro em segundo plano e substitui a que apareceu ao vivo. Corte
+  guiado por detecção de voz (Silero, 0,9 MB, baixado na primeira reunião),
+  busca em feixe, contexto entre trechos e falante palavra a palavra. Medido
+  no corpus de regressão: **WER 8,45% → 5,28%**, **CER 6,85% → 4,16%**,
+  **DER 28,1% → 20,6%**, ao custo de 0,43× a duração da reunião (era 0,36×).
+  Desligável em Configurações → Reuniões → Avançado.
+- **Número de participantes** em Configurações → Reuniões: informado, o
+  agrupamento corta em exatamente N grupos em vez de decidir por distância —
+  a única coisa que manteve a contagem estável em reunião longa.
+- **`isper-cli bench`** — roda o pipeline inteiro sobre um WAV e grava
+  relatório (JSON com todos os parâmetros e métricas), transcrição bruta,
+  normalizada, com falantes e palavras com horário. Com `--reference` e
+  `--reference-turns` calcula WER, CER e DER. `isper-cli compare` põe duas
+  rodadas lado a lado; `isper-cli score` compara dois textos.
+- **Corpus de regressão** (`fixtures/reuniao-sintetica.txt` +
+  `cargo run -p isper-cli --bin mkfixture`): reunião sintética de 190 s com
+  três falantes, transcrição e turnos de referência gerados junto. O áudio não
+  é versionado — o roteiro é.
+- `docs/transcription-pipeline.md`: arquitetura, parâmetros com origem
+  declarada, evidência de cada decisão e como medir.
+
+### Corrigido
+- **"Participante 255"**. A causa não era o `u8`: o agrupamento do sherpa-onnx
+  usa ligação completa sobre distância de cosseno, e a contagem de grupos
+  cresce com a DURAÇÃO da reunião, não com o número de pessoas. Medido na
+  mesma reunião de 3 falantes: 7 grupos em 3 min e **34 em 19 min** com o
+  limiar antigo (0,3) — extrapolando para 2 h, ~200. Três mudanças: limiar
+  passa a 0,5 (o default do próprio sherpa-onnx; o 0,3 fora calibrado numa
+  fixture de duas vozes sintéticas), grupos com menos de `max(6 s, 2% da
+  fala)` são absorvidos pelo vizinho temporal, e uma contagem implausível
+  (>12) não é mais publicada em silêncio: vira aviso e os rótulos genéricos
+  ficam. `speaker` virou `u32` — saturar em 255 transformava o sintoma em
+  rótulo.
+- **Palavra partida entre blocos** (`manual` → `anual`). O corte ao vivo
+  procurava a janela de menor energia do último 1,5 s, sem exigir que fosse
+  silêncio — e menor energia existe no meio de uma palavra. Agora o ponto
+  precisa estar abaixo de 15% do volume do bloco e de um piso absoluto; sem
+  silêncio, o buffer segue até 32 s e o corte forçado é contado.
+- **Áudio emendado na diarização**. Só o canal dos participantes era gravado,
+  sem os blocos silenciosos, colados uns nos outros — o segmentador via troca
+  de voz onde havia emenda. Agora os dois canais são gravados inteiros, e a
+  posição no arquivo é o instante da reunião (o que não chegou vira silêncio).
+- **Falante errado quando duas pessoas falam no mesmo segmento**: a atribuição
+  era por segmento do Whisper, com o falante de maior sobreposição levando a
+  fala inteira. Agora é por palavra, com alisamento das trocas curtas demais
+  para serem reais (o que causava troca de falante no meio de uma frase).
+- `best_of` era 1 no motor; o default do whisper.cpp é 5, e com 1 o
+  *temperature fallback* não tem candidato para escolher.
+- Idioma "pt-br" chegava cru ao whisper.cpp, que só conhece códigos de duas
+  letras — a inferência inteira falhava. Agora é reduzido a "pt".
+- Os logs do whisper.cpp e do ggml passam pelo `tracing` em vez do stderr.
+
+### Alterado
+- O motor carrega o modelo com alinhamento DTW (timestamps por token bem mais
+  precisos, +37 MB de VRAM medidos com `large-v3-turbo-q5_0`).
+- Os parâmetros do pipeline saíram do código para estruturas serializáveis
+  (`DecodeConfig`, `VadOptions`, `WindowOptions`, `AlignOptions`,
+  `ChunkOptions`, `DiarizeOptions`) — é o que o `bench` grava e edita.
+
 ## [0.15.0] - 2026-09-13
 
 ### Adicionado

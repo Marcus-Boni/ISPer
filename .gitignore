@@ -34,3 +34,10 @@ apps/isper-app/src-tauri/resources/
 
 # Capturas, logs de console e evidências geradas pelo Playwright durante auditorias
 /.playwright-mcp/
+
+# Corpus de regressão do pipeline: o roteiro (.txt) e as verdades de
+# referência (.ref.txt, .turns.tsv) são versionados; o áudio é gerado por
+# `cargo run -p isper-cli --bin mkfixture`.
+/fixtures/reuniao-sintetica-16k.wav
+# Saída do `isper-cli bench`.
+/bench/

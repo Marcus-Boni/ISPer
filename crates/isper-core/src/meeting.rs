@@ -16,7 +16,9 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 
+use crate::align::SpeakerTurn;
 use crate::audio::RawAudio;
+use crate::chunk::{self, ChunkOptions, CutReason};
 use crate::loopback::LoopbackSource;
 use crate::{IsperError, Result, WhisperEngine, audio, loopback};
 
@@ -112,11 +114,15 @@ pub fn group_speech<'a>(segments: impl IntoIterator<Item = SegmentRef<'a>>) -> V
     groups
 }
 
-/// Tamanho alvo de cada bloco de transcrição.
-const CHUNK_SECS: f32 = 20.0;
 /// Blocos mais silenciosos que isso nem vão para o Whisper (economiza GPU e
 /// evita as alucinações clássicas em silêncio, tipo "Legendas pela...").
+/// O áudio silencioso continua indo para o arquivo do passe final — é o que
+/// mantém a linha do tempo contínua.
 const SILENCE_RMS: f32 = 0.0035;
+/// Com que frequência vale reavaliar se já dá para cortar o buffer. O fatiador
+/// recebe pacotes de ~10 ms; procurar silêncio a cada um deles seria gastar
+/// CPU à toa.
+const CUT_CHECK_EVERY: Duration = Duration::from_millis(400);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Speaker {
@@ -124,7 +130,10 @@ pub enum Speaker {
     /// Alguém do loopback, sem identificação individual.
     Others,
     /// Alguém do loopback identificado pela diarização (1, 2, 3…).
-    Participant(u8),
+    ///
+    /// `u32` e não `u8`: saturar em 255 transformava um agrupamento quebrado
+    /// no rótulo "Participante 255" em vez de num erro visível.
+    Participant(u32),
 }
 
 impl Speaker {
@@ -137,15 +146,6 @@ impl Speaker {
     }
 }
 
-/// Um bloco de áudio dos participantes já em 16 kHz: onde começa no relógio
-/// da reunião e onde caiu no áudio concatenado guardado p/ diarização.
-#[derive(Debug, Clone, Copy)]
-pub struct AudioBlock {
-    pub wall_start: f32,
-    pub concat_start: f32,
-    pub secs: f32,
-}
-
 #[derive(Debug, Clone)]
 pub struct MeetingSegment {
     pub speaker: Speaker,
@@ -155,28 +155,37 @@ pub struct MeetingSegment {
 }
 
 pub struct MeetingResult {
-    /// Segmentos dos dois canais, em ordem cronológica.
+    /// Segmentos dos dois canais, em ordem cronológica (transcrição AO VIVO).
     pub segments: Vec<MeetingSegment>,
     pub duration_secs: f32,
-    /// Áudio dos participantes (16 kHz mono) concatenado — insumo da
-    /// diarização, que roda depois, fora do core (crate `isper-diarize`).
-    /// Fica num arquivo temporário, não em RAM (ver [`OthersAudio`]).
-    pub others_audio: OthersAudio,
-    /// Mapa bloco a bloco entre o áudio concatenado e o relógio da reunião.
-    pub others_blocks: Vec<AudioBlock>,
+    /// Áudio dos participantes (16 kHz mono), no RELÓGIO DA REUNIÃO — os
+    /// trechos sem entrega viram silêncio, de modo que a posição no arquivo é
+    /// o instante da reunião. Insumo da diarização e do passe final.
+    pub others_audio: ChannelAudio,
+    /// Idem para o microfone ("Eu"). Só o passe final usa.
+    pub me_audio: ChannelAudio,
+    /// Quantos blocos precisaram ser cortados sem silêncio à vista (o único
+    /// caso em que o ao vivo pode partir uma palavra).
+    pub forced_cuts: usize,
 }
 
-/// Áudio dos participantes (16 kHz mono, PCM 16 bits little-endian) gravado
+/// Áudio de um canal (16 kHz mono, PCM 16 bits little-endian) gravado
 /// DURANTE a reunião num arquivo temporário — não em RAM. Uma hora são 115 MB
 /// em i16; duas horas em memória empurravam o app para centenas de MB à toa,
-/// sendo que o áudio só é lido de volta uma vez, pela diarização, depois que
-/// a reunião termina. O arquivo é apagado quando este valor é descartado.
-pub struct OthersAudio {
+/// sendo que o áudio só é lido de volta depois que a reunião termina. O
+/// arquivo é apagado quando este valor é descartado.
+///
+/// A posição no arquivo é o INSTANTE DA REUNIÃO: o que não chegou (pausa na
+/// reprodução, dispositivo reaberto) entra como silêncio. Sem isso, o áudio
+/// concatenado emenda trechos distantes, e o segmentador da diarização vê uma
+/// troca de voz onde só houve uma emenda — era daí que saíam dezenas de
+/// "participantes" numa reunião de seis pessoas.
+pub struct ChannelAudio {
     path: Option<PathBuf>,
     samples: u64,
 }
 
-impl OthersAudio {
+impl ChannelAudio {
     /// Sem áudio (reunião sem participantes, ou sem arquivo temporário).
     pub fn empty() -> Self {
         Self {
@@ -231,7 +240,7 @@ impl OthersAudio {
     }
 }
 
-impl Drop for OthersAudio {
+impl Drop for ChannelAudio {
     fn drop(&mut self) {
         if let Some(path) = self.path.take() {
             let _ = std::fs::remove_file(path);
@@ -289,7 +298,14 @@ impl PcmSpool {
         }
     }
 
-    fn push(&mut self, samples: &[f32]) -> Result<()> {
+    /// Grava `samples` na posição correspondente a `wall_start` segundos de
+    /// reunião, preenchendo com silêncio o que faltar. É o que faz a posição
+    /// no arquivo ser o instante da reunião.
+    fn push_at(&mut self, wall_start: f32, samples: &[f32]) -> Result<()> {
+        let alvo = (wall_start.max(0.0) * crate::WHISPER_SAMPLE_RATE as f32) as u64;
+        if alvo > self.samples {
+            self.pad(alvo - self.samples)?;
+        }
         let mut bytes: Vec<u8> = Vec::with_capacity(samples.len() * 2);
         for s in samples {
             let v = (s.clamp(-1.0, 1.0) * i16::MAX as f32).round() as i16;
@@ -300,9 +316,35 @@ impl PcmSpool {
         Ok(())
     }
 
-    fn finish(mut self) -> Result<OthersAudio> {
+    /// Escreve `n` amostras de silêncio, em pedaços — um buraco de minutos
+    /// não pode virar um `Vec` de dezenas de MB.
+    fn pad(&mut self, n: u64) -> Result<()> {
+        const PEDACO: usize = 1 << 15;
+        let zeros = [0u8; PEDACO * 2];
+        let mut faltam = n;
+        while faltam > 0 {
+            let agora = faltam.min(PEDACO as u64) as usize;
+            self.file.write_all(&zeros[..agora * 2])?;
+            faltam -= agora as u64;
+        }
+        self.samples += n;
+        Ok(())
+    }
+
+    /// Completa o arquivo com silêncio até `secs` de reunião, para que a
+    /// duração do canal seja a da reunião mesmo que o áudio tenha acabado
+    /// antes.
+    fn pad_to(&mut self, secs: f32) -> Result<()> {
+        let alvo = (secs.max(0.0) * crate::WHISPER_SAMPLE_RATE as f32) as u64;
+        if alvo > self.samples {
+            self.pad(alvo - self.samples)?;
+        }
+        Ok(())
+    }
+
+    fn finish(mut self) -> Result<ChannelAudio> {
         self.file.flush()?;
-        Ok(OthersAudio {
+        Ok(ChannelAudio {
             path: Some(std::mem::take(&mut self.path)),
             samples: self.samples,
         })
@@ -318,69 +360,54 @@ impl Drop for PcmSpool {
     }
 }
 
-/// Tempo no relógio da reunião → posição no áudio concatenado.
-fn wall_to_concat(blocks: &[AudioBlock], t: f32) -> Option<f32> {
-    blocks
-        .iter()
-        .find(|b| t >= b.wall_start && t <= b.wall_start + b.secs)
-        .map(|b| b.concat_start + (t - b.wall_start))
-}
-
 impl MeetingResult {
     /// Áudio dos participantes em f32 normalizado, como a diarização espera
-    /// (lido do arquivo temporário — ver [`OthersAudio::read_f32`]).
+    /// (lido do arquivo temporário — ver [`ChannelAudio::read_f32`]).
     pub fn others_audio_f32(&self) -> Result<Vec<f32>> {
         self.others_audio.read_f32()
     }
 
-    /// Aplica turnos de falante (em tempo do áudio concatenado, como a
-    /// diarização devolve) aos segmentos "Participantes": cada segmento vira
-    /// "Participante N" do turno com maior sobreposição.
-    pub fn apply_speaker_turns(&mut self, turns: &[(f32, f32, usize)]) {
-        // Renumera os falantes por ordem de aparição: os ids do agrupamento
-        // podem ter buracos (clusters minúsculos são filtrados) e o leitor
-        // espera "Participante 1, 2, 3…".
-        let mut order: Vec<(f32, usize)> = turns.iter().map(|(s, _, spk)| (*s, *spk)).collect();
-        order.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let mut renumber: Vec<(usize, u8)> = Vec::new();
-        for (_, spk) in order {
-            if !renumber.iter().any(|(id, _)| *id == spk) {
-                let next = (renumber.len() + 1).min(255) as u8;
-                renumber.push((spk, next));
-            }
-        }
-        let number_of = |spk: usize| -> u8 {
-            renumber
-                .iter()
-                .find(|(id, _)| *id == spk)
-                .map(|(_, n)| *n)
-                .unwrap_or(1)
-        };
+    /// Áudio do microfone em f32 normalizado (insumo do passe final).
+    pub fn me_audio_f32(&self) -> Result<Vec<f32>> {
+        self.me_audio.read_f32()
+    }
 
-        // Empréstimos disjuntos: lemos `others_blocks` enquanto mutamos `segments`.
-        let blocks = &self.others_blocks;
+    /// Aplica turnos de falante aos segmentos "Participantes": cada segmento
+    /// vira "Participante N" do turno com maior sobreposição.
+    ///
+    /// Os turnos vêm no relógio da reunião — o mesmo do áudio gravado, porque
+    /// [`ChannelAudio`] preenche as lacunas com silêncio. Antes havia um mapa
+    /// bloco a bloco entre o "áudio concatenado" e o relógio; ele sumiu junto
+    /// com a concatenação.
+    ///
+    /// Atribuição por SEGMENTO é a granularidade do ao vivo. O passe final
+    /// ([`crate::pipeline`]) atribui por palavra.
+    pub fn apply_speaker_turns(&mut self, turns: &[SpeakerTurn]) {
         for seg in self.segments.iter_mut() {
             if seg.speaker != Speaker::Others {
                 continue;
             }
-            let Some(cs) = wall_to_concat(blocks, seg.start_secs) else {
-                continue;
-            };
-            let ce = cs + (seg.end_secs - seg.start_secs).max(0.1);
+            let cs = seg.start_secs;
+            let ce = seg.end_secs.max(cs + 0.1);
             let best = turns
                 .iter()
-                .map(|(s, e, spk)| ((e.min(ce) - s.max(cs)).max(0.0), *spk))
+                .map(|t| {
+                    (
+                        (t.end_secs.min(ce) - t.start_secs.max(cs)).max(0.0),
+                        t.speaker,
+                    )
+                })
                 .filter(|(overlap, _)| *overlap > 0.0)
                 .max_by(|a, b| a.0.total_cmp(&b.0));
             if let Some((_, spk)) = best {
-                seg.speaker = Speaker::Participant(number_of(spk));
+                seg.speaker = Speaker::Participant(spk + 1);
             }
         }
     }
 
     /// Quantos participantes distintos foram identificados.
     pub fn distinct_participants(&self) -> usize {
-        let mut ids: Vec<u8> = self
+        let mut ids: Vec<u32> = self
             .segments
             .iter()
             .filter_map(|s| match s.speaker {
@@ -418,7 +445,14 @@ impl MeetingHandle {
     }
 }
 
-type Job = (Speaker, f32, RawAudio);
+/// Um bloco pronto para o worker: de qual canal veio, em que instante da
+/// reunião começa, o áudio e se o corte foi forçado (sem silêncio à vista).
+struct Job {
+    speaker: Speaker,
+    offset: f32,
+    audio: RawAudio,
+    forced_cut: bool,
+}
 
 /// Inicia a gravação nos dois canais. Valida que ambos abriram antes de
 /// retornar — se o loopback ou o mic falhar, você fica sabendo já.
@@ -663,7 +697,10 @@ fn chunk_loop(
     feed: &mut dyn AudioFeed,
 ) {
     let (mut sample_rate, mut channels) = feed.format();
+    let chunk_opts = ChunkOptions::default();
     let mut buf: Vec<f32> = Vec::new();
+    // Quando foi a última vez que procuramos um ponto de corte.
+    let mut last_cut_check: Option<Instant> = None;
     // Offset global (em segundos) do início do buffer atual. Marcado pelo
     // RELÓGIO da reunião quando o buffer começa a encher: o loopback só
     // entrega amostras enquanto algo está tocando, então contar amostras
@@ -686,15 +723,16 @@ fn chunk_loop(
     ) {
         let min = (0.3 * sample_rate as f32) as usize * channels.max(1) as usize;
         if buf.len() >= min {
-            let _ = job_tx.send((
+            let _ = job_tx.send(Job {
                 speaker,
-                start_secs,
-                RawAudio {
+                offset: start_secs,
+                audio: RawAudio {
                     samples: std::mem::take(buf),
                     sample_rate,
                     channels,
                 },
-            ));
+                forced_cut: false,
+            });
         } else {
             buf.clear();
         }
@@ -702,7 +740,8 @@ fn chunk_loop(
 
     loop {
         let ch = channels.max(1) as usize;
-        let chunk_samples = (CHUNK_SECS * sample_rate as f32) as usize * ch;
+        // Abaixo do alvo nem vale chamar o planejador de corte.
+        let min_check_samples = (chunk_opts.target_secs * sample_rate as f32) as usize * ch;
         // Clonado a cada volta: um `reopen` troca o canal.
         let data_rx = feed.receiver().clone();
         let stall = if last_data_at.is_none() {
@@ -734,16 +773,33 @@ fn chunk_loop(
                         buf_start_secs = (started.elapsed().as_secs_f32() - chunk_secs).max(0.0);
                     }
                     buf.extend(c);
-                    if buf.len() >= chunk_samples {
-                        let cut = quiet_cut(&buf, sample_rate, ch);
-                        let piece: Vec<f32> = buf.drain(..cut).collect();
-                        let secs = piece.len() as f32 / ch as f32 / sample_rate as f32;
-                        let _ = job_tx.send((speaker, buf_start_secs, RawAudio {
-                            samples: piece,
-                            sample_rate,
-                            channels,
-                        }));
-                        buf_start_secs += secs;
+                    // Procurar silêncio custa; a cada pacote de 10 ms seria
+                    // desperdício. Reavaliamos a cada `CUT_CHECK_EVERY`.
+                    let vencido = last_cut_check.is_none_or(|t: Instant| t.elapsed() >= CUT_CHECK_EVERY);
+                    if vencido && buf.len() >= min_check_samples {
+                        last_cut_check = Some(Instant::now());
+                        if let Some(cut) = chunk::plan_cut(&buf, sample_rate, ch, &chunk_opts) {
+                            let piece: Vec<f32> = buf.drain(..cut.at.min(buf.len())).collect();
+                            let secs = piece.len() as f32 / ch as f32 / sample_rate as f32;
+                            if cut.reason == CutReason::Forced {
+                                tracing::debug!(
+                                    speaker = %speaker.label(),
+                                    at = buf_start_secs + secs,
+                                    "bloco cortado sem silêncio à vista"
+                                );
+                            }
+                            let _ = job_tx.send(Job {
+                                speaker,
+                                offset: buf_start_secs,
+                                audio: RawAudio {
+                                    samples: piece,
+                                    sample_rate,
+                                    channels,
+                                },
+                                forced_cut: cut.reason == CutReason::Forced,
+                            });
+                            buf_start_secs += secs;
+                        }
                     }
                 }
                 // A fonte fechou o canal: só o `stop` encerra este loop, então
@@ -784,15 +840,16 @@ fn recover(
     if !buf.is_empty() {
         let min = (0.3 * *sample_rate as f32) as usize * (*channels).max(1) as usize;
         if buf.len() >= min {
-            let _ = job_tx.send((
+            let _ = job_tx.send(Job {
                 speaker,
-                buf_start_secs,
-                RawAudio {
+                offset: buf_start_secs,
+                audio: RawAudio {
                     samples: std::mem::take(buf),
                     sample_rate: *sample_rate,
                     channels: *channels,
                 },
-            ));
+                forced_cut: false,
+            });
         }
         buf.clear();
     }
@@ -823,39 +880,6 @@ fn recover(
     }
 }
 
-/// Acha um ponto de corte silencioso: a janela de 100 ms com menor energia
-/// dentro do último 1,5 s do buffer. Cortar no silêncio evita partir uma
-/// palavra entre dois blocos.
-fn quiet_cut(buf: &[f32], sample_rate: u32, ch: usize) -> usize {
-    let frames = buf.len() / ch;
-    let win = (sample_rate as usize / 10).max(1); // 100 ms
-    let search = ((sample_rate as usize) * 3 / 2).min(frames); // último 1,5 s
-    if search < win * 2 {
-        return buf.len();
-    }
-    let start = frames - search;
-    let mut best_frame = frames;
-    let mut best_energy = f32::MAX;
-    let mut f = start;
-    while f + win <= frames {
-        let mut e = 0.0f32;
-        for fr in f..f + win {
-            let mut s = 0.0f32;
-            for c in 0..ch {
-                s += buf[fr * ch + c];
-            }
-            let m = s / ch as f32;
-            e += m * m;
-        }
-        if e < best_energy {
-            best_energy = e;
-            best_frame = f + win / 2;
-        }
-        f += win / 2; // passos de 50 ms
-    }
-    best_frame * ch
-}
-
 /// O que o worker de transcrição usa das opções (o resto é da captura).
 struct TranscribeOptions {
     lang: String,
@@ -865,7 +889,63 @@ struct TranscribeOptions {
     on_block: Option<BlockSink>,
 }
 
-/// Consome os blocos dos dois canais e monta a lista final de segmentos.
+/// Um canal gravado em disco durante a reunião. Se o arquivo não puder ser
+/// criado, a reunião segue — só o passe final e a diarização ficam sem insumo.
+struct ChannelSpool {
+    spool: Option<PcmSpool>,
+    speaker: Speaker,
+}
+
+impl ChannelSpool {
+    fn create(speaker: Speaker) -> Self {
+        match PcmSpool::create() {
+            Ok(s) => Self {
+                spool: Some(s),
+                speaker,
+            },
+            Err(e) => {
+                tracing::warn!(
+                    canal = %speaker.label(),
+                    "sem arquivo temporário para o áudio ({e}) — a transcrição final e a identificação de falantes ficam sem insumo nesta reunião"
+                );
+                Self {
+                    spool: None,
+                    speaker,
+                }
+            }
+        }
+    }
+
+    fn push_at(&mut self, wall_start: f32, samples: &[f32]) {
+        let Some(s) = self.spool.as_mut() else { return };
+        if let Err(e) = s.push_at(wall_start, samples) {
+            tracing::warn!(
+                canal = %self.speaker.label(),
+                "falha ao gravar o áudio em disco ({e}) — este canal fica sem passe final"
+            );
+            self.spool = None;
+        }
+    }
+
+    fn finish(mut self, duration_secs: f32) -> ChannelAudio {
+        let Some(mut s) = self.spool.take() else {
+            return ChannelAudio::empty();
+        };
+        if let Err(e) = s.pad_to(duration_secs) {
+            tracing::warn!(canal = %self.speaker.label(), "não consegui completar o áudio ({e})");
+        }
+        match s.finish() {
+            Ok(a) => a,
+            Err(e) => {
+                tracing::warn!(canal = %self.speaker.label(), "não consegui fechar o áudio ({e})");
+                ChannelAudio::empty()
+            }
+        }
+    }
+}
+
+/// Consome os blocos dos dois canais, transcreve ao vivo e grava o áudio dos
+/// dois canais em disco para o passe final.
 fn transcribe_worker(
     engine: Arc<WhisperEngine>,
     opts: TranscribeOptions,
@@ -880,54 +960,48 @@ fn transcribe_worker(
         on_block,
     } = opts;
     let mut segments: Vec<MeetingSegment> = Vec::new();
-    let mut others_blocks: Vec<AudioBlock> = Vec::new();
-    // Sem arquivo temporário a reunião segue normalmente — só a identificação
-    // de falantes fica sem insumo desta vez.
-    let mut spool = match PcmSpool::create() {
-        Ok(s) => Some(s),
-        Err(e) => {
-            tracing::warn!(
-                "sem arquivo temporário para o áudio dos participantes ({e}) — a identificação de falantes fica desligada nesta reunião"
-            );
-            None
+    let mut forced_cuts = 0usize;
+    let mut others = ChannelSpool::create(Speaker::Others);
+    let mut me = ChannelSpool::create(Speaker::Me);
+
+    for job in job_rx.iter() {
+        let Job {
+            speaker,
+            offset,
+            audio,
+            forced_cut,
+        } = job;
+        let block_secs = audio.duration_secs();
+        if forced_cut {
+            forced_cuts += 1;
         }
-    };
-    for (speaker, offset, raw) in job_rx.iter() {
-        let block_secs = raw.duration_secs();
-        if raw.rms() < SILENCE_RMS {
-            tracing::debug!(speaker = %speaker.label(), offset, "bloco silencioso pulado");
-            continue;
-        }
-        let samples = match raw.into_whisper_input() {
+        let quiet = audio.rms() < SILENCE_RMS;
+        let samples = match audio.into_whisper_input() {
             Ok(s) => s,
             Err(e) => {
                 tracing::warn!("bloco falhou no resample: {e}");
                 continue;
             }
         };
-        if speaker == Speaker::Others {
-            let written = spool.as_mut().map(|s| {
-                others_blocks.push(AudioBlock {
-                    wall_start: offset,
-                    concat_start: s.samples as f32 / crate::WHISPER_SAMPLE_RATE as f32,
-                    secs: samples.len() as f32 / crate::WHISPER_SAMPLE_RATE as f32,
-                });
-                s.push(&samples)
-            });
-            if let Some(Err(e)) = written {
-                tracing::warn!(
-                    "falha ao gravar o áudio dos participantes em disco ({e}) — identificação de falantes desligada nesta reunião"
-                );
-                spool = None;
-            }
+        // O áudio vai para o disco SEMPRE, silencioso ou não: é o silêncio
+        // que mantém a linha do tempo do arquivo igual à da reunião.
+        match speaker {
+            Speaker::Me => me.push_at(offset, &samples),
+            _ => others.push_at(offset, &samples),
         }
+        if quiet {
+            tracing::debug!(speaker = %speaker.label(), offset, "bloco silencioso não vai ao Whisper");
+            continue;
+        }
+
         match engine.transcribe(&samples, &lang, initial_prompt.as_deref()) {
             Ok(t) => {
-                tracing::info!(
+                tracing::debug!(
                     speaker = %speaker.label(),
                     offset,
                     block_secs,
                     infer_secs = t.infer_secs,
+                    forced_cut,
                     "bloco transcrito"
                 );
                 if let Some(sink) = &on_block {
@@ -971,19 +1045,21 @@ fn transcribe_worker(
         }
     }
     segments.sort_by(|a, b| a.start_secs.total_cmp(&b.start_secs));
-    let others_audio = match spool.map(PcmSpool::finish) {
-        Some(Ok(audio)) => audio,
-        Some(Err(e)) => {
-            tracing::warn!("não consegui fechar o áudio dos participantes ({e})");
-            OthersAudio::empty()
-        }
-        None => OthersAudio::empty(),
-    };
+    let duration_secs = started.elapsed().as_secs_f32();
+    let others_audio = others.finish(duration_secs);
+    let me_audio = me.finish(duration_secs);
+    if forced_cuts > 0 {
+        tracing::info!(
+            forced_cuts,
+            "blocos cortados sem silêncio à vista — o passe final refaz esses trechos inteiros"
+        );
+    }
     Ok(MeetingResult {
         segments,
-        duration_secs: started.elapsed().as_secs_f32(),
+        duration_secs,
         others_audio,
-        others_blocks,
+        me_audio,
+        forced_cuts,
     })
 }
 
@@ -1180,11 +1256,11 @@ mod tests {
         );
         // O que estava no buffer foi despachado antes de reabrir, carimbado
         // no início da reunião (chegou antes de 0,4 s de relógio → 0).
-        let (speaker, offset, audio) = job_rx.recv_timeout(Duration::from_secs(2)).unwrap();
-        assert_eq!(speaker, Speaker::Me);
-        assert_eq!(audio.samples.len(), 40);
-        assert_eq!((audio.sample_rate, audio.channels), (100, 1));
-        assert_eq!(offset, 0.0);
+        let job = job_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(job.speaker, Speaker::Me);
+        assert_eq!(job.audio.samples.len(), 40);
+        assert_eq!((job.audio.sample_rate, job.audio.channels), (100, 1));
+        assert_eq!(job.offset, 0.0);
 
         // Pelo canal novo o áudio volta a fluir, carimbado pelo relógio: 0,3 s
         // de áudio chegando com ≥ 0,4 s de reunião → começa em ≥ 0,1 s.
@@ -1193,9 +1269,9 @@ mod tests {
         std::thread::sleep(Duration::from_millis(30));
         stop_tx.send(()).unwrap();
         worker.join().unwrap();
-        let (_, offset2, audio2) = job_rx.recv_timeout(Duration::from_secs(2)).unwrap();
-        assert_eq!(audio2.samples.len(), 30);
-        assert!(offset2 >= 0.09, "{offset2} deveria ser ≥ 0,1 s");
+        let job2 = job_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(job2.audio.samples.len(), 30);
+        assert!(job2.offset >= 0.09, "{} deveria ser ≥ 0,1 s", job2.offset);
         assert!(shared.lock().unwrap().closed, "o stop fecha a fonte");
         assert!(job_rx.try_recv().is_err(), "nada além dos dois blocos");
     }
@@ -1204,8 +1280,10 @@ mod tests {
     fn audio_dos_participantes_vai_para_o_disco_e_volta_igual() {
         let mut spool = PcmSpool::create().unwrap();
         let path = spool.path.clone();
-        spool.push(&[0.0, 0.5, -0.5, 1.0, -1.0, 2.0, -2.0]).unwrap();
-        spool.push(&vec![0.25; 16_000]).unwrap();
+        spool
+            .push_at(0.0, &[0.0, 0.5, -0.5, 1.0, -1.0, 2.0, -2.0])
+            .unwrap();
+        spool.push_at(7.0 / 16_000.0, &vec![0.25; 16_000]).unwrap();
         let audio = spool.finish().unwrap();
         assert!(path.is_file(), "o arquivo existe enquanto o handle vive");
         assert_eq!(audio.samples(), 16_007);
@@ -1233,7 +1311,7 @@ mod tests {
             .map(|i| (i % 2000) as f32 / 1000.0 - 1.0)
             .collect();
         let mut spool = PcmSpool::create().unwrap();
-        spool.push(&data).unwrap();
+        spool.push_at(0.0, &data).unwrap();
         let audio = spool.finish().unwrap();
         let back = audio.read_f32().unwrap();
         assert_eq!(back.len(), data.len());
@@ -1241,10 +1319,39 @@ mod tests {
             assert!((got - want).abs() < 1.0 / 32_000.0, "{got} vs {want}");
         }
 
-        let empty = OthersAudio::empty();
+        let empty = ChannelAudio::empty();
         assert!(empty.is_empty());
         assert_eq!(empty.secs(), 0.0);
         assert!(empty.read_f32().unwrap().is_empty());
+    }
+
+    #[test]
+    fn buraco_na_entrega_vira_silencio_e_a_posicao_continua_sendo_o_relogio() {
+        // O canal entrega 0,5 s no instante 0 e só volta no instante 10: sem
+        // o preenchimento, os dois trechos ficariam colados e a diarização
+        // veria uma troca de voz que não houve.
+        let mut spool = PcmSpool::create().unwrap();
+        spool.push_at(0.0, &vec![0.4; 8_000]).unwrap();
+        spool.push_at(10.0, &vec![-0.4; 8_000]).unwrap();
+        spool.pad_to(12.0).unwrap();
+        let audio = spool.finish().unwrap();
+        assert_eq!(audio.samples(), 12 * 16_000);
+        let back = audio.read_f32().unwrap();
+        // O segundo trecho está exatamente aos 10 s.
+        assert!((back[10 * 16_000] + 0.4).abs() < 1.0 / 32_000.0);
+        // E o buraco é silêncio de verdade.
+        assert!(back[16_000..10 * 16_000].iter().all(|s| *s == 0.0));
+    }
+
+    #[test]
+    fn spool_nao_retrocede_quando_o_relogio_volta() {
+        // Jitter de relógio não pode fazer o arquivo encolher nem sobrescrever
+        // o que já foi gravado.
+        let mut spool = PcmSpool::create().unwrap();
+        spool.push_at(5.0, &vec![0.4; 1_600]).unwrap();
+        spool.push_at(1.0, &vec![0.2; 1_600]).unwrap();
+        let audio = spool.finish().unwrap();
+        assert_eq!(audio.samples(), 5 * 16_000 + 3_200);
     }
 
     #[test]
@@ -1324,72 +1431,5 @@ mod tests {
         assert!(md.contains("**[00:00] Eu:** Olá.\n"));
         assert!(md.contains("**[00:05] Participante 1:** Oi.\n"));
         assert!(md.contains("---\n\n## Resumo\nCurto.\n\n> Resumo gerado por IA"));
-    }
-
-    use proptest::prelude::*;
-
-    proptest! {
-        #![proptest_config(ProptestConfig::with_cases(64))]
-
-        /// O corte nunca passa do buffer; quando há espaço para procurar, cai
-        /// numa fronteira de frame dentro do último 1,5 s. Buffers curtos
-        /// (sem duas janelas de busca) são despachados inteiros.
-        #[test]
-        fn corte_fica_no_buffer_e_em_fronteira_de_frame(
-            samples in proptest::collection::vec(-1.0f32..1.0, 0..20_000),
-            rate in prop_oneof![Just(8_000u32), Just(16_000), Just(48_000)],
-            ch in 1usize..=2,
-        ) {
-            let cut = quiet_cut(&samples, rate, ch);
-            prop_assert!(cut <= samples.len());
-            let frames = samples.len() / ch;
-            let win = (rate as usize / 10).max(1);
-            let search = ((rate as usize) * 3 / 2).min(frames);
-            if search >= win * 2 {
-                prop_assert_eq!(cut % ch, 0);
-                prop_assert!(cut / ch >= frames - search);
-                prop_assert!(cut / ch <= frames);
-            } else {
-                prop_assert_eq!(cut, samples.len());
-            }
-        }
-
-        /// Um trecho de silêncio (300 ms) dentro do último 1,5 s é onde o corte
-        /// cai, qualquer que seja o ruído em volta — o bloco nunca parte uma
-        /// palavra cercada de silêncio.
-        #[test]
-        fn corte_cai_no_silencio(
-            rate in prop_oneof![Just(16_000u32), Just(48_000)],
-            ch in 1usize..=2,
-            secs in 2.0f32..6.0,
-            // Onde o silêncio começa, contado do fim (dentro do 1,5 s pesquisado).
-            from_end_ms in 400u32..1_400,
-            seed in any::<u64>(),
-        ) {
-            let frames = (secs * rate as f32) as usize;
-            let silence_len = rate as usize * 3 / 10;
-            let silence_start = frames - from_end_ms as usize * rate as usize / 1000;
-            let mut state = seed | 1;
-            let mut buf = Vec::with_capacity(frames * ch);
-            for f in 0..frames {
-                let v = if (silence_start..silence_start + silence_len).contains(&f) {
-                    0.0
-                } else {
-                    // Ruído alto (módulo entre 0,2 e 1,0), sinal por xorshift.
-                    state ^= state << 13;
-                    state ^= state >> 7;
-                    state ^= state << 17;
-                    let mag = 0.2 + (state % 800) as f32 / 1000.0;
-                    if state & 2 == 0 { mag } else { -mag }
-                };
-                buf.extend(std::iter::repeat_n(v, ch));
-            }
-            let cut_frame = quiet_cut(&buf, rate, ch) / ch;
-            prop_assert!(
-                (silence_start..=silence_start + silence_len).contains(&cut_frame),
-                "corte em {cut_frame}, silêncio em {silence_start}..{}",
-                silence_start + silence_len
-            );
-        }
     }
 }

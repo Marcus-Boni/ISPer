@@ -1,0 +1,44 @@
+# Roteiro do corpus de regressão do pipeline de transcrição.
+#
+# Gere o áudio com:
+#   cargo run --release -p isper-cli --bin mkfixture -- fixtures/reuniao-sintetica.txt
+#
+# O arquivo .wav NÃO é versionado (megabytes de áudio no Git envelhecem mal):
+# este roteiro é a fonte, e ele é reproduzível bit a bit na mesma máquina.
+#
+# Formato de cada fala:
+#   <pausa em segundos ANTES da fala>|<falante>|<texto>
+#
+# O texto é a VERDADE de referência (WER/CER) e o falante é a verdade da
+# diarização (DER) — os dois saem prontos ao gerar o áudio.
+#
+# As vozes vêm do SAPI do Windows (uma só voz em pt-BR nesta máquina) e são
+# separadas por perturbação de velocidade: 1,00 · 0,92 · 1,08. É o mesmo
+# recurso que o treino de reconhecimento de locutor usa para fabricar falantes
+# distintos, e muda o embedding o bastante para o agrupamento ter trabalho.
+# LIMITE CONHECIDO: voz sintética limpa não substitui reunião real com áudio
+# comprimido pelo Teams. Isto aqui pega regressão; não mede qualidade absoluta.
+#
+# O roteiro cobre, de propósito: monólogo longo, troca rápida de falante,
+# nomes próprios, siglas, termos técnicos, números, silêncio longo,
+# interrupção e frases compridas.
+
+0.0|Ana|Bom dia, pessoal. Vamos começar a reunião de acompanhamento do ERP com a Tommasi.
+0.8|Ana|Hoje temos três pontos: o fluxo de caixa, o manual do MRP e a migração do SharePoint.
+1.5|Bruno|Bom dia, Ana. O Paulo Rocha pediu para adiantar a parte do fluxo de caixa, porque a diretoria cobra o número na sexta.
+0.6|Ana|Combinado. Bruno, você consegue resumir onde estamos?
+0.9|Bruno|Consigo. O relatório de fluxo de caixa já está integrado ao ERP, mas ainda depende de um ajuste no cadastro de contas. Nós levantamos quarenta e sete lançamentos com centro de custo errado, e desses, trinta e dois vieram da importação antiga. A correção é manual, mas dá para fazer em dois dias se a Optsolv liberar o acesso ao ambiente de homologação até quarta-feira.
+2.4|Carla|Desculpa interromper, Bruno. O acesso já foi liberado ontem à noite.
+0.4|Bruno|Ah, ótimo. Então a estimativa cai para um dia.
+1.1|Ana|Carla, e a parte do manual?
+0.7|Carla|O manual do MRP está com a revisão da Javé. Eu enviei a versão dois ponto três na terça, e eles devolveram com quatorze comentários. Nenhum deles é bloqueante.
+1.3|Ana|Perfeito. E o SharePoint?
+0.8|Carla|A migração do SharePoint depende do time de infraestrutura. Eles pediram uma janela de quatro horas no sábado, das oito às doze.
+1.0|Bruno|Sábado é arriscado. Se der problema, ninguém está disponível para reverter.
+0.5|Carla|Concordo.
+0.4|Ana|Então fica assim: migração na quinta à noite, com o Paulo Rocha de plantão.
+6.0|Ana|Voltando. Alguém tem mais alguma coisa?
+1.2|Bruno|Só uma. O contrato com a Tommasi vence em trinta e um de outubro, e a renovação precisa passar pelo jurídico antes.
+0.9|Ana|Anotado. Eu falo com o jurídico hoje.
+0.6|Carla|Eu atualizo o manual até sexta e mando para a Optsolv.
+1.4|Ana|Ótimo. Obrigada, pessoal. Bom trabalho.

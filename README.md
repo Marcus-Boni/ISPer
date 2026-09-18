@@ -518,7 +518,10 @@ app e da CLI (configuração, migração de pastas, posição do indicador, atal
 definição da CLI). `clippy::unwrap_used` vale para todo o workspace: `unwrap()`
 só em testes. A estratégia completa, com o roteiro de validação manual dos
 casos de áudio (fone desconectado, suspensão, modo exclusivo, monitores), está
-em [`docs/TESTES.md`](docs/TESTES.md).
+em [`docs/TESTES.md`](docs/TESTES.md). A arquitetura do pipeline de
+transcrição — modos ao vivo e final, VAD, decodificação, diarização,
+atribuição de falante e como medir tudo isso — está em
+[`docs/transcription-pipeline.md`](docs/transcription-pipeline.md).
 
 O GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda,
 a cada push e PR, formatação (`cargo fmt --check`), os testes de todos os

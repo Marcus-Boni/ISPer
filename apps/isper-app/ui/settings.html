@@ -138,6 +138,32 @@
   </div>
   <div class="mprog" id="diarprog"><div class="progress"><i></i></div><span class="pct">0%</span></div>
   <p class="hint">Com os modelos instalados, "Participantes" vira "Participante 1", "Participante 2"… — pyannote + 3D-Speaker via sherpa-onnx, 100% local, ao encerrar a reunião.</p>
+  <label class="lbl" for="speakers">Quantos participantes costuma ter a reunião</label>
+  <select id="speakers" class="field">
+    <option value="0">Descobrir sozinho (padrão)</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5">5</option>
+    <option value="6">6</option>
+    <option value="7">7</option>
+    <option value="8">8</option>
+  </select>
+  <p class="hint">Informar o número é o que mais ajuda: sem ele, o agrupamento decide por distância entre vozes, e numa reunião longa acaba criando gente demais. Com o número, ele corta em exatamente essa quantidade.</p>
+
+  <details class="mt8">
+    <summary class="lbl">Avançado</summary>
+    <label class="switch mt8"><input type="checkbox" id="finalpass"><span class="track"><span class="thumb"></span></span>Refazer a transcrição ao encerrar a reunião (passe final)</label>
+    <p class="hint">Ligado por padrão. Ao encerrar, o ISPer transcreve o áudio inteiro de novo com mais capricho — corte guiado por detecção de voz, busca em feixe, contexto entre trechos e falante palavra a palavra — e substitui a transcrição que apareceu ao vivo. Leva alguns minutos por hora de reunião, em segundo plano; a transcrição ao vivo continua no lugar se algo falhar.</p>
+    <label class="lbl" for="diarthr">Limiar do agrupamento de falantes</label>
+    <select id="diarthr" class="field">
+      <option value="0">Padrão (0,5)</option>
+      <option value="0.35">0,35 — separa mais (mais falantes)</option>
+      <option value="0.65">0,65 — junta mais (menos falantes)</option>
+      <option value="0.8">0,8 — junta bastante</option>
+    </select>
+    <p class="hint">Distância máxima entre duas vozes para serem a mesma pessoa. Mexer aqui sem comparar o resultado costuma piorar — prefira informar o número de participantes acima.</p>
+  </details>
 </div>
 
 <div class="card reveal" data-i="4">
@@ -358,6 +384,9 @@
       embProviderChanged();
       $('showhome').checked = s.show_home_on_launch !== false;
       $('autoupdate').checked = s.auto_update_check !== false;
+      $('speakers').value = String(s.meeting_speakers || 0);
+      $('finalpass').checked = s.final_pass !== false;
+      $('diarthr').value = String(s.diarize_threshold || 0);
       $('retention').value = String(s.retention_days || 0);
       retentionSaved = String(s.retention_days || 0);
       $('retconfirm').hidden = true;
@@ -540,6 +569,9 @@
         auto_update_check: $('autoupdate').checked,
         // Um prazo escolhido mas não confirmado não vale: volta ao salvo.
         retention_days: ($('retconfirm').hidden ? Number($('retention').value) : Number(retentionSaved)) || 0,
+        meeting_speakers: Number($('speakers').value) || 0,
+        final_pass: $('finalpass').checked,
+        diarize_threshold: Number($('diarthr').value) || 0,
         call_detect: $('calldetect').value,
         live_insights: $('insights').checked,
         insights_interval_min: Number($('insint').value) || 5,
@@ -642,6 +674,8 @@
     const fmtSecs = (s) => s == null ? '—' : s < 1 ? Math.round(s * 1000) + ' ms' : s.toFixed(1) + ' s';
     add('Banco', d.db_path + (d.db_schema != null ? ' · schema v' + d.db_schema : '') + (d.db_bytes ? ' · ' + fmtBytes(d.db_bytes) : ''));
     add('Retenção', d.retention_days ? 'apaga o que passar de ' + d.retention_days + ' dias' : 'guarda para sempre');
+    add('Participantes', d.meeting_speakers ? String(d.meeting_speakers) : 'descobrir sozinho');
+    add('Passe final', d.final_pass === false ? 'desligado' : 'ligado');
     for (const m of (d.metrics || [])) {
       const name = m.kind === 'dictation' ? 'Ditados (30 dias)' : m.kind === 'meeting_block' ? 'Blocos de reunião (30 dias)' : m.kind + ' (30 dias)';
       const rate = m.total ? Math.round(m.errors / m.total * 1000) / 10 : 0;

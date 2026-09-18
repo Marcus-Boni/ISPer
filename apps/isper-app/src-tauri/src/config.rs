@@ -95,6 +95,24 @@ pub struct AppConfig {
     /// necessário). 0 = para sempre. A varredura roda ao abrir e uma vez por dia.
     #[serde(default)]
     pub retention_days: u32,
+    /// Passe final: ao encerrar a reunião, refazer a transcrição sobre o
+    /// áudio inteiro (VAD, beam search, falante por palavra) e substituir a
+    /// transcrição ao vivo. Custa alguns minutos por hora de reunião e é o
+    /// que dá a transcrição boa o bastante para virar ata.
+    #[serde(default = "default_true")]
+    pub final_pass: bool,
+    /// Quantos participantes a reunião tem, quando se sabe.
+    ///
+    /// Zero = descobrir pelo agrupamento. Informado, o agrupamento corta o
+    /// dendrograma em exatamente N grupos em vez de usar limiar de distância
+    /// — e é a única coisa que mantém a contagem de falantes estável numa
+    /// reunião de duas horas (ver `isper-diarize`).
+    #[serde(default)]
+    pub meeting_speakers: u32,
+    /// Limiar do agrupamento de falantes. 0 = o padrão do projeto (0,5).
+    /// Configuração avançada: mexer aqui sem medir costuma piorar.
+    #[serde(default)]
+    pub diarize_threshold: f32,
     /// Versão do formato deste arquivo — ver [`CONFIG_VERSION`].
     #[serde(default)]
     pub config_version: u32,
@@ -125,6 +143,9 @@ impl Default for AppConfig {
             insights_interval_min: default_insights_interval(),
             overlay_pinned: false,
             retention_days: 0,
+            final_pass: true,
+            meeting_speakers: 0,
+            diarize_threshold: 0.0,
             config_version: CONFIG_VERSION,
         }
     }

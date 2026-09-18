@@ -614,8 +614,8 @@
       m.appendChild(el('span', 'num', fmtClock(r.duration_secs)));
       if (diarizing === r.id) {
         const b = el('span', 'badge warn');
-        b.appendChild(el('span', 'dot warn pulse')); b.append('identificando falantes…');
-        b.title = 'a diarização roda em segundo plano na CPU — leva cerca de 40% da duração da reunião; o transcript já está disponível';
+        b.appendChild(el('span', 'dot warn pulse')); b.append('refazendo a transcrição…');
+        b.title = 'o passe final roda em segundo plano: transcreve o áudio inteiro de novo com mais capricho e identifica quem falou. A transcrição ao vivo já está disponível e é substituída quando ele terminar.';
         m.appendChild(b);
       } else {
         m.appendChild(el('span', 'badge', plural(r.participants, 'participante', 'participantes')));

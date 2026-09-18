@@ -275,10 +275,10 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
         ),
     }
 
-    // Fase 4: quem falou o quê — em segundo plano, se os modelos existirem.
-    if isper_diarize::models_installed() && !result.others_audio.is_empty() {
-        diarize_in_background(app.clone(), meeting_id, result);
-    }
+    // Passe final: a transcrição oficial, refeita sobre o áudio inteiro em
+    // segundo plano (VAD, beam search, quem falou o quê). Quando termina,
+    // substitui a transcrição ao vivo no banco e regrava o `.md`.
+    final_pass::run_in_background(app.clone(), meeting_id, result);
 
     Ok(md_path.display().to_string())
 }
@@ -322,105 +322,6 @@ pub(crate) fn notify_meeting_saved(
             open_file(md_path);
         }
     }
-}
-
-/// Roda a diarização numa thread, e ao terminar troca "Participantes" por
-/// "Participante N" no banco, regrava o `.md` e avisa as janelas. Enquanto
-/// roda, `diarizing` aponta para a reunião (o Início mostra um chip).
-pub(crate) fn diarize_in_background(
-    app: AppHandle,
-    meeting_id: i64,
-    mut result: meeting::MeetingResult,
-) {
-    {
-        let state = app.state::<AppState>();
-        *state.diarizing.lock_or_recover() = Some(meeting_id);
-    }
-    notify_status(&app);
-    std::thread::spawn(move || {
-        let started = Instant::now();
-        let audio_secs = result.others_audio.secs();
-        tracing::info!(
-            meeting_id,
-            audio_secs,
-            "diarização iniciada em segundo plano"
-        );
-        // O áudio sai do arquivo temporário só agora, para a diarização — e é
-        // liberado logo depois.
-        let outcome = result
-            .others_audio_f32()
-            .map_err(|e| e.to_string())
-            .and_then(|audio| isper_diarize::diarize(&audio).map_err(|e| e.to_string()));
-        match outcome {
-            Ok(turns) => {
-                let t: Vec<(f32, f32, usize)> =
-                    turns.iter().map(|t| (t.start, t.end, t.speaker)).collect();
-                result.apply_speaker_turns(&t);
-                let labels: Vec<String> =
-                    result.segments.iter().map(|s| s.speaker.label()).collect();
-                let pairs: Vec<(f32, &str)> = result
-                    .segments
-                    .iter()
-                    .zip(&labels)
-                    .map(|(s, l)| (s.start_secs, l.as_str()))
-                    .collect();
-                let participants = result.distinct_participants();
-                match open_store().and_then(|store| {
-                    let n = store.relabel_segments(meeting_id, &pairs)?;
-                    rewrite_markdown(&store, meeting_id);
-                    let title = store
-                        .get_meeting(meeting_id)?
-                        .map(|d| d.meeting.title)
-                        .unwrap_or_default();
-                    Ok((n, title))
-                }) {
-                    Ok((n, title)) => {
-                        tracing::info!(
-                            meeting_id,
-                            secs = started.elapsed().as_secs_f32(),
-                            "{participants} participante(s) identificado(s); {n} falas rotuladas"
-                        );
-                        let notify_on = app
-                            .state::<AppState>()
-                            .config
-                            .lock_or_recover()
-                            .after_meeting
-                            == "notify";
-                        if notify_on && n > 0 {
-                            let line2 = format!(
-                                "{} · clique para ver quem falou o quê",
-                                if participants == 1 {
-                                    "1 participante".to_string()
-                                } else {
-                                    format!("{participants} participantes")
-                                }
-                            );
-                            let app2 = app.clone();
-                            let _ = notify::show(
-                                notify::Toast {
-                                    title: "Falantes identificados",
-                                    line1: &title,
-                                    line2: Some(&line2),
-                                    silent: true,
-                                },
-                                move || open_library_at(&app2, meeting_id),
-                            );
-                        }
-                    }
-                    Err(e) => tracing::warn!("diarização pronta, mas não consegui gravar: {e}"),
-                }
-            }
-            Err(e) => tracing::warn!("diarização falhou (rótulos genéricos mantidos): {e}"),
-        }
-        {
-            let state = app.state::<AppState>();
-            let mut d = state.diarizing.lock_or_recover();
-            if *d == Some(meeting_id) {
-                *d = None;
-            }
-        }
-        notify_status(&app);
-    });
 }
 
 /// Inicia/encerra a reunião a partir do Início. Roda fora da thread principal:

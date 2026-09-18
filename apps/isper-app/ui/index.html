@@ -149,6 +149,7 @@
     'meeting': 'recording meeting',
     'meeting-processing': 'transcribing meeting',
     'meeting-diarize': 'transcribing meeting',
+    'meeting-final': 'transcribing meeting',
     'meeting-summary': 'transcribing meeting',
     'meeting-done': 'done'
   };
@@ -172,6 +173,7 @@
     else if (s === 'meeting') setStatus(msg ? 'reunião — ' + msg : 'gravando reunião — Eu + Participantes');
     else if (s === 'meeting-processing') { setStatus('transcrevendo a reunião…'); setCaptionHint('encerrando — transcrevendo o que faltava…'); }
     else if (s === 'meeting-diarize') setStatus('identificando quem falou…');
+    else if (s === 'meeting-final') { setStatus('refazendo a transcrição…'); setCaptionHint('passe final — transcrição definitiva em preparo'); }
     else if (s === 'meeting-summary') setStatus('resumindo com IA…');
     else if (s === 'meeting-done') { setStatus('reunião salva ✓'); setCaptionHint('reunião salva ✓'); blip(1320, .07); }
     else if (s === 'transcribing') setStatus('transcrevendo…');
