@@ -15,3 +15,14 @@
 crates/isper-core/tests/golden/** -text
 *.docx binary
 *.woff2 binary
+
+# GitHub Linguist — Metadados e estatísticas de linguagens do repositório
+# Skills e ferramentas de IA são dependências externas (vendored):
+# exclui das estatísticas da barra de linguagens e colapsa diffs em PRs.
+.agents/** linguist-vendored
+.claude/** linguist-vendored
+**/.impeccable/** linguist-vendored
+
+# Caso queira que o portal de documentação (Next.js/TSX) não concorra com o core em Rust,
+# descomente a linha abaixo para classificar o site como documentação no GitHub:
+# website/** linguist-documentation
