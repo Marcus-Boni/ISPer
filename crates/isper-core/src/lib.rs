@@ -12,6 +12,7 @@ pub mod context;
 pub mod embed;
 pub mod engine;
 pub mod export;
+pub mod import;
 pub mod loopback;
 pub mod meeting;
 pub mod metrics;
