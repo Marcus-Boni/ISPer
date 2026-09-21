@@ -18,6 +18,22 @@ bata com ela.
   (texto mais claro; o bloco final a substitui). Se o worker acumular fila,
   a captura volta aos blocos longos até esvaziar. O passe final, que gera a
   ata, não muda — só o que aparece na tela durante a reunião.
+- **Indicador flutuante mais baixo e melhor aproveitado.** A janela normal
+  passa de 460×104 para 460×68 e a de legendas de 760×132 para 760×100 — a
+  pílula tinha quase o dobro da altura do seu conteúdo. Em reunião a onda do
+  microfone sai de cena (sobrava em 8 px, ilegível) e a fala ao vivo fica com
+  a linha inteira; fora de reunião o "CC" some, porque legenda só existe em
+  reunião. Trocar de modo agora reancora a pílula pelo centro e pela base, em
+  vez de segurar o canto superior esquerdo.
+
+### Corrigido
+- **Os botões do indicador estouravam para fora da pílula no modo mini
+  durante uma reunião.** A janela mini tinha 150×56 (113 px úteis) e a linha
+  pedia 146 px — 162 passando de uma hora de reunião —, então o × (e depois
+  o +) eram desenhados fora da borda arredondada. O mini passa a 192×46,
+  dimensionado pelo pior caso, com o orçamento de largura documentado no
+  CSS e nos `OVERLAY_*`; fora de reunião a sobra vira o status, que antes
+  era um vazio de 89 px.
 
 ## [0.16.1] - 2026-09-20
 
