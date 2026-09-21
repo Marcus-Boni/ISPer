@@ -4,7 +4,13 @@
 #
 # O build.rs do whisper-rs-sys repassa qualquer GGML_* / CMAKE_* ao CMake.
 [env]
-# SIMD do Ryzen 7 7735HS
+# Conjunto de instruções FIXO (AVX2/FMA/F16C/BMI2 — o que o README promete: "qualquer
+# PC x64 com AVX2"). GGML_NATIVE fica OFF de propósito: com ele ligado (o padrão do
+# ggml) o CMake detecta a CPU de QUEM COMPILA e, num runner do GitHub com AVX-512,
+# emitia /arch:AVX512 — o instalador da 0.17.0 morria com instrução ilegal
+# (0xc000001d) na primeira inferência num Ryzen 7 7735HS, que não tem AVX-512.
+GGML_NATIVE = "OFF"
+GGML_AVX512 = "OFF"
 GGML_AVX2 = "ON"
 GGML_FMA = "ON"
 GGML_F16C = "ON"
