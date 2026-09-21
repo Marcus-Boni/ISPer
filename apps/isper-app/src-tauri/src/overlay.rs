@@ -183,8 +183,25 @@ pub(crate) fn overlay_set_mode(app: AppHandle, mode: String) -> Result<(), Strin
     };
     let (w, h) = overlay_size(&cfg);
     if let Some(overlay) = app.get_webview_window("overlay") {
+        let before = overlay.outer_size().map_err(|e| e.to_string())?;
+        let pos = overlay.outer_position().map_err(|e| e.to_string())?;
+        let scale = overlay.scale_factor().map_err(|e| e.to_string())?;
         overlay
             .set_size(tauri::LogicalSize::new(w, h))
+            .map_err(|e| e.to_string())?;
+        // Sem decoração, o tamanho externo é o lógico vezes a escala — não
+        // dá para reler `outer_size()` aqui e confiar que o SO já aplicou.
+        let after = ((w * scale).round() as u32, (h * scale).round() as u32);
+        let target = recenter_on_resize((pos.x, pos.y), (before.width, before.height), after);
+        let monitors: Vec<MonitorRect> = overlay
+            .available_monitors()
+            .map_err(|e| e.to_string())?
+            .iter()
+            .map(MonitorRect::from)
+            .collect();
+        let (x, y) = clamp_to_monitors(target, after, &monitors).unwrap_or(target);
+        overlay
+            .set_position(tauri::PhysicalPosition::new(x, y))
             .map_err(|e| e.to_string())?;
     }
     config::save(&cfg).map_err(|e| e.to_string())?;
@@ -239,6 +256,23 @@ impl From<&tauri::Monitor> for MonitorRect {
             h: m.size().height,
         }
     }
+}
+
+/// Para onde o indicador vai quando muda de tamanho. O Windows redimensiona
+/// segurando o canto superior esquerdo: encolhendo (legendas → mini) a pílula
+/// "pula" para a esquerda de quem olha, e crescendo (mini → legendas, 760 px)
+/// ela avança para fora da tela. Ancorar pelo centro e pela base mantém a
+/// pílula onde o usuário a largou; quem garante que ainda cabe no monitor é o
+/// `clamp_to_monitors` logo depois.
+pub(crate) fn recenter_on_resize(
+    pos: (i32, i32),
+    before: (u32, u32),
+    after: (u32, u32),
+) -> (i32, i32) {
+    (
+        pos.0 + (before.0 as i32 - after.0 as i32) / 2,
+        pos.1 + (before.1 as i32 - after.1 as i32),
+    )
 }
 
 /// Quanto do indicador precisa continuar visível para a posição lembrada valer.
@@ -336,6 +370,23 @@ mod tests {
         // Quase toda fora (só 20 px visíveis) também não vale.
         assert_eq!(clamp_to_monitors((2540, 700), SIZE, &[MAIN]), None);
         assert_eq!(clamp_to_monitors((100, 100), SIZE, &[]), None);
+    }
+
+    #[test]
+    fn trocar_de_modo_ancora_pelo_centro_e_pela_base() {
+        // Normal (460×68) → mini (184×46): a pílula encolhe sem sair do lugar.
+        assert_eq!(
+            recenter_on_resize((1050, 1300), (460, 68), (184, 46)),
+            (1188, 1322)
+        );
+        // Mini → legendas (760×100): cresce para os dois lados e para cima,
+        // em vez de avançar 576 px para a direita.
+        assert_eq!(
+            recenter_on_resize((1188, 1322), (184, 46), (760, 100)),
+            (900, 1268)
+        );
+        // Mesmo tamanho, nada se mexe.
+        assert_eq!(recenter_on_resize((10, 20), (460, 68), (460, 68)), (10, 20));
     }
 
     #[test]
