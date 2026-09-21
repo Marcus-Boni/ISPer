@@ -75,6 +75,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             start_secs: seg.start_secs,
             end_secs: seg.end_secs,
             text: seg.text.clone(),
+            provisional: false,
         };
         {
             let state = live_app.state::<AppState>();
@@ -86,6 +87,21 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             }
         }
         let _ = live_app.emit("isper-live", &item);
+    });
+    // Legenda provisória (buffer ainda aberto): só para a tela — não entra na
+    // lista guardada; o bloco final chega em segundos e a substitui.
+    let partial_app = app.clone();
+    let on_partial: meeting::SegmentSink = Arc::new(move |seg: &MeetingSegment| {
+        let _ = partial_app.emit(
+            "isper-live",
+            &LiveSegment {
+                speaker: seg.speaker.label(),
+                start_secs: seg.start_secs,
+                end_secs: seg.end_secs,
+                text: seg.text.clone(),
+                provisional: true,
+            },
+        );
     });
     // Cada bloco que passa pelo Whisper vira uma métrica local (Diagnóstico).
     let on_block: meeting::BlockSink = Arc::new(|b: &meeting::BlockStats| {
@@ -104,6 +120,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             source: LoopbackSource::parse(&cfg.meeting_source),
             input_device: cfg.input_device.clone(),
             on_segment: Some(on_segment),
+            on_partial: Some(on_partial),
             on_block: Some(on_block),
             dictionary: cfg.dictionary.clone(),
         }

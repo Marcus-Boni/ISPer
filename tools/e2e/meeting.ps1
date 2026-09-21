@@ -57,6 +57,16 @@ Check ($ui.live -and $ui.mark) "painel ao vivo e botao de marcar visiveis (legen
 
 $player = New-Object System.Media.SoundPlayer $fixture
 $player.Play()   # 29,5 s, assíncrono
+# Latencia da primeira legenda (provisoria ou final) no indicador: com blocos
+# de 6 s e provisorias a cada 2,5 s ela tem de chegar bem antes dos 20 s que
+# o bloco antigo levava. Mede do Play() ate o texto aparecer em cap-cur.
+$t0 = Get-Date; $firstAt = $null; $firstProv = $false
+while (((Get-Date) - $t0).TotalSeconds -lt 20) {
+  $c = EvJson 'http://tauri.localhost/' 'JSON.stringify({ cur: document.getElementById("cap-cur").textContent.trim(), prov: document.getElementById("cap-cur").classList.contains("provisional") })'
+  if ($c -and $c.cur -and $c.cur -notmatch 'legendas ao vivo') { $firstAt = [math]::Round(((Get-Date) - $t0).TotalSeconds, 1); $firstProv = [bool]$c.prov; break }
+  Start-Sleep -Milliseconds 500
+}
+Check ($null -ne $firstAt -and $firstAt -le 12) "primeira legenda em $firstAt s (provisoria=$firstProv; limite 12 s)"
 Start-Sleep -Seconds 6
 $m = EvJson 'home.html' "(async () => { const inv = window.__TAURI__.core.invoke; const [a, b] = await Promise.all([inv('mark_moment_cmd'), inv('mark_moment_cmd')]); return JSON.stringify({ a, b }); })()"
 Check ($m.a -eq $m.b) "debounce: duas marcas no mesmo instante valem uma ($($m.a) s)"

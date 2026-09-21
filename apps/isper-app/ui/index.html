@@ -7,14 +7,30 @@
 <style>
   /* Indicador flutuante: janela transparente, sem foco, arrastável.
      Três modos, decididos pelo TAMANHO REAL da janela (fonte única):
-     mini (< 300 px), normal, legendas (≥ 600 px). */
+     mini (< 300 px), normal, legendas (≥ 600 px).
+
+     ORÇAMENTO DE LARGURA — a janela é fixa, sem rolagem e sem decoração:
+     o que não couber vaza por cima da borda arredondada (era o que fazia os
+     botões estourarem no mini em reunião). Cada modo é dimensionado pelo
+     PIOR caso: reunião de 1 h+ ("1:02:05") com todos os botões visíveis.
+       mini      12 folga + 20 padding + 10 ponto + 8 + 53 relógio + 8
+                 + 66 (3 botões de 20 px, vãos de 3) = 177 → 192 px, que
+                 deixa ~13 px de sobra para variação de fonte entre máquinas
+       normal    fixos (ponto 10 + relógio 57 + 4 botões 100 + vãos 30)
+                 saem de 418 → sobram ~221 px para a fala ao vivo
+       legendas  a mesma conta em 718 → sobram ~521 px para a legenda
+     Mexeu em botão, vão ou fonte do relógio? Refaça a conta aqui E nos
+     OVERLAY_* de src-tauri/src/state.rs — os dois têm de andar juntos. */
   html, body { background: transparent !important; overflow: hidden; height: 100%; }
   * { user-select: none; }
   /* A sombra precisa caber DENTRO da janela (transparente, recorta tudo):
      margem de 8px embaixo para deslocamento 2px + desfoque 6px. */
   #pill {
     position: absolute; inset: 4px 6px 8px 6px;
-    display: flex; align-items: center; gap: 12px; padding: 0 12px 0 18px;
+    display: flex; align-items: center; gap: 10px; padding: 0 12px 0 18px;
+    /* Cinto de segurança do orçamento acima: um texto maior que o previsto
+       é cortado na borda em vez de desenhar fora da pílula. */
+    overflow: hidden;
     background: rgba(22, 19, 17, .94);
     border: 1px solid rgba(255, 255, 255, .09);
     border-radius: var(--r-pill);
@@ -28,7 +44,7 @@
   #pill.done { border-color: rgba(132, 194, 151, .4); }
   #pill.error { border-color: rgba(240, 126, 114, .55); }
 
-  #dot { width: 12px; height: 12px; }
+  #dot { width: 10px; height: 10px; }
   #pill.recording #dot { background: var(--accent); animation: pulse 1.3s ease-in-out infinite; }
   #pill.transcribing #dot { background: var(--warn); animation: pulse .6s ease-in-out infinite; }
   #pill.done #dot { background: var(--good); animation: ring-burst var(--dur-4) var(--ease-out) both; }
@@ -40,12 +56,20 @@
   #pill.call #dot { background: var(--warn); animation: pulse 1.1s ease-in-out infinite; }
   #pill.call #status { color: var(--warn); max-width: 70%; }
 
-  canvas { flex: 1; height: 46px; min-width: 0; }
+  /* `flex: 1` (base 0) e não `auto`: um <canvas> sem width tem 300px
+     intrínsecos, que empurrariam o resto para fora. */
+  canvas { flex: 1; height: 30px; min-width: 0; }
+  /* Em reunião a fala ao vivo vale mais que o nível do microfone: a onda
+     sobrava em 8 px — ilegível — e roubava metade do espaço do texto. */
+  #pill.meeting canvas { display: none; }
+
   #status {
     font-size: 13px; color: var(--muted); white-space: nowrap;
-    max-width: 46%; overflow: hidden; text-overflow: ellipsis; flex: none;
+    flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
     transition: color var(--dur-3);
   }
+  /* Em reunião o status É a fala ao vivo: fica com toda a sobra da linha. */
+  #pill.meeting #status { flex: 1 1 auto; }
   #status.flash { color: var(--warn); }
   #pill.done #status { color: var(--good); }
   #pill.error #status { color: var(--accent); }
@@ -55,11 +79,14 @@
   }
   #pill.meeting #timer { display: block; }
 
+  /* Controles: discretos em repouso, cheios no hover. Antes ficavam
+     invisíveis (opacity 0) mas já ocupavam o lugar — espaço morto e
+     ninguém descobria que a pílula tinha botões. */
   .ctl {
-    display: flex; gap: 4px; flex: none; opacity: 0; transform: translateX(6px);
-    transition: opacity var(--dur-2), transform var(--dur-3) var(--ease-out);
+    display: flex; gap: 4px; flex: none; margin-left: auto;
+    opacity: .45; transition: opacity var(--dur-2);
   }
-  #pill:hover .ctl, #pill:focus-within .ctl { opacity: 1; transform: none; }
+  #pill:hover .ctl, #pill:focus-within .ctl { opacity: 1; }
   .ctl button {
     width: 22px; height: 22px; border-radius: 50%; padding: 0;
     border: 1px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .06);
@@ -72,21 +99,31 @@
   .ctl button:disabled { opacity: .5; }
   .ctl #mark { display: none; color: var(--warn); font-size: 13px; }
   #pill.meeting .ctl #mark { display: grid; }
-  .ctl #cap { font-size: 11px; }
+  /* Legendas só fazem sentido em reunião — fora dela o CC era só ruído.
+     Continua visível se o modo já estiver ligado, senão não teria volta. */
+  .ctl #cap { display: none; font-size: 11px; }
+  #pill.meeting .ctl #cap, body.captions .ctl #cap { display: grid; }
   .ctl #cap.on { color: var(--warn); border-color: rgba(232, 193, 90, .5); }
 
-  /* Modo mini: só o ponto (+ cronômetro em reunião). */
-  body.mini #pill { gap: 10px; padding: 0 10px 0 14px; }
-  body.mini canvas, body.mini #status, body.mini #captions { display: none; }
-  body.mini .ctl { margin-left: auto; }
-  body.mini .ctl #cap { display: none; }
+  /* Modo mini: ponto + cronômetro. Botões, vãos e fonte menores — é o modo
+     mais apertado, e é onde o orçamento de largura não perdoa. */
+  body.mini #pill { gap: 8px; padding: 0 8px 0 12px; }
+  body.mini canvas, body.mini #captions { display: none; }
+  body.mini #timer { font-size: 12px; letter-spacing: .02em; }
+  /* Fora de reunião o mini era um ponto sozinho com 89 px de vazio até os
+     botões; o status ocupa essa sobra (e encurta com "…" se não couber). */
+  body.mini #status { font-size: 12px; }
+  body.mini #pill.meeting #status { display: none; }
+  body.mini .ctl { gap: 3px; }
+  body.mini .ctl button { width: 20px; height: 20px; font-size: 13px; }
+  body.mini .ctl #mark { font-size: 12px; }
+  body.mini #pill.meeting .ctl #cap { display: none; }
 
   /* Modo legendas: barra larga com as duas últimas falas da reunião. */
-  #captions { display: none; flex: 1; min-width: 0; flex-direction: column; justify-content: center; gap: 3px; padding: 6px 0; }
-  body.captions #pill { border-radius: 18px; align-items: center; padding: 0 14px 0 18px; }
+  #captions { display: none; flex: 1; min-width: 0; flex-direction: column; justify-content: center; gap: 3px; }
+  body.captions #pill { border-radius: 20px; align-items: center; padding: 0 12px 0 18px; }
   body.captions canvas, body.captions #status { display: none; }
   body.captions #captions { display: flex; }
-  body.captions #timer { display: block; }
   .cap-line { font-size: 17px; line-height: 1.3; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .cap-line.prev { font-size: 14px; color: var(--muted); -webkit-line-clamp: 1; }
   .cap-line .sp { font-weight: 600; color: var(--p1); margin-right: 6px; }
@@ -126,6 +163,7 @@
   let bars = new Array(N).fill(0);   // alvo (nível do mic)
   let shown = new Array(N).fill(0);  // desenhado (interpola até o alvo)
   let state = 'idle';
+  let waveRaf = 0;                   // laço da waveform (0 = parado)
 
   const truncate = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
   const replay = (node, cls) => { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); };
@@ -156,7 +194,9 @@
   const RESTING = new Set(['idle', 'done', 'error', 'discarded']);
   let lastLive = null;   // última fala recebida (para voltar depois de um aviso)
   let shortcutLabel = '';  // atalho de ditado (o repouso mostra "pronto · <atalho>")
-  const idleText = () => (shortcutLabel && !shortcutLabel.startsWith('(') ? 'pronto · ' + shortcutLabel : 'pronto');
+  const idleText = () =>
+    (!document.body.classList.contains('mini') && shortcutLabel && !shortcutLabel.startsWith('(')
+      ? 'pronto · ' + shortcutLabel : 'pronto');
   function setState(s, msg) {
     const wakingUp = RESTING.has(state) && !RESTING.has(s);
     state = s;
@@ -182,12 +222,14 @@
     else if (s === 'discarded') setStatus('ditado descartado');
     else if (s === 'error') setStatus(msg || 'erro');
     else setStatus('pronto');
+    syncWave();   // a onda some em reunião: para o laço junto
   }
 
   // ---- legendas ao vivo
   function captionLine(node, seg) {
     node.replaceChildren();
     node.classList.toggle('eu', seg.speaker === 'Eu');
+    node.classList.toggle('provisional', !!seg.provisional);
     const sp = document.createElement('span'); sp.className = 'sp'; sp.textContent = seg.speaker + ':';
     node.appendChild(sp);
     node.appendChild(document.createTextNode(seg.text));
@@ -207,6 +249,10 @@
     replay($('cap-cur'), 'swap');
     capCurSeg = seg;
   }
+  // Provisória: ocupa a linha atual sem virar "anterior" — a final substitui.
+  function showProvisional(seg) {
+    captionLine($('cap-cur'), seg);
+  }
 
   listen('isper-state', e => setState(e.payload.state, e.payload.text || e.payload.message));
   // Transcrição ao vivo: a última fala no lugar do status (modo normal) e
@@ -214,10 +260,16 @@
   listen('isper-live', e => {
     if (state !== 'meeting') return;
     const p = e.payload || {};
-    lastLive = p;
     const who = p.speaker === 'Eu' ? 'Eu: ' : '';
-    setStatus(who + truncate(String(p.text || '').trim(), 70));
-    pushCaption({ speaker: p.speaker || 'Participantes', text: String(p.text || '').trim() });
+    const text = String(p.text || '').trim();
+    if (p.provisional) {
+      setStatus(who + truncate(text, 70) + '…');
+      showProvisional({ speaker: p.speaker || 'Participantes', text, provisional: true });
+      return;
+    }
+    lastLive = p;
+    setStatus(who + truncate(text, 70));
+    pushCaption({ speaker: p.speaker || 'Participantes', text });
   });
   // Momento marcado: confirma por 2 s e volta ao que estava.
   let flashTimer = null;
@@ -254,6 +306,8 @@
     $('mini').title = mini ? 'voltar ao tamanho normal' : 'modo mini';
     $('cap').classList.toggle('on', captions);
     $('cap').title = captions ? 'voltar ao indicador normal' : 'legendas ao vivo (barra larga)';
+    if (state === 'idle') setStatus(idleText());   // o atalho só cabe fora do mini
+    syncWave();
   }
   addEventListener('resize', applyMode);
   applyMode();
@@ -295,8 +349,17 @@
   }
   addEventListener('resize', sizeCanvas);
 
-  // Waveform: barras interpolam até o nível alvo — movimento contínuo, sem saltos.
+  // Waveform: barras interpolam até o nível alvo — movimento contínuo, sem
+  // saltos. O laço só roda com a onda na tela: em reunião, no mini e nas
+  // legendas ela está escondida, e um indicador que fica horas aberto não
+  // pode gastar um quadro por frame desenhando coisa nenhuma.
+  function syncWave() {
+    const on = canvas.offsetParent !== null;   // null = display:none
+    if (on && !waveRaf) waveRaf = requestAnimationFrame(draw);
+    else if (!on && waveRaf) { cancelAnimationFrame(waveRaf); waveRaf = 0; }
+  }
   function draw() {
+    waveRaf = 0;
     if (canvas.clientWidth && (!canvas.width || canvas.width !== canvas.clientWidth * devicePixelRatio)) sizeCanvas();
     const w = canvas.width, h = canvas.height;
     if (w && h) {
@@ -315,9 +378,9 @@
         ctx.fill();
       }
     }
-    requestAnimationFrame(draw);
+    waveRaf = requestAnimationFrame(draw);
   }
-  draw();
+  syncWave();
 
   // Sons discretos de início/fim — WebAudio, sem arquivos.
   let audioCtx;

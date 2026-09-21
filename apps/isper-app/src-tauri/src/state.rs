@@ -41,13 +41,19 @@ pub(crate) const LIVE_KEEP: usize = 400;
 /// Soltar antes disso = toque rápido → vira modo mãos-livres.
 pub(crate) const TAP_THRESHOLD: Duration = Duration::from_millis(350);
 
-/// Tamanhos lógicos do indicador flutuante: normal e mini (ponto + cronômetro).
-pub(crate) const OVERLAY_FULL: (f64, f64) = (460.0, 104.0);
+/// Tamanhos lógicos do indicador flutuante. A janela é fixa e sem rolagem,
+/// então cada tamanho tem de caber o PIOR caso do modo — reunião de 1 h+
+/// ("1:02:05") com todos os botões — senão o conteúdo vaza por cima da borda.
+/// A conta de cada um está no `<style>` de ui/index.html: os dois andam
+/// juntos, mudou lá, muda aqui.
+pub(crate) const OVERLAY_FULL: (f64, f64) = (460.0, 68.0);
 
-pub(crate) const OVERLAY_MINI: (f64, f64) = (150.0, 56.0);
+/// Mini: ponto + cronômetro + 3 botões. Antes eram 150×56 e a linha pedia
+/// 146 px (162 passando de 1 h) em 113 px úteis — daí os ícones estourando.
+pub(crate) const OVERLAY_MINI: (f64, f64) = (192.0, 46.0);
 
 /// Modo legendas ao vivo: barra larga com as duas últimas falas.
-pub(crate) const OVERLAY_CAPTIONS: (f64, f64) = (760.0, 132.0);
+pub(crate) const OVERLAY_CAPTIONS: (f64, f64) = (760.0, 100.0);
 
 /// Argumento que o autostart passa ao ISPer: nesse caso ele nasce quieto na
 /// bandeja, sem abrir a tela Início.
@@ -131,6 +137,9 @@ pub(crate) struct LiveSegment {
     pub(crate) start_secs: f32,
     pub(crate) end_secs: f32,
     pub(crate) text: String,
+    /// Legenda provisória do bloco ainda aberto: só a tela usa; o bloco final
+    /// vem em seguida e a substitui.
+    pub(crate) provisional: bool,
 }
 
 pub(crate) fn open_store() -> anyhow::Result<MeetingStore> {

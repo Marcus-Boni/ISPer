@@ -752,7 +752,8 @@
   });
 
   // Falas da reunião chegando (bloco a bloco) — só enquanto o painel existe.
-  listen('isper-live', (e) => { if (!$('live').hidden) liveAppend(e.payload); });
+  // Provisórias (bloco ainda aberto) ficam só no indicador; aqui entra a final.
+  listen('isper-live', (e) => { if (!$('live').hidden && !(e.payload && e.payload.provisional)) liveAppend(e.payload); });
   listen('isper-moment', (e) => { if (!$('live').hidden) liveMoment((e.payload && e.payload.at_secs) || 0); toast('★ momento marcado em ' + fmtClock((e.payload && e.payload.at_secs) || 0), 'ok', 1800); });
   $('b-mark').addEventListener('click', () => invoke('mark_moment_cmd').catch(e => toast('erro: ' + e, 'err')));
   $('captions').addEventListener('change', (ev) => {
