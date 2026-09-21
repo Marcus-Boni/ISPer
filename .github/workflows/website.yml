@@ -4,9 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
-  release:
-    types: [published]
   workflow_dispatch:
+
+# Uma release não dispara mais este workflow. O deploy exige push na main ou
+# disparo manual, então o gatilho de release só gastava dois minutos validando
+# e construindo para então não publicar nada. Quem reage a uma release agora é
+# o portal-release-sync.yml, que abre o PR com o snapshot novo — e é o merge
+# desse PR, sendo um push na main, que publica.
 
 permissions:
   contents: read

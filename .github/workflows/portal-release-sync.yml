@@ -1,0 +1,147 @@
+name: Portal — sincronizar release
+
+# Quando uma release sai, a página de download precisa passar a anunciar o
+# instalador dela: nome, tamanho e soma SHA-256. Isso era mantido à mão e ficou
+# duas versões para trás duas vezes em dois dias — e o custo caía justamente
+# sobre o fluxo de integridade, onde a soma publicada tem de ser a do arquivo
+# que a pessoa acabou de baixar.
+#
+# O sync lê a release "latest" da API, que por definição ignora rascunhos e
+# pré-lançamentos: publicar um preview não troca o que o site oferece.
+#
+# Por que um token próprio em vez do GITHUB_TOKEN: o GitHub não dispara
+# workflows a partir de eventos criados com o token padrão (proteção contra
+# recursão). Um PR aberto por ele nasceria sem check nenhum, e a main exige
+# três — seria um PR impossível de mergear.
+
+on:
+  release:
+    types: [published]
+  schedule:
+    # Segunda, 09:00 em São Paulo. Rede de segurança: se o run da release
+    # falhar (API fora, token vencido), o PR aparece na semana seguinte em vez
+    # de o site ficar defasado até alguém reparar.
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag específica (vazio = a release mais recente)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-release-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: sincronizar snapshot e abrir PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Pré-lançamento não muda o que o site oferece para download.
+    if: github.event_name != 'release' || github.event.release.prerelease == false
+    env:
+      SYNC_TOKEN: ${{ secrets.PORTAL_SYNC_TOKEN }}
+      BRANCH: chore/portal-release-sync
+    steps:
+      - name: Sem PORTAL_SYNC_TOKEN não há PR a abrir
+        if: env.SYNC_TOKEN == ''
+        run: |
+          {
+            echo "### Sincronização do portal pulada"
+            echo
+            echo 'O secret `PORTAL_SYNC_TOKEN` não está configurado.'
+            echo
+            echo 'Um PR aberto com o `GITHUB_TOKEN` padrão não dispara os checks que a main exige, então não haveria como mergeá-lo.'
+            echo 'Até o token existir, atualize à mão: `cd website && node scripts/sync-release.mjs`.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v7
+        if: env.SYNC_TOKEN != ''
+        with:
+          # Autenticar o checkout com o token próprio é o que faz o push da
+          # branch e o PR contarem como ação de um usuário, disparando os checks.
+          token: ${{ secrets.PORTAL_SYNC_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        if: env.SYNC_TOKEN != ''
+        with:
+          node-version: "22"
+
+      - name: Sincroniza o snapshot
+        if: env.SYNC_TOKEN != ''
+        working-directory: website
+        env:
+          # Só para o limite de requisições da API; o script não escreve nada
+          # no GitHub.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -o pipefail
+          if [ -n "$TAG" ]; then
+            node scripts/sync-release.mjs --tag "$TAG" | tee "$RUNNER_TEMP/sync.log"
+          else
+            node scripts/sync-release.mjs | tee "$RUNNER_TEMP/sync.log"
+          fi
+
+      - name: O snapshot mudou?
+        id: diff
+        if: env.SYNC_TOKEN != ''
+        run: |
+          if git diff --quiet -- website/content/data/releases.snapshot.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Snapshot já estava em dia; nenhum PR aberto." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "version=$(node -p "require('./website/content/data/releases.snapshot.json').version")"
+              echo "tag=$(node -p "require('./website/content/data/releases.snapshot.json').tag")"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Empurra a branch
+        if: env.SYNC_TOKEN != '' && steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$BRANCH"
+          git add website/content/data/releases.snapshot.json
+          git commit -m "Portal: anunciar a ${{ steps.diff.outputs.tag }}" \
+                     -m "Gerado por scripts/sync-release.mjs a partir da release publicada. Tamanhos e URLs vêm da API; as somas SHA-256 vêm do SHA256SUMS.txt da própria release."
+          git push --force-with-lease origin "$BRANCH"
+
+      - name: Abre o PR, se ainda não houver
+        if: env.SYNC_TOKEN != '' && steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PORTAL_SYNC_TOKEN }}
+          TAG: ${{ steps.diff.outputs.tag }}
+        run: |
+          existing=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "PR #$existing já está aberto e recebeu o commit novo." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "A release **$TAG** foi publicada e o portal passa a anunciá-la."
+            echo
+            echo 'Gerado por `website/scripts/sync-release.mjs`. Nada aqui foi digitado: tamanhos e URLs vêm da API do GitHub, as somas SHA-256 vêm do `SHA256SUMS.txt` da própria release, e as notas saem do corpo dela.'
+            echo
+            echo '### Saída do sync'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/sync.log"
+            echo '```'
+            echo
+            echo '### Vale conferir antes de mergear'
+            echo
+            echo '- As notas foram extraídas do CHANGELOG automaticamente; se alguma ficou truncada estranha, edite o commit.'
+            echo '- Requisitos e estado da assinatura são preservados da versão anterior. Se a release passou a ser assinada, ajuste `authenticodeStatus`.'
+            echo
+            echo 'O merge publica o site.'
+          } > "$RUNNER_TEMP/pr.md"
+          gh pr create --base main --head "$BRANCH" \
+            --title "Portal: anunciar a $TAG" \
+            --body-file "$RUNNER_TEMP/pr.md"
