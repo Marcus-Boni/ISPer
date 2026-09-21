@@ -61,8 +61,20 @@ export function formatBytes(sizeBytes: number | null) {
   return `${formatted} ${units[unit]}`;
 }
 
+/**
+ * The audience is Brazilian and the build machine is not. GitHub Actions runs
+ * in UTC, so a bare `toLocaleDateString("pt-BR")` rendered a release published
+ * at 21:39 in São Paulo as the following day, and the same commit produced
+ * different HTML here and in CI. Naming the zone fixes both at once.
+ */
+export function formatReleaseDate(iso: string) {
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+}
+
+/* Derived from the snapshot: a hand-written version here went stale twice over
+   while the file beside it was correct. */
 export const releaseIntegrityNotice =
-  "Dados conferidos na release pública v0.15.0 em 16/09/2026.";
+  `Dados conferidos na release pública ${currentRelease.tag} em ${formatReleaseDate(currentRelease.fetchedAt)}.`;
 
 export const sourceInstallSteps = [
   "Instale Rust stable, Visual Studio Build Tools com C++ e Git.",

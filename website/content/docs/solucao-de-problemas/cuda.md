@@ -11,7 +11,7 @@ Use o instalador CUDA somente em uma máquina com GPU NVIDIA compatível. Em out
 
 ## O aplicativo não abre
 
-1. Confirme que baixou o arquivo `ISPer_0.15.0_x64-setup.exe`.
+1. Confirme que baixou o arquivo `ISPer_0.16.1_x64-setup.exe`.
 2. Atualize o driver NVIDIA.
 3. Abra **Configurações > Sistema > Diagnóstico** e confira as DLLs CUDA detectadas.
 4. Se o problema continuar, instale a variante CPU para separar falha de driver de falha do aplicativo.

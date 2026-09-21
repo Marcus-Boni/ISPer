@@ -23,7 +23,7 @@ A transcrição, a diarização e o histórico do ISPer funcionam localmente. Re
 
 Configurações e banco ficam em `%APPDATA%\ISPer`. Modelos e logs ficam em `%LOCALAPPDATA%\com.isper.desktop`. Reuniões são exportadas para `Documentos\ISPer\Reunioes`.
 
-Na versão 0.15.0, a retenção pode ser definida para 30, 90, 180 dias ou um ano. O padrão permanece **para sempre** até você escolher e confirmar um prazo.
+A retenção pode ser definida para 30, 90, 180 dias ou um ano. O padrão permanece **para sempre** até você escolher e confirmar um prazo.
 
 ## Antes de compartilhar um diagnóstico
 

@@ -5,6 +5,7 @@ import { DownloadSelector } from "@/components/download/download-selector";
 import {
   currentRelease,
   downloadVariants,
+  formatReleaseDate,
   releaseIntegrityNotice,
   releaseLinks,
   sourceInstallSteps,
@@ -29,7 +30,7 @@ export default function DownloadPage() {
   // Every distributed installer has to be signed before the page stops warning.
   const signed = downloadVariants.length > 0 && downloadVariants.every((asset) => asset.authenticodeStatus === "verified");
   const published = currentRelease.publishedAt
-    ? new Date(currentRelease.publishedAt).toLocaleDateString("pt-BR")
+    ? formatReleaseDate(currentRelease.publishedAt)
     : null;
 
   return (
