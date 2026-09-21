@@ -128,6 +128,11 @@
   .cap-line.prev { font-size: 14px; color: var(--muted); -webkit-line-clamp: 1; }
   .cap-line .sp { font-weight: 600; color: var(--p1); margin-right: 6px; }
   .cap-line.eu .sp { color: var(--accent); }
+  /* Legenda provisória (o bloco de 6 s ainda não fechou): a mesma fala, em
+     tom apagado — a definitiva entra por cima quando o Whisper fecha o bloco.
+     No modo normal quem avisa é o "…" no fim do status. */
+  .cap-line.provisional { color: var(--muted); }
+  .cap-line.provisional .sp { opacity: .65; }
   .cap-line.swap { animation: swap-in var(--dur-3) var(--ease-out) both; }
   .cap-hint { font-size: 13px; color: var(--muted); }
 </style>
