@@ -1,3 +1,5 @@
+import releaseSnapshot from "../../content/data/releases.snapshot.json";
+
 export const siteConfig = {
   name: "ISPer",
   title: "ISPer — Transcrição com IA local para Windows",
@@ -8,7 +10,11 @@ export const siteConfig = {
   releases: "https://github.com/Marcus-Boni/ISPer/releases",
   latestRelease: "https://github.com/Marcus-Boni/ISPer/releases/latest",
   issues: "https://github.com/Marcus-Boni/ISPer/issues",
-  currentVersion: "v0.15.0",
+  /* Derived, not restated. This used to be a literal, and it was still saying
+     v0.15.0 two releases later — the download page and the hero disagreeing
+     with the installer they hand out. The release snapshot is the one place a
+     version is written down. */
+  currentVersion: `v${releaseSnapshot.version}`,
   license: "MIT",
 } as const;
 
@@ -28,8 +34,3 @@ export const navItems = [
   { label: "Documentação", href: "/docs/" },
   { label: "Download", href: "/download/" },
 ] as const;
-
-export const releaseAssets = {
-  cpu: "https://github.com/Marcus-Boni/ISPer/releases/download/v0.15.0/ISPer_0.15.0_x64-cpu-setup.exe",
-  cuda: "https://github.com/Marcus-Boni/ISPer/releases/download/v0.15.0/ISPer_0.15.0_x64-setup.exe",
-} as const;
