@@ -3,6 +3,13 @@
 Ditado por voz 100% local (estilo Wispr Flow) em Rust + whisper.cpp, evoluindo para
 notetaker de reuniões do Teams. Roadmap completo em [ROADMAP.md](ROADMAP.md).
 
+**Site oficial: [isper.pages.dev](https://isper.pages.dev)** — [baixar o instalador](https://isper.pages.dev/download/)
+· [documentação](https://isper.pages.dev/docs/)
+
+Este README é para quem vai compilar: toolchain, CUDA, testes, release. Quem só quer
+usar o ISPer encontra no site a instalação guiada, os checksums para conferir o
+download e os guias de uso — sem passar por aqui.
+
 ## Estrutura
 
 ```
