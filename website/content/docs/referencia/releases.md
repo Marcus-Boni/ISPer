@@ -12,10 +12,12 @@ Cada release estável publica dois instaladores, CPU e CUDA, e junto com eles SB
 ## Verificar no PowerShell
 
 ```powershell
-(Get-FileHash .\ISPer_0.16.1_x64-cpu-setup.exe -Algorithm SHA256).Hash.ToLower()
+(Get-FileHash .\ISPer_<versão>_x64-cpu-setup.exe -Algorithm SHA256).Hash.ToLower()
 ```
 
-Compare o valor com `SHA256SUMS.txt` da mesma release.
+Troque `<versão>` pela que você baixou — ou use a [página de download](/download/), que monta o comando já com o nome do arquivo e mostra a soma ao lado, para comparar sem sair da tela.
+
+Os parênteses e o `.ToLower()` não são enfeite: `Get-FileHash` sozinho imprime uma tabela de três colunas com o caminho cortado e o hash em maiúsculas, enquanto o valor publicado é minúsculo. Assim sai uma linha só, igual à que está no `SHA256SUMS.txt` da mesma release.
 
 ## Assinaturas diferentes
 

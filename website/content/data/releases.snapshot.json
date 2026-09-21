@@ -1,42 +1,48 @@
 {
   "repository": "Marcus-Boni/ISPer",
-  "tag": "v0.16.1",
-  "version": "0.16.1",
+  "tag": "v0.17.1",
+  "version": "0.17.1",
   "channel": "stable",
-  "publishedAt": "2026-09-21T00:39:02Z",
-  "fetchedAt": "2026-09-21T01:25:08.000Z",
-  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.16.1",
+  "publishedAt": "2026-09-21T13:23:01Z",
+  "fetchedAt": "2026-09-21T13:34:14.413Z",
+  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.17.1",
   "notes": [
-    "Passe final da reunião: ao encerrar, a transcrição é refeita sobre o áudio inteiro, com corte guiado por detecção de voz e falante palavra a palavra. No corpus de regressão, WER de 8,45% para 5,28% e DER de 28,1% para 20,6%.",
-    "Reimportar reuniões da pasta, em Configurações → Sistema ou por isper-cli import: o Markdown é gravado antes do banco e reconstrói a Biblioteca se o índice se perder.",
-    "Biblioteca ordenada pela data da reunião, e não pela ordem em que as reuniões entraram no banco."
+    "Corrigido — O instalador da 0.17.0 fechava o app na primeira transcrição (ditado ou reunião) em CPUs sem AVX-512, com instrução ilegal (0xc000001d)."
   ],
   "assets": [
     {
-      "name": "ISPer_0.16.1_x64-cpu-setup.exe",
+      "name": "ISPer_0.17.1_x64-cpu-setup.exe",
       "platform": "windows",
       "arch": "x64",
       "variant": "cpu",
       "kind": "installer",
-      "sizeBytes": 9858680,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.16.1/ISPer_0.16.1_x64-cpu-setup.exe",
-      "sha256": "10106e59e631f49377d70784fedd0803d7ae2f20b0fcfc4debae673d6c7bda28",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.16.1/SHA256SUMS.txt",
+      "sizeBytes": 9856006,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.17.1/ISPer_0.17.1_x64-cpu-setup.exe",
+      "sha256": "fcd5172225d69c41214215890cd24c2d298f973611524900787d7016a7ed4b61",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.17.1/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
-      "requirements": ["Windows 10/11 x64", "CPU moderna com AVX2 recomendado", "8 GB de RAM ou mais"]
+      "requirements": [
+        "Windows 10/11 x64",
+        "CPU moderna com AVX2 recomendado",
+        "8 GB de RAM ou mais"
+      ]
     },
     {
-      "name": "ISPer_0.16.1_x64-setup.exe",
+      "name": "ISPer_0.17.1_x64-setup.exe",
       "platform": "windows",
       "arch": "x64",
       "variant": "cuda",
       "kind": "installer",
-      "sizeBytes": 422838123,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.16.1/ISPer_0.16.1_x64-setup.exe",
-      "sha256": "ba17a402e63f66ccce08f303a8dc7113477fe394319fef09d20eb9af6d8a20ed",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.16.1/SHA256SUMS.txt",
+      "sizeBytes": 422855495,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.17.1/ISPer_0.17.1_x64-setup.exe",
+      "sha256": "690bc113234603448f8429614d3b625a0f09d728710d268b347540f4c5411763",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.17.1/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
-      "requirements": ["Windows 10/11 x64", "GPU NVIDIA compatível com CUDA", "VRAM conforme modelo Whisper escolhido"]
+      "requirements": [
+        "Windows 10/11 x64",
+        "GPU NVIDIA compatível com CUDA",
+        "VRAM conforme modelo Whisper escolhido"
+      ]
     }
   ]
 }
