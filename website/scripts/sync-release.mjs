@@ -20,10 +20,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { notesFromBody } from "./lib/release-notes.mjs";
 
 const SNAPSHOT = path.join(process.cwd(), "content", "data", "releases.snapshot.json");
 const CHECKSUMS = "SHA256SUMS.txt";
-const MAX_NOTES = 4;
 
 /** Campos que descrevem o produto, usados quando a variante ainda não existe no snapshot. */
 const DEFAULTS = {
@@ -58,83 +58,6 @@ async function api(url) {
   const response = await fetch(url, { headers });
   if (!response.ok) throw new Error(`GET ${url} devolveu ${response.status} ${response.statusText}`);
   return response.json();
-}
-
-/**
- * Markdown para texto corrido. A página renderiza texto puro, e deixar `**` ou
- * backtick passar significa mostrar a marcação para o leitor.
- */
-function stripMarkdown(text) {
-  return text
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * Primeira frase de cada item de primeiro nível, com a seção do CHANGELOG na
- * frente. O corpo da release segue o Keep a Changelog: `### Corrigido` e itens
- * `- **resumo em negrito** detalhe…`, com as continuações indentadas. O negrito
- * é o resumo que o autor escreveu — a primeira frase costuma ser exatamente a
- * nota que cabe numa página de download; o resto é para quem abre o CHANGELOG.
- */
-function notesFromBody(body) {
-  const lines = String(body ?? "").split(/\r?\n/);
-  const items = [];
-  let section = null;
-  let current = null;
-
-  const flush = () => {
-    if (!current) return;
-    const text = stripMarkdown(current.text);
-    if (text) items.push({ section: current.section, text });
-    current = null;
-  };
-
-  for (const line of lines) {
-    const heading = line.match(/^#{1,6}\s+(.*)$/);
-    if (heading) {
-      flush();
-      section = stripMarkdown(heading[1]);
-      continue;
-    }
-    const bullet = line.match(/^\s{0,1}[-*]\s+(.*)$/);
-    if (bullet) {
-      flush();
-      current = { section, text: bullet[1] };
-      continue;
-    }
-    if (current && /^\s{2,}\S/.test(line)) {
-      current.text += ` ${line.trim()}`;
-      continue;
-    }
-    if (!line.trim()) flush();
-  }
-  flush();
-
-  return items.slice(0, MAX_NOTES).map(({ section: label, text }) => {
-    const sentence = firstSentence(text);
-    return label ? `${label} — ${sentence}` : sentence;
-  });
-}
-
-/**
- * Corta na primeira quebra de frase, mas só depois de haver frase: abreviações
- * e versões ("0.17.0.") produzem pontos que não terminam nada. Se a primeira
- * for curta demais para significar algo sozinha, leva a seguinte junto.
- */
-function firstSentence(text) {
-  const MIN = 60;
-  let cut = 0;
-  while (cut < text.length) {
-    const next = text.slice(cut).search(/[.!?](\s|$)/);
-    if (next === -1) return text;
-    cut += next + 1;
-    if (cut >= MIN) return text.slice(0, cut).trim();
-  }
-  return text;
 }
 
 function variantOf(name) {
