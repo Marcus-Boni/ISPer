@@ -134,6 +134,17 @@ impl DecodeConfig {
         Self::base()
     }
 
+    /// Legenda provisória: o mais rápido que o decoder consegue — greedy sem
+    /// candidatos extras e sem fallback de temperatura. O texto é substituído
+    /// pelo bloco final em segundos; não vale gastar GPU para acertar vírgula.
+    pub fn partial() -> Self {
+        Self {
+            best_of: 1,
+            temperature_inc: 0.0,
+            ..Self::base()
+        }
+    }
+
     /// Passe final da reunião. As diferenças em relação ao ao vivo:
     ///
     /// - **beam search 5**: o default do whisper.cpp quando se escolhe
@@ -255,6 +266,15 @@ mod tests {
         // o fallback de temperatura: com 1 candidato não há o que escolher.
         assert_eq!(DecodeConfig::base().best_of, 5);
         assert!(DecodeConfig::base().temperature_inc > 0.0);
+    }
+
+    #[test]
+    fn perfil_provisorio_e_o_mais_barato() {
+        let p = DecodeConfig::partial();
+        assert_eq!(p.beam_size, 0, "greedy");
+        assert_eq!(p.best_of, 1, "sem candidatos extras");
+        assert_eq!(p.temperature_inc, 0.0, "sem fallback");
+        assert!(!p.token_timestamps);
     }
 
     #[test]

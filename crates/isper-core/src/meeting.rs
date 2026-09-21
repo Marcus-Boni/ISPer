@@ -50,6 +50,10 @@ pub struct MeetingOptions {
     pub input_device: Option<String>,
     /// Chamado a cada segmento transcrito durante a gravação.
     pub on_segment: Option<SegmentSink>,
+    /// Chamado com a legenda PROVISÓRIA do bloco ainda aberto (a cada
+    /// [`PARTIAL_EVERY`], se o worker estiver livre). O bloco final chega em
+    /// seguida por `on_segment` e a substitui; ela não entra na ata.
+    pub on_partial: Option<SegmentSink>,
     /// Chamado a cada bloco transcrito (ou que falhou): duração do áudio e
     /// tempo de inferência, para as métricas locais do app.
     pub on_block: Option<BlockSink>,
@@ -123,6 +127,14 @@ const SILENCE_RMS: f32 = 0.0035;
 /// recebe pacotes de ~10 ms; procurar silêncio a cada um deles seria gastar
 /// CPU à toa.
 const CUT_CHECK_EVERY: Duration = Duration::from_millis(400);
+/// Legenda provisória: de quanto em quanto tempo o buffer aberto vai ao
+/// Whisper enquanto o bloco não fecha (só com o worker livre).
+pub const PARTIAL_EVERY: Duration = Duration::from_millis(2500);
+/// Menos áudio que isto não rende legenda provisória.
+const PARTIAL_MIN_SECS: f32 = 1.5;
+/// Com esta quantidade de blocos esperando, o worker está atrasado: a captura
+/// volta aos blocos longos ([`ChunkOptions::relaxed`]) até a fila esvaziar.
+const BACKLOG_RELAX: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Speaker {
@@ -452,6 +464,9 @@ struct Job {
     offset: f32,
     audio: RawAudio,
     forced_cut: bool,
+    /// Legenda provisória (buffer ainda aberto): vai à tela, não à ata nem
+    /// ao arquivo do passe final.
+    provisional: bool,
 }
 
 /// Inicia a gravação nos dois canais. Valida que ambos abriram antes de
@@ -467,6 +482,7 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
         source,
         input_device,
         on_segment,
+        on_partial,
         on_block,
         dictionary,
     } = opts;
@@ -513,6 +529,7 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
         initial_prompt,
         dictionary,
         on_segment,
+        on_partial,
         on_block,
     };
     std::thread::spawn(move || {
@@ -697,7 +714,10 @@ fn chunk_loop(
     feed: &mut dyn AudioFeed,
 ) {
     let (mut sample_rate, mut channels) = feed.format();
-    let chunk_opts = ChunkOptions::default();
+    let live_opts = ChunkOptions::live();
+    let relaxed_opts = ChunkOptions::relaxed();
+    // Quando a última legenda provisória saiu (relógio de parede).
+    let mut last_partial: Option<Instant> = None;
     let mut buf: Vec<f32> = Vec::new();
     // Quando foi a última vez que procuramos um ponto de corte.
     let mut last_cut_check: Option<Instant> = None;
@@ -732,6 +752,7 @@ fn chunk_loop(
                     channels,
                 },
                 forced_cut: false,
+                provisional: false,
             });
         } else {
             buf.clear();
@@ -740,6 +761,13 @@ fn chunk_loop(
 
     loop {
         let ch = channels.max(1) as usize;
+        // Blocos curtos para a legenda chegar cedo; se o worker acumulou fila
+        // (GPU ocupada, build CPU), blocos longos até ela esvaziar.
+        let chunk_opts = if job_tx.len() >= BACKLOG_RELAX {
+            &relaxed_opts
+        } else {
+            &live_opts
+        };
         // Abaixo do alvo nem vale chamar o planejador de corte.
         let min_check_samples = (chunk_opts.target_secs * sample_rate as f32) as usize * ch;
         // Clonado a cada volta: um `reopen` troca o canal.
@@ -778,7 +806,7 @@ fn chunk_loop(
                     let vencido = last_cut_check.is_none_or(|t: Instant| t.elapsed() >= CUT_CHECK_EVERY);
                     if vencido && buf.len() >= min_check_samples {
                         last_cut_check = Some(Instant::now());
-                        if let Some(cut) = chunk::plan_cut(&buf, sample_rate, ch, &chunk_opts) {
+                        if let Some(cut) = chunk::plan_cut(&buf, sample_rate, ch, chunk_opts) {
                             let piece: Vec<f32> = buf.drain(..cut.at.min(buf.len())).collect();
                             let secs = piece.len() as f32 / ch as f32 / sample_rate as f32;
                             if cut.reason == CutReason::Forced {
@@ -797,9 +825,30 @@ fn chunk_loop(
                                     channels,
                                 },
                                 forced_cut: cut.reason == CutReason::Forced,
+                                provisional: false,
                             });
                             buf_start_secs += secs;
                         }
+                    }
+                    // Legenda provisória: o buffer aberto vai ao Whisper de
+                    // tempos em tempos, só com o worker livre — o bloco final
+                    // substitui o texto em segundos.
+                    let buf_secs = buf.len() as f32 / ch as f32 / sample_rate as f32;
+                    let partial_due =
+                        last_partial.is_none_or(|t: Instant| t.elapsed() >= PARTIAL_EVERY);
+                    if partial_due && buf_secs >= PARTIAL_MIN_SECS && job_tx.is_empty() {
+                        last_partial = Some(Instant::now());
+                        let _ = job_tx.send(Job {
+                            speaker,
+                            offset: buf_start_secs,
+                            audio: RawAudio {
+                                samples: buf.clone(),
+                                sample_rate,
+                                channels,
+                            },
+                            forced_cut: false,
+                            provisional: true,
+                        });
                     }
                 }
                 // A fonte fechou o canal: só o `stop` encerra este loop, então
@@ -849,6 +898,7 @@ fn recover(
                     channels: *channels,
                 },
                 forced_cut: false,
+                provisional: false,
             });
         }
         buf.clear();
@@ -886,6 +936,7 @@ struct TranscribeOptions {
     initial_prompt: Option<String>,
     dictionary: Vec<String>,
     on_segment: Option<SegmentSink>,
+    on_partial: Option<SegmentSink>,
     on_block: Option<BlockSink>,
 }
 
@@ -944,6 +995,59 @@ impl ChannelSpool {
     }
 }
 
+/// Legenda provisória de um buffer ainda aberto: perfil mais barato, uma
+/// linha só (os segmentos emendados), sem tocar na ata nem no arquivo do
+/// passe final. Se já há bloco final esperando na fila, a provisória está
+/// velha e nem vai ao Whisper.
+#[allow(clippy::too_many_arguments)]
+fn transcribe_partial(
+    engine: &WhisperEngine,
+    lang: &str,
+    initial_prompt: Option<&str>,
+    dictionary: &[String],
+    on_partial: Option<&SegmentSink>,
+    job_rx: &Receiver<Job>,
+    speaker: Speaker,
+    offset: f32,
+    audio: RawAudio,
+) {
+    let Some(sink) = on_partial else { return };
+    if !job_rx.is_empty() || audio.rms() < SILENCE_RMS {
+        return;
+    }
+    let Ok(samples) = audio.into_whisper_input() else {
+        return;
+    };
+    let decode = crate::profile::DecodeConfig::partial();
+    let req = crate::engine::TranscribeRequest {
+        lang,
+        decode: &decode,
+        prompt: initial_prompt,
+    };
+    match engine.transcribe_with(&samples, req) {
+        Ok(t) => {
+            let (Some(first), Some(last)) = (t.segments.first(), t.segments.last()) else {
+                return;
+            };
+            let text = if dictionary.is_empty() {
+                t.text.clone()
+            } else {
+                crate::text::apply_dictionary(&t.text, dictionary)
+            };
+            if text.trim().is_empty() {
+                return;
+            }
+            sink(&MeetingSegment {
+                speaker,
+                start_secs: offset + first.start_secs,
+                end_secs: offset + last.end_secs,
+                text,
+            });
+        }
+        Err(e) => tracing::debug!(speaker = %speaker.label(), "legenda provisória falhou: {e}"),
+    }
+}
+
 /// Consome os blocos dos dois canais, transcreve ao vivo e grava o áudio dos
 /// dois canais em disco para o passe final.
 fn transcribe_worker(
@@ -957,6 +1061,7 @@ fn transcribe_worker(
         initial_prompt,
         dictionary,
         on_segment,
+        on_partial,
         on_block,
     } = opts;
     let mut segments: Vec<MeetingSegment> = Vec::new();
@@ -970,7 +1075,22 @@ fn transcribe_worker(
             offset,
             audio,
             forced_cut,
+            provisional,
         } = job;
+        if provisional {
+            transcribe_partial(
+                &engine,
+                &lang,
+                initial_prompt.as_deref(),
+                &dictionary,
+                on_partial.as_ref(),
+                &job_rx,
+                speaker,
+                offset,
+                audio,
+            );
+            continue;
+        }
         let block_secs = audio.duration_secs();
         if forced_cut {
             forced_cuts += 1;

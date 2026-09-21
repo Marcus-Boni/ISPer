@@ -11,6 +11,14 @@ bata com ela.
 
 ## [Unreleased]
 
+### Alterado
+- **Legendas ao vivo mais rápidas.** O bloco ao vivo passa de 20 s (teto
+  32 s) para 6 s (teto 12 s), cortado no silêncio como antes, e enquanto o
+  bloco não fecha uma **legenda provisória** vai ao indicador a cada 2,5 s
+  (texto mais claro; o bloco final a substitui). Se o worker acumular fila,
+  a captura volta aos blocos longos até esvaziar. O passe final, que gera a
+  ata, não muda — só o que aparece na tela durante a reunião.
+
 ## [0.16.1] - 2026-09-20
 
 ### Corrigido

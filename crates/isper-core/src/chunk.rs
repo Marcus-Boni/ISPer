@@ -51,6 +51,29 @@ impl Default for ChunkOptions {
     }
 }
 
+impl ChunkOptions {
+    /// Perfil das legendas ao vivo: blocos curtos. O atraso de uma legenda é o
+    /// tamanho do bloco mais a inferência, então 20 s de alvo eram 20 s de
+    /// espera. O passe final refaz tudo com o VAD sobre o arquivo inteiro —
+    /// o corte curto não custa qualidade na ata, só no ao vivo, onde chegar
+    /// cedo vale mais.
+    pub fn live() -> Self {
+        Self {
+            target_secs: 6.0,
+            max_secs: 12.0,
+            search_secs: 2.5,
+            ..Self::default()
+        }
+    }
+
+    /// Perfil de folga, usado quando o worker está atrasado: cada inferência
+    /// tem um custo fixo, então blocos maiores custam menos por segundo de
+    /// áudio e a fila volta a esvaziar.
+    pub fn relaxed() -> Self {
+        Self::default()
+    }
+}
+
 /// Por que o corte aconteceu naquele ponto.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CutReason {
@@ -244,6 +267,23 @@ mod tests {
 
     // Opções compactas: os testes de propriedade rodam centenas de buffers, e
     // 20 s de áudio por caso seria minuto de CPU sem ganho de cobertura.
+    #[test]
+    fn perfil_ao_vivo_corta_no_silencio_bem_antes_do_padrao() {
+        // 7 s de fala com 0,3 s de silêncio a 0,5 s do fim: o perfil ao vivo
+        // (alvo 6 s) corta; o padrão (alvo 20 s) ainda espera.
+        let mut buf = fala(7.0, 0.3);
+        let frames = buf.len();
+        let silence_start = frames - (SR as usize) / 2;
+        for v in &mut buf[silence_start..silence_start + (SR as usize) * 3 / 10] {
+            *v = 0.0;
+        }
+        let live = plan_cut(&buf, SR, 1, &ChunkOptions::live()).expect("perfil ao vivo corta");
+        assert_eq!(live.reason, CutReason::Silence);
+        assert!(live.at >= silence_start && live.at <= silence_start + (SR as usize) * 3 / 10);
+        assert_eq!(plan_cut(&buf, SR, 1, &ChunkOptions::default()), None);
+        assert!(ChunkOptions::live().max_secs < ChunkOptions::relaxed().target_secs);
+    }
+
     fn curtas() -> ChunkOptions {
         ChunkOptions {
             target_secs: 2.0,

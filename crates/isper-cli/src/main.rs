@@ -460,6 +460,7 @@ fn run_meeting(cli: &Cli, seconds: u64, source: &str) -> anyhow::Result<()> {
             source,
             input_device: None,
             on_segment: None,
+            on_partial: None,
             on_block: None,
             dictionary: Vec::new(),
         },
