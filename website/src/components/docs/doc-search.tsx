@@ -110,10 +110,13 @@ export function DocSearch({ items, inputId = "docs-search" }: { items: SearchIte
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
-      // Clear, then close. Blurring would drop the reader's tab position to the
-      // top of the document, which is worse than staying where they are.
-      if (query) clear();
-      else close();
+      // Dois tempos, como manda o padrão de combobox: o primeiro Escape fecha
+      // a lista e o segundo limpa a consulta. Fazer as duas coisas de uma vez
+      // jogava fora uma busca que o leitor talvez só quisesse corrigir.
+      // Nenhum dos dois tira o foco: perder a posição de tabulação para o topo
+      // do documento é pior do que ficar onde se está.
+      if (open) close();
+      else if (query) clear();
       return;
     }
     if (!open || results.length === 0) return;
@@ -129,9 +132,12 @@ export function DocSearch({ items, inputId = "docs-search" }: { items: SearchIte
     } else if (event.key === "End") {
       event.preventDefault();
       setActive(results.length - 1);
-    } else if (event.key === "Enter" && active >= 0) {
+    } else if (event.key === "Enter") {
       event.preventDefault();
-      const target = results[active];
+      // Sem seta, vale o primeiro resultado. Exigir ArrowDown antes fazia o
+      // Enter não responder — a tecla que todo mundo aperta depois de digitar
+      // numa busca simplesmente não fazia nada, sem dizer por quê.
+      const target = results[active >= 0 ? active : 0];
       if (target) { close(); router.push(target.href); }
     }
   }

@@ -34,7 +34,8 @@ export function InteractiveStage() {
   const [mode, setMode] = useState<"dictation" | "meeting">("dictation");
   const [active, setActive] = useState(false);
   const [step, setStep] = useState(0);
-  const [driven, setDriven] = useState(false);
+  /** Depois que o leitor toca no palco, a camada de rolagem não manda mais. */
+  const released = useRef(false);
   const waveform = useRef<SVGSVGElement>(null);
 
   /**
@@ -45,9 +46,11 @@ export function InteractiveStage() {
    */
   useEffect(() => {
     const onDrive = (event: Event) => {
+      // Um evento atrasado não desfaz uma escolha já feita: o aviso de
+      // liberação e o último quadro da rolagem podem se cruzar.
+      if (released.current) return;
       const detail = (event as CustomEvent<{ mode: "dictation" | "meeting"; active: boolean }>).detail;
       if (!detail) return;
-      setDriven(true);
       setMode(detail.mode);
       setActive(detail.active);
       setStep(0);
@@ -96,10 +99,19 @@ export function InteractiveStage() {
   const modes = ["dictation", "meeting"] as const;
   const { list: tabList, tabProps } = useTablist(modes, mode, (next) => { setMode(next); reset(); });
 
-  /** Any deliberate interaction ends the scroll-driven sequence. */
+  /**
+   * Any deliberate interaction ends the scroll-driven sequence — including one
+   * that arrives before the sequence has started.
+   *
+   * Isto dependia de um estado `driven` que só virava verdadeiro quando a
+   * camada de rolagem já tinha falado. Quem chegasse ao palco e clicasse numa
+   * aba antes disso não liberava nada, e a camada assumia o palco um instante
+   * depois, desfazendo a escolha recém-feita. O ref também não tinha leitor no
+   * listener, então a corrida que ele aparentava cobrir seguia aberta.
+   */
   const takeOver = () => {
-    if (!driven) return;
-    setDriven(false);
+    if (released.current) return;
+    released.current = true;
     window.dispatchEvent(new CustomEvent("isper:stage-released"));
   };
 
