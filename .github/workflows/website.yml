@@ -106,7 +106,12 @@ jobs:
   deploy:
     name: deploy to Cloudflare Pages
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Sempre a partir da main, e também pelo disparo manual: um deploy que
+    # falhou por causa externa, ou um secret rotacionado, não deveria exigir
+    # um commit vazio só para republicar o que já está na main.
+    if: >
+      github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
