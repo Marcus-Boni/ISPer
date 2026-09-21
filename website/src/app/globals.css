@@ -29,13 +29,10 @@
   --good: #84c297;
   --good-soft: rgba(132, 194, 151, 0.14);
   --warn: #e8c15a;
-  --warn-soft: rgba(232, 193, 90, 0.14);
   --info: #7cc4f0;
   --p1: #9ab4ea;
   --p2: #c9a0f0;
   --p3: #f0c97c;
-  --p4: #7cf0c9;
-  --p5: #f0a07c;
 
   /* Chart de-emphasis. --muted sits at the same lightness as --accent (0.705 vs
      0.719), which the palette validator rejects: ΔE 13.1 for normal vision, below
@@ -44,7 +41,6 @@
 
   /* Structure */
   --header-h: 4.25rem;
-  --shell-gutter: 2rem;
   --r-sm: 0.5rem;
   --r-md: 0.75rem;
   --r-lg: 1rem;
@@ -362,6 +358,22 @@ body[data-menu-open] {
 .desktop-nav a:hover::after,
 .desktop-nav a:focus-visible::after {
   transform: scaleX(1);
+}
+
+/* Onde o leitor está. A página atual ganha o traço inteiro; a seção que a
+   contém ganha meio traço, porque "você está dentro disto" não é a mesma
+   afirmação que "você está aqui" — e é a distinção que o aria-current fazia
+   errado, marcando as duas como página ao mesmo tempo. */
+.desktop-nav a[data-nav]::after {
+  transform: scaleX(1);
+}
+
+.desktop-nav a[data-nav="section"]::after {
+  background: var(--muted-2);
+}
+
+.desktop-nav a[data-nav] {
+  color: var(--ink);
 }
 
 .desktop-nav a:hover,
@@ -1042,6 +1054,8 @@ body[data-menu-open] {
   border-color: var(--p2) !important;
 }
 
+/* O mesmo falante, a mesma cor: o bento e a transcrição do palco mostram
+   "Eu" lado a lado na mesma tela. */
 .me {
   border-color: var(--p3) !important;
 }
@@ -1448,7 +1462,7 @@ body[data-menu-open] {
 .faq-list p {
   margin: 0;
   padding: 0 1.15rem 1.15rem;
-  max-width: 78ch;
+  max-width: 72ch;
   color: var(--ink-2);
   line-height: 1.7;
 }
@@ -1924,7 +1938,7 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 .transcript-row time { color: var(--muted-2); font: .65rem var(--font-mono); padding-top: .2rem; }
 .transcript-row p { margin: 0; color: var(--ink-2); font-size: .75rem; line-height: 1.5; }
 .transcript-row strong { display: block; margin-bottom: .2rem; font-size: .7rem; }
-.transcript-row .p1 { color: var(--p1); } .transcript-row .p2 { color: var(--p2); } .transcript-row .me { color: var(--accent); }
+.transcript-row .p1 { color: var(--p1); } .transcript-row .p2 { color: var(--p2); } .transcript-row .me { color: var(--p3); }
 .summary-preview { display: flex; gap: .65rem; padding: .7rem .75rem; background: var(--accent-soft); border-radius: .65rem; }
 .summary-preview svg { width: 1rem; color: var(--accent); }
 .summary-preview strong { font-size: .7rem; }
@@ -2187,7 +2201,7 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 }
 
 .result-section {
-  color: var(--accent-2);
+  color: var(--muted);
   font-size: 0.72rem;
 }
 
@@ -3252,10 +3266,14 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
   line-height: 1.65;
 }
 
+/* O DESIGN.md cita "um marcador em cada item" como a forma mais fácil de
+   gastar o terracota antes de um controle de verdade aparecer. E --line-2, que
+   os guias usavam, dá 1,84:1 sobre o fundo: o marcador some. --muted-2 fica em
+   5,04:1 e é o mesmo nos dois lugares. */
 .notice-steps li::marker,
 .ordered-steps li::marker,
 .marked-list li::marker {
-  color: var(--accent);
+  color: var(--muted-2);
 }
 
 .notice .text-link {
@@ -3321,7 +3339,7 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
   }
 }
 
-.docs-prose { min-width: 0; max-width: 64ch; color: var(--ink-2); overflow-wrap: anywhere; }
+.docs-prose { min-width: 0; max-width: 68ch; color: var(--ink-2); overflow-wrap: anywhere; }
 .docs-prose h1 { margin-bottom: 1.5rem; }
 .docs-prose h2 { margin: 3.6rem 0 1.1rem; color: var(--ink); font: 550 2rem/1.12 var(--font-display); letter-spacing: -.02em; }
 .docs-prose h3 { margin: 2.4rem 0 .75rem; color: var(--ink); font-size: 1.25rem; }
@@ -3337,7 +3355,7 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 /* Terracotta marks action and active state. A marker on every bullet and a
    colour on every inline token spent it on ordinary prose, so by the time a
    real control appeared it no longer signalled anything. */
-.docs-prose li::marker { color: var(--line-2); }
+.docs-prose li::marker { color: var(--muted-2); }
 .docs-prose a { color: var(--accent-2); font-weight: 620; text-decoration: underline; text-decoration-color: rgba(240,126,114,.45); text-underline-offset: 4px; }
 .docs-prose :not(pre) > code { padding: .12rem .38rem; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg-2); color: var(--ink); font: .9em var(--font-mono); }
 .docs-prose figure[data-rehype-pretty-code-figure] { margin: 0; }
