@@ -58,6 +58,11 @@ jobs:
       - name: Typecheck
         run: pnpm exec tsc --noEmit
 
+      # Puro e sem rede: o parser das notas da release lê texto livre escrito
+      # por gente, e é a peça do sync que pode degradar em silêncio.
+      - name: Testes dos scripts
+        run: node --test "scripts/**/*.test.mjs"
+
   build:
     name: static export
     needs: validate

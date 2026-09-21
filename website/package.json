@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "node --test \"scripts/**/*.test.mjs\"",
     "content:check": "node scripts/validate-content.mjs",
     "export:check": "node scripts/verify-export.mjs",
     "links:check": "node scripts/check-links.mjs",
