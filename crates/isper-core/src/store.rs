@@ -472,6 +472,71 @@ impl MeetingStore {
         Ok(changed)
     }
 
+    /// Já existe uma reunião vinda deste `.md` (ou começada neste instante)?
+    ///
+    /// O `md_path` é a chave natural: um arquivo, uma reunião. O `started_at`
+    /// cobre as reuniões antigas, gravadas antes de o caminho ser guardado.
+    pub fn has_meeting_from(&self, md_path: &str, started_at: &str) -> Result<bool> {
+        let n: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM meetings WHERE md_path = ?1 OR started_at = ?2",
+            params![md_path, started_at],
+            |r| r.get(0),
+        )?;
+        Ok(n > 0)
+    }
+
+    /// Reinsere no índice uma reunião lida do Markdown
+    /// ([`crate::import::ImportedMeeting`]).
+    ///
+    /// Devolve `None` quando a reunião já está no banco — reimportar a pasta
+    /// inteira tem de ser seguro de repetir. Tudo numa transação: ou a
+    /// reunião entra completa, com falas, resumo e momentos, ou não entra.
+    pub fn import_meeting(
+        &self,
+        m: &crate::import::ImportedMeeting,
+        md_path: &str,
+    ) -> Result<Option<i64>> {
+        if self.has_meeting_from(md_path, &m.started_at)? {
+            return Ok(None);
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "INSERT INTO meetings (title, started_at, started_ts, duration_secs, md_path, summary)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                m.title,
+                m.started_at,
+                parse_local_stamp(&m.started_at),
+                m.duration_secs,
+                md_path,
+                m.summary
+            ],
+        )?;
+        let id = tx.last_insert_rowid();
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO segments (meeting_id, speaker, start_secs, end_secs, text)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+            )?;
+            for seg in &m.segments {
+                stmt.execute(params![
+                    id,
+                    seg.speaker,
+                    seg.start_secs,
+                    seg.end_secs,
+                    seg.text
+                ])?;
+            }
+            let mut stmt =
+                tx.prepare("INSERT INTO moments (meeting_id, at_secs) VALUES (?1, ?2)")?;
+            for at in &m.moments {
+                stmt.execute(params![id, f64::from(*at)])?;
+            }
+        }
+        tx.commit()?;
+        Ok(Some(id))
+    }
+
     /// Troca TODOS os segmentos da reunião pelos do passe final.
     ///
     /// O ao vivo grava enquanto a reunião acontece; o passe final refaz o
@@ -895,8 +960,16 @@ impl MeetingStore {
     // ------------------------------------------------------------ leitura
 
     /// Todas as reuniões, mais recente primeiro.
+    /// Reuniões da mais recente para a mais antiga.
+    ///
+    /// Ordena pela hora da REUNIÃO (`started_ts`), não pela ordem de
+    /// inserção: uma reunião reimportada de um `.md`
+    /// ([`Self::import_meeting`]) recebe um id novo e apareceria fora de
+    /// lugar se o `id` mandasse.
     pub fn list_meetings(&self) -> Result<Vec<MeetingRow>> {
-        let sql = format!("SELECT {MEETING_COLUMNS} FROM meetings m ORDER BY m.id DESC");
+        let sql = format!(
+            "SELECT {MEETING_COLUMNS} FROM meetings m ORDER BY m.started_ts DESC, m.id DESC"
+        );
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt.query_map([], row_to_meeting)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -904,7 +977,9 @@ impl MeetingStore {
 
     /// As `limit` reuniões mais recentes (tela Início).
     pub fn recent_meetings(&self, limit: i64) -> Result<Vec<MeetingRow>> {
-        let sql = format!("SELECT {MEETING_COLUMNS} FROM meetings m ORDER BY m.id DESC LIMIT ?1");
+        let sql = format!(
+            "SELECT {MEETING_COLUMNS} FROM meetings m ORDER BY m.started_ts DESC, m.id DESC LIMIT ?1"
+        );
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt.query_map(params![limit.max(0)], row_to_meeting)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -957,7 +1032,7 @@ impl MeetingStore {
              WHERE m.title LIKE ?1 ESCAPE '\\'
                 OR m.summary LIKE ?1 ESCAPE '\\'
                 OR m.id IN (SELECT meeting_id FROM segments WHERE text LIKE ?1 ESCAPE '\\')
-             ORDER BY m.id DESC"
+             ORDER BY m.started_ts DESC, m.id DESC"
         );
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt.query_map(params![pattern], row_to_meeting)?;
@@ -1338,6 +1413,99 @@ mod tests {
             store.speakers(id).unwrap(),
             vec!["Eu", "Participante 1", "Participante 2"]
         );
+    }
+
+    #[test]
+    fn a_biblioteca_ordena_pela_hora_da_reuniao_e_nao_pela_de_insercao() {
+        // Reunião recuperada de um .md entra DEPOIS no banco (id maior) mas é
+        // mais ANTIGA. Ordenar por id a jogaria para o topo.
+        use crate::import::parse_markdown;
+        use crate::meeting::{SegmentRef, render_markdown};
+
+        let store = temp_store("ordem");
+        let md_de = |titulo: &str, quando: &str| {
+            let segs = [SegmentRef {
+                speaker: "Eu",
+                start_secs: 0.0,
+                end_secs: 2.0,
+                text: "Oi.",
+            }];
+            render_markdown(titulo, quando, 10.0, &segs, None, &[])
+        };
+        // Grava primeiro a mais NOVA, depois a mais VELHA.
+        for (titulo, quando, arquivo) in [
+            ("Mais nova", "18/09/2026 14:58", "/tmp/nova.md"),
+            ("Mais velha", "08/09/2026 14:47", "/tmp/velha.md"),
+        ] {
+            let m = parse_markdown(arquivo, &md_de(titulo, quando)).expect("parse");
+            store.import_meeting(&m, arquivo).expect("importa");
+        }
+        let titulos: Vec<String> = store
+            .list_meetings()
+            .expect("lista")
+            .into_iter()
+            .map(|r| r.title)
+            .collect();
+        assert_eq!(
+            titulos,
+            vec!["Mais nova".to_string(), "Mais velha".to_string()],
+            "a lista tem que sair pela data da reunião"
+        );
+    }
+
+    #[test]
+    fn reimportar_a_pasta_recupera_a_reuniao_e_pode_ser_repetido() {
+        use crate::import::parse_markdown;
+        use crate::meeting::{SegmentRef, render_markdown};
+
+        let store = temp_store("import");
+        let segs = [
+            SegmentRef {
+                speaker: "Eu",
+                start_secs: 0.0,
+                end_secs: 2.0,
+                text: "Bom dia.",
+            },
+            SegmentRef {
+                speaker: "Participante 1",
+                start_secs: 10.0,
+                end_secs: 14.0,
+                text: "Bom dia, Ana.",
+            },
+        ];
+        let md = render_markdown(
+            "Reunião recuperada",
+            "16/09/2026 11:23",
+            60.0,
+            &segs,
+            Some(
+                "## Resumo
+Curto.",
+            ),
+            &[10.0],
+        );
+        let imported = parse_markdown("r.md", &md).expect("parse");
+
+        let id = store
+            .import_meeting(&imported, "/tmp/reuniao-recuperada.md")
+            .expect("importa")
+            .expect("id novo");
+        let det = store.get_meeting(id).expect("busca").expect("existe");
+        assert_eq!(det.meeting.title, "Reunião recuperada");
+        assert_eq!(det.segments.len(), 2);
+        assert_eq!(det.segments[1].speaker, "Participante 1");
+        assert!(det.summary.as_deref().is_some_and(|s| s.contains("Curto")));
+        assert_eq!(det.moments.len(), 1);
+
+        // Repetir a importação não duplica — é o que permite rodar a
+        // recuperação na pasta inteira sem medo.
+        assert_eq!(
+            store
+                .import_meeting(&imported, "/tmp/reuniao-recuperada.md")
+                .expect("repete"),
+            None
+        );
+        assert_eq!(store.list_meetings().expect("lista").len(), 1);
     }
 
     #[test]

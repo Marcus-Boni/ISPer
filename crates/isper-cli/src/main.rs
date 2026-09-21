@@ -100,6 +100,23 @@ enum Cmd {
     },
     /// Compara dois relatórios de `bench` lado a lado
     Compare { before: PathBuf, after: PathBuf },
+    /// Reconstrói a Biblioteca a partir dos Markdowns das reuniões
+    ///
+    /// O `.md` é o artefato durável: ele é gravado ANTES do banco e sobrevive
+    /// a qualquer acidente com o índice. Este comando lê a pasta de volta e
+    /// reinsere o que faltar. É seguro repetir — o que já está no banco é
+    /// pulado.
+    Import {
+        /// Pasta com os `.md` (padrão: Documentos\ISPer\Reunioes)
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        /// Banco a corrigir (padrão: o do app, %APPDATA%\ISPer\isper.db)
+        #[arg(long)]
+        db: Option<PathBuf>,
+        /// Grava de verdade. Sem isto, só mostra o que faria.
+        #[arg(long)]
+        apply: bool,
+    },
     /// WER/CER entre dois arquivos de texto
     Score {
         /// Transcrição de referência (corrigida à mão)
@@ -175,6 +192,7 @@ fn main() -> anyhow::Result<()> {
         } => run_diarize(path, *speakers, *threshold),
         Cmd::Bench { .. } => run_bench(&cli),
         Cmd::Compare { before, after } => bench::compare(before, after),
+        Cmd::Import { dir, db, apply } => run_import(dir.as_deref(), db.as_deref(), *apply),
         Cmd::Score {
             reference,
             hypothesis,
@@ -184,6 +202,106 @@ fn main() -> anyhow::Result<()> {
         Cmd::Llm(cmd) => run_llm(cmd),
         _ => run_dictation(&cli),
     }
+}
+
+/// Pasta padrão dos Markdowns: `Documentos\ISPer\Reunioes`.
+fn default_meetings_dir() -> Option<PathBuf> {
+    let home = std::env::var_os("USERPROFILE").map(PathBuf::from)?;
+    Some(home.join("Documents").join("ISPer").join("Reunioes"))
+}
+
+/// Banco padrão do app: `%APPDATA%\ISPer\isper.db`.
+fn default_db() -> Option<PathBuf> {
+    std::env::var_os("APPDATA")
+        .map(PathBuf::from)
+        .map(|p| p.join("ISPer").join("isper.db"))
+}
+
+fn run_import(dir: Option<&Path>, db: Option<&Path>, apply: bool) -> anyhow::Result<()> {
+    let dir = dir
+        .map(Path::to_path_buf)
+        .or_else(default_meetings_dir)
+        .context("não achei a pasta de reuniões — passe --dir")?;
+    let db = db
+        .map(Path::to_path_buf)
+        .or_else(default_db)
+        .context("não achei o banco do app — passe --db")?;
+    anyhow::ensure!(dir.is_dir(), "pasta não encontrada: {}", dir.display());
+    anyhow::ensure!(db.is_file(), "banco não encontrado: {}", db.display());
+    println!("pasta: {}", dir.display());
+    println!("banco: {}", db.display());
+    if !apply {
+        println!(
+            "(simulação — nada é gravado; use --apply para valer)
+"
+        );
+    }
+
+    let mut arquivos: Vec<PathBuf> = std::fs::read_dir(&dir)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|e| e == "md"))
+        .collect();
+    arquivos.sort();
+
+    let store = MeetingStore::open(&db)?;
+    let (mut novas, mut existentes, mut falhas) = (0usize, 0usize, 0usize);
+    for path in &arquivos {
+        let nome = path.file_name().unwrap_or_default().to_string_lossy();
+        let parsed = match isper_core::import::parse_file(path) {
+            Ok(Ok(m)) => m,
+            Ok(Err(e)) => {
+                println!("  ! {nome}: {e}");
+                falhas += 1;
+                continue;
+            }
+            Err(e) => {
+                println!("  ! {nome}: não consegui ler ({e})");
+                falhas += 1;
+                continue;
+            }
+        };
+        let caminho = path.to_string_lossy().to_string();
+        if store.has_meeting_from(&caminho, &parsed.started_at)? {
+            existentes += 1;
+            continue;
+        }
+        println!(
+            "  + {} · {} · {} falas{}",
+            parsed.started_at,
+            parsed.title,
+            parsed.segments.len(),
+            if parsed.summary.is_some() {
+                " · com resumo"
+            } else {
+                ""
+            }
+        );
+        if apply {
+            store.import_meeting(&parsed, &caminho)?;
+        }
+        novas += 1;
+    }
+
+    println!();
+    println!(
+        "{} arquivo(s) · {} {} · {} já no banco · {} com problema",
+        arquivos.len(),
+        novas,
+        if apply {
+            "reimportada(s)"
+        } else {
+            "a reimportar"
+        },
+        existentes,
+        falhas
+    );
+    if !apply && novas > 0 {
+        println!(
+            "
+Para gravar: isper-cli import --apply"
+        );
+    }
+    Ok(())
 }
 
 fn run_bench(cli: &Cli) -> anyhow::Result<()> {

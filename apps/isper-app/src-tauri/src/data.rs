@@ -218,6 +218,59 @@ pub(crate) fn backup_database() -> Result<String, String> {
     Ok(dest.display().to_string())
 }
 
+/// Reconstrói a Biblioteca a partir dos `.md` em `Documentos\ISPer\Reunioes`.
+///
+/// O Markdown é gravado ANTES do banco e sobrevive a qualquer acidente com o
+/// índice; este comando lê a pasta de volta e reinsere o que faltar. É seguro
+/// repetir: uma reunião que já está no banco é pulada.
+///
+/// Devolve `(reimportadas, já no banco, com problema)`.
+#[tauri::command]
+pub(crate) fn reimport_meetings() -> Result<(usize, usize, usize), String> {
+    let dir = meetings_dir().map_err(|e| e.to_string())?;
+    let store = open_store().map_err(|e| e.to_string())?;
+    let mut arquivos: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .map_err(|e| format!("não consegui ler {}: {e}", dir.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|e| e == "md"))
+        .collect();
+    arquivos.sort();
+
+    let (mut novas, mut existentes, mut falhas) = (0usize, 0usize, 0usize);
+    for path in &arquivos {
+        let caminho = path.to_string_lossy().to_string();
+        match isper_core::import::parse_file(path) {
+            Ok(Ok(m)) => match store.import_meeting(&m, &caminho) {
+                Ok(Some(id)) => {
+                    tracing::info!(id, arquivo = %caminho, "reunião reimportada do Markdown");
+                    novas += 1;
+                }
+                Ok(None) => existentes += 1,
+                Err(e) => {
+                    tracing::warn!(arquivo = %caminho, "não consegui reimportar: {e}");
+                    falhas += 1;
+                }
+            },
+            Ok(Err(e)) => {
+                tracing::warn!("Markdown não reconhecido: {e}");
+                falhas += 1;
+            }
+            Err(e) => {
+                tracing::warn!(arquivo = %caminho, "não consegui ler: {e}");
+                falhas += 1;
+            }
+        }
+    }
+    tracing::info!(
+        arquivos = arquivos.len(),
+        novas,
+        existentes,
+        falhas,
+        "reimportação da pasta concluída"
+    );
+    Ok((novas, existentes, falhas))
+}
+
 /// Abre o Explorer com `path` selecionado.
 fn reveal(path: &Path) {
     let _ = std::process::Command::new("explorer.exe")

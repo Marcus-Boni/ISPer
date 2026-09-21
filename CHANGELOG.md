@@ -11,6 +11,27 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-09-20
+
+### Corrigido
+- **A Biblioteca ordenava por ordem de inserção, não pela data da reunião**
+  (`ORDER BY m.id DESC`). Enquanto toda reunião entrava na ordem em que
+  acontecia, os dois coincidiam; qualquer reunião trazida de volta pela
+  reimportação abaixo aparecia fora de lugar. Agora ordena por `started_ts`.
+
+### Adicionado
+- **Reimportar reuniões da pasta** (Configurações → Sistema, e
+  `isper-cli import`). O `.md` em `Documentos\ISPer\Reunioes` é gravado
+  ANTES do banco e sobrevive a qualquer acidente com o índice; este caminho
+  lê a pasta de volta e reinsere o que faltar — falas, horários, falantes,
+  momentos marcados e o resumo da IA. É seguro repetir: o que já está na
+  Biblioteca é pulado (chave: o caminho do `.md`, com a data como reserva).
+  A CLI simula por padrão e só grava com `--apply`.
+
+  O que NÃO volta é a granularidade original: o Markdown guarda parágrafos
+  (falas seguidas do mesmo falante já agrupadas), então uma reunião
+  reimportada tem segmentos mais longos que a original. O texto é o mesmo.
+
 ## [0.16.0] - 2026-09-18
 
 ### Adicionado

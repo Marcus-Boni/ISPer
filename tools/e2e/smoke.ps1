@@ -38,6 +38,13 @@ Check ($s.version -eq $st.version) "Configuracoes: versao $($s.version) (igual a
 $errs = Get-JsErrors 'settings.html'
 Check (@($errs).Count -eq 0) "Configuracoes sem erros de JS$(Format-JsErrors $errs)"
 
+# Recuperacao da Biblioteca (v0.16.1): o botao existe e o comando responde.
+# Rodar com a pasta ja indexada devolve 0 novas — idempotente por construcao.
+$reimp = EvJson 'settings.html' 'JSON.stringify({ btn: !!document.getElementById("reimport") })'
+Check $reimp.btn "Configuracoes tem o botao de reimportar reunioes"
+$r = @(Invoke-Isper 'reimport_meetings' 'undefined' 'settings.html')
+Check ($r.Count -eq 3 -and $r[0] -eq 0) "reimportar e idempotente (novas=$($r[0]), ja no banco=$($r[1]), falhas=$($r[2]))"
+
 # Campos do passe final (v0.16.0): existem na tela, carregam o valor atual e
 # voltam do backend depois de salvar. Sem isto, um id trocado no HTML passa
 # despercebido — a tela abre sem erro de JS e simplesmente nao salva nada.

@@ -203,6 +203,7 @@ fn main() {
             diagnostics,
             export_diagnostics,
             backup_database,
+            reimport_meetings,
             notify_test,
             home_status,
             toggle_meeting_cmd,
