@@ -12,7 +12,7 @@ Cada release estável publica dois instaladores, CPU e CUDA, e junto com eles SB
 ## Verificar no PowerShell
 
 ```powershell
-(Get-FileHash .\ISPer_0.16.1_x64-cpu-setup.exe -Algorithm SHA256).Hash
+(Get-FileHash .\ISPer_0.16.1_x64-cpu-setup.exe -Algorithm SHA256).Hash.ToLower()
 ```
 
 Compare o valor com `SHA256SUMS.txt` da mesma release.

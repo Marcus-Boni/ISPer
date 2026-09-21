@@ -44,7 +44,16 @@ export function DownloadSelector({ assets, notice }: { assets: ReleaseAsset[]; n
 
   if (!selected) return null;
 
-  const hashCommand = `Get-FileHash .\\${selected.name} -Algorithm SHA256`;
+  /**
+   * Parenthesised, `.Hash`, and lowered — each part earns its place.
+   *
+   * Bare `Get-FileHash` prints a three-column table (Algorithm, Hash, Path)
+   * with the path truncated, and the hash in uppercase. The page shows the sum
+   * in lowercase, so "se as duas linhas forem iguais" described a comparison
+   * that could never look equal: wrong shape and wrong case. This form emits
+   * exactly one line, character-identical to the value printed below it.
+   */
+  const hashCommand = `(Get-FileHash .\\${selected.name} -Algorithm SHA256).Hash.ToLower()`;
 
   return (
     <div className="download-panel">
