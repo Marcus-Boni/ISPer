@@ -88,6 +88,47 @@ pub(crate) fn open_home(app: &AppHandle) {
     open_or_focus(app, "home", build_home);
 }
 
+/// Janela do ISPer Copilot: HUD de decisões e notetaker em tempo real durante a reunião.
+pub(crate) fn build_copilot(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+    tauri::WebviewWindowBuilder::new(
+        app,
+        "copilot",
+        tauri::WebviewUrl::App("copilot.html".into()),
+    )
+    .title("ISPer Copilot — Decisões e Notetaker")
+    .inner_size(980.0, 720.0)
+    // 360 px de mínimo porque o HUD foi desenhado para caber acoplado ao lado
+    // do Teams; com o mínimo em 520 o modo sidecar não era alcançável.
+    .min_inner_size(360.0, 480.0)
+    .build()
+}
+
+pub(crate) fn open_copilot(app: &AppHandle) {
+    open_or_focus(app, "copilot", build_copilot);
+}
+
+/// Atalho global do Copilot: traz o HUD para a frente ou o esconde.
+///
+/// Esconder só quando ele já está na frente — aberto atrás do Teams, o que se
+/// espera do atalho é ver o Copilot, não fazê-lo sumir. Esconder (e não
+/// fechar) mantém a conversa do chat e o que estiver digitado.
+pub(crate) fn toggle_copilot(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("copilot")
+        && w.is_visible().unwrap_or(false)
+        && w.is_focused().unwrap_or(false)
+    {
+        let _ = w.hide();
+        return;
+    }
+    open_copilot(app);
+}
+
+#[tauri::command]
+pub(crate) async fn open_copilot_window(app: AppHandle) -> Result<(), String> {
+    open_copilot(&app);
+    Ok(())
+}
+
 #[tauri::command]
 pub(crate) async fn open_settings_window(app: AppHandle) -> Result<(), String> {
     open_settings(&app);

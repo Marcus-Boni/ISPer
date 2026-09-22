@@ -14,6 +14,7 @@
 
 mod calls;
 mod config;
+mod copilot;
 mod data;
 mod dictation;
 mod final_pass;
@@ -145,13 +146,21 @@ fn main() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
-                    let (is_meeting, is_mark) = {
+                    let (is_meeting, is_mark, is_copilot) = {
                         let st = app.state::<AppState>();
                         let is_meeting =
                             st.meeting_shortcut.lock_or_recover().as_ref() == Some(shortcut);
                         let is_mark = st.mark_shortcut.lock_or_recover().as_ref() == Some(shortcut);
-                        (is_meeting, is_mark)
+                        let is_copilot =
+                            st.copilot_shortcut.lock_or_recover().as_ref() == Some(shortcut);
+                        (is_meeting, is_mark, is_copilot)
                     };
+                    if is_copilot {
+                        if event.state == ShortcutState::Pressed {
+                            toggle_copilot(app);
+                        }
+                        return;
+                    }
                     if is_mark {
                         if event.state == ShortcutState::Pressed {
                             let _ = mark_moment(app);
@@ -223,7 +232,16 @@ fn main() {
             semantic_search,
             index_all,
             set_embeddings_key,
-            test_embeddings
+            test_embeddings,
+            open_copilot_window,
+            copilot_get_state,
+            copilot_analyze_now,
+            copilot_card_action,
+            copilot_save_scratchpad,
+            copilot_query,
+            copilot_enrich_notes,
+            copilot_set_always_on_top,
+            copilot_dismiss_memory
         ])
         .setup(|app| {
             let cfg = config::load();
@@ -247,6 +265,8 @@ fn main() {
                 last_meeting_toggle: Mutex::new(None),
                 mark_shortcut: Mutex::new(None),
                 active_mark_shortcut: Mutex::new(String::new()),
+                copilot_shortcut: Mutex::new(None),
+                active_copilot_shortcut: Mutex::new(String::new()),
                 moments: Mutex::new(Vec::new()),
                 live: Mutex::new(Vec::new()),
                 diarizing: Mutex::new(None),
@@ -255,6 +275,7 @@ fn main() {
                 update_available: Mutex::new(None),
                 call: Mutex::new(CallState::default()),
                 insights: Mutex::new(InsightsState::default()),
+                copilot: Mutex::new(CopilotAppState::default()),
                 indexing: Mutex::new(None),
                 indicator_item: Mutex::new(None),
             });
@@ -300,12 +321,20 @@ fn main() {
             }
 
             // Atalhos globais: os preferidos das configurações, senão os primeiros livres.
-            let (label, _meeting_label, _mark_label) = register_shortcuts(app.handle(), &cfg);
+            let (label, _meeting_label, _mark_label, _copilot_label) =
+                register_shortcuts(app.handle(), &cfg);
 
             // Ícone na bandeja: clique esquerdo abre o Início; direito, o menu.
             let hint = MenuItem::with_id(app, "hint", hint_text(&label), false, None::<&str>)?;
             let home_item =
                 MenuItem::with_id(app, "home", "Abrir o ISPer (Início)", true, None::<&str>)?;
+            let copilot_item = MenuItem::with_id(
+                app,
+                "copilot",
+                "ISPer Copilot (Decisões ao vivo)…",
+                true,
+                None::<&str>,
+            )?;
             let library_item = MenuItem::with_id(
                 app,
                 "library",
@@ -335,6 +364,7 @@ fn main() {
                 &[
                     &hint,
                     &home_item,
+                    &copilot_item,
                     &library_item,
                     &meeting_item,
                     &indicator_item,
@@ -363,6 +393,7 @@ fn main() {
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "quit" => quit_app(app),
                     "home" => open_home(app),
+                    "copilot" => open_copilot(app),
                     "meeting" => {
                         let _ = toggle_meeting(app);
                     }

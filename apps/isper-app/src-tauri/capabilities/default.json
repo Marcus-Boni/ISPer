@@ -1,8 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissões das janelas do app: eventos, comandos internos e controle da própria janela (arrastar/redimensionar o indicador)",
-  "windows": ["overlay", "home", "settings", "library"],
+  "description": "Permissoes das janelas do app: eventos, comandos internos e controle da propria janela (arrastar/redimensionar o indicador). Janela fora desta lista nao consegue nem ouvir eventos (plugin:event|listen e negado pela ACL) - foi o que deixou o Copilot sem transcricao ao vivo.",
+  "windows": [
+    "overlay",
+    "home",
+    "settings",
+    "copilot",
+    "library"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

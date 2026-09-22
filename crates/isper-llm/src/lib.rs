@@ -9,6 +9,7 @@
 //! - **Provider trocável**: o trait [`LlmProvider`] abstrai a API — Claude,
 //!   Groq e Gemini implementados; trocar é editar uma linha de configuração.
 
+pub mod copilot;
 pub mod embeddings;
 mod insights;
 mod polish;
@@ -18,6 +19,11 @@ mod summary;
 #[cfg(test)]
 pub(crate) mod testing;
 
+pub use copilot::{
+    CardKind, CardStatus, CardUrgency, CopilotAnalysis, CopilotCard, CopilotInput, TriggerKind,
+    analyze_meeting, card_id, detect_trigger, enrich_notes, enrich_notes_stream, is_same_card,
+    query_meeting, query_meeting_stream, render_decisions_markdown,
+};
 pub use embeddings::{Embedder, EmbeddingSettings, embedder_from_settings};
 pub use insights::{InsightsInput, live_insights};
 pub use polish::{POLISH_STYLES, polish_dictation};

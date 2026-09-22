@@ -109,12 +109,13 @@ pub(crate) fn quit_app(app: &AppHandle) {
     };
     tracing::info!("saindo com reunião ativa — encerrando e salvando antes");
     *app.state::<AppState>().meeting_started.lock_or_recover() = None;
+    let decisions = confirmed_cards(app);
     set_tray_recording(app, false);
     let _ = app.emit("isper-state", json!({"state": "meeting-processing"}));
     show_overlay(app);
     let app = app.clone();
     std::thread::spawn(move || {
-        match finish_meeting(&app, handle) {
+        match finish_meeting(&app, handle, decisions) {
             Ok(path) => tracing::info!("reunião salva antes de sair em {path}"),
             Err(e) => tracing::warn!("ao salvar antes de sair: {e}"),
         }
