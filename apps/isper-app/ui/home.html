@@ -84,8 +84,18 @@
   .ins-body h4:first-child { margin-top: 0; }
   .ins-body ul { margin: 0; padding-left: 16px; }
   .ins-body li { margin: 2px 0; color: var(--ink-2); }
-  .ins-body li.task::marker { content: "☐ "; }
-  .ins-body li.done::marker { content: "☑ "; }
+  /* Marcadores como ícone: ::marker só aceita texto, então a bolinha sai
+     de cena e um ::before com máscara pinta o SVG em currentColor. */
+  .ins-body li.task, .ins-body li.done { list-style: none; position: relative; }
+  .ins-body li.task::before, .ins-body li.done::before {
+    content: ""; position: absolute; left: -16px; top: .3em;
+    width: 12px; height: 12px; background: currentColor;
+    -webkit-mask: var(--mk) center / contain no-repeat;
+    mask: var(--mk) center / contain no-repeat;
+  }
+  .ins-body li.task::before { --mk: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222.4%22%20y%3D%222.4%22%20width%3D%2211.2%22%20height%3D%2211.2%22%20rx%3D%222%22%2F%3E%3C%2Fsvg%3E"); }
+  .ins-body li.done { color: var(--good); }
+  .ins-body li.done::before { --mk: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222.4%22%20y%3D%222.4%22%20width%3D%2211.2%22%20height%3D%2211.2%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22m5.2%208.2%202%202%203.6-4%22%2F%3E%3C%2Fsvg%3E"); }
   .ins-body p { margin: 2px 0; color: var(--ink-2); }
   .ins-body .none { color: var(--muted-2); }
   .ins-body.swap { animation: swap-in var(--dur-3) var(--ease-out) both; }
@@ -170,12 +180,14 @@
       <div class="row actions-row">
         <button class="btn btn-primary" id="b-meeting">Iniciar gravação de reunião</button>
         <span class="timer" id="m-timer"></span>
-        <button class="btn btn-sm" id="b-mark" title="registra o instante para o resumo e a Biblioteca" hidden>★ Marcar momento</button>
+        <button class="btn btn-sm btn-subtle" id="b-copilot" title="Abrir ISPer Copilot (decisões ao vivo, transcrição e notetaker)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg>Copilot HUD</button>
+        <button class="btn btn-sm" id="b-mark" title="registra o instante para o resumo e a Biblioteca" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z"/></svg>Marcar momento</button>
         <label class="switch" id="cap-switch" title="barra larga de legendas no indicador flutuante" hidden><input type="checkbox" id="captions"><span class="track"><span class="thumb"></span></span>Legendas ao vivo</label>
       </div>
       <dl class="specs">
         <dt>Atalho</dt><dd id="s-mshortcut">…</dd>
         <dt>Marcar momento</dt><dd id="s-markshortcut">…</dd>
+        <dt>Copilot</dt><dd id="s-copilotshortcut">…</dd>
         <dt>Áudio</dt><dd id="s-source">…</dd>
         <dt>Falantes</dt><dd id="s-diar">…</dd>
         <dt>Resumo por IA</dt><dd id="s-llm">…</dd>
@@ -330,7 +342,7 @@
     const row = el('div', 'live-row');
     row.appendChild(el('span', 'ts num', fmtClock(atSecs)));
     const body = el('span');
-    body.appendChild(el('span', 'sp text-warn', '★ momento marcado'));
+    body.appendChild(el('span', 'sp text-warn', 'momento marcado'));
     row.appendChild(body);
     list.appendChild(row);
     list.scrollTop = list.scrollHeight;
@@ -486,7 +498,8 @@
       } else dd.textContent = fallback;
     };
     keycaps($('s-mshortcut'), st.meeting_shortcut, 'inicia e encerra', 'nenhum atalho livre — só pela bandeja ou por aqui');
-    keycaps($('s-markshortcut'), st.mark_shortcut, 'durante a reunião, ou o botão ★ aqui e no indicador', 'sem atalho livre — use o botão ★');
+    keycaps($('s-markshortcut'), st.mark_shortcut, 'durante a reunião, ou o botão de marcar momento aqui e no indicador', 'sem atalho livre — use o botão de marcar momento');
+    keycaps($('s-copilotshortcut'), st.copilot_shortcut, 'mostra e esconde as decisões ao vivo', 'sem atalho livre — use o botão Copilot HUD');
     $('b-mark').hidden = !st.meeting_active;
     $('cap-switch').hidden = !st.meeting_active;
     $('captions').checked = !!st.overlay_captions;
@@ -754,8 +767,9 @@
   // Falas da reunião chegando (bloco a bloco) — só enquanto o painel existe.
   // Provisórias (bloco ainda aberto) ficam só no indicador; aqui entra a final.
   listen('isper-live', (e) => { if (!$('live').hidden && !(e.payload && e.payload.provisional)) liveAppend(e.payload); });
-  listen('isper-moment', (e) => { if (!$('live').hidden) liveMoment((e.payload && e.payload.at_secs) || 0); toast('★ momento marcado em ' + fmtClock((e.payload && e.payload.at_secs) || 0), 'ok', 1800); });
+  listen('isper-moment', (e) => { if (!$('live').hidden) liveMoment((e.payload && e.payload.at_secs) || 0); toast('momento marcado em ' + fmtClock((e.payload && e.payload.at_secs) || 0), 'ok', 1800); });
   $('b-mark').addEventListener('click', () => invoke('mark_moment_cmd').catch(e => toast('erro: ' + e, 'err')));
+  $('b-copilot').addEventListener('click', () => invoke('open_copilot_window').catch(e => toast(String(e), 'err')));
   $('captions').addEventListener('change', (ev) => {
     invoke('overlay_set_mode', { mode: ev.target.checked ? 'captions' : 'normal' })
       .then(() => { if (ev.target.checked) invoke('show_indicator_cmd').catch(() => {}); })
