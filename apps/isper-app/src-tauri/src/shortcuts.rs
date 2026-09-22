@@ -59,11 +59,15 @@ pub(crate) fn register_first_free(
     None
 }
 
-/// (Re)registra os três atalhos globais — ditado, reunião e marcar momento —
-/// a partir da configuração: o preferido de cada um tem prioridade; os
-/// candidatos padrão são o fallback. Guarda os `Shortcut`s no estado (o
-/// handler compara com eles) e devolve os rótulos ativos, nessa ordem.
-pub(crate) fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, String, String) {
+/// (Re)registra os quatro atalhos globais — ditado, reunião, marcar momento
+/// e Copilot — a partir da configuração: o preferido de cada um tem
+/// prioridade; os candidatos padrão são o fallback. Guarda os `Shortcut`s no
+/// estado (o handler compara com eles) e devolve os rótulos ativos, nessa
+/// ordem.
+pub(crate) fn register_shortcuts(
+    app: &AppHandle,
+    cfg: &AppConfig,
+) -> (String, String, String, String) {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
     let shortcuts = app.global_shortcut();
     let _ = shortcuts.unregister_all();
@@ -104,14 +108,26 @@ pub(crate) fn register_shortcuts(app: &AppHandle, cfg: &AppConfig) -> (String, S
         Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
         None => (None, "(nenhum)".to_string()),
     };
+    taken.extend(mark_sc);
+
+    let copilot = candidates(
+        cfg.copilot_shortcut.as_deref(),
+        &COPILOT_SHORTCUT_CANDIDATES,
+    );
+    let (copilot_sc, copilot_label) = match register_first_free(shortcuts, &copilot, &taken) {
+        Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
+        None => (None, "(nenhum)".to_string()),
+    };
 
     *state.dictation_shortcut.lock_or_recover() = dict_sc;
     *state.meeting_shortcut.lock_or_recover() = meet_sc;
     *state.mark_shortcut.lock_or_recover() = mark_sc;
+    *state.copilot_shortcut.lock_or_recover() = copilot_sc;
     *state.active_shortcut.lock_or_recover() = dict_label.clone();
     *state.active_meeting_shortcut.lock_or_recover() = meet_label.clone();
     *state.active_mark_shortcut.lock_or_recover() = mark_label.clone();
-    (dict_label, meet_label, mark_label)
+    *state.active_copilot_shortcut.lock_or_recover() = copilot_label.clone();
+    (dict_label, meet_label, mark_label, copilot_label)
 }
 
 /// Atalho de reunião: alterna a gravação, com debounce contra auto-repeat.
@@ -152,6 +168,7 @@ mod tests {
             .copied()
             .chain(MEETING_SHORTCUT_CANDIDATES)
             .chain(MARK_SHORTCUT_CANDIDATES)
+            .chain(COPILOT_SHORTCUT_CANDIDATES)
             .collect();
         for combo in &all {
             assert!(Shortcut::from_str(combo).is_ok(), "combo inválido: {combo}");

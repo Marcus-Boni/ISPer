@@ -42,7 +42,7 @@
 </head>
 <body class="atmos">
 <h1 class="reveal" data-i="0">Configurações</h1>
-<p class="sub reveal" data-i="0">Atalhos ativos agora: ditado <b id="active">…</b> · reunião <b id="mactive">…</b> · marcar momento <b id="kactive">…</b></p>
+<p class="sub reveal" data-i="0">Atalhos ativos agora: ditado <b id="active">…</b> · reunião <b id="mactive">…</b> · marcar momento <b id="kactive">…</b> · Copilot <b id="cactive">…</b></p>
 
 <div class="card reveal" data-i="1">
   <h2>Ditado</h2>
@@ -107,7 +107,18 @@
     </select>
     <button class="btn" id="cap-markshortcut" title="pressione a combinação que quiser">Gravar atalho</button>
   </div>
-  <p class="hint">Um toque registra o instante ("★ momento marcado"): os momentos aparecem na Biblioteca, no Markdown e orientam o resumo por IA. Também há o botão ★ no indicador e na tela Início.</p>
+  <p class="hint">Um toque registra o instante ("momento marcado"): os momentos aparecem na Biblioteca, no Markdown e orientam o resumo por IA. Também há o botão de marcar momento no indicador e na tela Início.</p>
+  <label class="lbl" for="copilotshortcut">Atalho global para o Copilot (decisões ao vivo)</label>
+  <div class="row">
+    <select id="copilotshortcut" class="field">
+      <option value="">(automático — Ctrl+Alt+C ou o próximo livre)</option>
+      <option value="ctrl+alt+c">Ctrl+Alt+C</option>
+      <option value="ctrl+shift+c">Ctrl+Shift+C</option>
+      <option value="ctrl+alt+p">Ctrl+Alt+P</option>
+    </select>
+    <button class="btn" id="cap-copilotshortcut" title="pressione a combinação que quiser">Gravar atalho</button>
+  </div>
+  <p class="hint">Traz o Copilot para a frente; com ele já na frente, esconde. O que estiver digitado no chat e nas notas continua lá. Também há o botão do Copilot no indicador e na tela Início.</p>
   <label class="lbl" for="calldetect">Chamadas do Teams</label>
   <select id="calldetect" class="field">
     <option value="notify">Avisar quando uma chamada começar e perguntar se gravo (padrão)</option>
@@ -346,6 +357,7 @@
   $('cap-shortcut').addEventListener('click', () => captureInto($('shortcut'), $('cap-shortcut')));
   $('cap-mshortcut').addEventListener('click', () => captureInto($('mshortcut'), $('cap-mshortcut')));
   $('cap-markshortcut').addEventListener('click', () => captureInto($('markshortcut'), $('cap-markshortcut')));
+  $('cap-copilotshortcut').addEventListener('click', () => captureInto($('copilotshortcut'), $('cap-copilotshortcut')));
 
   async function loadMics(selected) {
     const sel = $('mic');
@@ -364,9 +376,11 @@
       $('active').textContent = s.active_shortcut;
       $('mactive').textContent = s.active_meeting_shortcut || '(nenhum)';
       $('kactive').textContent = s.active_mark_shortcut || '(nenhum)';
+      $('cactive').textContent = s.active_copilot_shortcut || '(nenhum)';
       setCombo($('shortcut'), s.shortcut || '');
       setCombo($('mshortcut'), s.meeting_shortcut || '');
       setCombo($('markshortcut'), s.mark_shortcut || '');
+      setCombo($('copilotshortcut'), s.copilot_shortcut || '');
       await loadMics(s.input_device || '');
       $('polish').checked = !!s.polish;
       $('pstyle').value = s.polish_style || 'clean';
@@ -566,6 +580,7 @@
         input_device: $('mic').value || null,
         meeting_shortcut: $('mshortcut').value || null,
         mark_shortcut: $('markshortcut').value || null,
+        copilot_shortcut: $('copilotshortcut').value || null,
         polish: $('polish').checked,
         polish_style: $('pstyle').value,
         after_meeting: $('after').value,
@@ -587,7 +602,7 @@
       UI.busy(b, false);
       UI.flash(b, 'Salvo ✓');
       status('salvo — atalho de ditado ativo: ' + label, 'ok');
-      try { const s = await invoke('get_settings'); $('mactive').textContent = s.active_meeting_shortcut || '(nenhum)'; $('kactive').textContent = s.active_mark_shortcut || '(nenhum)'; } catch (_) {}
+      try { const s = await invoke('get_settings'); $('mactive').textContent = s.active_meeting_shortcut || '(nenhum)'; $('kactive').textContent = s.active_mark_shortcut || '(nenhum)'; $('cactive').textContent = s.active_copilot_shortcut || '(nenhum)'; } catch (_) {}
       setTimeout(() => renderModels(false), 1500);
       await loadEmbeddings();
     } catch (e) {

@@ -28,6 +28,10 @@ pub(crate) const MEETING_SHORTCUT_CANDIDATES: [&str; 3] =
 /// Candidatos ao atalho "marcar momento" (durante a reunião).
 pub(crate) const MARK_SHORTCUT_CANDIDATES: [&str; 3] = ["ctrl+alt+k", "ctrl+shift+k", "ctrl+alt+j"];
 
+/// Candidatos ao atalho do Copilot (abre/fecha o HUD de decisões).
+pub(crate) const COPILOT_SHORTCUT_CANDIDATES: [&str; 3] =
+    ["ctrl+alt+c", "ctrl+shift+c", "ctrl+alt+p"];
+
 /// Dois toques de "marcar momento" mais próximos que isso contam como um.
 pub(crate) const MARK_DEBOUNCE: Duration = Duration::from_millis(1500);
 
@@ -46,7 +50,7 @@ pub(crate) const TAP_THRESHOLD: Duration = Duration::from_millis(350);
 /// ("1:02:05") com todos os botões — senão o conteúdo vaza por cima da borda.
 /// A conta de cada um está no `<style>` de ui/index.html: os dois andam
 /// juntos, mudou lá, muda aqui.
-pub(crate) const OVERLAY_FULL: (f64, f64) = (460.0, 68.0);
+pub(crate) const OVERLAY_FULL: (f64, f64) = (490.0, 68.0);
 
 /// Mini: ponto + cronômetro + 3 botões. Antes eram 150×56 e a linha pedia
 /// 146 px (162 passando de 1 h) em 113 px úteis — daí os ícones estourando.
@@ -109,6 +113,9 @@ pub(crate) struct AppState {
     pub(crate) last_meeting_toggle: Mutex<Option<Instant>>,
     pub(crate) mark_shortcut: Mutex<Option<Shortcut>>,
     pub(crate) active_mark_shortcut: Mutex<String>,
+    /// Atalho que alterna a janela do Copilot.
+    pub(crate) copilot_shortcut: Mutex<Option<Shortcut>>,
+    pub(crate) active_copilot_shortcut: Mutex<String>,
     /// Momentos marcados na reunião em andamento (segundos desde o início).
     pub(crate) moments: Mutex<Vec<f32>>,
     /// Falas da reunião em andamento, na ordem em que foram transcritas.
@@ -124,6 +131,8 @@ pub(crate) struct AppState {
     pub(crate) call: Mutex<CallState>,
     /// Insights ao vivo da reunião atual (loop, último resultado, erro).
     pub(crate) insights: Mutex<InsightsState>,
+    /// Copilot executivo em tempo real da reunião ativa.
+    pub(crate) copilot: Mutex<CopilotAppState>,
     /// Indexação semântica completa em andamento (progresso).
     pub(crate) indexing: Mutex<Option<IndexProgress>>,
     /// Item "Mostrar/Ocultar indicador" da bandeja (o texto acompanha o estado).
