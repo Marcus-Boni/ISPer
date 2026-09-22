@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::meeting::MeetingResult;
 use crate::{IsperError, Result};
@@ -29,6 +29,8 @@ pub struct MeetingRow {
     pub md_path: Option<String>,
     /// Momentos marcados durante a reunião.
     pub moments: i64,
+    /// Decisões validadas no Copilot (a Biblioteca marca a reunião).
+    pub decisions: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -46,6 +48,27 @@ pub struct MeetingDetail {
     pub segments: Vec<StoredSegment>,
     /// Instantes marcados (segundos desde o início), em ordem.
     pub moments: Vec<f32>,
+    /// O que você validou no Copilot durante a reunião, em ordem de fala.
+    pub decisions: Vec<StoredDecision>,
+}
+
+/// Um card que o usuário confirmou no Copilot durante a reunião.
+///
+/// Guarda o texto já resolvido, não uma referência ao card vivo: o Copilot é
+/// de memória e some quando a reunião acaba. Os tipos vêm do `isper-llm` como
+/// texto (`"decision"`, `"action"`, …) porque o banco não conhece aquele crate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StoredDecision {
+    /// `decision`, `action`, `risk` ou `question`.
+    pub kind: String,
+    pub title: String,
+    pub description: String,
+    pub owner: Option<String>,
+    pub due_date: Option<String>,
+    /// `low`, `medium` ou `high`.
+    pub urgency: String,
+    /// Instante da fala que originou o card.
+    pub at_secs: f32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -100,7 +123,8 @@ const MEETING_COLUMNS: &str = "m.id, m.title, m.started_at, m.duration_secs,
     (m.summary IS NOT NULL AND m.summary != ''), m.md_path,
     (SELECT COUNT(*) FROM segments s WHERE s.meeting_id = m.id),
     (SELECT COUNT(DISTINCT s.speaker) FROM segments s WHERE s.meeting_id = m.id AND s.speaker != 'Eu'),
-    (SELECT COUNT(*) FROM moments mo WHERE mo.meeting_id = m.id)";
+    (SELECT COUNT(*) FROM moments mo WHERE mo.meeting_id = m.id),
+    (SELECT COUNT(*) FROM decisions de WHERE de.meeting_id = m.id)";
 
 fn row_to_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<MeetingRow> {
     Ok(MeetingRow {
@@ -113,6 +137,7 @@ fn row_to_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<MeetingRow> {
         segments: row.get(6)?,
         participants: row.get(7)?,
         moments: row.get(8)?,
+        decisions: row.get(9)?,
     })
 }
 
@@ -136,7 +161,7 @@ fn like_pattern(q: &str) -> String {
 /// de versão maior (criado por um ISPer mais novo) é recusado em vez de
 /// alterado às cegas. Bancos anteriores a esta numeração chegam como 0 e
 /// passam pelo passo 1, que é idempotente sobre o que eles já têm.
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 /// Eventos de métrica mais antigos que isto (90 dias) saem do banco.
 pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
@@ -245,6 +270,7 @@ fn migrate(conn: &Connection) -> Result<()> {
         match version {
             0 => migrate_to_v1(&tx)?,
             1 => migrate_to_v2(&tx)?,
+            2 => migrate_to_v3(&tx)?,
             other => {
                 return Err(IsperError::Schema(format!(
                     "sem migração a partir da versão {other}"
@@ -333,6 +359,26 @@ fn migrate_to_v2(conn: &Connection) -> Result<()> {
     )?;
     backfill_stamps(conn, "meetings", "started_at", "started_ts")?;
     backfill_stamps(conn, "dictations", "at", "at_ts")?;
+    Ok(())
+}
+
+/// Passo 3 — decisões validadas no Copilot (Fase 8). Tabela nova e vazia:
+/// reuniões antigas simplesmente não têm linhas aqui.
+fn migrate_to_v3(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS decisions (
+            id          INTEGER PRIMARY KEY,
+            meeting_id  INTEGER NOT NULL REFERENCES meetings(id),
+            kind        TEXT NOT NULL,
+            title       TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            owner       TEXT,
+            due_date    TEXT,
+            urgency     TEXT NOT NULL DEFAULT 'medium',
+            at_secs     REAL NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_decisions_meeting ON decisions(meeting_id);",
+    )?;
     Ok(())
 }
 
@@ -434,6 +480,59 @@ impl MeetingStore {
         }
         tx.commit()?;
         Ok(())
+    }
+
+    /// Guarda as decisões validadas no Copilot. Regrava do zero: salvar duas
+    /// vezes a mesma reunião não duplica as linhas.
+    pub fn save_decisions(&self, meeting_id: i64, items: &[StoredDecision]) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "DELETE FROM decisions WHERE meeting_id = ?1",
+            params![meeting_id],
+        )?;
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO decisions
+                 (meeting_id, kind, title, description, owner, due_date, urgency, at_secs)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            )?;
+            for d in items {
+                stmt.execute(params![
+                    meeting_id,
+                    d.kind,
+                    d.title,
+                    d.description,
+                    d.owner,
+                    d.due_date,
+                    d.urgency,
+                    f64::from(d.at_secs),
+                ])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Decisões de uma reunião, na ordem em que apareceram na conversa.
+    pub fn decisions(&self, meeting_id: i64) -> Result<Vec<StoredDecision>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT kind, title, description, owner, due_date, urgency, at_secs
+             FROM decisions WHERE meeting_id = ?1 ORDER BY at_secs, id",
+        )?;
+        let rows = stmt
+            .query_map(params![meeting_id], |r| {
+                Ok(StoredDecision {
+                    kind: r.get(0)?,
+                    title: r.get(1)?,
+                    description: r.get(2)?,
+                    owner: r.get(3)?,
+                    due_date: r.get(4)?,
+                    urgency: r.get(5)?,
+                    at_secs: r.get::<_, f64>(6)? as f32,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 
     /// Guarda o resumo gerado por IA (Fase 5).
@@ -595,6 +694,10 @@ impl MeetingStore {
             params![meeting_id],
         )?;
         self.conn.execute(
+            "DELETE FROM decisions WHERE meeting_id = ?1",
+            params![meeting_id],
+        )?;
+        self.conn.execute(
             "DELETE FROM segments WHERE meeting_id = ?1",
             params![meeting_id],
         )?;
@@ -665,6 +768,7 @@ impl MeetingStore {
                 params![m.id],
             )?;
             tx.execute("DELETE FROM moments WHERE meeting_id = ?1", params![m.id])?;
+            tx.execute("DELETE FROM decisions WHERE meeting_id = ?1", params![m.id])?;
             tx.execute("DELETE FROM segments WHERE meeting_id = ?1", params![m.id])?;
             tx.execute("DELETE FROM meetings WHERE id = ?1", params![m.id])?;
         }
@@ -1080,11 +1184,13 @@ impl MeetingStore {
                 r.get::<_, f64>(0).map(|v| v as f32)
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        let decisions = self.decisions(meeting_id)?;
         Ok(Some(MeetingDetail {
             meeting,
             summary,
             segments,
             moments,
+            decisions,
         }))
     }
 
@@ -1143,6 +1249,107 @@ mod tests {
 
     fn temp_store(name: &str) -> MeetingStore {
         MeetingStore::open(&temp_path(name)).expect("abrir banco temporário")
+    }
+
+    fn sample_decision(kind: &str, title: &str, at: f32) -> StoredDecision {
+        StoredDecision {
+            kind: kind.into(),
+            title: title.into(),
+            description: "detalhe".into(),
+            owner: None,
+            due_date: None,
+            urgency: "medium".into(),
+            at_secs: at,
+        }
+    }
+
+    #[test]
+    fn decisoes_voltam_na_ordem_da_conversa() {
+        let store = temp_store("decisoes");
+        let id = store
+            .save("Reunião", "21/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+
+        store
+            .save_decisions(
+                id,
+                &[
+                    sample_decision("action", "Enviar proposta", 90.0),
+                    sample_decision("decision", "Entrega dia 30", 45.0),
+                ],
+            )
+            .unwrap();
+
+        let got = store.decisions(id).unwrap();
+        assert_eq!(got.len(), 2);
+        assert_eq!(
+            got[0].title, "Entrega dia 30",
+            "ordena pelo instante da fala"
+        );
+        assert_eq!(got[1].title, "Enviar proposta");
+        assert_eq!(got[0].kind, "decision");
+
+        // E chegam junto com o resto do detalhe da reunião.
+        let detail = store.get_meeting(id).unwrap().unwrap();
+        assert_eq!(detail.decisions.len(), 2);
+    }
+
+    #[test]
+    fn salvar_de_novo_regrava_em_vez_de_duplicar() {
+        let store = temp_store("decisoes-regrava");
+        let id = store
+            .save("Reunião", "21/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        let uma = [sample_decision("decision", "Única", 10.0)];
+        store.save_decisions(id, &uma).unwrap();
+        store.save_decisions(id, &uma).unwrap();
+        assert_eq!(store.decisions(id).unwrap().len(), 1);
+
+        // Lista vazia limpa o que havia.
+        store.save_decisions(id, &[]).unwrap();
+        assert!(store.decisions(id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn campos_opcionais_sobrevivem_a_ida_e_volta() {
+        let store = temp_store("decisoes-campos");
+        let id = store
+            .save("Reunião", "21/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        let mut d = sample_decision("action", "Avaliar SLA", 73.5);
+        d.owner = Some("Carlos".into());
+        d.due_date = Some("Sem prazo definido".into());
+        d.urgency = "high".into();
+        store.save_decisions(id, std::slice::from_ref(&d)).unwrap();
+
+        let got = store.decisions(id).unwrap();
+        assert_eq!(got, vec![d]);
+    }
+
+    #[test]
+    fn apagar_a_reuniao_leva_as_decisoes_junto() {
+        let store = temp_store("decisoes-apaga");
+        let id = store
+            .save("Reunião", "21/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        store
+            .save_decisions(id, &[sample_decision("decision", "X", 1.0)])
+            .unwrap();
+        store.delete_meeting(id).unwrap();
+        assert!(
+            store.decisions(id).unwrap().is_empty(),
+            "decisão órfã ficaria para sempre no banco"
+        );
+    }
+
+    #[test]
+    fn reuniao_sem_copilot_nao_tem_decisoes() {
+        let store = temp_store("decisoes-vazio");
+        let id = store
+            .save("Reunião", "21/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        assert!(store.decisions(id).unwrap().is_empty());
+        assert!(store.get_meeting(id).unwrap().unwrap().decisions.is_empty());
     }
 
     fn sample_result() -> MeetingResult {
