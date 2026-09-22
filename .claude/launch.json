@@ -4,8 +4,22 @@
     {
       "name": "isper-portal",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--dir", "website", "dev", "--port", "3111"],
+      "runtimeArgs": [
+        "--dir",
+        "website",
+        "dev",
+        "--port",
+        "3111"
+      ],
       "port": 3111
+    },
+    {
+      "name": "copilot-harness",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "tools/e2e/copilot-harness.py"
+      ],
+      "port": 3112
     }
   ]
 }
