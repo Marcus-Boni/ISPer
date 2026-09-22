@@ -59,8 +59,8 @@ impl ChunkOptions {
     /// cedo vale mais.
     pub fn live() -> Self {
         Self {
-            target_secs: 6.0,
-            max_secs: 12.0,
+            target_secs: 5.0,
+            max_secs: 10.0,
             search_secs: 2.5,
             ..Self::default()
         }

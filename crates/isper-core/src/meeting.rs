@@ -129,9 +129,9 @@ const SILENCE_RMS: f32 = 0.0035;
 const CUT_CHECK_EVERY: Duration = Duration::from_millis(400);
 /// Legenda provisória: de quanto em quanto tempo o buffer aberto vai ao
 /// Whisper enquanto o bloco não fecha (só com o worker livre).
-pub const PARTIAL_EVERY: Duration = Duration::from_millis(2500);
+pub const PARTIAL_EVERY: Duration = Duration::from_millis(1500);
 /// Menos áudio que isto não rende legenda provisória.
-const PARTIAL_MIN_SECS: f32 = 1.5;
+const PARTIAL_MIN_SECS: f32 = 1.0;
 /// Com esta quantidade de blocos esperando, o worker está atrasado: a captura
 /// volta aos blocos longos ([`ChunkOptions::relaxed`]) até a fila esvaziar.
 const BACKLOG_RELAX: usize = 2;

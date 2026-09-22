@@ -1,0 +1,1288 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ISPer Copilot — Decisões e Notetaker</title>
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  /* O HUD é a única janela que roda ao lado do Teams: tudo aqui foi medido
+     para caber em 380 px de largura (sidecar acoplado) e continuar bonito em
+     1200 px (janela cheia, duas colunas). Nada de style="…" no HTML — a
+     convenção do projeto é classe, como nas outras janelas. */
+  html, body { height: 100%; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  /* ------------------------------------------------------------ topbar */
+  .copilot-header {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 9px 14px; border-bottom: 1px solid var(--line);
+    background: rgba(30, 26, 24, .82);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    flex: none; z-index: 5;
+  }
+  .brand-group { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .brand-group h1 {
+    font-family: var(--font-display); font-weight: 600; font-size: 16px;
+    letter-spacing: -.01em; margin: 0; white-space: nowrap;
+  }
+  .copilot-spark { color: var(--accent); font-size: 14px; }
+  .copilot-spark.live { animation: pulse 2.2s ease-in-out infinite; }
+
+  .meeting-badge {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    padding: 3px 9px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 500;
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--muted);
+    transition: color var(--dur-2), border-color var(--dur-2), background var(--dur-2);
+  }
+  .meeting-badge.active {
+    background: var(--accent-soft); border-color: rgba(240, 126, 114, .45); color: var(--accent);
+  }
+  .meeting-clock { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* Dinâmica de fala: Eu vs Participantes. */
+  .talk-meter {
+    display: flex; align-items: center; gap: 8px; padding: 4px 10px;
+    background: var(--panel); border-radius: var(--r-pill); border: 1px solid var(--line);
+    font-size: 11px; font-family: var(--font-mono); color: var(--muted); white-space: nowrap;
+  }
+  .meter-bar { width: 72px; height: 6px; background: var(--panel-3); border-radius: 3px; overflow: hidden; display: flex; flex: none; }
+  .meter-me { height: 100%; background: var(--accent); transition: width var(--dur-3) var(--ease-out); }
+  .meter-others { height: 100%; background: var(--info); transition: width var(--dur-3) var(--ease-out); }
+  .meter-label { font-variant-numeric: tabular-nums; }
+  .meter-warn { display: inline-flex; color: var(--warn); }
+
+  .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .view-toggles { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px; gap: 2px; }
+  .view-btn {
+    background: transparent; border: none; font-size: 11.5px; padding: 4px 9px;
+    color: var(--muted); border-radius: 6px; cursor: pointer;
+    transition: background var(--dur-1), color var(--dur-1);
+  }
+  .view-btn:hover { color: var(--ink-2); }
+  .view-btn[aria-pressed="true"] { background: var(--panel-3); color: var(--ink); font-weight: 600; }
+  .pin-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: rgba(240, 126, 114, .45); }
+
+  /* ------------------------------------------------- faixa de estado */
+  /* O que faltava antes: erro da IA, falta de chave e "analisando" eram
+     calculados no Rust e nunca apareciam na tela. */
+  .status-strip {
+    display: flex; align-items: center; gap: 9px; flex: none;
+    padding: 7px 14px; font-size: 12px; border-bottom: 1px solid var(--line);
+    background: var(--panel); color: var(--ink-2);
+    animation: swap-in var(--dur-2) var(--ease-out) both;
+  }
+  .status-strip.warn { background: var(--warn-soft); color: var(--warn); border-bottom-color: rgba(232, 193, 90, .3); }
+  .status-strip.err { background: var(--accent-soft); color: var(--accent); border-bottom-color: rgba(240, 126, 114, .3); }
+  .status-strip .status-text { flex: 1; min-width: 0; }
+  .status-spin {
+    width: 12px; height: 12px; border-radius: 50%; flex: none;
+    border: 2px solid currentColor; border-right-color: transparent;
+    animation: spin .8s linear infinite;
+  }
+
+  /* --------------------------------------------------------- layout */
+  .copilot-main { display: flex; flex: 1; min-height: 0; }
+  .pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .pane-transcript { flex: 1 1 46%; min-width: 300px; border-right: 1px solid var(--line); }
+  .pane-copilot { flex: 1 1 54%; min-width: 320px; background: var(--panel); }
+  body.view-transcript .pane-transcript { flex: 1 1 100%; border-right: none; }
+  body.view-transcript .pane-copilot { display: none; }
+  body.view-copilot .pane-transcript { display: none; }
+  body.view-copilot .pane-copilot { flex: 1 1 100%; }
+
+  .pane-header {
+    display: flex; align-items: center; gap: 8px; flex: none;
+    padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--bg-2);
+  }
+  .pane-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); white-space: nowrap; }
+  .search-box {
+    display: flex; align-items: center; gap: 5px; margin-left: auto;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--r-pill); padding: 2px 9px; max-width: 190px; flex: 1 1 110px;
+    transition: border-color var(--dur-2), box-shadow var(--dur-2);
+  }
+  .search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .search-box input { background: transparent; border: none; font-size: 12px; width: 100%; min-width: 0; color: var(--ink); }
+  /* O anel de foco é da CAIXA, não do input: o base.css dá box-shadow em
+     :focus-visible e, somado ao :focus-within daqui, saíam dois anéis
+     vermelhos encavalados. */
+  .search-box input:focus, .search-box input:focus-visible { outline: none; box-shadow: none; }
+  .search-box input::placeholder { color: var(--muted-2); }
+  .search-count { font-size: 10.5px; color: var(--muted-2); font-family: var(--font-mono); flex: none; }
+
+  /* ------------------------------------------------ transcrição viva */
+  .stream-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
+  .transcript-stream { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 11px; scroll-behavior: smooth; }
+  .stream-item { display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; line-height: 1.45; animation: swap-in var(--dur-2) var(--ease-out) both; }
+  .stream-item.hit-out { display: none; }
+  .stream-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .speaker-tag { font-weight: 700; border-radius: 4px; padding: 1px 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+  .speaker-me { background: var(--accent-soft); color: var(--accent); }
+  .speaker-others { background: rgba(124, 196, 240, .16); color: var(--info); }
+  .stream-time { font-family: var(--font-mono); color: var(--muted-2); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .stream-text { color: var(--ink); overflow-wrap: anywhere; }
+  .stream-item.provisional .stream-text { color: var(--muted); font-style: italic; }
+  .stream-item.flash .stream-text { background: var(--warn-soft); border-radius: 4px; }
+  .stream-item mark { background: rgba(232, 193, 90, .35); color: var(--ink); border-radius: 2px; padding: 0 1px; }
+
+  /* Voltar ao vivo: só aparece quando o usuário rolou para trás. */
+  .jump-live {
+    position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+    z-index: 2; box-shadow: var(--shadow-2); animation: pop var(--dur-2) var(--ease-spring) both;
+  }
+
+  /* ------------------------------------------------------ copilot hub */
+  .topic-banner {
+    display: flex; align-items: flex-start; gap: 8px; flex: none;
+    padding: 9px 13px; border-bottom: 1px solid var(--line); background: var(--panel-2);
+  }
+  .topic-badge { font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em; padding: 3px 6px; border-radius: 4px; background: var(--panel-3); color: var(--muted); font-weight: 700; flex: none; }
+  .topic-text { font-size: 12.5px; font-weight: 500; color: var(--ink-2); line-height: 1.4; min-width: 0; }
+
+  .copilot-tabs { display: flex; border-bottom: 1px solid var(--line); background: var(--panel-2); flex: none; }
+  .c-tab {
+    flex: 1; padding: 9px 4px; font-size: 12px; font-weight: 600; text-align: center;
+    background: transparent; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); cursor: pointer; transition: color var(--dur-1), border-color var(--dur-1), background var(--dur-1);
+  }
+  .c-tab:hover { color: var(--ink-2); }
+  .c-tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); background: rgba(255, 255, 255, .02); }
+  .tab-count { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted-2); }
+  .c-tab[aria-selected="true"] .tab-count { color: var(--accent); }
+  .c-view { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .c-view.on { display: flex; }
+
+  /* Filtros do feed. */
+  .card-filters { display: flex; gap: 5px; padding: 9px 12px 3px; flex-wrap: wrap; flex: none; }
+  .filter-chip {
+    font-size: 11px; padding: 3px 9px; border-radius: var(--r-pill);
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--muted);
+    cursor: pointer; transition: background var(--dur-1), color var(--dur-1), border-color var(--dur-1);
+  }
+  .filter-chip:hover { border-color: var(--line-2); color: var(--ink-2); }
+  .filter-chip[aria-pressed="true"] { background: var(--panel-3); color: var(--ink); border-color: var(--line-2); font-weight: 600; }
+  .filter-chip .n { font-family: var(--font-mono); opacity: .75; }
+
+  .cards-feed { flex: 1; overflow-y: auto; padding: 9px 12px 14px; display: flex; flex-direction: column; gap: 9px; }
+  #cards-items { display: flex; flex-direction: column; gap: 9px; }
+
+  .card-item {
+    position: relative; background: var(--panel-2); border: 1px solid var(--line);
+    border-left: 3px solid var(--line-2); border-radius: var(--r);
+    padding: 10px 12px; display: flex; flex-direction: column; gap: 5px;
+    box-shadow: var(--shadow-1); animation: pop var(--dur-3) var(--ease-spring) both;
+    transition: border-color var(--dur-2), box-shadow var(--dur-2);
+  }
+  .card-item:hover { box-shadow: var(--shadow-2); }
+  .card-decision { border-left-color: var(--good); }
+  .card-action   { border-left-color: var(--info); }
+  .card-risk     { border-left-color: var(--warn); }
+  .card-question { border-left-color: var(--p2); }
+  /* Memória: não é uma decisão desta reunião, é contexto de outra — fica
+     visualmente à parte para não se confundir com o que está em jogo agora. */
+  .card-memory   { border-left-color: var(--p4); background: var(--panel); }
+  .card-memory .card-desc { font-style: italic; }
+  .memory-source { font-size: 11px; color: var(--muted-2); }
+  .card-item.is-confirmed { background: var(--panel); border-color: rgba(132, 194, 151, .35); }
+  .card-item.is-discarded { opacity: .5; }
+
+  .card-top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .card-kind-tag { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 6px; border-radius: 4px; }
+  .kind-decision { background: var(--good-soft); color: var(--good); }
+  .kind-action   { background: rgba(124, 196, 240, .16); color: var(--info); }
+  .kind-risk     { background: var(--warn-soft); color: var(--warn); }
+  .kind-question { background: rgba(201, 160, 240, .16); color: var(--p2); }
+  .kind-memory   { background: rgba(124, 240, 201, .16); color: var(--p4); }
+  /* Urgência alta: chegou a ser calculada no Rust e nunca era mostrada. */
+  .urgency-high { display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+  .card-at { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted-2); background: none; border: none; padding: 2px 4px; border-radius: 4px; cursor: pointer; }
+  .card-at:hover { color: var(--accent); background: var(--accent-soft); }
+
+  .card-title { font-size: 13.5px; font-weight: 600; color: var(--ink); margin: 0; line-height: 1.3; }
+  .card-desc { font-size: 12.5px; color: var(--muted); margin: 0; line-height: 1.42; overflow-wrap: anywhere; }
+  .card-meta-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .card-pill { padding: 2px 7px; border-radius: var(--r-pill); background: var(--panel-3); color: var(--ink-2); font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
+  .card-pill.alert { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+  .card-actions { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 2px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, .05); }
+  .card-act-btn {
+    background: transparent; border: 1px solid rgba(255, 255, 255, .09); border-radius: 5px;
+    padding: 3px 8px; font-size: 11px; color: var(--muted); cursor: pointer;
+    transition: background var(--dur-1), color var(--dur-1), border-color var(--dur-1);
+  }
+  .card-act-btn:hover { background: rgba(255, 255, 255, .06); color: var(--ink); }
+  .card-act-btn.act-confirm:hover { background: var(--good-soft); color: var(--good); border-color: rgba(132, 194, 151, .5); }
+  .card-act-btn.act-discard:hover { background: var(--accent-soft); color: var(--accent); border-color: rgba(240, 126, 114, .5); }
+
+  .feed-footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 2px; }
+  .feed-footer .btn-link { font-size: 11.5px; }
+
+  /* ---------------------------------------------------------- chat Q&A */
+  .chat-messages { flex: 1; overflow-y: auto; padding: 12px 13px; display: flex; flex-direction: column; gap: 10px; }
+  .chat-bubble { display: flex; flex-direction: column; gap: 4px; max-width: 92%; font-size: 12.8px; line-height: 1.45; animation: swap-in var(--dur-2) var(--ease-out) both; }
+  .chat-bubble p { margin: 0 0 5px; }
+  .chat-bubble p:last-child { margin-bottom: 0; }
+  .chat-user { align-self: flex-end; background: var(--panel-3); padding: 8px 12px; border-radius: 12px 12px 3px 12px; color: var(--ink); overflow-wrap: anywhere; }
+  .chat-ai { align-self: flex-start; background: var(--panel-2); padding: 9px 13px; border-radius: 12px 12px 12px 3px; border: 1px solid var(--line); color: var(--ink-2); overflow-wrap: anywhere; }
+  .chat-ai.is-err { border-color: rgba(240, 126, 114, .45); color: var(--accent); background: var(--accent-soft); }
+  .chat-hint { font-size: 11px; color: var(--muted-2); }
+  /* Cursor no fim do parágrafo que ainda está sendo escrito. Some sozinho
+     quando a resposta fecha, porque a classe sai junto. */
+  .chat-ai p.streaming::after {
+    content: ""; display: inline-block; width: 2px; height: 1em;
+    margin-left: 2px; vertical-align: -2px; background: var(--accent);
+    animation: caret 1s steps(2, start) infinite;
+  }
+  @keyframes caret { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .chat-ai p.streaming::after { animation: none; }
+  }
+  .typing { display: inline-flex; gap: 3px; align-items: center; }
+  .typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); animation: pulse 1.1s ease-in-out infinite; }
+  .typing i:nth-child(2) { animation-delay: .18s; }
+  .typing i:nth-child(3) { animation-delay: .36s; }
+  .chat-input-area { display: flex; gap: 7px; align-items: flex-end; padding: 9px 11px; border-top: 1px solid var(--line); background: var(--bg-2); flex: none; }
+  .chat-input-area textarea { flex: 1; resize: none; max-height: 96px; min-height: 34px; padding: 7px 11px; border-radius: var(--r); }
+
+  /* ------------------------------------------------------- scratchpad */
+  .notes-view { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 11px 12px; gap: 9px; }
+  .notes-view textarea { flex: 1; min-height: 0; resize: none; padding: 11px; line-height: 1.55; }
+  .notes-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; }
+  .notes-status { font-size: 11px; color: var(--muted-2); margin-right: auto; }
+
+  /* ------------------------------------------------------ vazio/ajuda */
+  .copilot-empty {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 26px 20px; color: var(--muted); gap: 9px;
+  }
+  .copilot-empty .empty-icon { font-size: 28px; }
+  .copilot-empty h2 { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--ink-2); margin: 0; }
+  .copilot-empty p { max-width: 330px; font-size: 12.5px; margin: 0; line-height: 1.55; }
+
+  /* Ícones: 16x16, traço em currentColor — o mesmo desenho dos SVG que já
+     existem no Início e na Biblioteca. Nada de emoji: eles vêm coloridos da
+     fonte do sistema e destoam do resto da interface. */
+  .ico { width: 13px; height: 13px; flex: none; vertical-align: -2px; }
+  .ico-lg { width: 26px; height: 26px; stroke-width: 1.1; }
+  .card-kind-tag .ico, .urgency-high .ico, .card-pill .ico { width: 11px; height: 11px; }
+  .empty-icon { color: var(--muted-2); }
+  .copilot-spark .ico { width: 15px; height: 15px; }
+  /* Botão com ícone + texto: o gap do flex faz o espaçamento. */
+  .card-act-btn { display: inline-flex; align-items: center; gap: 5px; }
+  .card-kind-tag, .urgency-high, .card-pill { display: inline-flex; align-items: center; gap: 4px; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* ------------------------------------------------- modo sidecar 380px */
+  /* Acoplado ao lado do Teams não cabem duas colunas nem o medidor inteiro. */
+  @media (max-width: 720px) {
+    .copilot-header { padding: 8px 11px; gap: 8px; }
+    .brand-group h1 { font-size: 14px; }
+    /* O medidor sai da primeira linha, mas sem forçar uma linha só para ele:
+       em 400 px ele divide espaço com os botões e o cabeçalho fica 1 linha
+       mais baixo — altura é o recurso escasso no modo acoplado. */
+    .talk-meter { order: 3; margin: 0 auto; }
+    .header-actions { order: 2; }
+    .meter-hide { display: none; }
+    .pane-transcript, .pane-copilot { min-width: 0; }
+    .search-box { max-width: 120px; }
+  }
+  @media (max-width: 360px) {
+    .meeting-badge .badge-label { display: none; }
+    .copilot-empty p { font-size: 12px; }
+  }
+</style>
+</head>
+<body class="atmos view-split">
+
+<header class="copilot-header">
+  <div class="brand-group">
+    <span class="copilot-spark" id="spark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg></span>
+    <h1>ISPer Copilot</h1>
+    <span class="meeting-badge" id="meeting-badge">
+      <span class="dot" id="meeting-dot"></span>
+      <span class="badge-label" id="meeting-status-label">Aguardando reunião</span>
+    </span>
+    <span class="meeting-clock" id="meeting-clock" hidden></span>
+  </div>
+
+  <div class="talk-meter" id="talk-meter" title="Tempo de fala acumulado: você vs. os participantes">
+    <span class="meter-hide">Dinâmica</span>
+    <div class="meter-bar" role="img" aria-label="proporção de tempo de fala" id="meter-img">
+      <div class="meter-me" id="meter-me"></div>
+      <div class="meter-others" id="meter-others"></div>
+    </div>
+    <span class="meter-label" id="meter-label">—</span>
+    <span id="meter-warn" class="meter-warn" title="Você está falando há alguns minutos sem pausa" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 2.4 14.6 13.6H1.4L8 2.4Z"/><path d="M8 6.4v3.2M8 11.8h.01"/></svg></span>
+  </div>
+
+  <div class="header-actions">
+    <button id="btn-analyze" class="btn btn-sm btn-primary" title="Analisar agora — pede uma leitura da conversa à IA"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg>Analisar</button>
+    <button id="btn-pin" class="btn btn-sm btn-icon pin-btn" aria-pressed="false" title="Manter o Copilot sempre por cima (modo sidecar)" aria-label="manter sempre por cima"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M6 2h4v4l2.5 3.2v1h-9v-1L6 6V2Z"/><path d="M8 10.2V14"/></svg></button>
+    <div class="view-toggles" role="group" aria-label="Disposição das colunas">
+      <button class="view-btn" id="v-trans" aria-pressed="false" title="Fala — só a transcrição">Fala</button>
+      <button class="view-btn" id="v-split" aria-pressed="true">Dividido</button>
+      <button class="view-btn" id="v-copilot" aria-pressed="false" title="Decisões — só o Copilot">Decisões</button>
+    </div>
+  </div>
+</header>
+
+<div class="status-strip" id="status-strip" hidden>
+  <span class="status-spin" id="status-spin" hidden aria-hidden="true"></span>
+  <span class="status-text" id="status-text"></span>
+  <button class="btn btn-sm btn-ghost" id="status-action" hidden></button>
+</div>
+
+<main class="copilot-main">
+  <!-- ------------------------------------------------ coluna 1: a fala -->
+  <section class="pane pane-transcript" aria-label="Transcrição ao vivo">
+    <div class="pane-header">
+      <span class="pane-title">Fala ao vivo</span>
+      <div class="search-box">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 14 14"/></svg>
+        <input id="trans-search" type="search" placeholder="Buscar… (/)" aria-label="Buscar na transcrição">
+        <span class="search-count" id="search-count" aria-live="polite"></span>
+      </div>
+      <button id="btn-mark" class="btn btn-sm" title="Marcar momento — registra este instante para o resumo e a Biblioteca" aria-label="marcar momento"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="m8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z"/></svg></button>
+    </div>
+    <div class="stream-wrap">
+      <div class="transcript-stream" id="stream-list" tabindex="0" aria-label="Falas transcritas">
+        <div class="copilot-empty" id="trans-empty">
+          <div class="empty-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico ico-lg"><rect x="6" y="1.6" width="4" height="7.4" rx="2"/><path d="M3.4 7.6a4.6 4.6 0 0 0 9.2 0M8 12v2.4"/></svg></div>
+          <h2>Nada transcrito ainda</h2>
+          <p>Cada fala da reunião aparece aqui em segundos, separando <strong>você</strong> dos <strong>participantes</strong>.</p>
+        </div>
+      </div>
+      <button class="btn btn-sm jump-live" id="jump-live" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 2.8v9.4M4.4 8.6 8 12.2l3.6-3.6"/></svg>Voltar ao vivo</button>
+    </div>
+  </section>
+
+  <!-- --------------------------------------------- coluna 2: o copilot -->
+  <section class="pane pane-copilot" aria-label="Copilot">
+    <div class="topic-banner">
+      <span class="topic-badge">Agora</span>
+      <span class="topic-text" id="topic-text" aria-live="polite">Aguardando início da discussão…</span>
+    </div>
+
+    <div class="copilot-tabs" role="tablist" aria-label="Painéis do Copilot">
+      <button class="c-tab" id="tab-cards" role="tab" aria-selected="true" aria-controls="view-cards" data-tab="cards">
+        Decisões <span class="tab-count" id="cards-count">0</span>
+      </button>
+      <button class="c-tab" id="tab-chat" role="tab" aria-selected="false" aria-controls="view-chat" data-tab="chat" tabindex="-1">
+        Perguntar
+      </button>
+      <button class="c-tab" id="tab-notes" role="tab" aria-selected="false" aria-controls="view-notes" data-tab="notes" tabindex="-1">
+        Notas
+      </button>
+    </div>
+
+    <!-- ---------------------------------------------------- feed -->
+    <div class="c-view on" id="view-cards" role="tabpanel" aria-labelledby="tab-cards">
+      <div class="card-filters" role="group" aria-label="Filtrar cards por tipo">
+        <button class="filter-chip" data-filter="all" aria-pressed="true">Tudo <span class="n" id="n-all">0</span></button>
+        <button class="filter-chip" data-filter="decision" aria-pressed="false">Decisões <span class="n" id="n-decision">0</span></button>
+        <button class="filter-chip" data-filter="action" aria-pressed="false">Ações <span class="n" id="n-action">0</span></button>
+        <button class="filter-chip" data-filter="risk" aria-pressed="false">Riscos <span class="n" id="n-risk">0</span></button>
+        <button class="filter-chip" data-filter="question" aria-pressed="false">Perguntas <span class="n" id="n-question">0</span></button>
+        <button class="filter-chip" data-filter="memory" aria-pressed="false" title="Memória — reuniões anteriores sobre o mesmo assunto">Memória <span class="n" id="n-memory">0</span></button>
+      </div>
+      <div class="cards-feed" id="cards-list">
+        <div id="cards-items" aria-live="polite" aria-relevant="additions"></div>
+        <div class="copilot-empty" id="cards-empty">
+          <div class="empty-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico ico-lg"><path d="M8 1.6a4.4 4.4 0 0 0-2.6 8c.4.3.6.7.6 1.2h4c0-.5.2-.9.6-1.2A4.4 4.4 0 0 0 8 1.6Z"/><path d="M6.4 12.8h3.2M7 14.4h2"/></svg></div>
+          <h2 id="cards-empty-title">Ouvindo a conversa</h2>
+          <p id="cards-empty-text">Assim que um acordo for firmado, uma tarefa for combinada ou uma objeção ficar sem resposta, o card aparece aqui.</p>
+        </div>
+        <div class="feed-footer" id="feed-footer" hidden>
+          <button class="btn-link" id="btn-copy-all">Copiar decisões validadas</button>
+          <button class="btn-link" id="btn-show-discarded" aria-pressed="false"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------------------------------------------------- chat -->
+    <div class="c-view" id="view-chat" role="tabpanel" aria-labelledby="tab-chat" hidden>
+      <div class="chat-messages" id="chat-messages" aria-live="polite">
+        <div class="chat-bubble chat-ai">
+          <p>Pergunte qualquer coisa sobre o que já foi dito nesta reunião.</p>
+          <p class="chat-hint">Ex.: “qual valor o cliente citou?”, “o que ficou pendente?”, “dê 2 argumentos contra essa proposta”.</p>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <textarea id="chat-input" class="field" rows="1" placeholder="Pergunte sobre a reunião…" aria-label="Pergunta sobre a reunião"></textarea>
+        <button id="chat-send" class="btn btn-sm btn-primary">Enviar</button>
+      </div>
+    </div>
+
+    <!-- --------------------------------------------------- notas -->
+    <div class="c-view" id="view-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
+      <div class="notes-view">
+        <textarea id="notes-input" class="field" aria-label="Suas anotações da reunião"
+          placeholder="Anote solto — a IA completa depois com os números e as falas exatas.&#10;&#10;- prazo da entrega&#10;- valor combinado&#10;- quem ficou com o quê"></textarea>
+        <div class="notes-actions">
+          <span class="notes-status" id="notes-status" aria-live="polite"></span>
+          <button id="btn-undo-enrich" class="btn btn-sm" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M2.4 6.4h8.2a3.4 3.4 0 0 1 0 6.8H6.8"/><path d="M5.4 3.4 2.4 6.4l3 3"/></svg>Desfazer</button>
+          <button id="btn-enrich" class="btn btn-sm btn-primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg>Enriquecer com a reunião</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<p class="sr-only" id="live-announce" aria-live="polite"></p>
+
+<script src="assets/ui.js"></script>
+<script>
+  const { listen } = window.__TAURI__.event;
+  const { invoke } = window.__TAURI__.core;
+  const $ = (id) => document.getElementById(id);
+
+  // Traçados dos ícones, num grid 16x16. Descritos como nós (tag + atributos)
+  // em vez de markup: nada de innerHTML, e o desenho fica explícito.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const ICONS = {
+    search: [['circle', { cx: 7, cy: 7, r: 4.5 }], ['path', { d: 'M10.4 10.4 14 14' }]],
+    pin: [['path', { d: 'M6 2h4v4l2.5 3.2v1h-9v-1L6 6V2Z' }], ['path', { d: 'M8 10.2V14' }]],
+    spark: [['path', { d: 'M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z' }]],
+    mic: [
+      ['rect', { x: 6, y: 1.6, width: 4, height: 7.4, rx: 2 }],
+      ['path', { d: 'M3.4 7.6a4.6 4.6 0 0 0 9.2 0M8 12v2.4' }],
+    ],
+    bulb: [
+      ['path', { d: 'M8 1.6a4.4 4.4 0 0 0-2.6 8c.4.3.6.7.6 1.2h4c0-.5.2-.9.6-1.2A4.4 4.4 0 0 0 8 1.6Z' }],
+      ['path', { d: 'M6.4 12.8h3.2M7 14.4h2' }],
+    ],
+    person: [
+      ['circle', { cx: 8, cy: 5.2, r: 2.4 }],
+      ['path', { d: 'M3.4 13.6c0-2.6 2.1-4.2 4.6-4.2s4.6 1.6 4.6 4.2' }],
+    ],
+    calendar: [
+      ['rect', { x: 2.2, y: 3.6, width: 11.6, height: 10.4, rx: 1.6 }],
+      ['path', { d: 'M2.2 6.6h11.6M5.4 1.8v3M10.6 1.8v3' }],
+    ],
+    alert: [['path', { d: 'M8 2.4 14.6 13.6H1.4L8 2.4Z' }], ['path', { d: 'M8 6.4v3.2M8 11.8h.01' }]],
+    star: [['path', { d: 'm8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z' }]],
+    check: [['path', { d: 'm2.8 8.4 3.6 3.6L13.2 4.6' }]],
+    undo: [['path', { d: 'M2.4 6.4h8.2a3.4 3.4 0 0 1 0 6.8H6.8' }], ['path', { d: 'M5.4 3.4 2.4 6.4l3 3' }]],
+    open: [
+      ['path', { d: 'M9.2 2.4h4.4v4.4M13.6 2.4 7.6 8.4' }],
+      ['path', { d: 'M12 9.6v3a1.6 1.6 0 0 1-1.6 1.6h-7a1.6 1.6 0 0 1-1.6-1.6v-7A1.6 1.6 0 0 1 3.4 4h3' }],
+    ],
+    down: [['path', { d: 'M8 2.8v9.4M4.4 8.6 8 12.2l3.6-3.6' }]],
+    copy: [
+      ['rect', { x: 5.6, y: 5.6, width: 8, height: 8, rx: 1.6 }],
+      ['path', { d: 'M10.4 5.6v-2A1.6 1.6 0 0 0 8.8 2H3.4a1.6 1.6 0 0 0-1.6 1.6V9a1.6 1.6 0 0 0 1.6 1.6h2.2' }],
+    ],
+    close: [['path', { d: 'm4.2 4.2 7.6 7.6M11.8 4.2l-7.6 7.6' }]],
+    history: [
+      ['path', { d: 'M8 4.6V8l2.6 1.6' }],
+      ['path', { d: 'M2.6 8a5.4 5.4 0 1 0 1.7-3.9' }],
+      ['path', { d: 'M2 2.6v3h3' }],
+    ],
+  };
+
+  /** Um <svg> no estilo do app. `cls` extra para tamanhos especiais. */
+  function icon(name, cls) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    const base = {
+      viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+      'stroke-width': '1.4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+      'aria-hidden': 'true', class: 'ico' + (cls ? ' ' + cls : ''),
+    };
+    for (const k in base) svg.setAttribute(k, base[k]);
+    (ICONS[name] || []).forEach(([tag, attrs]) => {
+      const node = document.createElementNS(SVG_NS, tag);
+      for (const k in attrs) node.setAttribute(k, String(attrs[k]));
+      svg.appendChild(node);
+    });
+    return svg;
+  }
+
+  /** Ícone + texto num elemento; o gap do flex cuida do espaçamento. */
+  function withIcon(el, name, text) {
+    el.replaceChildren(icon(name), document.createTextNode(text));
+    return el;
+  }
+
+  const KINDS = ['decision', 'action', 'risk', 'question'];
+  const KIND_LABEL = { decision: 'Decisão', action: 'Ação', risk: 'Risco', question: 'Pergunta' };
+
+  let dto = null;             // último CopilotDto do Rust
+  let filter = 'all';
+  let showDiscarded = false;
+  let searchTerm = '';
+  let provisionalEl = null;   // a legenda provisória em cena (some quando o bloco fecha)
+  let stick = true;           // rolar sozinho só enquanto o usuário está no fim
+  let notesTimer = null;
+  let notesBefore = null;     // texto anterior ao "enriquecer" (para desfazer)
+  let chatBusy = false;
+  let liveReply = null;       // resposta em streaming: { id, el|target, buf }
+  const streamId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  let clockAnchor = null;     // { secs, at } para o cronômetro andar entre eventos
+
+  // ----------------------------------------------------------- utilidades
+  const announce = (msg) => { $('live-announce').textContent = msg; };
+
+  /** Pinta as ocorrências do termo sem innerHTML: o texto vem do Whisper e
+   *  pode conter "<", que viraria marcação. Só nós criamos nós aqui. */
+  function paintText(node, raw, term) {
+    node.replaceChildren();
+    if (!term) { node.textContent = raw; return false; }
+    const hay = raw.toLowerCase();
+    let i = 0, from = 0, found = false;
+    while ((i = hay.indexOf(term, from)) !== -1) {
+      found = true;
+      if (i > from) node.appendChild(document.createTextNode(raw.slice(from, i)));
+      const m = document.createElement('mark');
+      m.textContent = raw.slice(i, i + term.length);
+      node.appendChild(m);
+      from = i + term.length;
+    }
+    if (from < raw.length) node.appendChild(document.createTextNode(raw.slice(from)));
+    return found;
+  }
+
+  // ------------------------------------------------------ disposição
+  // `userView` é a escolha deliberada do usuário; `applyView` é o que cabe na
+  // largura atual. Sem essa separação, encolher a janela uma vez trocava a
+  // preferência para sempre e "Dividido" nunca mais voltava.
+  let userView = 'split';
+  const narrow = matchMedia('(max-width: 720px)');
+
+  function applyView() {
+    const mode = (narrow.matches && userView === 'split') ? 'copilot' : userView;
+    document.body.classList.remove('view-split', 'view-transcript', 'view-copilot');
+    document.body.classList.add('view-' + mode);
+    // O botão marcado é o que está valendo na tela, não a preferência
+    // guardada: ver "Dividido" aceso com uma coluna só seria mentira.
+    $('v-trans').setAttribute('aria-pressed', String(mode === 'transcript'));
+    $('v-split').setAttribute('aria-pressed', String(mode === 'split'));
+    $('v-copilot').setAttribute('aria-pressed', String(mode === 'copilot'));
+    $('v-split').disabled = narrow.matches;
+    $('v-split').title = narrow.matches
+      ? 'Dividido — a janela está estreita demais para duas colunas'
+      : 'Dividido — fala e decisões lado a lado';
+  }
+
+  function setView(mode) {
+    userView = mode;
+    try { localStorage.setItem('copilot.view', mode); } catch (_) {}
+    applyView();
+  }
+  $('v-trans').addEventListener('click', () => setView('transcript'));
+  $('v-split').addEventListener('click', () => setView('split'));
+  $('v-copilot').addEventListener('click', () => setView('copilot'));
+  narrow.addEventListener('change', applyView);
+
+  // ------------------------------------------------------------- abas
+  const tabs = Array.from(document.querySelectorAll('.c-tab'));
+  function selectTab(name) {
+    tabs.forEach((t) => {
+      const on = t.dataset.tab === name;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      const view = $('view-' + t.dataset.tab);
+      view.classList.toggle('on', on);
+      view.hidden = !on;
+    });
+    if (name === 'chat') $('chat-input').focus();
+    if (name === 'notes') $('notes-input').focus();
+  }
+  tabs.forEach((t) => t.addEventListener('click', () => selectTab(t.dataset.tab)));
+  // Setas entre abas: o padrão ARIA que faltava.
+  $('view-cards').parentElement.querySelector('.copilot-tabs')
+    .addEventListener('keydown', (e) => {
+      const i = tabs.findIndex((t) => t.getAttribute('aria-selected') === 'true');
+      let n = -1;
+      if (e.key === 'ArrowRight') n = (i + 1) % tabs.length;
+      else if (e.key === 'ArrowLeft') n = (i - 1 + tabs.length) % tabs.length;
+      else if (e.key === 'Home') n = 0;
+      else if (e.key === 'End') n = tabs.length - 1;
+      if (n < 0) return;
+      e.preventDefault();
+      selectTab(tabs[n].dataset.tab);
+      tabs[n].focus();
+    });
+
+  // -------------------------------------------------- transcrição viva
+  const stream = $('stream-list');
+  stream.addEventListener('scroll', () => {
+    stick = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 48;
+    $('jump-live').hidden = stick;
+  });
+  $('jump-live').addEventListener('click', () => {
+    stick = true;
+    $('jump-live').hidden = true;
+    stream.scrollTop = stream.scrollHeight;
+  });
+
+  function buildSegment(seg) {
+    const item = document.createElement('div');
+    item.className = 'stream-item' + (seg.provisional ? ' provisional' : '');
+    item.dataset.at = String(seg.start_secs || 0);
+
+    const meta = document.createElement('div');
+    meta.className = 'stream-meta';
+    const sp = document.createElement('span');
+    sp.className = 'speaker-tag ' + (seg.speaker === 'Eu' ? 'speaker-me' : 'speaker-others');
+    sp.textContent = seg.speaker;
+    meta.appendChild(sp);
+    const time = document.createElement('span');
+    time.className = 'stream-time';
+    time.textContent = UI.fmtClock(seg.start_secs || 0);
+    meta.appendChild(time);
+    item.appendChild(meta);
+
+    const text = document.createElement('div');
+    text.className = 'stream-text';
+    text.dataset.raw = seg.text || '';
+    paintText(text, seg.text || '', searchTerm);
+    item.appendChild(text);
+    return item;
+  }
+
+  function addSegment(seg) {
+    $('trans-empty').hidden = true;
+    // A provisória é sempre substituída — antes o bloco final era acrescentado
+    // por cima dela e a mesma frase aparecia duas vezes.
+    if (provisionalEl) { provisionalEl.remove(); provisionalEl = null; }
+    const el = buildSegment(seg);
+    stream.appendChild(el);
+    if (seg.provisional) provisionalEl = el;
+    if (searchTerm) applySearch();
+    if (stick) stream.scrollTop = stream.scrollHeight;
+    else $('jump-live').hidden = false;
+  }
+
+  function applySearch() {
+    let hits = 0;
+    stream.querySelectorAll('.stream-item').forEach((el) => {
+      const node = el.querySelector('.stream-text');
+      const raw = node.dataset.raw || '';
+      const found = paintText(node, raw, searchTerm);
+      if (searchTerm && found) hits++;
+      el.classList.toggle('hit-out', !!searchTerm && !found);
+    });
+    $('search-count').textContent = searchTerm ? (hits + (hits === 1 ? ' fala' : ' falas')) : '';
+  }
+  $('trans-search').addEventListener('input', (e) => {
+    searchTerm = e.target.value.trim().toLowerCase();
+    applySearch();
+  });
+  $('trans-search').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.target.value = ''; searchTerm = ''; applySearch(); e.target.blur(); }
+  });
+
+  function jumpTo(atSecs) {
+    // A coluna da fala pode estar escondida (sidecar ou "só decisões").
+    if (document.body.classList.contains('view-copilot')) {
+      setView(narrow.matches ? 'transcript' : 'split');
+    }
+    const items = Array.from(stream.querySelectorAll('.stream-item'));
+    const target = items.find((el) => Number(el.dataset.at) >= atSecs - 1) || items[items.length - 1];
+    if (!target) return;
+    stick = false;
+    target.scrollIntoView({ block: 'center' });
+    target.classList.add('flash');
+    setTimeout(() => target.classList.remove('flash'), 1400);
+  }
+
+  $('btn-mark').addEventListener('click', async () => {
+    try {
+      const at = await invoke('mark_moment_cmd');
+      UI.toast('momento marcado em ' + UI.fmtClock(at || 0), 'ok', 1800);
+    } catch (e) { UI.toast(String(e), 'err'); }
+  });
+
+  // ------------------------------------------------------ faixa de estado
+  function renderStatus(d) {
+    const strip = $('status-strip'), text = $('status-text'),
+          spin = $('status-spin'), action = $('status-action');
+    strip.className = 'status-strip';
+    spin.hidden = true; action.hidden = true; strip.hidden = false;
+
+    if (!d.configured) {
+      strip.classList.add('warn');
+      text.textContent = 'Sem provider de IA configurado — o Copilot não consegue analisar a conversa.';
+      action.hidden = false;
+      action.textContent = 'Abrir Configurações';
+      action.onclick = () => invoke('open_settings_window').catch((e) => UI.toast(String(e), 'err'));
+      return;
+    }
+    if (d.error) {
+      strip.classList.add('err');
+      text.textContent = 'A última análise falhou: ' + d.error;
+      action.hidden = false;
+      action.textContent = 'Tentar de novo';
+      action.onclick = () => $('btn-analyze').click();
+      return;
+    }
+    if (d.running) {
+      spin.hidden = false;
+      text.textContent = d.last_trigger
+        ? 'Analisando — ' + d.last_trigger + '…'
+        : 'Analisando a conversa…';
+      return;
+    }
+    if (!d.meeting_active) {
+      text.textContent = 'Nenhuma reunião em andamento. Inicie a gravação para o Copilot acompanhar.';
+      return;
+    }
+    if (d.dynamics_note) {
+      strip.classList.add('warn');
+      text.textContent = d.dynamics_note;
+      return;
+    }
+    if (d.last_updated) {
+      text.textContent = 'Acompanhando a conversa · última leitura às ' + d.last_updated;
+      return;
+    }
+    strip.hidden = true;
+  }
+
+  function renderMetrics(m) {
+    const total = (m.me_talk_secs || 0) + (m.others_talk_secs || 0);
+    if (total < 4) {
+      $('meter-me').style.width = '50%';
+      $('meter-others').style.width = '50%';
+      $('meter-label').textContent = '—';
+      $('meter-img').setAttribute('aria-label', 'tempo de fala ainda insuficiente para medir');
+      $('talk-meter').classList.remove('text-warn');
+      return;
+    }
+    const me = Math.round((m.me_talk_secs / total) * 100);
+    $('meter-me').style.width = me + '%';
+    $('meter-others').style.width = (100 - me) + '%';
+    $('meter-label').textContent = me + '% / ' + (100 - me) + '%';
+    $('meter-warn').hidden = !m.monologue;
+    $('meter-img').setAttribute('aria-label', 'você falou ' + me + ' por cento do tempo');
+    $('talk-meter').classList.toggle('text-warn', !!m.monologue);
+    $('talk-meter').title = m.monologue
+      ? 'Você está falando há alguns minutos sem pausa — talvez seja hora de abrir espaço.'
+      : 'Tempo de fala acumulado: você vs. os participantes';
+  }
+
+  // ------------------------------------------------------------- cards
+  function cardEl(card) {
+    const el = document.createElement('article');
+    el.className = 'card-item card-' + card.kind
+      + (card.status === 'confirmed' ? ' is-confirmed' : '')
+      + (card.status === 'discarded' ? ' is-discarded' : '');
+
+    const top = document.createElement('div');
+    top.className = 'card-top';
+    const tag = document.createElement('span');
+    tag.className = 'card-kind-tag kind-' + card.kind;
+    tag.textContent = KIND_LABEL[card.kind] || card.kind;
+    top.appendChild(tag);
+
+    if (card.urgency === 'high' && card.status !== 'discarded') {
+      const u = document.createElement('span');
+      u.className = 'urgency-high';
+      withIcon(u, 'alert', 'urgente');
+      top.appendChild(u);
+    }
+    if (card.status === 'confirmed') {
+      const ok = document.createElement('span');
+      ok.className = 'chip chip-ok';
+      withIcon(ok, 'check', 'na ata');
+      ok.title = 'Vai entrar no arquivo da reunião quando a gravação terminar';
+      top.appendChild(ok);
+    }
+
+    const at = document.createElement('button');
+    at.className = 'card-at';
+    at.type = 'button';
+    at.textContent = UI.fmtClock(card.at_secs || 0);
+    at.title = 'Ir para ' + at.textContent + ' na transcrição';
+    at.addEventListener('click', () => jumpTo(card.at_secs || 0));
+    top.appendChild(at);
+    el.appendChild(top);
+
+    const title = document.createElement('h3');
+    title.className = 'card-title';
+    title.textContent = card.title;
+    el.appendChild(title);
+
+    if (card.description) {
+      const desc = document.createElement('p');
+      desc.className = 'card-desc';
+      desc.textContent = card.description;
+      el.appendChild(desc);
+    }
+
+    const noDue = card.kind === 'action'
+      && (!card.due_date || /sem prazo|não definido|nao definido/i.test(card.due_date));
+    if (card.owner || card.kind === 'action') {
+      const row = document.createElement('div');
+      row.className = 'card-meta-row';
+      if (card.owner) {
+        const p = document.createElement('span');
+        p.className = 'card-pill';
+        withIcon(p, 'person', card.owner);
+        row.appendChild(p);
+      }
+      if (card.kind === 'action') {
+        const p = document.createElement('span');
+        p.className = 'card-pill' + (noDue ? ' alert' : '');
+        withIcon(p, noDue ? 'alert' : 'calendar',
+          noDue ? 'prazo em aberto' : card.due_date);
+        row.appendChild(p);
+      }
+      el.appendChild(row);
+    }
+
+    const acts = document.createElement('div');
+    acts.className = 'card-actions';
+    const act = (label, cls, action, title, ico) => {
+      const b = document.createElement('button');
+      b.className = 'card-act-btn ' + cls;
+      b.type = 'button';
+      if (ico) withIcon(b, ico, label);
+      else b.textContent = label;
+      if (title) b.title = title;
+      b.addEventListener('click', () => cardAction(card.id, action));
+      acts.appendChild(b);
+    };
+    if (card.status === 'proposed') {
+      act('Confirmar', 'act-confirm', 'confirm', 'Confirmar — marca como validado e leva para a ata da reunião', 'check');
+      act('Descartar', 'act-discard', 'discard', 'Descartar — some do feed e a IA para de sugerir de novo', 'close');
+    } else {
+      act('Desfazer', '', 'reset', 'Desfazer — volta o card para a fila', 'undo');
+    }
+    const copy = document.createElement('button');
+    copy.className = 'card-act-btn';
+    copy.type = 'button';
+    withIcon(copy, 'copy', 'Copiar');
+    copy.addEventListener('click', async () => {
+      const parts = [(KIND_LABEL[card.kind] || card.kind) + ': ' + card.title];
+      if (card.description) parts.push(card.description);
+      if (card.owner) parts.push('Responsável: ' + card.owner);
+      if (card.due_date) parts.push('Prazo: ' + card.due_date);
+      try {
+        await navigator.clipboard.writeText(parts.join('\n'));
+        UI.flash(copy, 'copiado', 'ok', 1200);
+      } catch (_) { UI.toast('não consegui copiar', 'err'); }
+    });
+    acts.appendChild(copy);
+    el.appendChild(acts);
+    return el;
+  }
+
+  /// Card de memória: uma reunião anterior que falou do mesmo assunto.
+  function memoryEl(m) {
+    const el = document.createElement('article');
+    el.className = 'card-item card-memory';
+
+    const top = document.createElement('div');
+    top.className = 'card-top';
+    const tag = document.createElement('span');
+    tag.className = 'card-kind-tag kind-memory';
+    withIcon(tag, 'history', 'Memória');
+    top.appendChild(tag);
+    const when = document.createElement('span');
+    when.className = 'memory-source';
+    when.textContent = m.started_at + (m.at_secs != null ? ' · ' + UI.fmtClock(m.at_secs) : '');
+    top.appendChild(when);
+    el.appendChild(top);
+
+    const title = document.createElement('h3');
+    title.className = 'card-title';
+    title.textContent = m.title;
+    el.appendChild(title);
+
+    const desc = document.createElement('p');
+    desc.className = 'card-desc';
+    desc.textContent = '“' + m.snippet + '”';
+    el.appendChild(desc);
+
+    const acts = document.createElement('div');
+    acts.className = 'card-actions';
+    const abrir = document.createElement('button');
+    abrir.className = 'card-act-btn';
+    abrir.type = 'button';
+    withIcon(abrir, 'open', 'Abrir reunião');
+    abrir.title = 'Abrir reunião — ver esta conversa inteira na Biblioteca';
+    abrir.addEventListener('click', () => {
+      invoke('open_library_window', { meeting: m.meeting_id })
+        .catch((e) => UI.toast(String(e), 'err'));
+    });
+    acts.appendChild(abrir);
+
+    const sair = document.createElement('button');
+    sair.className = 'card-act-btn act-discard';
+    sair.type = 'button';
+    withIcon(sair, 'close', 'Dispensar');
+    sair.title = 'Dispensar — não mostrar esta reunião de novo nesta chamada';
+    sair.addEventListener('click', () => {
+      invoke('copilot_dismiss_memory', { memoryId: m.id })
+        .catch((e) => UI.toast(String(e), 'err'));
+    });
+    acts.appendChild(sair);
+    el.appendChild(acts);
+    return el;
+  }
+
+  function renderCards(d) {
+    const all = d.cards || [];
+    const live = all.filter((c) => c.status !== 'discarded');
+    const discarded = all.filter((c) => c.status === 'discarded');
+    const memories = d.memories || [];
+
+    // A aba chama-se "Decisões", então conta cards; o chip "Tudo" conta o
+    // que aparece no feed, memórias incluídas. São medidas diferentes.
+    $('cards-count').textContent = String(live.length);
+    $('n-all').textContent = String(live.length + memories.length);
+    $('n-memory').textContent = String(memories.length);
+    KINDS.forEach((k) => { $('n-' + k).textContent = String(live.filter((c) => c.kind === k).length); });
+
+    let shown = filter === 'all' || filter === 'memory' ? [] : live.filter((c) => c.kind === filter);
+    if (filter === 'all') shown = live.slice();
+    if (showDiscarded) shown = shown.concat(filter === 'all' ? discarded : discarded.filter((c) => c.kind === filter));
+
+    // Descartados no fim; o resto por urgência e, empatando, na ordem em que
+    // a conversa produziu. Confirmar um card não muda o lugar dele — ver a
+    // lista pular embaixo do cursor é desagradável.
+    const rank = { high: 0, medium: 1, low: 2 };
+    const out = (c) => (c.status === 'discarded' ? 1 : 0);
+    shown = shown.slice().sort((a, b) =>
+      (out(a) - out(b))
+      || ((rank[a.urgency] ?? 1) - (rank[b.urgency] ?? 1))
+      || ((a.at_secs || 0) - (b.at_secs || 0)));
+
+    // As memórias vêm antes: são contexto que muda como você lê o resto.
+    const mostrarMem = filter === 'all' || filter === 'memory';
+    const nos = (mostrarMem ? memories.map(memoryEl) : []).concat(shown.map(cardEl));
+    $('cards-items').replaceChildren(...nos);
+
+    // O vazio é irmão da lista, nunca filho: antes o replaceChildren apagava
+    // o próprio nó do estado vazio e ele nunca mais voltava.
+    const empty = $('cards-empty');
+    empty.hidden = nos.length > 0;
+    if (!nos.length) {
+      const t = $('cards-empty-title'), p = $('cards-empty-text');
+      if (!d.configured) {
+        t.textContent = 'Falta configurar a IA';
+        p.textContent = 'Escolha um provider e informe a chave em Configurações → Inteligência. A transcrição continua 100% local; só o texto vai para a análise.';
+      } else if (!d.meeting_active) {
+        t.textContent = 'Nenhuma reunião em andamento';
+        p.textContent = 'Inicie a gravação pelo Início, pelo indicador flutuante ou pela bandeja — o Copilot entra junto.';
+      } else if (filter === 'memory') {
+        t.textContent = 'Nenhuma reunião anterior sobre isto';
+        p.textContent = 'Quando o assunto de agora aparecer em alguma reunião já gravada, ela surge aqui. Depende da busca semântica estar ligada em Configurações → Inteligência.';
+      } else if (live.length && filter !== 'all') {
+        t.textContent = 'Nada deste tipo ainda';
+        p.textContent = 'Há outros cards no feed. Toque em “Tudo” para ver todos.';
+      } else {
+        t.textContent = 'Ouvindo a conversa';
+        p.textContent = 'Assim que um acordo for firmado, uma tarefa for combinada ou uma objeção ficar sem resposta, o card aparece aqui.';
+      }
+    }
+
+    const footer = $('feed-footer');
+    footer.hidden = all.length === 0;
+    $('btn-copy-all').hidden = !live.some((c) => c.status === 'confirmed');
+    const btnD = $('btn-show-discarded');
+    btnD.hidden = discarded.length === 0;
+    btnD.textContent = (showDiscarded ? 'Ocultar' : 'Mostrar') + ' descartados (' + discarded.length + ')';
+    btnD.setAttribute('aria-pressed', String(showDiscarded));
+  }
+
+  async function cardAction(cardId, action) {
+    try {
+      await invoke('copilot_card_action', { cardId, action });
+      if (action === 'confirm') announce('card confirmado e marcado para a ata');
+    } catch (e) { UI.toast(String(e), 'err'); }
+  }
+
+  document.querySelectorAll('.filter-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      filter = chip.dataset.filter;
+      document.querySelectorAll('.filter-chip').forEach((c) => {
+        c.setAttribute('aria-pressed', String(c.dataset.filter === filter));
+      });
+      if (dto) renderCards(dto);
+    });
+  });
+
+  $('btn-show-discarded').addEventListener('click', () => {
+    showDiscarded = !showDiscarded;
+    if (dto) renderCards(dto);
+  });
+
+  $('btn-copy-all').addEventListener('click', async () => {
+    const ok = (dto.cards || []).filter((c) => c.status === 'confirmed');
+    const txt = ok.map((c) => {
+      let s = '- [' + (KIND_LABEL[c.kind] || c.kind) + '] ' + c.title;
+      if (c.description) s += ' — ' + c.description;
+      const meta = [];
+      if (c.owner) meta.push('responsável: ' + c.owner);
+      if (c.due_date) meta.push('prazo: ' + c.due_date);
+      if (meta.length) s += ' (' + meta.join(' · ') + ')';
+      return s;
+    }).join('\n');
+    try {
+      await navigator.clipboard.writeText(txt);
+      UI.toast('decisões validadas copiadas', 'ok');
+    } catch (_) { UI.toast('não consegui copiar', 'err'); }
+  });
+
+  // ------------------------------------------------------- render geral
+  function render(d) {
+    const first = dto === null;
+    dto = d;
+
+    $('meeting-badge').classList.toggle('active', d.meeting_active);
+    $('meeting-dot').className = 'dot' + (d.meeting_active ? ' bad pulse' : '');
+    $('meeting-status-label').textContent = d.meeting_active ? 'Gravando' : 'Aguardando reunião';
+    $('spark').classList.toggle('live', d.meeting_active);
+    $('meeting-clock').hidden = !d.meeting_active;
+    $('btn-analyze').disabled = !d.meeting_active || !d.configured || d.running;
+    $('btn-mark').disabled = !d.meeting_active;
+    $('topic-text').textContent = d.active_topic || 'Em andamento';
+
+    renderStatus(d);
+    renderMetrics(d);
+    renderCards(d);
+
+    // O bloco de notas é do usuário: só recebe texto do Rust na abertura da
+    // janela. Sobrescrever depois apagaria o que ele estivesse digitando.
+    if (first && d.scratchpad && !$('notes-input').value) {
+      $('notes-input').value = d.scratchpad;
+    }
+    if (typeof d.elapsed_secs === 'number') {
+      clockAnchor = { secs: d.elapsed_secs, at: Date.now() };
+      tickClock();
+    }
+  }
+
+  // --------------------------------------------------------- cronômetro
+  // O Rust manda o tempo decorrido junto com cada evento; entre um e outro a
+  // tela anda sozinha a partir desse marco.
+  function tickClock() {
+    if (!clockAnchor || !dto || !dto.meeting_active) return;
+    const secs = clockAnchor.secs + (Date.now() - clockAnchor.at) / 1000;
+    $('meeting-clock').textContent = UI.fmtClock(secs);
+  }
+  setInterval(tickClock, 1000);
+
+  $('btn-analyze').addEventListener('click', async () => {
+    const btn = $('btn-analyze');
+    UI.busy(btn, true, 'Analisando…');
+    try { await invoke('copilot_analyze_now'); }
+    catch (e) { UI.toast(String(e), 'err'); }
+    finally { UI.busy(btn, false); }
+  });
+
+  // Sempre por cima: o que faz o HUD valer ao lado do Teams.
+  $('btn-pin').addEventListener('click', async () => {
+    const btn = $('btn-pin');
+    const on = btn.getAttribute('aria-pressed') !== 'true';
+    try {
+      await invoke('copilot_set_always_on_top', { on });
+      btn.setAttribute('aria-pressed', String(on));
+      UI.toast(on ? 'Copilot fixado por cima das outras janelas' : 'Copilot desafixado', 'ok', 1600);
+    } catch (e) { UI.toast(String(e), 'err'); }
+  });
+
+  // ----------------------------------------------------------- chat Q&A
+  const chatInput = $('chat-input');
+  chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 96) + 'px';
+  });
+
+  function bubble(cls) {
+    const b = document.createElement('div');
+    b.className = 'chat-bubble ' + cls;
+    $('chat-messages').appendChild(b);
+    return b;
+  }
+
+  /// Pinta o texto em parágrafos. `live` marca o último com o cursor piscando.
+  function paintReply(el, text, live) {
+    el.replaceChildren();
+    const parts = String(text).split(/\n{2,}/);
+    parts.forEach((p, i) => {
+      const node = document.createElement('p');
+      node.textContent = p.trim();
+      if (live && i === parts.length - 1) node.classList.add('streaming');
+      el.appendChild(node);
+    });
+  }
+
+  async function sendChat() {
+    if (chatBusy) return;
+    const q = chatInput.value.trim();
+    if (!q) return;
+
+    chatBusy = true;
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    chatInput.disabled = true;
+    UI.busy($('chat-send'), true, '…');
+
+    bubble('chat-user').textContent = q;
+    const ai = bubble('chat-ai');
+    const dots = document.createElement('span');
+    dots.className = 'typing';
+    dots.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
+    ai.appendChild(dots);
+    const box = $('chat-messages');
+    box.scrollTop = box.scrollHeight;
+
+    // O id amarra os pedaços a ESTA pergunta: um token atrasado de uma
+    // pergunta anterior não pode cair no balão novo.
+    const id = streamId('q');
+    liveReply = { id, el: ai, buf: '', box };
+
+    try {
+      const reply = await invoke('copilot_query', { question: q, streamId: id });
+      paintReply(ai, reply, false);
+    } catch (e) {
+      ai.replaceChildren();
+      ai.classList.add('is-err');
+      // Se o modelo chegou a dizer algo antes de falhar, não jogue fora.
+      ai.textContent = liveReply.buf
+        ? liveReply.buf + '\n\n(interrompido: ' + e + ')'
+        : String(e);
+    } finally {
+      liveReply = null;
+      chatBusy = false;
+      chatInput.disabled = false;
+      UI.busy($('chat-send'), false);
+      box.scrollTop = box.scrollHeight;
+      chatInput.focus();
+    }
+  }
+  $('chat-send').addEventListener('click', sendChat);
+  chatInput.addEventListener('keydown', (e) => {
+    // Enter envia; Shift+Enter quebra linha — o esperado num campo de chat.
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+
+  // -------------------------------------------------------- scratchpad
+  const notes = $('notes-input');
+  notes.addEventListener('input', () => {
+    $('btn-undo-enrich').hidden = true;
+    notesBefore = null;
+    $('notes-status').textContent = 'editando…';
+    clearTimeout(notesTimer);
+    // Guardar a cada tecla seria uma IPC por caractere; 600 ms cobre a pausa
+    // natural da digitação e garante que nada se perca ao fechar a janela.
+    notesTimer = setTimeout(async () => {
+      try {
+        await invoke('copilot_save_scratchpad', { text: notes.value });
+        $('notes-status').textContent = 'salvo';
+      } catch (_) { $('notes-status').textContent = 'não consegui salvar'; }
+    }, 600);
+  });
+  window.addEventListener('beforeunload', () => {
+    invoke('copilot_save_scratchpad', { text: notes.value }).catch(() => {});
+  });
+
+  $('btn-enrich').addEventListener('click', async () => {
+    const raw = notes.value.trim();
+    if (!raw) { UI.toast('escreva algumas anotações primeiro', 'err'); notes.focus(); return; }
+    const btn = $('btn-enrich');
+    UI.busy(btn, true, 'Enriquecendo…');
+
+    // O texto reescrito vai substituindo o original enquanto chega. Guardamos
+    // o anterior antes da primeira letra: se falhar no meio, ele volta.
+    const antes = notes.value;
+    const id = streamId('n');
+    liveReply = { id, target: notes, buf: '' };
+    notes.readOnly = true;
+    clearTimeout(notesTimer);   // o autosave não pode gravar um texto pela metade
+    $('notes-status').textContent = 'escrevendo…';
+
+    try {
+      const enriched = await invoke('copilot_enrich_notes', { rawNotes: raw, streamId: id });
+      notesBefore = antes;
+      notes.value = enriched;
+      $('btn-undo-enrich').hidden = false;
+      $('notes-status').textContent = 'enriquecido com as falas da reunião';
+      await invoke('copilot_save_scratchpad', { text: enriched });
+    } catch (e) {
+      notes.value = antes;      // nada de deixar o texto do usuário pela metade
+      notesBefore = null;
+      $('notes-status').textContent = '';
+      UI.toast(String(e), 'err');
+    } finally {
+      liveReply = null;
+      notes.readOnly = false;
+      UI.busy(btn, false);
+    }
+  });
+
+  $('btn-undo-enrich').addEventListener('click', async () => {
+    if (notesBefore === null) return;
+    notes.value = notesBefore;
+    notesBefore = null;
+    $('btn-undo-enrich').hidden = true;
+    $('notes-status').textContent = 'voltou ao texto anterior';
+    try { await invoke('copilot_save_scratchpad', { text: notes.value }); } catch (_) {}
+  });
+
+  // ------------------------------------------------------------ atalhos
+  document.addEventListener('keydown', (e) => {
+    const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if (e.key === '/' && !typing) { e.preventDefault(); $('trans-search').focus(); return; }
+    if (!e.ctrlKey) return;
+    if (e.key === '1') { e.preventDefault(); selectTab('cards'); }
+    else if (e.key === '2') { e.preventDefault(); selectTab('chat'); }
+    else if (e.key === '3') { e.preventDefault(); selectTab('notes'); }
+  });
+
+  // ------------------------------------------------------------ eventos
+  // Streaming: o Rust manda pedaços de resposta conforme o modelo escreve.
+  listen('isper-copilot-token', (e) => {
+    const p = e.payload;
+    if (!p || !liveReply || p.id !== liveReply.id) return;  // pedaço de um pedido já encerrado
+    liveReply.buf += p.chunk;
+    if (liveReply.target) {
+      liveReply.target.value = liveReply.buf;
+      liveReply.target.scrollTop = liveReply.target.scrollHeight;
+    } else {
+      paintReply(liveReply.el, liveReply.buf, true);        // tira os pontinhos na 1ª letra
+      liveReply.box.scrollTop = liveReply.box.scrollHeight;
+    }
+  });
+  listen('isper-copilot', (e) => { if (e.payload) render(e.payload); });
+  listen('isper-copilot-metrics', (e) => {
+    if (!e.payload) return;
+    renderMetrics(e.payload);
+    if (typeof e.payload.elapsed_secs === 'number') {
+      clockAnchor = { secs: e.payload.elapsed_secs, at: Date.now() };
+    }
+  });
+  listen('isper-live', (e) => { if (e.payload) addSegment(e.payload); });
+  listen('isper-state', (e) => {
+    const p = e.payload || {};
+    if (p.state === 'meeting') {
+      // Reunião nova: a tela recomeça limpa.
+      stream.querySelectorAll('.stream-item').forEach((el) => el.remove());
+      provisionalEl = null;
+      $('trans-empty').hidden = false;
+      stick = true;
+    }
+    invoke('copilot_get_state').then(render).catch(() => {});
+  });
+
+  // -------------------------------------------------------- inicialização
+  try {
+    const saved = localStorage.getItem('copilot.view');
+    userView = ['split', 'transcript', 'copilot'].includes(saved) ? saved : 'split';
+  } catch (_) { userView = 'split'; }
+  applyView();
+  selectTab('cards');
+
+  invoke('copilot_get_state').then(render).catch(() => {});
+  invoke('live_transcript').then((segs) => {
+    if (Array.isArray(segs)) segs.forEach(addSegment);
+  }).catch(() => {});
+</script>
+</body>
+</html>

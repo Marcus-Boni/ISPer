@@ -32,6 +32,12 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
         drop(slot);
         *state.meeting_started.lock_or_recover() = None;
         stop_insights_loop(app);
+        stop_copilot_loop(app);
+        // Lido AGORA, com a reunião que acabou ainda no ar. `finish_meeting`
+        // roda numa thread e ainda espera o worker do Whisper terminar —
+        // começar outra reunião nesse intervalo zeraria os cards, e a ata
+        // desta aqui sairia sem as decisões que você validou.
+        let decisions = confirmed_cards(app);
         on_meeting_stopped(app);
         set_meeting_text(app, &meeting_item_text(app, false));
         set_tray_recording(app, false);
@@ -40,7 +46,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
         show_overlay(app);
         let app = app.clone();
         std::thread::spawn(move || {
-            match finish_meeting(&app, handle) {
+            match finish_meeting(&app, handle, decisions) {
                 Ok(path) => {
                     tracing::info!("reunião salva em {path}");
                     let _ = app.emit("isper-state", json!({"state": "meeting-done"}));
@@ -87,6 +93,12 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             }
         }
         let _ = live_app.emit("isper-live", &item);
+        on_live_segment(
+            &live_app,
+            &item.speaker,
+            item.end_secs - item.start_secs,
+            &item.text,
+        );
     });
     // Legenda provisória (buffer ainda aberto): só para a tela — não entra na
     // lista guardada; o bloco final chega em segundos e a substitui.
@@ -143,6 +155,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             show_overlay(app);
             // Insights ao vivo (se ligados): rodadas periódicas sobre o transcript.
             reset_insights(app);
+            reset_copilot(app);
             Ok(())
         }
         Err(e) => {
@@ -168,7 +181,11 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
 /// arquivo. A diarização (quem falou o quê) roda DEPOIS, em segundo plano:
 /// na CPU ela leva ~40% da duração da reunião — bloquear o fim da reunião
 /// por isso fazia ninguém esperar, e os rótulos ficavam genéricos para sempre.
-pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::Result<String> {
+pub(crate) fn finish_meeting(
+    app: &AppHandle,
+    handle: MeetingHandle,
+    decisions: Vec<isper_llm::CopilotCard>,
+) -> anyhow::Result<String> {
     let result = handle.stop()?;
     if result.segments.is_empty() {
         anyhow::bail!("nenhuma fala detectada na reunião");
@@ -183,7 +200,14 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
         taken.sort_by(|a, b| a.total_cmp(b));
         taken
     };
-    let md = meeting::to_markdown(&title, &started_at, &result, &moments);
+    // `decisions` vem pronto de quem encerrou a reunião (ver toggle_meeting):
+    // relê-lo aqui seria tarde demais.
+    let decisions_md = isper_llm::render_decisions_markdown(&decisions);
+    let mut md = meeting::to_markdown(&title, &started_at, &result, &moments);
+    if let Some(d) = decisions_md.as_deref() {
+        md.push_str("\n---\n\n");
+        md.push_str(d);
+    }
 
     // O transcript é salvo ANTES do resumo: se a API falhar, nada se perde.
     let docs = meetings_dir()?;
@@ -201,6 +225,16 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
         && let Err(e) = store.save_moments(meeting_id, &moments)
     {
         tracing::warn!("não consegui guardar os momentos marcados: {e}");
+    }
+    // Aba "Decisões" da Biblioteca: o Copilot é de memória e some com a
+    // reunião, então o que você validou precisa virar linha no banco.
+    if !decisions.is_empty() {
+        let rows = stored_decisions(&decisions);
+        if let Err(e) = store.save_decisions(meeting_id, &rows) {
+            tracing::warn!("não consegui guardar as decisões do Copilot: {e}");
+        } else {
+            tracing::info!(n = rows.len(), "decisões do Copilot guardadas");
+        }
     }
 
     // Fase 5: título + resumo por IA de nuvem, numa chamada — só o TEXTO do
@@ -241,8 +275,12 @@ pub(crate) fn finish_meeting(app: &AppHandle, handle: MeetingHandle) -> anyhow::
                         result.duration_secs,
                         &refs,
                         Some(&format!(
-                            "{}\n\n_Resumo gerado via {} ({})._",
+                            "{}{}\n\n_Resumo gerado via {} ({})._",
                             summary.body.trim(),
+                            decisions_md
+                                .as_deref()
+                                .map(|d| format!("\n\n{d}"))
+                                .unwrap_or_default(),
                             provider.name(),
                             provider.model()
                         )),

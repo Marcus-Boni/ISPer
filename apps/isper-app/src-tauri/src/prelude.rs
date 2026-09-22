@@ -9,6 +9,7 @@ pub(crate) use serde_json::json;
 pub(crate) use tauri::{AppHandle, Emitter, Manager};
 
 pub(crate) use crate::calls::*;
+pub(crate) use crate::copilot::*;
 pub(crate) use crate::data::*;
 pub(crate) use crate::dictation::*;
 pub(crate) use crate::final_pass;
