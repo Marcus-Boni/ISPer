@@ -24,6 +24,8 @@ pub(crate) struct SettingsDto {
     active_meeting_shortcut: String,
     mark_shortcut: Option<String>,
     active_mark_shortcut: String,
+    copilot_shortcut: Option<String>,
+    active_copilot_shortcut: String,
     polish: bool,
     polish_style: String,
     after_meeting: String,
@@ -67,6 +69,8 @@ pub(crate) struct SettingsPatch {
     meeting_shortcut: Option<String>,
     #[serde(default)]
     mark_shortcut: Option<String>,
+    #[serde(default)]
+    copilot_shortcut: Option<String>,
     #[serde(default)]
     polish: bool,
     #[serde(default)]
@@ -282,6 +286,7 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
     let active_shortcut = state.active_shortcut.lock_or_recover().clone();
     let active_meeting_shortcut = state.active_meeting_shortcut.lock_or_recover().clone();
     let active_mark_shortcut = state.active_mark_shortcut.lock_or_recover().clone();
+    let active_copilot_shortcut = state.active_copilot_shortcut.lock_or_recover().clone();
     let llm = isper_llm::load_settings();
     let llm_key_present = if llm.provider.is_empty() {
         false
@@ -322,6 +327,8 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         active_meeting_shortcut,
         mark_shortcut: cfg.mark_shortcut,
         active_mark_shortcut,
+        copilot_shortcut: cfg.copilot_shortcut,
+        active_copilot_shortcut,
         polish: cfg.polish,
         polish_style: cfg.polish_style,
         after_meeting: cfg.after_meeting,
@@ -373,6 +380,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         input_device: patch.input_device,
         meeting_shortcut: patch.meeting_shortcut,
         mark_shortcut: patch.mark_shortcut,
+        copilot_shortcut: patch.copilot_shortcut,
         polish: patch.polish,
         polish_style: patch.polish_style.unwrap_or_default(),
         after_meeting: patch.after_meeting.unwrap_or_default(),
@@ -408,7 +416,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
     }
 
     // Reaplica os atalhos na hora — sem reiniciar o app.
-    let (label, _meeting_label, _mark_label) = register_shortcuts(&app, &cfg);
+    let (label, _meeting_label, _mark_label, _copilot_label) = register_shortcuts(&app, &cfg);
     set_hint(&app, &label);
     let recording = state.meeting.lock_or_recover().is_some();
     set_meeting_text(&app, &meeting_item_text(&app, recording));

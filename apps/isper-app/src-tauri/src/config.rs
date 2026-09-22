@@ -69,6 +69,9 @@ pub struct AppConfig {
     /// Atalho global que marca um momento durante a reunião.
     #[serde(default = "default_mark_shortcut")]
     pub mark_shortcut: Option<String>,
+    /// Atalho global que abre/fecha o Copilot (`None` = o primeiro livre).
+    #[serde(default = "default_copilot_shortcut")]
+    pub copilot_shortcut: Option<String>,
     /// Indicador no modo "legendas ao vivo" (barra larga com as últimas falas).
     #[serde(default)]
     pub overlay_captions: bool,
@@ -136,6 +139,7 @@ impl Default for AppConfig {
             after_meeting: default_after_meeting(),
             voice_commands: true,
             mark_shortcut: default_mark_shortcut(),
+            copilot_shortcut: default_copilot_shortcut(),
             overlay_captions: false,
             auto_update_check: true,
             call_detect: default_call_detect(),
@@ -161,6 +165,10 @@ fn default_insights_interval() -> u32 {
 
 fn default_meeting_shortcut() -> Option<String> {
     Some("ctrl+alt+m".into())
+}
+
+fn default_copilot_shortcut() -> Option<String> {
+    Some("ctrl+alt+c".into())
 }
 
 fn default_mark_shortcut() -> Option<String> {
@@ -251,6 +259,7 @@ impl AppConfig {
         clean(&mut self.shortcut);
         clean(&mut self.meeting_shortcut);
         clean(&mut self.mark_shortcut);
+        clean(&mut self.copilot_shortcut);
         clean(&mut self.model);
         clean(&mut self.input_device);
         lowered_or(&mut self.lang, default_lang());
