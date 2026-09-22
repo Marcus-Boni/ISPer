@@ -33,6 +33,34 @@ atalhos globais, áudio e o atualizador.
 .\tools\e2e\soak.ps1 -Minutes 120 -Exe .\target\release\isper-app.exe
 ```
 
+## Banco de testes do Copilot (sem compilar o app)
+
+`copilot-harness.py` é a exceção da pasta: ele **não** abre o ISPer. Serve a
+pasta `apps/isper-app/ui/` num servidor local e injeta um `window.__TAURI__`
+de mentira em `copilot.html`, com uma reunião roteirizada. Serve para iterar
+no HUD — layout, estados vazios, erro, teclado, modo acoplado de 380 px — sem
+esperar um build com CUDA.
+
+```powershell
+python .\tools\e2e\copilot-harness.py   # http://127.0.0.1:3112/copilot.html
+```
+
+Serve também `/library.html`, com uma reunião de exemplo que já tem decisões
+validadas — é como se testa a seção "Decisões e alertas" sem gravar nada.
+
+No console da página: `__sim.play()` despeja a reunião inteira, `__sim.step()`
+avança uma fala, `__sim.partial('…')` manda uma legenda provisória e
+`__sim.scenario('no-key' | 'idle' | 'error' | 'meeting')` troca o cenário. O
+mock cobre só a camada de tela — áudio, Whisper e as chamadas de IA de verdade
+continuam sendo exercício do `meeting.ps1`.
+
+> **O que o harness NÃO pega: a ACL do Tauri.** Aqui `listen()` é um mock e sempre
+> funciona. No app, uma janela que não esteja em `capabilities/default.json` leva
+> `plugin:event|listen not allowed by ACL` e fica sem evento nenhum — os comandos
+> continuam respondendo, então a janela parece viva, carrega o estado ao abrir e
+> congela a partir dali. Foi assim que o Copilot nasceu sem transcrição ao vivo.
+> Janela nova: confira a ACL no app de verdade, não só aqui.
+
 O `smoke.ps1` também roda toda noite no GitHub Actions
 ([`e2e-nightly.yml`](../../.github/workflows/e2e-nightly.yml)): o runner
 Windows compila o app sem CUDA e o abre de verdade (WebView2 + CDP). Como o
