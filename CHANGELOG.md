@@ -11,6 +11,116 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **ISPer Copilot — assistente de decisões ao vivo (Fase 8).** Uma janela nova
+  (`copilot.html`), aberta pelo botão ✦ do indicador flutuante, pelo Início ou
+  pela bandeja, que acompanha a reunião em andamento: a fala transcrita de um
+  lado e, do outro, um feed de **Decisões, Ações, Riscos e Perguntas
+  recomendadas** que a IA extrai da conversa. Cada card pode ser confirmado,
+  descartado ou desfeito com um clique, e mostra responsável, prazo (com aviso
+  quando o prazo ficou em aberto) e o instante da fala que o originou — clicar
+  no horário pula para o trecho na transcrição.
+- **O que você confirma vai para a ata.** As decisões validadas durante a
+  chamada entram no Markdown da reunião numa seção própria, com responsáveis,
+  prazos e a cobrança dos prazos que ficaram em aberto. Sem isso, validar um
+  card no HUD não deixava rastro nenhum no arquivo final.
+- **Gatilhos locais de análise.** Antes de gastar uma chamada de IA, o ISPer lê
+  o trecho recém-transcrito procurando marcas de acordo ("então fica
+  combinado"), de tarefa ("eu envio", "fica de") e de objeção ("discordo", "me
+  preocupa"). Quando acha, antecipa a rodada — o card aparece em segundos em
+  vez de esperar o pulso periódico. A detecção roda na máquina, sem rede e sem
+  custo.
+- **"Pergunte à Reunião" e bloco de notas aumentado.** Uma aba de perguntas
+  sobre o que já foi dito ("qual valor o cliente citou?") e um bloco de
+  anotações soltas que a IA completa com os números e as falas exatas da
+  conversa, preservando a sua ordem e marcando o que não foi discutido. As
+  notas salvam sozinhas e voltam ao reabrir a janela.
+- **Medidor de dinâmica da conversa.** Proporção de fala entre você e os
+  participantes, com aviso discreto de monólogo quando você fala vários
+  minutos seguidos sem pausa — a conta olha a sequência contínua, não o total
+  da reunião.
+- **Modo sidecar.** O HUD cabe em 380 px de largura para ficar acoplado ao lado
+  do Teams ou do Meet, com um botão de fixar por cima das outras janelas. Ao
+  estreitar, as duas colunas viram uma só e a preferência de layout volta
+  sozinha quando a janela cresce.
+- **Banco de testes da janela** (`tools/e2e/copilot-harness.py`): serve a UI
+  com um Tauri de mentira e uma reunião roteirizada, para iterar no HUD sem
+  recompilar o app com CUDA.
+- **Respostas em streaming (SSE).** O trait `LlmProvider` ganhou
+  `complete_stream`, com leitura de Server-Sent Events para Claude, Groq e
+  Gemini. No Copilot, a resposta do "Pergunte à Reunião" e o enriquecimento de
+  notas vão aparecendo enquanto o modelo escreve, em vez de esperar o texto
+  inteiro — e o que já chegou continua na tela se a conexão cair no meio. Um
+  provider que não implemente streaming cai automaticamente no `complete` de
+  sempre, sem que a tela precise saber.
+- **Atalho global do Copilot (`Ctrl+Alt+C`).** Traz o HUD para a frente; com
+  ele já na frente, esconde (o que estiver digitado no chat e nas notas fica).
+  Configurável em Configurações → Reuniões, como os outros três, e o combo
+  ativo aparece no Início.
+- **Memória de reuniões passadas (RAG).** Quando o assunto da conversa muda, o
+  Copilot consulta o índice semântico local e traz as reuniões anteriores que
+  falaram do mesmo tema — com o trecho exato, a data e um atalho para abrir
+  aquela reunião na Biblioteca. Os cards de memória ficam no topo do feed,
+  separados do que está em jogo agora, e podem ser dispensados um a um. Usa a
+  busca semântica que já existia; sem ela configurada, o Copilot simplesmente
+  segue sem memória. A consulta é feita com o resumo de uma frase do tópico —
+  é o único texto que sai da máquina nessa etapa.
+- **Decisões e alertas na Biblioteca.** O que você validou no Copilot agora é
+  gravado no banco (schema v3) e aparece no detalhe da reunião, com tipo,
+  responsável, prazo (marcando o que ficou em aberto) e o horário da fala que
+  originou cada card — clicar no horário rola o transcript até ali. A lista de
+  reuniões ganhou um selo com quantas decisões cada uma tem.
+
+### Corrigido
+- **O Copilot não recebia evento nenhum: a janela ficava congelada.** A fala ao
+  vivo só aparecia fechando e reabrindo o HUD, os cards nunca se atualizavam
+  sozinhos e o streaming não escrevia na tela. A janela `copilot` não estava na
+  lista de janelas da ACL (`capabilities/default.json`), e sem isso o Tauri
+  recusa `plugin:event|listen` — ou seja, `listen()` falhava em silêncio e
+  nada reativo funcionava. Os comandos continuavam respondendo (comandos do
+  app não passam pela ACL), o que fazia parecer que a janela estava viva: ela
+  carregava o estado ao abrir e congelava a partir dali. **Janela nova no app
+  precisa entrar nessa lista.**
+- **A primeira leitura da reunião demorava até 45 s.** Um assistente mudo no
+  primeiro minuto parece quebrado, mesmo estando certo em não ter o que dizer.
+  A primeira rodada agora acontece aos 20 s e com um gate de texto menor; o
+  pulso normal assume depois.
+- **Anel de foco duplicado no campo de busca do HUD.** O `base.css` já põe um
+  anel em `:focus-visible` e o `:focus-within` da caixa punha outro por cima —
+  saíam dois contornos vermelhos encavalados. O anel agora é só o da caixa.
+
+### Alterado
+- **Ícones no lugar de emojis e glifos, em todas as janelas.** Emoji vem
+  colorido da fonte do sistema e destoa do resto; o `★` e os `☐ ☑` eram texto
+  com peso e alinhamento fora do padrão. Agora tudo é SVG de traço (16×16,
+  `currentColor`, `stroke-width` 1.4) — o mesmo desenho que o Início e a
+  Biblioteca já usavam. Inclui o indicador flutuante (marcar momento e
+  Copilot), o botão de marcar no Início, o selo e os chips de momento da
+  Biblioteca e os marcadores da lista de pendências (via máscara CSS, porque
+  `::marker` só aceita texto). Na pílula os botões são caixas de tamanho fixo,
+  então a conta de largura não mudou; `CC`, `–` e `×` continuam como texto,
+  que ali é rótulo e controle de janela, não pictograma.
+
+- **Uma reunião nova podia herdar os cards da anterior.** Encerrar a reunião
+  não interrompe na hora uma análise que já está no ar: a thread pode estar
+  parada numa chamada HTTP. Se outra reunião começasse nesse intervalo, o
+  resultado atrasado caía no estado novo — cards da reunião passada no HUD da
+  atual — e a limpeza da thread velha apagava o canal da nova, desligando os
+  gatilhos instantâneos em silêncio pelo resto da reunião. Cada thread agora
+  carrega a geração com que nasceu e só encosta no estado se ela ainda for a
+  corrente.
+- **As decisões validadas podiam não chegar na ata.** Elas eram lidas lá
+  dentro do salvamento, que roda em segundo plano e ainda espera o worker do
+  Whisper terminar; começar outra reunião nesse intervalo zerava os cards e a
+  ata da reunião que acabou saía sem nada. Agora são capturadas no instante em
+  que a gravação encerra.
+
+### Alterado
+- **Legendas ao vivo ainda mais rápidas.** O bloco ao vivo passa de 6 s (teto
+  12 s) para 5 s (teto 10 s) e a legenda provisória, de 2,5 s para 1,5 s. As
+  duas continuam cedendo lugar quando o worker acumula fila, então em máquina
+  lenta nada muda.
+
 ## [0.17.1] - 2026-09-21
 
 ### Corrigido
