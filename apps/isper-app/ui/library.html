@@ -94,6 +94,39 @@
   .moment:hover { background: rgba(232, 193, 90, .25); }
   .moment:active { transform: scale(.96); }
   .moment .ex { font: 12px var(--font-body); color: var(--ink-2); max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Decisões validadas no Copilot durante a reunião. Mesma linguagem dos
+     cards do HUD (tarja colorida por tipo), em lista vertical. */
+  .ico { width: 13px; height: 13px; flex: none; vertical-align: -2px; }
+  .badge.warn .ico, .moment .ico { width: 12px; height: 12px; }
+  .badge.warn { gap: 4px; }
+  .decisions { display: flex; flex-direction: column; gap: 8px; }
+  .dec {
+    background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--line-2);
+    border-radius: var(--r); padding: 10px 13px; display: flex; flex-direction: column; gap: 5px;
+  }
+  .dec-decision { border-left-color: var(--good); }
+  .dec-action   { border-left-color: var(--info); }
+  .dec-risk     { border-left-color: var(--warn); }
+  .dec-question { border-left-color: var(--p2); }
+  .dec-top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .dec-kind { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 6px; border-radius: 4px; }
+  .dk-decision { background: var(--good-soft); color: var(--good); }
+  .dk-action   { background: rgba(124, 196, 240, .16); color: var(--info); }
+  .dk-risk     { background: var(--warn-soft); color: var(--warn); }
+  .dk-question { background: rgba(201, 160, 240, .16); color: var(--p2); }
+  .dec-urg { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+  .dec-at {
+    margin-left: auto; font: 11px var(--font-mono); color: var(--muted-2);
+    background: none; border: none; padding: 2px 5px; border-radius: 4px; cursor: pointer;
+  }
+  .dec-at:hover { color: var(--accent); background: var(--accent-soft); }
+  .dec-title { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .dec-desc { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .dec-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dec-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: var(--r-pill); background: var(--panel-3); color: var(--ink-2); font-size: 11px; }
+  .dec-pill .ico, .dec-urg .ico, .dec-kind .ico { width: 11px; height: 11px; }
+  .dec-urg, .dec-kind { display: inline-flex; align-items: center; gap: 4px; }
+  .dec-pill.alert { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
   .seg.star { box-shadow: inset 3px 0 0 var(--warn); padding-left: 8px; }
   .seg.target { animation: target-flash 1.6s ease-out both; }
   @keyframes target-flash { 0% { background: rgba(232, 193, 90, .35); } 100% { background: transparent; } }
@@ -141,6 +174,23 @@
   const { listen } = window.__TAURI__.event;
   const $ = (id) => document.getElementById(id);
   const { el, toast, fmtClock, plural } = UI;
+
+  // Ícones da tela (mesmo desenho dos do Copilot: 16x16, currentColor).
+  const GLYPH_NS = 'http://www.w3.org/2000/svg';
+  const GLYPHS = { star: ['m8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z'] };
+  function mkGlyph(name) {
+    const svg = document.createElementNS(GLYPH_NS, 'svg');
+    const base = { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+      'stroke-width': '1.4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+      'aria-hidden': 'true', class: 'ico' };
+    for (const k in base) svg.setAttribute(k, base[k]);
+    (GLYPHS[name] || []).forEach((d) => {
+      const pth = document.createElementNS(GLYPH_NS, 'path');
+      pth.setAttribute('d', d);
+      svg.appendChild(pth);
+    });
+    return svg;
+  }
   // Mesmas regras do núcleo (meeting.rs): um parágrafo só continua se for o
   // mesmo falante, com pausa < 4 s e sem passar de 60 s.
   const GROUP_MAX_SECS = 60, GROUP_GAP_SECS = 4;
@@ -222,7 +272,8 @@
     if (extra && extra.score != null) { const s = el('span', 'badge score', pct(extra.score)); s.title = 'similaridade entre a sua pergunta e o melhor trecho'; m.appendChild(s); }
     if (r.participants != null) m.appendChild(el('span', 'badge', plural(r.participants, 'participante', 'participantes')));
     if (r.has_summary) m.appendChild(el('span', 'badge ok', 'resumo IA'));
-    if (r.moments) { const b = el('span', 'badge warn', '★ ' + r.moments); b.title = plural(r.moments, 'momento marcado', 'momentos marcados'); m.appendChild(b); }
+    if (r.moments) { const b = el('span', 'badge warn'); b.append(mkGlyph('star'), document.createTextNode(String(r.moments))); b.title = plural(r.moments, 'momento marcado', 'momentos marcados'); m.appendChild(b); }
+    if (r.decisions) { const b = el('span', 'chip chip-ok', String(r.decisions)); b.title = plural(r.decisions, 'decisão validada no Copilot', 'decisões validadas no Copilot'); m.appendChild(b); }
     it.appendChild(m);
     if (extra && extra.snippet) {
       const snip = el('div', 'snip');
@@ -382,13 +433,78 @@
         target.scrollIntoView({ block: 'center', behavior: UI.reduce() ? 'auto' : 'smooth' });
         target.classList.remove('target'); void target.offsetWidth; target.classList.add('target');
       };
+      // Decisões validadas no Copilot: o que você confirmou ao vivo, com o
+      // horário da fala que deu origem a cada uma (clique para ir até lá).
+      const decisions = det.decisions || [];
+      if (decisions.length) {
+        const DEC_LABEL = { decision: 'Decisão', action: 'Ação', risk: 'Risco', question: 'Pergunta' };
+        // Mesmo desenho dos ícones do Copilot: 16x16, traço em currentColor.
+        const NS = 'http://www.w3.org/2000/svg';
+        const PATHS = {
+          person: ['M3.4 13.6c0-2.6 2.1-4.2 4.6-4.2s4.6 1.6 4.6 4.2'],
+          calendar: ['M2.2 6.6h11.6M5.4 1.8v3M10.6 1.8v3', 'M3.8 3.6h8.4a1.6 1.6 0 0 1 1.6 1.6v7.2a1.6 1.6 0 0 1-1.6 1.6H3.8a1.6 1.6 0 0 1-1.6-1.6V5.2a1.6 1.6 0 0 1 1.6-1.6Z'],
+          alert: ['M8 2.4 14.6 13.6H1.4L8 2.4Z', 'M8 6.4v3.2M8 11.8h.01'],
+        };
+        const mkIcon = (name) => {
+          const svg = document.createElementNS(NS, 'svg');
+          const base = { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+            'stroke-width': '1.4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+            'aria-hidden': 'true', class: 'ico' };
+          for (const k in base) svg.setAttribute(k, base[k]);
+          if (name === 'person') {
+            const c = document.createElementNS(NS, 'circle');
+            c.setAttribute('cx', '8'); c.setAttribute('cy', '5.2'); c.setAttribute('r', '2.4');
+            svg.appendChild(c);
+          }
+          (PATHS[name] || []).forEach((d) => {
+            const pth = document.createElementNS(NS, 'path');
+            pth.setAttribute('d', d);
+            svg.appendChild(pth);
+          });
+          return svg;
+        };
+        const pill = (name, text, cls) => {
+          const el2 = el('span', cls);
+          el2.append(mkIcon(name), document.createTextNode(text));
+          return el2;
+        };
+        d.appendChild(el('h3', 'eyebrow', 'Decisões e alertas (Copilot)'));
+        const decBox = el('div', 'decisions');
+        for (const dec of decisions) {
+          const card = el('div', 'dec dec-' + dec.kind);
+          const top = el('div', 'dec-top');
+          top.appendChild(el('span', 'dec-kind dk-' + dec.kind, DEC_LABEL[dec.kind] || dec.kind));
+          if (dec.urgency === 'high') top.appendChild(pill('alert', 'urgente', 'dec-urg'));
+          const at = el('button', 'dec-at', fmtClock(dec.at_secs));
+          at.title = 'ir para este trecho do transcript';
+          at.addEventListener('click', () => flashTo(segEls.get(groupAt(dec.at_secs))));
+          top.appendChild(at);
+          card.appendChild(top);
+          card.appendChild(el('div', 'dec-title', dec.title));
+          if (dec.description) card.appendChild(el('div', 'dec-desc', dec.description));
+          const noDue = dec.kind === 'action'
+            && (!dec.due_date || /sem prazo|n[ãa]o definido/i.test(dec.due_date));
+          if (dec.owner || dec.kind === 'action') {
+            const meta = el('div', 'dec-meta');
+            if (dec.owner) meta.appendChild(pill('person', dec.owner, 'dec-pill'));
+            if (dec.kind === 'action') {
+              meta.appendChild(pill(noDue ? 'alert' : 'calendar',
+                noDue ? 'prazo em aberto' : dec.due_date,
+                'dec-pill' + (noDue ? ' alert' : '')));
+            }
+            card.appendChild(meta);
+          }
+          decBox.appendChild(card);
+        }
+        d.appendChild(decBox);
+      }
       if (moments.length) {
         d.appendChild(el('h3', 'eyebrow', 'Momentos marcados'));
         const box = el('div', 'moments');
         for (const at of moments) {
           const g = groupAt(at);
           const chip = el('button', 'moment');
-          chip.appendChild(el('span', '', '★ ' + fmtClock(at)));
+          chip.append(mkGlyph('star'), el('span', '', fmtClock(at)));
           if (g) chip.appendChild(el('span', 'ex', g.text));
           chip.title = 'ir para este trecho';
           chip.addEventListener('click', () => flashTo(g && segEls.get(g)));
