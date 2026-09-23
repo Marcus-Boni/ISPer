@@ -11,6 +11,11 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-23
+
+A fase 7.6: além dos dois instaladores, o ISPer passa a ter uma versão
+portátil, para usar sem instalar.
+
 ### Adicionado
 - **Versão portátil (zip)**, ao lado dos instaladores: a pasta do ISPer
   inteira, para usar sem instalar. Os dados ficam nas mesmas pastas da versão
