@@ -69,6 +69,9 @@ jobs:
         id: pre
         env:
           GH_TOKEN: ${{ github.token }}
+          # Só para conferir o token (validade, escopos, vencimento); o GitHub
+          # mascara o valor no log.
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
         run: |
           set -euo pipefail
           skip() {
@@ -88,6 +91,37 @@ jobs:
           [ -n "$url" ] || skip "$TAG não tem o instalador CPU (*-cpu-setup.exe)."
           if [ "$DRY_RUN" != "true" ] && [ "$HAS_TOKEN" != "true" ]; then
             skip "Sem o secret WINGET_TOKEN: nada foi submetido. Veja packaging/winget/README.md."
+          fi
+          # Confere o token antes de saber se há o que submeter: um token
+          # vencido ou sem escopo não pode aparecer só na primeira release
+          # depois de o pacote ser aceito no winget-pkgs.
+          if [ "$DRY_RUN" != "true" ]; then
+            headers=$(curl -sS -o /dev/null -D - -H "Authorization: token $WINGET_TOKEN" \
+              -H "Accept: application/vnd.github+json" https://api.github.com/user | tr -d '\r')
+            status=$(awk 'NR == 1 { print $2 }' <<<"$headers")
+            if [ "$status" != "200" ]; then
+              echo "::error title=WINGET_TOKEN recusado::A API do GitHub respondeu $status: token vencido, revogado ou colado errado. Gere outro e rode: gh secret set WINGET_TOKEN"
+              exit 1
+            fi
+            scopes=$(grep -i '^x-oauth-scopes:' <<<"$headers" | cut -d: -f2- | tr -d ' ' || true)
+            if [ -z "$scopes" ]; then
+              echo "::error title=WINGET_TOKEN não é clássico::O Komac precisa de um PAT clássico; os fine-grained não trazem escopos. Veja packaging/winget/README.md."
+              exit 1
+            fi
+            case ",$scopes," in
+              *,repo,* | *,public_repo,*) ;;
+              *)
+                echo "::error title=WINGET_TOKEN sem public_repo::Escopos do token: $scopes. Abrir o PR no winget-pkgs precisa de public_repo."
+                exit 1
+                ;;
+            esac
+            case ",$scopes," in
+              *,workflow,*) ;;
+              *) echo "::warning title=WINGET_TOKEN sem workflow::Sem o escopo workflow, sincronizar o fork falha quando o upstream muda os próprios workflows." ;;
+            esac
+            expires=$(grep -i '^github-authentication-token-expiration:' <<<"$headers" | cut -d: -f2- | sed 's/^ *//' || true)
+            echo "::notice title=WINGET_TOKEN ok::escopos $scopes; vence ${expires:-nunca}"
+            echo "WINGET_TOKEN ok: escopos $scopes; vence ${expires:-nunca}." >> "$GITHUB_STEP_SUMMARY"
           fi
           # O Komac parte da versão anterior que já está no winget-pkgs.
           if ! gh api "repos/microsoft/winget-pkgs/contents/manifests/m/MarcusBoni/ISPer" --silent 2>/dev/null; then

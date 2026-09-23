@@ -35,7 +35,15 @@ Ele precisa de um token do mantenedor, que nunca fica no repositório:
 
 Sem o secret, ou enquanto a primeira versão do pacote não é aceita no
 `winget-pkgs`, o workflow avisa no resumo da run e pula; a release não depende
-dele. Para ensaiar sem abrir PR (os manifestos ficam como artefato da run):
+dele. Mesmo assim, toda run confere o token primeiro: se ele foi recusado
+(vencido ou revogado), se é *fine-grained* ou se não tem `public_repo`, a run
+falha com o motivo; sem `workflow`, sai um aviso. O resumo mostra os escopos e
+quando o token vence. Para conferir à mão, rode com a última tag. Aquela
+versão já está no `winget-pkgs` ou tem PR aberto, então nada é submetido:
+
+```powershell
+gh workflow run winget.yml -f tag=v0.20.0
+``` Para ensaiar sem abrir PR (os manifestos ficam como artefato da run):
 
 ```powershell
 gh workflow run winget.yml -f tag=v0.21.0 -f dry-run=true
