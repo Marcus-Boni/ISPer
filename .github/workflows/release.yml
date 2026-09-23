@@ -382,7 +382,7 @@ jobs:
       && (needs.sign.result == 'success' || needs.sign.result == 'skipped')
     permissions:
       contents: write
-      # Só para disparar o portal-release-sync no fim (ver o último passo).
+      # Só para disparar o portal-release-sync e o winget no fim (últimos passos).
       actions: write
     runs-on: windows-latest
     timeout-minutes: 30
@@ -477,4 +477,21 @@ jobs:
             exit 0
           } else {
             "Portal avisado: portal-release-sync disparado para $env:TAG." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          }
+
+      # O PR da versão nova no microsoft/winget-pkgs (winget.yml, com o
+      # Komac). Mesma regra do portal: o evento da release não o acordaria, e
+      # falhar aqui não derruba a release. Sem o secret WINGET_TOKEN, ou antes
+      # de a primeira versão do pacote ser aceita no winget-pkgs, o próprio
+      # winget.yml avisa e pula.
+      - name: Avisa o winget (winget.yml)
+        if: steps.release.outputs.created == 'true'
+        shell: pwsh
+        run: |
+          gh workflow run winget.yml -f tag=$env:TAG
+          if ($LASTEXITCODE -ne 0) {
+            "::warning title=winget nao avisado::gh workflow run falhou ($LASTEXITCODE). Rode: gh workflow run winget.yml -f tag=$env:TAG"
+            exit 0
+          } else {
+            "winget avisado: winget.yml disparado para $env:TAG." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
           }

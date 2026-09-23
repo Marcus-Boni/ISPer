@@ -82,10 +82,12 @@ como segredo é o mantenedor, pela interface do GitHub ou por
 (Get-FileHash .\ISPer_0.15.0_x64-cpu-setup.exe -Algorithm SHA256).Hash
 ```
 
-Depois de publicar, os manifestos do **winget** da versão (pacote
-`MarcusBoni.ISPer`, instalador CPU) saem de
-`scripts/winget-manifests.ps1 -Version <v>`; como enviá-los ao
-`microsoft/winget-pkgs` está em [`packaging/winget/README.md`](../packaging/winget/README.md).
+Depois de publicar, o `release.yml` dispara o `winget.yml`, que abre com o
+Komac o PR da versão nova do pacote **winget** `MarcusBoni.ISPer` (instalador
+CPU) no `microsoft/winget-pkgs`. Ele precisa do secret `WINGET_TOKEN` e de o
+pacote já existir lá; sem isso, avisa e pula. O caminho à mão
+(`scripts/winget-manifests.ps1 -Version <v>`) e o token estão em
+[`packaging/winget/README.md`](../packaging/winget/README.md).
 O caminho de reserva (`scripts/release.ps1`) não gera os zips portáteis.
 
 ## Assinatura Authenticode: o estado e o caminho
