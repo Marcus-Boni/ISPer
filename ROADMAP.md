@@ -267,7 +267,7 @@ A ordem é impacto ÷ esforço.
 - [ ] `winget install ISPer` (manifesto no winget-pkgs) e zip portátil
 - [ ] Vitrine do repositório no GitHub: descrição em inglês revisada, *topics* (rust, tauri, whisper, speech-to-text, windows, meeting-notes), README em inglês com GIF de demonstração, imagem de *social preview*
 - [ ] Site de docs (mdBook no GitHub Pages): guia, FAQ, troubleshooting, arquitetura
-- [ ] ADRs em `docs/adr/` (Rust+Tauri, LLM em nuvem, keepalive do loopback, diarização pós-hoc)
+- [x] ADRs em `docs/adr/` (23/09): Rust+Tauri, LLM em nuvem, keepalive do loopback, diarização pós-hoc e mais seis — os dois modos de transcrição, a UI sem build step, releases no CI, retenção "para sempre" com Desfazer, SQLCipher adiado e o próprio registro; índice e modelo em [`docs/adr/README.md`](docs/adr/README.md)
 - [ ] `cargo doc` com `#![deny(missing_docs)]` no core; feature flags para o experimental (legendas ao vivo, comandos de voz)
 
 ## Boas práticas transversais
