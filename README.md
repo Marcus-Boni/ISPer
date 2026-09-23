@@ -373,6 +373,7 @@ Onde mora cada parte:
 | `crates/isper-llm/src/providers.rs` | `complete_stream` (SSE) para Claude, Groq e Gemini |
 | `apps/isper-app/src-tauri/src/copilot.rs` | Estado da reunião, loop de análise, memória (RAG), comandos |
 | `apps/isper-app/ui/copilot.html` | O HUD |
+| `apps/isper-app/ui/locales/{pt-BR,en}.json` | Os textos do HUD (chaves `copilot.*`) |
 
 Três decisões que valem a leitura antes de mexer:
 
@@ -395,7 +396,9 @@ primeira leitura (`FIRST_ROUND_SECS`, 20 s), pulso (`COPILOT_AUTO_INTERVAL_SECS`
 transcrição (20 min na análise, 30 min no Q&A) e o corte da memória
 (`RECALL_MIN_SCORE`, 0,55 — escolhido para errar para o lado de calado, **ainda
 não calibrado com reuniões reais**). As frases-gatilho ficam em
-`DECISION_CUES`, `ACTION_CUES` e `RISK_CUES`, em `crates/isper-llm/src/copilot.rs`.
+`DECISION_CUES`, `ACTION_CUES` e `RISK_CUES`, em `crates/isper-llm/src/copilot.rs`,
+e são em português, como o prompt: com a interface em inglês, cards, respostas
+e notas continuam saindo em português.
 
 **Custo:** com um provedor configurado, o loop roda em **toda** reunião, com o
 HUD aberto ou não — ao contrário dos Insights ao vivo, que só fazem rodadas
@@ -415,7 +418,8 @@ python tools/e2e/copilot-harness.py
 ```
 
 Serve `/copilot.html` e `/library.html` com um Tauri simulado e uma reunião
-roteirizada (`__sim.play()`, `__sim.scenario('no-key')` no console). Ele **não**
+roteirizada (`__sim.play()`, `__sim.scenario('no-key')`, `__sim.lang('en')` no
+console; `?lang=en` abre em inglês). Ele **não**
 pega a ACL — lá `listen()` é mock. Detalhes em `tools/e2e/README.md`.
 
 ### CLI (Fase 1)
