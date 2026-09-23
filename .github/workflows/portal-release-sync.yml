@@ -72,7 +72,7 @@ jobs:
           # branch e o PR contarem como ação de um usuário, disparando os checks.
           token: ${{ secrets.PORTAL_SYNC_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: env.SYNC_TOKEN != ''
         with:
           node-version: "22"
