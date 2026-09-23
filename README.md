@@ -400,10 +400,20 @@ não calibrado com reuniões reais**). As frases-gatilho ficam em
 e são em português, como o prompt: com a interface em inglês, cards, respostas
 e notas continuam saindo em português.
 
-**Custo:** com um provedor configurado, o loop roda em **toda** reunião, com o
-HUD aberto ou não — ao contrário dos Insights ao vivo, que só fazem rodadas
-periódicas com `live_insights` ligado. Numa conversa contínua são perto de 80
-chamadas por hora.
+**Custo:** rodada, gatilho e memória só acontecem com a janela do HUD na tela
+— visível, mesmo atrás de outra, e não minimizada. O loop confere a cada 2 s
+(`WATCH_TICK`) e, quando a janela aparece, lê a conversa na hora; a decisão de
+cada volta está em `turn()`, com testes. Com a janela aberta, numa conversa
+contínua, são perto de 80 chamadas por hora. Até a 0.20.0 o loop rodava em
+toda reunião, com o HUD aberto ou não.
+
+**Notas:** o bloco vai com a reunião — seção "Notas da reunião" no fim do
+`.md`, coluna `notes` no banco (schema v4) e a Biblioteca. O fim da reunião
+captura o estado (`CopilotWrapUp`) com a geração; enquanto o estado ainda for
+daquela reunião, vale o texto mais recente, e depois de salva cada edição
+regrava banco e ata. As notas não vão para o provedor do resumo, só para o
+"Enriquecer". Toda regravação do `.md` passa por `meeting_markdown` (em
+`library.rs`), uma de cada vez, e põe decisões e notas no fim.
 
 **Janela nova precisa entrar na ACL.** Fora de `capabilities/default.json`, o
 Tauri nega `plugin:event|listen` e a janela não recebe evento nenhum — mas os

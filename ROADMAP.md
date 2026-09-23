@@ -19,9 +19,9 @@
 | F5 Inteligência | ✅ | resumo, título, polimento, insights ao vivo e busca semântica (Gemini ou Ollama local) — 10/09 |
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
 | F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (criptografia em repouso adiada com decisão registrada); 7.5 com 5 de 6 (v0.19.0 — falta a rodada com o NVDA); 7.6 com 4 de 5 (v0.20.0 — falta o winget, em revisão no winget-pkgs) |
-| F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; 5 itens em aberto — validar a memória, custo com a janela fechada, notas que não são salvas, idioma do que a IA escreve e o sync do portal quando sobra a branch do PR anterior |
+| F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; só com a janela aberta e notas salvas com a reunião (23/09); 3 itens em aberto — validar a memória, idioma do que a IA escreve e ver o sync do portal numa release |
 
-**107 itens entregues · 12 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: consertar o sync do portal (#63; a próxima release passa, a seguinte não) e decidir o custo do Copilot com a janela fechada e as notas dele (8.3) → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot numa reunião real, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**109 itens entregues · 10 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -306,10 +306,10 @@ ACL. Guia de uso em [isper.pages.dev/docs/copilot](https://isper.pages.dev/docs/
 ### 8.3 Em aberto
 
 - [ ] Validar a memória com reuniões reais e calibrar `RECALL_MIN_SCORE` (0,55 foi escolhido para errar para o lado de calado, sem medição). Depende de ligar a busca semântica e indexar o histórico
-- [ ] Decidir se o Copilot analisa com a janela fechada. Hoje ele roda em toda reunião gravada com provedor configurado — perto de 80 chamadas por hora —, ao contrário dos Insights ao vivo, que só fazem rodadas periódicas se ativados
-- [ ] Salvar as notas do Copilot com a reunião. Hoje elas ficam só na memória do app e somem quando a reunião seguinte começa
+- [x] Decidir se o Copilot analisa com a janela fechada (23/09): **não**. Rodada, gatilho e memória só com a janela na tela — visível, mesmo atrás de outra, e não minimizada —, conferida a cada 2 s; ao aparecer, ela lê a conversa na hora. Eram perto de 80 chamadas por hora em toda reunião com provedor configurado
+- [x] Salvar as notas do Copilot com a reunião (23/09): seção no fim da ata, coluna `notes` no banco (schema v4, com cópia antes de migrar), a Biblioteca e o `isper-cli import`; editar depois do fim também salva. Não vão para o resumo da IA. No caminho, **as decisões validadas sumiam da ata** desde a v0.18.0 — o passe final e o renomear regravavam o `.md` pelo banco sem elas —, e as notas de uma reunião vazavam para a seguinte com a janela aberta
 - [ ] O que a IA escreve no idioma da interface: o resumo, os cards, as respostas e as notas do Copilot seguem o prompt em pt-BR mesmo com a interface em inglês (registrado na i18n da 7.5, 23/09)
-- [ ] O sync do portal falha quando a branch do PR anterior ficou no remoto: o repositório não apaga a branch no merge, o checkout raso do workflow não a conhece e o `git push --force-with-lease` recusa com *stale info*. Aconteceu na v0.20.0 (a run das 18:43; a das 18:45 abriu o #61); a próxima release repete
+- [ ] O sync do portal falhava quando a branch do PR anterior ficou no remoto (v0.20.0, a run das 18:43): o repositório não apaga a branch no merge, o checkout raso não a conhece e o `git push --force-with-lease` sem valor recusava com *stale info*. Corrigido no #63 com a lease explícita, lida do `git ls-remote`, e simulado contra um remoto local; falta ver numa release em que a branch tenha sobrado — a segunda depois de 23/09
 - [x] Ver o disparo automático do portal (#41) funcionar numa release: "Portal avisado" no resumo da v0.19.0 (23/09), que abriu o #53 sozinha; na v0.20.0 o disparo também saiu
 
 ## Boas práticas transversais

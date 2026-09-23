@@ -11,7 +11,31 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **As notas do Copilot são salvas com a reunião.** O que você escreve na aba
+  Notas entra no fim da ata, na seção "Notas da reunião", e aparece na
+  Biblioteca, em "Suas notas (Copilot)". Se você continuar escrevendo depois
+  do fim — com a janela ainda mostrando a reunião que acabou —, cada alteração
+  também é salva nela. As notas ficam na máquina: não vão para o resumo da IA,
+  só para o "Enriquecer com a reunião". O `isper-cli import` também as traz de
+  volta do `.md`.
+
 ### Alterado
+- **O Copilot só consome o provedor de IA com a janela aberta.** Até aqui ele
+  analisava toda reunião gravada com provedor configurado, com a janela aberta
+  ou não — perto de 80 chamadas por hora que ninguém estava vendo. Agora a
+  leitura da conversa, os gatilhos e a memória só acontecem com a janela
+  visível (mesmo atrás de outra, como ao lado do Teams); fechada, escondida
+  pelo atalho ou minimizada, nada é enviado. Ao abrir a janela no meio da
+  reunião, ele lê em poucos segundos o que já foi dito. A fala ao vivo e a
+  dinâmica da conversa continuam sendo registradas o tempo todo.
+- **O banco da Biblioteca ganha um formato novo — com cópia de segurança.**
+  Para guardar as notas, o ISPer atualiza o banco na primeira vez que abrir e,
+  antes, salva uma cópia dele como estava em `%APPDATA%\ISPer\isper.db.v3.bak`.
+  A 0.20.0 e as anteriores não abrem o banco atualizado; para voltar a uma
+  delas, feche o ISPer, instale a versão anterior e renomeie a cópia para
+  `isper.db` — as reuniões gravadas depois da atualização continuam nos
+  arquivos `.md` em Documentos.
 - **Dependências**: sha2 0.11 (isper-models migrado: o digest virou um
   `hybrid_array::Array`, sem `{:x}`, e o hex sai de uma função própria com
   teste pelo vetor do FIPS 180-2), windows-sys 0.61, winreg 0.56 e
@@ -21,6 +45,18 @@ bata com ela.
   download-artifact v8 (hash divergente agora falha o download) e
   pnpm/action-setup v6. Os PRs do Dependabot correspondentes ficam
   supersedidos.
+
+### Corrigido
+- **As decisões validadas no Copilot sumiam da ata** depois do passe final da
+  transcrição e ao renomear o título ou um falante na Biblioteca: essas
+  regravações montavam o `.md` a partir do banco sem a seção de decisões. Elas
+  continuavam no banco e na Biblioteca, mas não no arquivo. Agora decisões e
+  notas ficam sempre no fim da ata, em qualquer regravação — e também na
+  exportação em Markdown.
+- Com a janela do Copilot aberta de uma reunião para a seguinte, as notas da
+  anterior continuavam no bloco e iam para a nova na primeira tecla.
+- O `isper-cli import` tomava as decisões do Copilot de uma ata sem resumo
+  pelo resumo da reunião.
 
 ## [0.20.0] - 2026-09-23
 

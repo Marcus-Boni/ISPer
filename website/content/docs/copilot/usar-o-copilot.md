@@ -25,6 +25,8 @@ Com uma reunião gravando, abra o Copilot por qualquer um destes caminhos:
 
 O atalho traz o Copilot para a frente; com ele já na frente, esconde a janela. O que estiver digitado no chat e nas notas continua lá. Dá para trocar a combinação em **Configurações → Reuniões**.
 
+Abra o Copilot quando quiser acompanhar a reunião: ele só lê a conversa com a janela aberta (veja [Quando os cards aparecem](#quando-os-cards-aparecem)).
+
 ## Os cards
 
 Cada card tem um tipo:
@@ -42,9 +44,11 @@ Os filtros no topo do feed separam os tipos.
 
 ## Quando os cards aparecem
 
-A primeira leitura da conversa acontece cerca de 20 segundos depois de a reunião começar. Depois disso, o Copilot relê a conversa periodicamente enquanto houver fala nova.
+O Copilot lê a conversa **enquanto a janela dele está aberta** — mesmo atrás de outra janela, como fica ao lado do Teams. Com ela aberta desde o começo, a primeira leitura acontece cerca de 20 segundos depois de a reunião começar; depois disso, o Copilot relê a conversa periodicamente enquanto houver fala nova.
 
-Algumas frases antecipam a leitura, porque costumam marcar o momento em que algo importante acontece:
+Fechada, escondida pelo atalho ou minimizada, a janela não gera leituras. A fala ao vivo e a dinâmica da conversa continuam sendo registradas, e ao abrir o Copilot no meio da reunião ele lê em poucos segundos o que já foi dito (até os últimos 20 minutos).
+
+Com a janela aberta, algumas frases antecipam a leitura, porque costumam marcar o momento em que algo importante acontece:
 
 - acordos — *"então fica combinado"*, *"fechado"*, *"vamos seguir com"*;
 - tarefas — *"eu envio"*, *"fica de"*, *"vai avaliar"*;
@@ -60,7 +64,7 @@ Essa detecção roda na sua máquina, sem rede. A faixa no topo da janela diz o 
 
 Os descartados podem ser vistos de novo pelo link no fim do feed.
 
-Ao encerrar a reunião, o que você confirmou entra no Markdown da reunião numa seção própria, **Decisões e ações validadas no Copilot**, com responsáveis, prazos e a lista do que ficou sem prazo. Os cards que você não confirmou não entram.
+Ao encerrar a reunião, o que você confirmou entra no fim do Markdown da reunião numa seção própria, **Decisões e ações validadas no Copilot**, com responsáveis, prazos e a lista do que ficou sem prazo. Os cards que você não confirmou não entram.
 
 ## Pergunte à Reunião
 
@@ -74,8 +78,10 @@ Na aba **Notas**, anote solto durante a reunião — *"prazo da entrega"*, *"que
 
 As notas salvam sozinhas enquanto você digita e voltam se você fechar e reabrir a janela durante a reunião. **Desfazer** volta ao texto de antes do enriquecimento.
 
-> [!WARNING/Atenção]
-> As notas **não entram na ata nem na Biblioteca**. Elas ficam na janela até a próxima reunião começar ou até o ISPer ser fechado. Copie o que quiser guardar antes disso.
+As notas vão com a reunião. Ao encerrar, elas entram no fim da ata, na seção **Notas da reunião**, e aparecem na Biblioteca. Se você continuar escrevendo depois do fim, com a janela ainda mostrando a reunião que acabou, cada alteração também vai para ela — a aba mostra *salvo na reunião*. Quando outra reunião começa, o bloco fica vazio para ela.
+
+> [!NOTE/Observação]
+> As notas ficam na sua máquina. Elas não vão para o resumo da reunião: só saem para o provedor de IA quando você usa **Enriquecer com a reunião**.
 
 ## Dinâmica da conversa
 
@@ -95,4 +101,4 @@ O Copilot cabe em 380 px de largura para ficar acoplado ao lado do Teams ou do M
 
 ## Depois da reunião
 
-Na **Biblioteca**, o detalhe da reunião ganha a seção **Decisões e alertas (Copilot)** com o que você confirmou. Clicar no horário de um card rola o transcript até a fala. Na lista de reuniões, um selo mostra quantas decisões cada uma tem.
+Na **Biblioteca**, o detalhe da reunião ganha a seção **Decisões e alertas (Copilot)** com o que você confirmou e, abaixo dela, **Suas notas (Copilot)**. Clicar no horário de um card rola o transcript até a fala. Na lista de reuniões, um selo mostra quantas decisões cada uma tem.
