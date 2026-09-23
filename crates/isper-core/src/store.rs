@@ -68,6 +68,8 @@ pub struct MeetingDetail {
     pub moments: Vec<f32>,
     /// O que você validou no Copilot durante a reunião, em ordem de fala.
     pub decisions: Vec<StoredDecision>,
+    /// As notas que você escreveu no Copilot, como você as deixou.
+    pub notes: Option<String>,
 }
 
 /// Um card que o usuário confirmou no Copilot durante a reunião.
@@ -197,7 +199,7 @@ fn like_pattern(q: &str) -> String {
 /// de versão maior (criado por um ISPer mais novo) é recusado em vez de
 /// alterado às cegas. Bancos anteriores a esta numeração chegam como 0 e
 /// passam pelo passo 1, que é idempotente sobre o que eles já têm.
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 
 /// Eventos de métrica mais antigos que isto (90 dias) saem do banco.
 pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
@@ -316,6 +318,7 @@ fn migrate(conn: &Connection) -> Result<()> {
             0 => migrate_to_v1(&tx)?,
             1 => migrate_to_v2(&tx)?,
             2 => migrate_to_v3(&tx)?,
+            3 => migrate_to_v4(&tx)?,
             other => {
                 return Err(IsperError::Schema(format!(
                     "sem migração a partir da versão {other}"
@@ -483,6 +486,12 @@ fn migrate_to_v3(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Passo 4 — as notas que o usuário escreve no Copilot durante a reunião.
+/// Coluna nova e vazia: reuniões antigas simplesmente não têm notas.
+fn migrate_to_v4(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "meetings", "notes", "TEXT")
+}
+
 /// Preenche `ts_col` a partir do texto de `text_col` onde ainda está vazio.
 fn backfill_stamps(conn: &Connection, table: &str, text_col: &str, ts_col: &str) -> Result<()> {
     let rows: Vec<(i64, String)> = {
@@ -646,6 +655,17 @@ impl MeetingStore {
         Ok(())
     }
 
+    /// Guarda as notas do Copilot da reunião (o `.md` é regravado pelo app).
+    /// Texto vazio apaga: a reunião volta a não ter notas.
+    pub fn set_notes(&self, meeting_id: i64, notes: &str) -> Result<()> {
+        let notes = notes.trim();
+        self.conn.execute(
+            "UPDATE meetings SET notes = ?1 WHERE id = ?2",
+            params![(!notes.is_empty()).then_some(notes), meeting_id],
+        )?;
+        Ok(())
+    }
+
     /// Troca o título da reunião (o `.md` é regravado pelo app).
     pub fn rename_meeting(&self, meeting_id: i64, title: &str) -> Result<()> {
         self.conn.execute(
@@ -692,7 +712,8 @@ impl MeetingStore {
     ///
     /// Devolve `None` quando a reunião já está no banco — reimportar a pasta
     /// inteira tem de ser seguro de repetir. Tudo numa transação: ou a
-    /// reunião entra completa, com falas, resumo e momentos, ou não entra.
+    /// reunião entra completa, com falas, resumo, momentos e notas, ou não
+    /// entra.
     pub fn import_meeting(
         &self,
         m: &crate::import::ImportedMeeting,
@@ -703,15 +724,16 @@ impl MeetingStore {
         }
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
-            "INSERT INTO meetings (title, started_at, started_ts, duration_secs, md_path, summary)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO meetings (title, started_at, started_ts, duration_secs, md_path, summary, notes)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 m.title,
                 m.started_at,
                 parse_local_stamp(&m.started_at),
                 m.duration_secs,
                 md_path,
-                m.summary
+                m.summary,
+                m.notes
             ],
         )?;
         let id = tx.last_insert_rowid();
@@ -1257,15 +1279,15 @@ impl MeetingStore {
         let Some(meeting) = meeting else {
             return Ok(None);
         };
-        let summary: Option<String> = self
+        let (summary, notes): (Option<String>, Option<String>) = self
             .conn
             .query_row(
-                "SELECT summary FROM meetings WHERE id = ?1",
+                "SELECT summary, notes FROM meetings WHERE id = ?1",
                 params![meeting_id],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .optional()?
-            .flatten();
+            .unwrap_or_default();
         let mut stmt = self.conn.prepare(
             "SELECT speaker, start_secs, end_secs, text FROM segments
              WHERE meeting_id = ?1 ORDER BY start_secs, id",
@@ -1295,6 +1317,7 @@ impl MeetingStore {
             segments,
             moments,
             decisions,
+            notes,
         }))
     }
 
@@ -1358,8 +1381,9 @@ mod tests {
     #[test]
     fn migrar_um_banco_com_dados_guarda_a_copia_de_antes() {
         let path = temp_path("pre-migracao");
-        // Monta um banco na versão anterior: cria na atual e recua um passo
-        // (a v3 só acrescentou a tabela de decisões).
+        // Monta um banco na v2: cria na atual e recua (a v3 acrescentou a
+        // tabela de decisões; a v4, a coluna de notas, que o passo 4 aceita já
+        // existente).
         {
             let store = MeetingStore::open(&path).unwrap();
             store
@@ -1531,6 +1555,68 @@ mod tests {
             .unwrap();
         assert!(store.decisions(id).unwrap().is_empty());
         assert!(store.get_meeting(id).unwrap().unwrap().decisions.is_empty());
+    }
+
+    #[test]
+    fn notas_do_copilot_gravam_trocam_e_apagam() {
+        let store = temp_store("notas");
+        let id = store
+            .save("Reunião", "23/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        let notas = |s: &MeetingStore| s.get_meeting(id).unwrap().unwrap().notes;
+        assert_eq!(notas(&store), None, "reunião nova nasce sem notas");
+
+        store.set_notes(id, "  - valor: 40 mil\n").unwrap();
+        assert_eq!(notas(&store).as_deref(), Some("- valor: 40 mil"));
+
+        store.set_notes(id, "- valor: 45 mil").unwrap();
+        assert_eq!(
+            notas(&store).as_deref(),
+            Some("- valor: 45 mil"),
+            "regravar troca"
+        );
+
+        store.set_notes(id, " \n ").unwrap();
+        assert_eq!(notas(&store), None, "texto vazio apaga");
+    }
+
+    #[test]
+    fn banco_da_v3_ganha_a_coluna_de_notas_sem_perder_nada() {
+        let path = temp_path("v3-para-v4");
+        let id = {
+            let store = MeetingStore::open(&path).unwrap();
+            let id = store
+                .save("Da 0.18", "22/09/2026 09:00", &sample_result(), None)
+                .unwrap();
+            store
+                .save_decisions(id, &[sample_decision("decision", "Lançar dia 30", 4.0)])
+                .unwrap();
+            // Recua para a v3: a mesma estrutura, menos a coluna de notas.
+            store
+                .conn
+                .execute_batch("ALTER TABLE meetings DROP COLUMN notes; PRAGMA user_version = 3;")
+                .unwrap();
+            id
+        };
+
+        let store = MeetingStore::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+        assert!(
+            pre_migration_backup_path(&path, 3).exists(),
+            "cópia da v3 antes de migrar"
+        );
+        let detalhe = store
+            .get_meeting(id)
+            .unwrap()
+            .expect("a reunião continua lá");
+        assert_eq!(detalhe.meeting.title, "Da 0.18");
+        assert_eq!(detalhe.decisions.len(), 1, "as decisões continuam");
+        assert_eq!(detalhe.notes, None);
+        store.set_notes(id, "anotado depois").unwrap();
+        assert_eq!(
+            store.get_meeting(id).unwrap().unwrap().notes.as_deref(),
+            Some("anotado depois")
+        );
     }
 
     fn sample_result() -> MeetingResult {
@@ -1844,7 +1930,7 @@ mod tests {
     #[test]
     fn reimportar_a_pasta_recupera_a_reuniao_e_pode_ser_repetido() {
         use crate::import::parse_markdown;
-        use crate::meeting::{SegmentRef, render_markdown};
+        use crate::meeting::{SegmentRef, append_copilot_sections, render_markdown};
 
         let store = temp_store("import");
         let segs = [
@@ -1861,7 +1947,7 @@ mod tests {
                 text: "Bom dia, Ana.",
             },
         ];
-        let md = render_markdown(
+        let mut md = render_markdown(
             "Reunião recuperada",
             "16/09/2026 11:23",
             60.0,
@@ -1872,6 +1958,7 @@ Curto.",
             ),
             &[10.0],
         );
+        append_copilot_sections(&mut md, None, Some("- ligar para a Ana"));
         let imported = parse_markdown("r.md", &md).expect("parse");
 
         let id = store
@@ -1883,7 +1970,12 @@ Curto.",
         assert_eq!(det.segments.len(), 2);
         assert_eq!(det.segments[1].speaker, "Participante 1");
         assert!(det.summary.as_deref().is_some_and(|s| s.contains("Curto")));
+        assert!(
+            det.summary.as_deref().is_some_and(|s| !s.contains("ligar")),
+            "as notas não entram no resumo"
+        );
         assert_eq!(det.moments.len(), 1);
+        assert_eq!(det.notes.as_deref(), Some("- ligar para a Ana"));
 
         // Repetir a importação não duplica — é o que permite rodar a
         // recuperação na pasta inteira sem medo.

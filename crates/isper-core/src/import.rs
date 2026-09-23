@@ -12,7 +12,10 @@
 //! ## O que volta e o que não volta
 //!
 //! Volta: título, data, duração, o texto inteiro com horário e falante, o
-//! resumo da IA e os momentos marcados.
+//! resumo da IA, os momentos marcados e as notas escritas no Copilot.
+//!
+//! Não volta: as decisões validadas no Copilot — o texto delas continua no
+//! `.md`, mas não é lido de volta para a aba da Biblioteca.
 //!
 //! Não volta: a granularidade original. O Markdown guarda PARÁGRAFOS
 //! (`group_speech` junta falas seguidas do mesmo falante), então uma reunião
@@ -51,6 +54,8 @@ pub struct ImportedMeeting {
     pub summary: Option<String>,
     /// Momentos marcados, em segundos da reunião.
     pub moments: Vec<f32>,
+    /// As notas que o usuário escreveu no Copilot, se o arquivo tiver a seção.
+    pub notes: Option<String>,
 }
 
 /// Por que um `.md` não pôde ser lido como reunião do ISPer.
@@ -94,6 +99,9 @@ pub fn parse_markdown(name: &str, md: &str) -> Result<ImportedMeeting, ImportErr
         .and_then(parse_ts)
         .unwrap_or(0.0);
 
+    // As seções do Copilot saem primeiro: sem isto, o corte do resumo abaixo
+    // as levaria junto.
+    let (md, notes) = split_copilot(md);
     // O resumo fica depois do separador `---`; corta antes de varrer as falas
     // para que um resumo com "**[" dentro não vire fala.
     let (corpo, summary) = split_summary(md);
@@ -127,6 +135,7 @@ pub fn parse_markdown(name: &str, md: &str) -> Result<ImportedMeeting, ImportErr
         segments,
         summary,
         moments,
+        notes,
     })
 }
 
@@ -175,6 +184,49 @@ fn parse_moments(corpo: &str) -> Vec<f32> {
         })
         .filter_map(parse_ts)
         .collect()
+}
+
+/// Separa do fim da ata as seções do Copilot e devolve o texto das notas.
+///
+/// Elas vêm depois de tudo, abertas por títulos fixos. Sem este corte,
+/// entrariam no resumo (tudo depois do primeiro `---`) — e, numa ata sem
+/// resumo, virariam um resumo que nunca existiu. As decisões não voltam para
+/// o banco: o texto delas continua no `.md`.
+///
+/// Da 0.18 à 0.20 as decisões iam DENTRO do bloco do resumo, antes do rodapé;
+/// cortar pelo título pega esse formato também.
+fn split_copilot(md: &str) -> (&str, Option<String>) {
+    use crate::meeting::{COPILOT_DECISIONS_HEADING, NOTES_BYLINE, NOTES_HEADING};
+
+    let Some(pos) = [COPILOT_DECISIONS_HEADING, NOTES_HEADING]
+        .into_iter()
+        .filter_map(|h| find_heading(md, h))
+        .min()
+    else {
+        return (md, None);
+    };
+    let (resto, copilot) = md.split_at(pos);
+    // O `---` que abria as seções é do renderizador, não do resumo.
+    let resto = resto.trim_end();
+    let resto = resto.strip_suffix("---").unwrap_or(resto);
+
+    // A seção de notas é a última: tudo depois do título é do usuário — até
+    // um "##" que ele tenha escrito.
+    let notes = find_heading(copilot, NOTES_HEADING).and_then(|p| {
+        let texto = copilot[p + NOTES_HEADING.len()..].trim_start();
+        let texto = texto.strip_prefix(NOTES_BYLINE).unwrap_or(texto).trim();
+        (!texto.is_empty()).then(|| texto.to_string())
+    });
+    (resto, notes)
+}
+
+/// Posição de um título que ocupa a linha inteira.
+fn find_heading(md: &str, heading: &str) -> Option<usize> {
+    md.match_indices(heading).map(|(i, _)| i).find(|&i| {
+        let comeca_linha = i == 0 || md[..i].ends_with('\n');
+        let fim = &md[i + heading.len()..];
+        comeca_linha && (fim.is_empty() || fim.starts_with('\n') || fim.starts_with("\r\n"))
+    })
 }
 
 /// Separa o corpo do resumo da IA (tudo depois do `---` isolado).
@@ -332,6 +384,53 @@ mod tests {
             ),
             Err(ImportError::NoSegments(_))
         ));
+    }
+
+    fn com_copilot(summary: Option<&str>, notas: Option<&str>) -> String {
+        use crate::meeting::{COPILOT_DECISIONS_HEADING, append_copilot_sections};
+        let segs = [seg("Eu", 0.0, 2.0, "Fechamos o preço.")];
+        let mut md = render_markdown("R", "16/09/2026 11:23", 10.0, &segs, summary, &[]);
+        let decisoes = format!("{COPILOT_DECISIONS_HEADING}\n\n- **Preço de 40 mil**\n");
+        append_copilot_sections(&mut md, Some(&decisoes), notas);
+        md
+    }
+
+    #[test]
+    fn notas_do_copilot_voltam_e_nao_entram_no_resumo() {
+        let notas = "- ligar para o fornecedor\n\n## Minhas pendências\n- contrato";
+        let md = com_copilot(Some("## Resumo\nNegociação fechada."), Some(notas));
+        let m = parse_markdown("r.md", &md).expect("importa");
+        assert_eq!(
+            m.notes.as_deref(),
+            Some(notas),
+            "o texto do usuário, inteiro — com o ## dele"
+        );
+        let resumo = m.summary.expect("resumo");
+        assert_eq!(resumo, "## Resumo\nNegociação fechada.");
+        assert_eq!(m.segments.len(), 1);
+    }
+
+    #[test]
+    fn ata_sem_resumo_com_decisoes_nao_ganha_resumo() {
+        // Antes, o --- das decisões fazia o import tomá-las por resumo.
+        let m = parse_markdown("r.md", &com_copilot(None, None)).expect("importa");
+        assert_eq!(m.summary, None);
+        assert_eq!(m.notes, None);
+    }
+
+    #[test]
+    fn formato_antigo_com_decisoes_dentro_do_resumo() {
+        // Da 0.18 à 0.20: resumo, decisões e a assinatura do provedor no mesmo
+        // bloco, antes do rodapé do renderizador.
+        let bloco = format!(
+            "## Resumo\nNegociação fechada.\n\n{}\n\n- **Preço de 40 mil**\n\n_Resumo gerado via groq (llama)._",
+            crate::meeting::COPILOT_DECISIONS_HEADING
+        );
+        let segs = [seg("Eu", 0.0, 2.0, "Fechamos o preço.")];
+        let md = render_markdown("R", "16/09/2026 11:23", 10.0, &segs, Some(&bloco), &[]);
+        let m = parse_markdown("r.md", &md).expect("importa");
+        assert_eq!(m.summary.as_deref(), Some("## Resumo\nNegociação fechada."));
+        assert_eq!(m.notes, None);
     }
 
     #[test]
