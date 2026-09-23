@@ -1,0 +1,162 @@
+name: winget — publicar versão nova
+
+# Depois de cada release, abre no microsoft/winget-pkgs o PR da versão nova do
+# pacote MarcusBoni.ISPer (o instalador CPU, ver docs/adr/0012). Quem gera e
+# submete é o Komac: ele parte do manifesto da versão anterior que já está no
+# winget-pkgs e troca só URL, SHA-256, data e notas — por isso só funciona
+# depois que a primeira versão do pacote foi aceita lá. Antes disso, e sem o
+# token, o job avisa e pula: a release nunca depende dele.
+#
+# O Komac roda direto, fixado por versão e pelo SHA-256 do binário, em vez da
+# ação vedantmgoyal9/winget-releaser: ela faz a mesma coisa, mas instala o
+# cargo-binstall de um branch (@main) e a última versão do Komac a cada run.
+#
+# Gatilho: o release.yml publica com o GITHUB_TOKEN, e o `release: released`
+# dele não acorda outros workflows (proteção contra recursão). Por isso o
+# release.yml dispara este aqui explicitamente (workflow_dispatch), como faz
+# com o portal-release-sync. O gatilho `release` fica para as releases
+# publicadas à mão, pelo release.ps1.
+#
+# Token: PAT *clássico* do mantenedor com `public_repo` e `workflow`, no
+# secret WINGET_TOKEN (o Komac não aceita fine-grained; `workflow` é para
+# sincronizar o fork quando o upstream muda os próprios workflows). O PR sai
+# do fork Marcus-Boni/winget-pkgs.
+#
+# Ensaio: `gh workflow run winget.yml -f tag=v0.21.0 -f dry-run=true` gera os
+# manifestos sem abrir PR e os deixa como artefato da run.
+
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag da release (ex.: v0.21.0)"
+        required: true
+        type: string
+      dry-run:
+        description: "Só gerar os manifestos, sem abrir o PR"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: winget-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE: MarcusBoni.ISPer
+  # Fixado por versão e pelo SHA-256 do tarball, conferido contra o
+  # SHA256SUMS da release do Komac. Para atualizar, troque os dois juntos.
+  KOMAC_VERSION: 2.16.0
+  KOMAC_SHA256: 7d2707fa6210f2789a3702de49fbd150b736dbf426ee0b9bc8e098736f9fd82d
+
+jobs:
+  publish:
+    name: PR no microsoft/winget-pkgs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TAG: ${{ inputs.tag || github.event.release.tag_name }}
+      DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
+      HAS_TOKEN: ${{ secrets.WINGET_TOKEN != '' }}
+      KOMAC_FORK_OWNER: ${{ github.repository_owner }}
+    steps:
+      - name: Pré-condições
+        id: pre
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          skip() {
+            echo "::notice title=winget pulado::$1"
+            echo "$1" >> "$GITHUB_STEP_SUMMARY"
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          version="${TAG#v}"
+          if ! pre=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.prerelease or .draft' 2>/dev/null); then
+            echo "::error title=release inexistente::Não há release com a tag $TAG em $GITHUB_REPOSITORY."
+            exit 1
+          fi
+          [ "$pre" = "false" ] || skip "$TAG é prévia ou rascunho: não vai para o winget."
+          url=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" \
+            --jq '[.assets[] | select(.name | test("-cpu-setup[.]exe$")) | .browser_download_url] | first // ""')
+          [ -n "$url" ] || skip "$TAG não tem o instalador CPU (*-cpu-setup.exe)."
+          if [ "$DRY_RUN" != "true" ] && [ "$HAS_TOKEN" != "true" ]; then
+            skip "Sem o secret WINGET_TOKEN: nada foi submetido. Veja packaging/winget/README.md."
+          fi
+          # O Komac parte da versão anterior que já está no winget-pkgs.
+          if ! gh api "repos/microsoft/winget-pkgs/contents/manifests/m/MarcusBoni/ISPer" --silent 2>/dev/null; then
+            skip "$PACKAGE ainda não está no winget-pkgs (a primeira versão está em revisão). Submeta à mão: scripts/winget-manifests.ps1 e packaging/winget/README.md."
+          fi
+          if gh api "repos/microsoft/winget-pkgs/contents/manifests/m/MarcusBoni/ISPer/$version" --silent 2>/dev/null; then
+            skip "A $version já está no winget-pkgs."
+          fi
+          {
+            echo "go=true"
+            echo "version=$version"
+            echo "url=$url"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Instala o Komac ${{ env.KOMAC_VERSION }}
+        if: steps.pre.outputs.go == 'true'
+        run: |
+          set -euo pipefail
+          f="komac-${KOMAC_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/russellbanks/Komac/releases/download/v${KOMAC_VERSION}/$f"
+          echo "${KOMAC_SHA256}  $RUNNER_TEMP/$f" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/komac"
+          tar -xzf "$RUNNER_TEMP/$f" -C "$RUNNER_TEMP/komac"
+          echo "$RUNNER_TEMP/komac" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/komac/komac" --version
+
+      - name: Sincroniza o fork
+        if: steps.pre.outputs.go == 'true' && env.DRY_RUN != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: komac sync-fork
+
+      - name: Gera os manifestos e abre o PR
+        if: steps.pre.outputs.go == 'true'
+        env:
+          # No ensaio basta ler o winget-pkgs; o token padrão serve.
+          GITHUB_TOKEN: ${{ env.DRY_RUN == 'true' && github.token || secrets.WINGET_TOKEN }}
+          KOMAC_CREATED_WITH: ISPer release workflow
+          KOMAC_CREATED_WITH_URL: ${{ github.server_url }}/${{ github.repository }}/blob/main/.github/workflows/winget.yml
+          VERSION: ${{ steps.pre.outputs.version }}
+          URL: ${{ steps.pre.outputs.url }}
+        run: |
+          set -euo pipefail
+          args=(update "$PACKAGE" --version "$VERSION" --urls "$URL"
+                --release-notes-url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG")
+          if [ "$DRY_RUN" = "true" ]; then
+            args+=(--dry-run --output "$RUNNER_TEMP/manifests")
+          else
+            args+=(--submit)
+          fi
+          komac "${args[@]}"
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Ensaio: manifestos de $PACKAGE $VERSION gerados, nenhum PR aberto." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "PR de $PACKAGE $VERSION aberto no microsoft/winget-pkgs." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Manifestos do ensaio
+        if: steps.pre.outputs.go == 'true' && env.DRY_RUN == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: winget-manifests-${{ steps.pre.outputs.version }}
+          path: ${{ runner.temp }}/manifests
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Limpa branches já mescladas no fork
+        if: steps.pre.outputs.go == 'true' && env.DRY_RUN != 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: komac cleanup --only-merged
