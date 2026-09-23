@@ -20,6 +20,8 @@ No console da página:
     __sim.analyzing(true)       # liga/desliga o estado "analisando"
     __sim.failStream(true)      # a próxima resposta cai no meio do streaming
     __sim.lang('en')            # troca o idioma na hora, como o app faz
+    __sim.endMeeting()          # a reunião acaba e é salva, com as notas
+    __sim.newMeeting()          # outra reunião começa com a janela aberta
 
 A página recebe o mesmo dicionário que o app injeta no nascimento da janela
 (`ui/locales/`); `?lang=en` na URL abre direto em inglês.
@@ -98,6 +100,8 @@ MOCK = r"""
     cursor: 0,
     cards: JSON.parse(JSON.stringify(CARDS)),
     scratchpad: '- prazo da entrega\n- quem fica com o SLA',
+    generation: 1,
+    savedMeeting: null,   // id da reunião em que as notas já foram salvas
     analyzing: false,
     error: null,
     failStream: false,
@@ -132,6 +136,8 @@ MOCK = r"""
       last_updated: S.cursor > 3 ? '10:42:07' : null,
       last_trigger: S.cursor > 5 ? 'decision' : null,
       error: S.scenario === 'error' ? 'status 429: limite de requisições do provider' : S.error,
+      generation: S.generation,
+      notes_saved: S.savedMeeting !== null,
     };
   }
 
@@ -196,7 +202,8 @@ MOCK = r"""
             return Promise.resolve();
           case 'copilot_save_scratchpad':
             S.scratchpad = args.text;
-            return Promise.resolve();
+            // Depois de salva a reunião, a edição vai para ela.
+            return Promise.resolve(S.savedMeeting !== null);
           case 'copilot_analyze_now':
             if (S.scenario === 'idle') return Promise.reject('nenhuma reunião em andamento');
             window.__sim.analyzing(true);
@@ -247,6 +254,15 @@ MOCK = r"""
     },
     reset() { S.cursor = 0; S.cards = JSON.parse(JSON.stringify(CARDS)); S.failStream = false; push(); },
     failStream(on) { S.failStream = !!on; return S.failStream; },
+    // Fim da reunião: salva no banco, e o bloco fica ligado a ela.
+    endMeeting() { S.scenario = 'idle'; S.savedMeeting = 42; push(); return S.savedMeeting; },
+    // Outra reunião começa com a janela aberta: estado novo, bloco vazio.
+    newMeeting() {
+      S.generation += 1; S.savedMeeting = null; S.scratchpad = '';
+      S.scenario = 'meeting'; S.cursor = 0; S.cards = JSON.parse(JSON.stringify(CARDS));
+      push();
+      return S.generation;
+    },
     // Troca o idioma como o app faz (evento isper-ui com o dicionário novo).
     lang(name) {
       const strings = (window.__ISPER_LOCALES || {})[name];
@@ -322,6 +338,7 @@ LIB_MOCK = r"""
               segments: SEGS.map((r) => ({ speaker: r[0], start_secs: r[1], end_secs: r[2], text: r[3] })),
               moments: args.id === 2 ? [] : [45],
               decisions: args.id === 2 ? [] : DECISIONS,
+              notes: args.id === 2 ? null : '- prazo: dia 30, sem relatórios\n- Carlos avalia o SLA de fim de semana\n\n<b>isto é texto, não HTML</b>',
             });
           }
           default: return Promise.resolve(null);

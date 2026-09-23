@@ -79,25 +79,54 @@ pub(crate) fn segment_refs(detail: &MeetingDetail) -> Vec<SegmentRef<'_>> {
         .collect()
 }
 
+/// Uma regravação de `.md` por vez.
+///
+/// Várias partes do app regravam a ata a partir do banco — o fim da reunião
+/// com o resumo, o passe final, renomear, e agora cada edição das notas do
+/// Copilot. Cada uma lê o banco e escreve o arquivo; sem esta trava, uma
+/// leitura antiga podia chegar ao disco depois de uma mais nova e desfazer
+/// a edição de alguém.
+static MARKDOWN_WRITE: Mutex<()> = Mutex::new(());
+
+/// A ata inteira a partir do banco: falas, momentos, resumo e, no fim, as
+/// seções do Copilot — decisões validadas e notas.
+///
+/// `summary` troca o resumo guardado: o fim da reunião usa para acrescentar
+/// a linha de qual provedor gerou o resumo, que não fica no banco.
+pub(crate) fn meeting_markdown(detail: &MeetingDetail, summary: Option<&str>) -> String {
+    let mut md = meeting::render_markdown(
+        &detail.meeting.title,
+        &detail.meeting.started_at,
+        detail.meeting.duration_secs,
+        &segment_refs(detail),
+        summary.or(detail.summary.as_deref()),
+        &detail.moments,
+    );
+    meeting::append_copilot_sections(
+        &mut md,
+        decisions_markdown(&detail.decisions).as_deref(),
+        detail.notes.as_deref(),
+    );
+    md
+}
+
 /// Regrava o Markdown da reunião a partir do banco (fonte única): título,
-/// falantes e resumo sempre iguais aos da Biblioteca. Falha só vai ao log —
-/// o banco já está certo.
+/// falantes, resumo, decisões e notas sempre iguais aos da Biblioteca. Falha
+/// só vai ao log — o banco já está certo.
 pub(crate) fn rewrite_markdown(store: &MeetingStore, id: i64) {
+    rewrite_markdown_with_summary(store, id, None);
+}
+
+/// [`rewrite_markdown`] com o resumo dado no lugar do guardado.
+pub(crate) fn rewrite_markdown_with_summary(store: &MeetingStore, id: i64, summary: Option<&str>) {
+    let _uma_por_vez = MARKDOWN_WRITE.lock_or_recover();
     let Ok(Some(detail)) = store.get_meeting(id) else {
         return;
     };
     let Some(path) = detail.meeting.md_path.as_deref() else {
         return;
     };
-    let md = meeting::render_markdown(
-        &detail.meeting.title,
-        &detail.meeting.started_at,
-        detail.meeting.duration_secs,
-        &segment_refs(&detail),
-        detail.summary.as_deref(),
-        &detail.moments,
-    );
-    if let Err(e) = std::fs::write(path, md) {
+    if let Err(e) = std::fs::write(path, meeting_markdown(&detail, summary)) {
         tracing::warn!("não consegui regravar {path}: {e}");
     }
 }
@@ -126,18 +155,7 @@ pub(crate) fn export_meeting(id: i64, format: String) -> Result<String, String> 
                 &detail.moments,
             ),
         ),
-        "md" => (
-            "md",
-            meeting::render_markdown(
-                &m.title,
-                &m.started_at,
-                m.duration_secs,
-                &refs,
-                detail.summary.as_deref(),
-                &detail.moments,
-            )
-            .into_bytes(),
-        ),
+        "md" => ("md", meeting_markdown(&detail, None).into_bytes()),
         other => return Err(format!("formato desconhecido: {other}")),
     };
     let base = match m.md_path.as_deref().map(Path::new) {
@@ -209,4 +227,73 @@ pub(crate) fn list_dictations(
 #[tauri::command]
 pub(crate) fn delete_dictation(id: i64) -> crate::undo::Scheduled {
     crate::undo::schedule(crate::undo::Doomed::Dictation(id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use isper_core::store::{StoredDecision, StoredSegment};
+
+    fn detalhe(summary: Option<&str>, notes: Option<&str>) -> MeetingDetail {
+        MeetingDetail {
+            meeting: MeetingRow {
+                id: 1,
+                title: "Negociação".into(),
+                started_at: "23/09/2026 10:00".into(),
+                duration_secs: 120.0,
+                segments: 1,
+                participants: 1,
+                has_summary: summary.is_some(),
+                md_path: None,
+                moments: 0,
+                decisions: 1,
+            },
+            summary: summary.map(Into::into),
+            segments: vec![StoredSegment {
+                speaker: "Participante 1".into(),
+                start_secs: 4.0,
+                end_secs: 9.0,
+                text: "Fechamos em quarenta mil.".into(),
+            }],
+            moments: Vec::new(),
+            decisions: vec![StoredDecision {
+                kind: "decision".into(),
+                title: "Preço de 40 mil".into(),
+                description: "Aprovado pelo cliente".into(),
+                owner: None,
+                due_date: None,
+                urgency: "high".into(),
+                at_secs: 4.0,
+            }],
+            notes: notes.map(Into::into),
+        }
+    }
+
+    #[test]
+    fn ata_regravada_pelo_banco_mantem_decisoes_e_notas() {
+        // Era o que se perdia: o passe final e o renomear regravam a ata pelo
+        // banco, e a regravação não conhecia as decisões.
+        let md = meeting_markdown(
+            &detalhe(Some("## Resumo\nFechado."), Some("- mandar contrato")),
+            None,
+        );
+        assert!(md.contains(meeting::COPILOT_DECISIONS_HEADING));
+        assert!(md.contains("**Preço de 40 mil**"));
+        assert!(md.contains(meeting::NOTES_HEADING));
+        assert!(md.trim_end().ends_with("- mandar contrato"));
+
+        // E o caminho de volta: reimportar dá o mesmo resumo e as mesmas notas.
+        let m = isper_core::import::parse_markdown("r.md", &md).expect("importa");
+        assert_eq!(m.summary.as_deref(), Some("## Resumo\nFechado."));
+        assert_eq!(m.notes.as_deref(), Some("- mandar contrato"));
+    }
+
+    #[test]
+    fn resumo_dado_substitui_o_guardado_so_nesta_gravacao() {
+        let d = detalhe(Some("## Resumo\nFechado."), None);
+        let assinado = "## Resumo\nFechado.\n\n_Resumo gerado via groq (llama)._";
+        let md = meeting_markdown(&d, Some(assinado));
+        assert!(md.contains("_Resumo gerado via groq (llama)._"));
+        assert!(!meeting_markdown(&d, None).contains("Resumo gerado via"));
+    }
 }

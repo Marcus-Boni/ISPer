@@ -2,7 +2,7 @@
 
 use crate::prelude::*;
 use isper_core::loopback::LoopbackSource;
-use isper_core::meeting::{self, MeetingHandle, MeetingOptions, MeetingSegment, SegmentRef};
+use isper_core::meeting::{self, MeetingHandle, MeetingOptions, MeetingSegment};
 
 /// Depois de um ditado ou reunião: se houver reunião ativa, o overlay volta
 /// a mostrar o estado dela; se estiver fixo, volta ao repouso; senão, esconde.
@@ -35,9 +35,9 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
         stop_copilot_loop(app);
         // Lido AGORA, com a reunião que acabou ainda no ar. `finish_meeting`
         // roda numa thread e ainda espera o worker do Whisper terminar —
-        // começar outra reunião nesse intervalo zeraria os cards, e a ata
-        // desta aqui sairia sem as decisões que você validou.
-        let decisions = confirmed_cards(app);
+        // começar outra reunião nesse intervalo zeraria o Copilot, e a ata
+        // desta aqui sairia sem as decisões que você validou e sem as notas.
+        let copilot = copilot_wrap_up(app);
         on_meeting_stopped(app);
         set_meeting_text(app, &meeting_item_text(app, false));
         set_tray_recording(app, false);
@@ -46,7 +46,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
         show_overlay(app);
         let app = app.clone();
         std::thread::spawn(move || {
-            match finish_meeting(&app, handle, decisions) {
+            match finish_meeting(&app, handle, copilot) {
                 Ok(path) => {
                     tracing::info!("reunião salva em {path}");
                     let _ = app.emit("isper-state", json!({"state": "meeting-done"}));
@@ -184,7 +184,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
 pub(crate) fn finish_meeting(
     app: &AppHandle,
     handle: MeetingHandle,
-    decisions: Vec<isper_llm::CopilotCard>,
+    copilot: CopilotWrapUp,
 ) -> anyhow::Result<String> {
     let result = handle.stop()?;
     if result.segments.is_empty() {
@@ -204,14 +204,23 @@ pub(crate) fn finish_meeting(
         taken.sort_by(|a, b| a.total_cmp(b));
         taken
     };
-    // `decisions` vem pronto de quem encerrou a reunião (ver toggle_meeting):
-    // relê-lo aqui seria tarde demais.
-    let decisions_md = isper_llm::render_decisions_markdown(&decisions);
-    let mut md = meeting::to_markdown(&title, &started_at, &result, &moments);
-    if let Some(d) = decisions_md.as_deref() {
-        md.push_str("\n---\n\n");
-        md.push_str(d);
-    }
+    // `copilot` vem pronto de quem encerrou a reunião (ver toggle_meeting):
+    // relê-lo aqui seria tarde demais. As notas, não: se o estado ainda é
+    // desta reunião, vale o que o usuário escreveu até agora.
+    let decisions_md = isper_llm::render_decisions_markdown(&copilot.decisions);
+    let transcript = meeting::to_markdown(&title, &started_at, &result, &moments);
+    // O que vai para o provedor do resumo leva as decisões, não as notas. Elas
+    // são rascunho do usuário e só saem da máquina quando ele pede
+    // ("Enriquecer com a reunião"); mandá-las a cada reunião mudaria, calado,
+    // o que o ISPer promete sobre privacidade.
+    let mut para_resumo = transcript.clone();
+    meeting::append_copilot_sections(&mut para_resumo, decisions_md.as_deref(), None);
+    let mut md = transcript;
+    meeting::append_copilot_sections(
+        &mut md,
+        decisions_md.as_deref(),
+        Some(&wrap_up_notes(app, &copilot)),
+    );
 
     // O transcript é salvo ANTES do resumo: se a API falhar, nada se perde.
     let docs = meetings_dir()?;
@@ -232,23 +241,27 @@ pub(crate) fn finish_meeting(
     }
     // Aba "Decisões" da Biblioteca: o Copilot é de memória e some com a
     // reunião, então o que você validou precisa virar linha no banco.
-    if !decisions.is_empty() {
-        let rows = stored_decisions(&decisions);
+    if !copilot.decisions.is_empty() {
+        let rows = stored_decisions(&copilot.decisions);
         if let Err(e) = store.save_decisions(meeting_id, &rows) {
             tracing::warn!("não consegui guardar as decisões do Copilot: {e}");
         } else {
             tracing::info!(n = rows.len(), "decisões do Copilot guardadas");
         }
     }
+    // As notas também: e daqui em diante o bloco do Copilot grava direto
+    // nesta reunião, se o usuário continuar escrevendo.
+    attach_saved_meeting(app, &copilot, &store, meeting_id);
 
     // Fase 5: título + resumo por IA de nuvem, numa chamada — só o TEXTO do
-    // transcript sai da máquina. Com resposta, o Markdown é regravado inteiro
-    // (título novo + resumo) a partir da mesma fonte que a Biblioteca usa.
+    // transcript (com as decisões validadas) sai da máquina. Com resposta, o
+    // Markdown é regravado inteiro a partir do banco, a fonte que a Biblioteca
+    // usa.
     let settings = isper_llm::load_settings();
     match isper_llm::provider_from_settings(&settings) {
         Ok(provider) => {
             let _ = app.emit("isper-state", json!({"state": "meeting-summary"}));
-            match isper_llm::summarize_meeting_titled(provider.as_ref(), &md) {
+            match isper_llm::summarize_meeting_titled(provider.as_ref(), &para_resumo) {
                 Ok(summary) => {
                     if let Some(t) = summary
                         .title
@@ -260,39 +273,16 @@ pub(crate) fn finish_meeting(
                         let _ = store.rename_meeting(meeting_id, &title);
                     }
                     let _ = store.set_summary(meeting_id, summary.body.trim());
-                    let labels: Vec<String> =
-                        result.segments.iter().map(|s| s.speaker.label()).collect();
-                    let refs: Vec<SegmentRef<'_>> = result
-                        .segments
-                        .iter()
-                        .zip(&labels)
-                        .map(|(s, l)| SegmentRef {
-                            speaker: l,
-                            start_secs: s.start_secs,
-                            end_secs: s.end_secs,
-                            text: &s.text,
-                        })
-                        .collect();
-                    let full = meeting::render_markdown(
-                        &title,
-                        &started_at,
-                        result.duration_secs,
-                        &refs,
-                        Some(&format!(
-                            "{}{}\n\n_Resumo gerado via {} ({})._",
-                            summary.body.trim(),
-                            decisions_md
-                                .as_deref()
-                                .map(|d| format!("\n\n{d}"))
-                                .unwrap_or_default(),
-                            provider.name(),
-                            provider.model()
-                        )),
-                        &moments,
+                    // Pelo banco, e não montado aqui: enquanto o resumo saía, o
+                    // usuário pode ter mexido nas notas. A linha do provedor
+                    // não fica guardada, então vai junto só nesta gravação.
+                    let assinado = format!(
+                        "{}\n\n_Resumo gerado via {} ({})._",
+                        summary.body.trim(),
+                        provider.name(),
+                        provider.model()
                     );
-                    if let Err(e) = std::fs::write(&md_path, full) {
-                        tracing::warn!("não consegui regravar o Markdown com o resumo: {e}");
-                    }
+                    rewrite_markdown_with_summary(&store, meeting_id, Some(&assinado));
                     tracing::info!("resumo e título gerados via {}", provider.name());
                 }
                 Err(e) => tracing::warn!("resumo falhou (transcript preservado): {e}"),
