@@ -357,6 +357,67 @@ indexado em segundo plano; "Indexar tudo" cobre o histórico anterior e
 refaz o índice quando o modelo muda. Os vetores de um modelo nunca se
 comparam com os de outro.
 
+### Copilot de reunião (Fase 8)
+
+Janela própria (`copilot.html`) que acompanha a reunião ao vivo: a fala de um
+lado e, do outro, cards de **decisão, ação, risco e pergunta** extraídos pela
+IA. O que o usuário confirma vira seção do Markdown da reunião e linha na
+tabela `decisions` (schema v3), que a Biblioteca mostra. Guia de uso no site:
+[Usar o Copilot](https://isper.pages.dev/docs/copilot/usar-o-copilot/).
+
+Onde mora cada parte:
+
+| Arquivo | O quê |
+|---|---|
+| `crates/isper-llm/src/copilot.rs` | Cards, prompt, parser do JSON, id estável, gatilhos locais, seção da ata |
+| `crates/isper-llm/src/providers.rs` | `complete_stream` (SSE) para Claude, Groq e Gemini |
+| `apps/isper-app/src-tauri/src/copilot.rs` | Estado da reunião, loop de análise, memória (RAG), comandos |
+| `apps/isper-app/ui/copilot.html` | O HUD |
+
+Três decisões que valem a leitura antes de mexer:
+
+- **O id do card é derivado de `kind + título normalizado`, nunca o da IA.** O
+  modelo devolve `"c1"`, `"c2"` a cada rodada; ids que colidem entre rodadas
+  fariam "Confirmar" mexer em outro card. Títulos reformulados contam como o
+  mesmo card por semelhança de tokens (`SAME_CARD_SIMILARITY`).
+- **Cada thread de análise carrega a geração da reunião em que nasceu.**
+  Encerrar não interrompe uma chamada HTTP em voo; sem a geração, o resultado
+  atrasado cairia na reunião seguinte e a limpeza da thread velha apagaria o
+  canal da nova.
+- **Dois eventos, não um.** `isper-copilot` leva o estado inteiro e só sai
+  quando ele muda; `isper-copilot-metrics` leva a dinâmica de fala, a cada
+  bloco transcrito, com garganta. Mandar o estado inteiro a cada fala clonava
+  os cards e devolvia o bloco de notas para a tela no meio da digitação.
+
+Os parâmetros ficam em constantes no topo de `apps/isper-app/src-tauri/src/copilot.rs`:
+primeira leitura (`FIRST_ROUND_SECS`, 20 s), pulso (`COPILOT_AUTO_INTERVAL_SECS`,
+45 s), piso entre rodadas (`MIN_GAP_BETWEEN_ROUNDS_SECS`, 15 s), janela de
+transcrição (20 min na análise, 30 min no Q&A) e o corte da memória
+(`RECALL_MIN_SCORE`, 0,55 — escolhido para errar para o lado de calado, **ainda
+não calibrado com reuniões reais**). As frases-gatilho ficam em
+`DECISION_CUES`, `ACTION_CUES` e `RISK_CUES`, em `crates/isper-llm/src/copilot.rs`.
+
+**Custo:** com um provedor configurado, o loop roda em **toda** reunião, com o
+HUD aberto ou não — ao contrário dos Insights ao vivo, que só fazem rodadas
+periódicas com `live_insights` ligado. Numa conversa contínua são perto de 80
+chamadas por hora.
+
+**Janela nova precisa entrar na ACL.** Fora de `capabilities/default.json`, o
+Tauri nega `plugin:event|listen` e a janela não recebe evento nenhum — mas os
+comandos do app continuam respondendo (comandos próprios não passam pela ACL),
+então ela carrega o estado ao abrir e congela a partir dali. Foi assim que o
+Copilot nasceu sem transcrição ao vivo.
+
+Para iterar no HUD sem compilar o app com CUDA:
+
+```bash
+python tools/e2e/copilot-harness.py
+```
+
+Serve `/copilot.html` e `/library.html` com um Tauri simulado e uma reunião
+roteirizada (`__sim.play()`, `__sim.scenario('no-key')` no console). Ele **não**
+pega a ACL — lá `listen()` é mock. Detalhes em `tools/e2e/README.md`.
+
 ### CLI (Fase 1)
 
 ```bash
