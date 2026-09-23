@@ -7,7 +7,7 @@
 
 ---
 
-## Estado atual — 23/09/2026 · v0.18.0 (Copilot de reunião entregue; F7 segue com 7.5 e 7.6)
+## Estado atual — 23/09/2026 · v0.20.0 (7.5 e 7.6 entregues; o que falta da F7 depende de terceiros ou é à mão)
 
 | Fase | Estado | Resumo |
 |---|---|---|
@@ -18,10 +18,10 @@
 | F4 Notetaker Teams | ✅ | validado em reunião real (07/09); detecção de chamada entregue em 10/09 (validar numa chamada real); **auditoria completa do pipeline em 18/09** — passe final, VAD, falante por palavra e a causa do "Participante 255" (v0.16.0) |
 | F5 Inteligência | ✅ | resumo, título, polimento, insights ao vivo e busca semântica (Gemini ou Ollama local) — 10/09 |
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
-| F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (13/09; criptografia em repouso adiada com decisão registrada); 7.5 com 2 itens entregues; 7.6 não começada |
-| F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; 4 itens em aberto — validar a memória, custo com a janela fechada, notas que não são salvas, disparo do portal |
+| F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (criptografia em repouso adiada com decisão registrada); 7.5 com 5 de 6 (v0.19.0 — falta a rodada com o NVDA); 7.6 com 3 de 5 (v0.20.0 — winget em revisão no winget-pkgs, social preview a subir à mão) |
+| F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; 5 itens em aberto — validar a memória, custo com a janela fechada, notas que não são salvas, idioma do que a IA escreve e o sync do portal quando sobra a branch do PR anterior |
 
-**99 itens entregues · 18 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: decidir o custo do Copilot com a janela fechada e salvar as notas dele (8.3) → validar a v0.18.0 numa reunião real, com a busca semântica ligada para a memória → 7.5 → 7.6, enquanto a candidatura à SignPath tramita.
+**106 itens entregues · 13 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: consertar o sync do portal antes da próxima release e decidir o custo do Copilot com a janela fechada e as notas dele (8.3) → a rodada com o NVDA (7.5) e a social preview (7.6), que são à mão → validar a memória do Copilot numa reunião real, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -258,7 +258,7 @@ A ordem é impacto ÷ esforço.
 
 - [x] Onboarding de primeira execução (testar mic → escolher modelo → atalho → IA opcional) (23/09): janela guiada com medidor de nível, download do modelo recomendado, ditado de teste e chave de IA testada; `config.toml` versão 2 (quem já usava não a vê); Configurações → Sistema reabre
 - [x] `desfazer` em toast no lugar de `confirm()` para exclusões; tema claro/escuro seguindo o sistema (23/09)
-- [x] i18n desde já (dicionário JSON, pt-BR primeiro) e README em inglês (23/09): todas as janelas (Copilot inclusive), bandeja, notificações, erros e README.en; pendente: o texto que a IA do Copilot escreve segue o idioma do prompt (pt-BR), não o da interface
+- [x] i18n desde já (dicionário JSON, pt-BR primeiro) e README em inglês (23/09): todas as janelas (Copilot inclusive), bandeja, notificações, erros e README.en; o que a IA escreve (resumo e Copilot) continua em pt-BR — item em aberto na 8.3
 - [ ] Acessibilidade: navegação completa por teclado e teste com NVDA — teclado, contraste AA, nomes acessíveis e reflow entregues e cobertos pelo `a11y.ps1` (23/09); roteiro do NVDA em `docs/TESTES.md`, falta a rodada com o leitor de tela
 - [x] Detecção de reunião ativa → "Gravar transcrição?" (10/09; detalhes na Fase 4)
 - [x] Indicador flutuante fixo em repouso (10/09): "Indicador" no Início e na bandeja alternam mostrar/ocultar; antes o preview sumia em 2,5 s. Configurações redimensionável; Ditados em largura inteira
@@ -308,7 +308,9 @@ ACL. Guia de uso em [isper.pages.dev/docs/copilot](https://isper.pages.dev/docs/
 - [ ] Validar a memória com reuniões reais e calibrar `RECALL_MIN_SCORE` (0,55 foi escolhido para errar para o lado de calado, sem medição). Depende de ligar a busca semântica e indexar o histórico
 - [ ] Decidir se o Copilot analisa com a janela fechada. Hoje ele roda em toda reunião gravada com provedor configurado — perto de 80 chamadas por hora —, ao contrário dos Insights ao vivo, que só fazem rodadas periódicas se ativados
 - [ ] Salvar as notas do Copilot com a reunião. Hoje elas ficam só na memória do app e somem quando a reunião seguinte começa
-- [ ] Ver o disparo automático do portal (#41) funcionar na próxima release: o resumo da run deve dizer "Portal avisado"
+- [ ] O que a IA escreve no idioma da interface: o resumo, os cards, as respostas e as notas do Copilot seguem o prompt em pt-BR mesmo com a interface em inglês (registrado na i18n da 7.5, 23/09)
+- [ ] O sync do portal falha quando a branch do PR anterior ficou no remoto: o repositório não apaga a branch no merge, o checkout raso do workflow não a conhece e o `git push --force-with-lease` recusa com *stale info*. Aconteceu na v0.20.0 (a run das 18:43; a das 18:45 abriu o #61); a próxima release repete
+- [x] Ver o disparo automático do portal (#41) funcionar numa release: "Portal avisado" no resumo da v0.19.0 (23/09), que abriu o #53 sozinha; na v0.20.0 o disparo também saiu
 
 ## Boas práticas transversais
 
