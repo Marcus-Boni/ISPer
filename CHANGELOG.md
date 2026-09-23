@@ -11,6 +11,17 @@ bata com ela.
 
 ## [Unreleased]
 
+### Alterado
+- **Dependências**: sha2 0.11 (isper-models migrado: o digest virou um
+  `hybrid_array::Array`, sem `{:x}`, e o hex sai de uma função própria com
+  teste pelo vetor do FIPS 180-2), windows-sys 0.61, winreg 0.56 e
+  tauri-winrt-notification 0.8 — o texto das notificações passa a ser
+  escapado pelo próprio Windows, e não mais à mão —, além de clap, toml, ureq
+  e crc32fast em patch. GitHub Actions: setup-node v7, upload-artifact v7,
+  download-artifact v8 (hash divergente agora falha o download) e
+  pnpm/action-setup v6. Os PRs do Dependabot correspondentes ficam
+  supersedidos.
+
 ## [0.20.0] - 2026-09-23
 
 A fase 7.6: além dos dois instaladores, o ISPer passa a ter uma versão

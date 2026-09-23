@@ -318,7 +318,7 @@ pub fn download_asset(
     drop(out);
 
     if let Some(expected) = expected_sha256 {
-        let got = format!("{:x}", hasher.finalize());
+        let got = hex(&hasher.finalize());
         if !got.eq_ignore_ascii_case(expected) {
             let _ = std::fs::remove_file(&part);
             return Err(ModelsError::Checksum {
@@ -334,6 +334,20 @@ pub fn download_asset(
     std::fs::rename(&part, dest)?;
     tracing::info!("baixado e verificado: {}", dest.display());
     Ok(())
+}
+
+/// Hexadecimal minúsculo, como o `sha256sum` e o `lfs.oid` do Hugging Face.
+///
+/// Na sha2 0.10 bastava `format!("{:x}", …)`; desde a 0.11 o digest é um
+/// `hybrid_array::Array`, que não implementa `LowerHex`.
+fn hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for &b in bytes {
+        out.push(char::from(DIGITS[usize::from(b >> 4)]));
+        out.push(char::from(DIGITS[usize::from(b & 0x0f)]));
+    }
+    out
 }
 
 /// Remove um modelo da pasta padrão (ignora se não existir).
@@ -397,6 +411,28 @@ mod migration_tests {
     }
 }
 
+#[cfg(test)]
+mod checksum_tests {
+    use super::hex;
+    use sha2::{Digest, Sha256};
+
+    #[test]
+    fn sha256_sai_no_formato_do_hugging_face() {
+        // Vetor do FIPS 180-2 para "abc". Se o formato divergir, todo
+        // download de modelo falha como checksum errado.
+        assert_eq!(
+            hex(&Sha256::digest(b"abc")),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn hex_preserva_zeros_a_esquerda() {
+        assert_eq!(hex(&[0x00, 0x0f, 0xa0, 0xff]), "000fa0ff");
+        assert_eq!(hex(&[]), "");
+    }
+}
+
 /// Testes que falam com a rede — ignorados por padrão (o CI roda offline);
 /// rode à mão depois de mexer no HTTP: `cargo test -p isper-models -- --ignored`.
 #[cfg(test)]
@@ -441,6 +477,13 @@ mod network_tests {
             !dest.with_extension("part").exists(),
             "o .part virou o arquivo final"
         );
+
+        // Checksum certo: o hash calculado em streaming bate com o do arquivo
+        // inteiro. É o caminho de todo modelo Whisper baixado.
+        let expected = hex(&Sha256::digest(text.as_bytes()));
+        download_asset(url, &dest, Some(&expected), None, &mut |_, _| {})
+            .expect("checksum certo deve passar");
+        assert!(dest.exists(), "o arquivo conferido fica no disco");
 
         // Checksum errado: nada fica no disco e o erro diz o que esperava.
         let err = download_asset(url, &dest, Some("00"), None, &mut |_, _| {})
