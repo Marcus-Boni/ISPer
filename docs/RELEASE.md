@@ -67,6 +67,10 @@ como segredo é o mantenedor, pela interface do GitHub ou por
 
 - `ISPer_<v>_x64-setup.exe` (GPU, ~400 MB) e `ISPer_<v>_x64-cpu-setup.exe`
   (CPU, ~9 MB), com `.sig` (assinatura minisign que o atualizador confere).
+- `ISPer_<v>_x64-portable.zip` (GPU) e `ISPer_<v>_x64-cpu-portable.zip`
+  (CPU): a versão **portátil** — o mesmo exe e as mesmas DLLs do instalador
+  numa pasta `ISPer\`, com o `portable.txt` que faz o app avisar da versão
+  nova sem instalar por cima (ver o [ADR 0012](adr/0012-distribuicao-portatil-e-winget.md)).
 - `latest.json` e `latest-cpu.json`: os manifests que o app consulta.
 - `ISPer_<v>_sbom.cdx.json`: SBOM CycloneDX 1.5 do app — cada crate e
   versão que entra no binário. Serve para responder "essa vulnerabilidade
@@ -77,6 +81,12 @@ como segredo é o mantenedor, pela interface do GitHub ou por
 ```powershell
 (Get-FileHash .\ISPer_0.15.0_x64-cpu-setup.exe -Algorithm SHA256).Hash
 ```
+
+Depois de publicar, os manifestos do **winget** da versão (pacote
+`MarcusBoni.ISPer`, instalador CPU) saem de
+`scripts/winget-manifests.ps1 -Version <v>`; como enviá-los ao
+`microsoft/winget-pkgs` está em [`packaging/winget/README.md`](../packaging/winget/README.md).
+O caminho de reserva (`scripts/release.ps1`) não gera os zips portáteis.
 
 ## Assinatura Authenticode: o estado e o caminho
 

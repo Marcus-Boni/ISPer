@@ -20,6 +20,8 @@ const PROGRESS_EVERY: Duration = Duration::from_millis(250);
 const ENDPOINT_ENV: &str = "ISPER_UPDATE_ENDPOINT";
 /// Baixa e verifica a assinatura, mas não instala (testes ponta a ponta).
 const DRY_RUN_ENV: &str = "ISPER_UPDATE_DRY_RUN";
+/// Onde a versão portátil manda baixar a versão nova.
+const DOWNLOAD_PAGE: &str = "https://isper.pages.dev/download/";
 
 /// Versões já anunciadas por toast nesta execução (uma vez por versão).
 static ANNOUNCED: Mutex<Option<String>> = Mutex::new(None);
@@ -32,6 +34,8 @@ pub(crate) struct UpdateInfo {
     pub(crate) notes: Option<String>,
     /// Data de publicação, `dd/mm/aaaa`.
     pub(crate) date: Option<String>,
+    /// Este ISPer é a versão portátil: a tela oferece baixar, não instalar.
+    pub(crate) portable: bool,
 }
 
 fn build_updater(app: &AppHandle) -> anyhow::Result<Updater> {
@@ -57,6 +61,7 @@ fn describe(update: &Update) -> UpdateInfo {
         date: update
             .date
             .map(|d| format!("{:02}/{:02}/{}", d.day(), d.month() as u8, d.year())),
+        portable: crate::paths::is_portable(),
     }
 }
 
@@ -96,6 +101,10 @@ pub(crate) async fn check(app: &AppHandle) -> anyhow::Result<Option<UpdateInfo>>
 pub(crate) async fn install(app: &AppHandle) -> anyhow::Result<String> {
     if app.state::<AppState>().meeting.lock_or_recover().is_some() {
         anyhow::bail!(crate::i18n::tr(app, "errors.update-in-meeting"));
+    }
+    // O instalador instalaria uma segunda cópia em `Programs`, sem tocar nesta.
+    if crate::paths::is_portable() {
+        anyhow::bail!(crate::i18n::tr(app, "errors.update-portable"));
     }
     let updater = build_updater(app)?;
     let Some(update) = updater.check().await.map_err(friendly)? else {
@@ -222,6 +231,18 @@ pub(crate) async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>, S
 #[tauri::command]
 pub(crate) async fn install_update(app: AppHandle) -> Result<String, String> {
     install(&app).await.map_err(|e| e.to_string())
+}
+
+/// Abre a página de download no navegador padrão — a "atualização" da versão
+/// portátil é baixar o zip novo. O endereço é fixo: nada vindo de fora vai
+/// para a linha de comando.
+#[tauri::command]
+pub(crate) fn open_download_page() -> Result<(), String> {
+    std::process::Command::new("explorer")
+        .arg(DOWNLOAD_PAGE)
+        .spawn()
+        .map(drop)
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

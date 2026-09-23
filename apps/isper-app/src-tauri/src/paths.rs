@@ -14,6 +14,27 @@ use std::path::{Path, PathBuf};
 /// Variáveis que um processo Windows normal sempre tem — e que já faltaram.
 const REQUIRED_ENV: [&str; 3] = ["LOCALAPPDATA", "APPDATA", "USERPROFILE"];
 
+/// Arquivo que marca a versão portátil (o zip da release): fica ao lado do exe.
+/// Explícito de propósito — "não tem desinstalador ao lado" também valeria
+/// para um build de desenvolvimento, e o atualizador deixaria de funcionar nele.
+pub(crate) const PORTABLE_MARKER: &str = "portable.txt";
+
+/// A pasta `dir` é de uma cópia portátil (tem o marcador).
+pub(crate) fn is_portable_dir(dir: &Path) -> bool {
+    dir.join(PORTABLE_MARKER).is_file()
+}
+
+/// Este ISPer roda da versão portátil, e não de uma instalação: o atualizador
+/// avisa da versão nova, mas não instala por cima (instalaria uma segunda
+/// cópia em `Programs`); aponta a página de download. Os dados ficam nas
+/// mesmas pastas da versão instalada (ADR 0012).
+pub(crate) fn is_portable() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(is_portable_dir))
+        .unwrap_or(false)
+}
+
 fn local_base() -> Option<PathBuf> {
     dirs::data_local_dir().or_else(|| std::env::var_os("LOCALAPPDATA").map(PathBuf::from))
 }
@@ -78,6 +99,24 @@ pub(crate) fn missing_vars(present: impl Fn(&str) -> bool) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn copia_portatil_e_reconhecida_pelo_marcador_ao_lado_do_exe() {
+        let dir = std::env::temp_dir().join(format!("isper-portable-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(
+            !is_portable_dir(&dir),
+            "sem marcador: instalação normal (ou build de dev)"
+        );
+        std::fs::write(dir.join(PORTABLE_MARKER), "ISPer portátil").unwrap();
+        assert!(is_portable_dir(&dir));
+        // Uma PASTA com o nome do marcador não conta.
+        let other = dir.join("sub");
+        std::fs::create_dir_all(other.join(PORTABLE_MARKER)).unwrap();
+        assert!(!is_portable_dir(&other));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn temp_base(name: &str) -> PathBuf {
         let dir =

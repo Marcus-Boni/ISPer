@@ -246,6 +246,40 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # Versão portátil: o MESMO exe e as MESMAS DLLs que o instalador leva
+      # (bundle.resources vão para a raiz), numa pasta ISPer\ dentro do zip, com
+      # o marcador portable.txt — com ele o app avisa da versão nova mas não
+      # instala por cima (instalaria uma segunda cópia em Programs). Artefato à
+      # parte: o job da SignPath continua recebendo só o instalador.
+      - name: Versão portátil (zip)
+        shell: pwsh
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          $stage = 'portable/ISPer'
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item target/release/isper-app.exe $stage
+          $res = 'apps/isper-app/src-tauri/resources'
+          $dirs = @('sherpa', 'vcredist')
+          if ($env:VARIANT -eq 'gpu') { $dirs += 'cuda' }
+          foreach ($d in $dirs) {
+            $dlls = @(Get-ChildItem "$res/$d" -Filter *.dll)
+            if ($dlls.Count -eq 0) { throw "nenhuma DLL em $res/$d" }
+            $dlls | Copy-Item -Destination $stage
+          }
+          Copy-Item packaging/portable/portable.txt $stage
+          $name = if ($env:VARIANT -eq 'cpu') { "ISPer_${env:VERSION}_x64-cpu-portable.zip" } else { "ISPer_${env:VERSION}_x64-portable.zip" }
+          New-Item -ItemType Directory -Force out-portable | Out-Null
+          Compress-Archive -Path $stage -DestinationPath "out-portable/$name" -CompressionLevel Optimal
+          "{0}  {1:N1} MB ({2} arquivos)" -f $name, ((Get-Item "out-portable/$name").Length / 1MB), @(Get-ChildItem $stage).Count | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portable-${{ matrix.variant }}
+          path: out-portable/
+          if-no-files-found: error
+          retention-days: 30
+
   # Lista de tudo que entra no binário do app (crates e versões), para quem audita ou
   # precisa saber se uma vulnerabilidade upstream afeta o ISPer.
   sbom:
@@ -371,6 +405,11 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
+          pattern: portable-*
+          path: artifacts/
+
+      - uses: actions/download-artifact@v4
+        with:
           name: sbom
           path: artifacts/sbom/
 
@@ -384,6 +423,10 @@ jobs:
             $src = if (Test-Path "artifacts/installer-$v-signed") { "artifacts/installer-$v-signed" } else { "artifacts/installer-$v" }
             Get-ChildItem $src -Filter '*.exe' -Recurse | Copy-Item -Destination $dist -Force
           }
+          # Zips portáteis: entram no SHA256SUMS.txt junto com o resto.
+          $zips = @(Get-ChildItem artifacts -Filter '*-portable.zip' -Recurse)
+          if ($zips.Count -ne 2) { throw "esperava 2 zips portateis (cpu e gpu), achei $($zips.Count)" }
+          $zips | Copy-Item -Destination $dist -Force
           $sbom = Get-ChildItem artifacts/sbom -Filter '*.cdx.json' -Recurse | Select-Object -First 1
           ./scripts/release-assets.ps1 -Dist $dist -Version $env:VERSION -Sbom $sbom.FullName
 

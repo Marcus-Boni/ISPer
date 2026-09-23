@@ -11,6 +11,13 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **Versão portátil (zip)**, ao lado dos instaladores: a pasta do ISPer
+  inteira, para usar sem instalar. Os dados ficam nas mesmas pastas da versão
+  instalada. Quando sai versão nova, a versão portátil avisa e abre a página
+  de download em vez de instalar por cima; o Diagnóstico mostra se o ISPer é
+  a versão instalada ou a portátil.
+
 ### Corrigido
 - Os seletores de *Aparência* e de *Idioma da interface* acompanham a troca
   feita em outra janela. Com as Configurações e a primeira configuração

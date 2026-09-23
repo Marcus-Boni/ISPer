@@ -13,7 +13,7 @@ pessoa com um fone na mão. Complementa a seção "Testes e CI" do
 | Golden | `crates/isper-core/tests/golden.rs` + `tests/golden/` | Markdown, SRT e DOCX byte a byte; qualquer mudança de formato aparece como diff no PR (`ISPER_UPDATE_GOLDEN=1 cargo test -p isper-core --test golden` regenera) | idem |
 | Integração sem rede | `crates/isper-llm/src/testing.rs` (`FakeProvider`) | resumo, título, polimento e insights do prompt ao pós-processamento, inclusive erros do provider | idem |
 | Integração com rede | `isper-models` (`#[ignore]`) | API do Hugging Face e download com checksum | à mão: `cargo test --release -p isper-models -- --ignored` |
-| Ponta a ponta | `tools/e2e/*.ps1` (o app real, via CDP) | janelas e indicador, reunião com áudio, exportações, atualizador, memória em reunião longa, dados, tema, desfazer, idioma, primeira configuração e acessibilidade | smoke, dados, tema, desfazer, idioma, primeira configuração e acessibilidade toda noite no CI (`e2e-nightly.yml`, sem áudio nem GPU); reunião, atualizador e soak à mão, antes de lançar |
+| Ponta a ponta | `tools/e2e/*.ps1` (o app real, via CDP) | janelas e indicador, reunião com áudio, exportações, atualizador, memória em reunião longa, dados, tema, desfazer, idioma, primeira configuração, acessibilidade e versão portátil | smoke, dados, tema, desfazer, idioma, primeira configuração, acessibilidade e versão portátil toda noite no CI (`e2e-nightly.yml`, sem áudio nem GPU); reunião, atualizador e soak à mão, antes de lançar |
 | Manual | roteiro abaixo | o que precisa de hardware: fone, suspensão, outro app em modo exclusivo, monitores | antes de cada release |
 
 Regras que valem para tudo: `cargo clippy --workspace --all-targets -- -D warnings`

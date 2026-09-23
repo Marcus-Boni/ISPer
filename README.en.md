@@ -433,7 +433,12 @@ in [`docs/RELEASE.md`](docs/RELEASE.md).
 | CPU | `ISPer_<v>_x64-cpu-setup.exe` (~50 MB) | any x64 PC with AVX2 | `latest-cpu.json` |
 
 Both carry the sherpa-onnx DLLs (speaker identification) and the Visual C++
-runtime next to the exe, so a clean machine installs and runs it. On the CPU,
+runtime next to the exe, so a clean machine installs and runs it. Each
+release also has a **portable zip** per variant (`…-portable.zip`: the same
+exe and DLLs in an `ISPer\` folder, with a `portable.txt` marker that makes
+the app announce new versions without installing over itself), and the CPU
+installer is packaged for **winget** as `MarcusBoni.ISPer`
+([`packaging/winget/`](packaging/winget/README.md)). On the CPU,
 prefer the Small or Medium model; Large is slow without a GPU.
 
 ```powershell
