@@ -8,6 +8,10 @@ O porquê de um pacote só está no [ADR 0012](../../docs/adr/0012-distribuicao-
 winget install MarcusBoni.ISPer
 ```
 
+> **Situação:** a 0.19.0 foi submetida em 23/09/2026 como
+> [microsoft/winget-pkgs#439838](https://github.com/microsoft/winget-pkgs/pull/439838).
+> O comando acima só funciona depois que esse PR for aceito.
+
 ## A cada versão publicada
 
 1. Gere e valide os manifestos (o SHA-256 vem do `SHA256SUMS.txt` da
