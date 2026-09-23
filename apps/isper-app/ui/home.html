@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>ISPer</title>
+<script src="assets/boot.js"></script>
 <link rel="stylesheet" href="assets/base.css">
 <style>
   body { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; overflow: hidden; }
@@ -15,7 +16,7 @@
   #statetext { transition: opacity var(--dur-2); }
   #statetext.swap { animation: swap-in var(--dur-2) var(--ease-out) both; }
   /* Botão do indicador: fica "ligado" enquanto ele está na tela. */
-  #b-indicator.on { color: var(--accent); border-color: rgba(240, 126, 114, .45); background: var(--accent-soft); }
+  #b-indicator.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); }
   #b-indicator.on svg circle:first-child { fill: var(--accent); }
 
   /* ---- conteúdo ---- */
@@ -61,7 +62,7 @@
   .meeting .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--dur-2); }
   .meeting .m { color: var(--muted); font-size: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .badge { font-size: 11px; padding: 1px 7px; border-radius: var(--r-pill); border: 1px solid var(--line); color: var(--muted); }
-  .badge.ok { color: var(--good); border-color: rgba(132, 194, 151, .45); }
+  .badge.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
 
   footer label { color: var(--muted); }
 
@@ -104,14 +105,14 @@
 
   /* Banners: versão nova e chamada do Teams detectada. */
   .update, .callbanner { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; }
-  .update { border-color: rgba(240, 126, 114, .45); background: linear-gradient(90deg, var(--accent-soft), transparent 70%); }
+  .update { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: linear-gradient(90deg, var(--accent-soft), transparent 70%); }
   .update .dot-new { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); flex: none; }
   .update .text, .callbanner .text { font-size: 13px; }
   .update .text b, .callbanner .text b { font-weight: 600; }
   .update .text .hint { margin: 0 0 0 8px; font-size: 12px; }
   .update .progress { flex-basis: 100%; }
   .update .notes { flex-basis: 100%; margin: 0; white-space: pre-wrap; font: 12.5px/1.5 var(--font-sans); color: var(--ink-2); max-height: 160px; overflow-y: auto; border-top: 1px solid var(--line); padding-top: 8px; }
-  .callbanner { border-color: rgba(232, 193, 90, .45); background: linear-gradient(90deg, var(--warn-soft), transparent 70%); }
+  .callbanner { border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: linear-gradient(90deg, var(--warn-soft), transparent 70%); }
   .callbanner .text .hint { margin: 0 0 0 8px; font-size: 12px; }
   @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
 </style>

@@ -49,6 +49,8 @@ pub(crate) struct SettingsDto {
     meeting_speakers: u32,
     /// Limiar do agrupamento de falantes (0 = o padrão do projeto).
     diarize_threshold: f32,
+    /// Tema da interface (`system` · `light` · `dark`) — muda por `set_ui_theme`.
+    theme: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -350,6 +352,7 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         final_pass: cfg.final_pass,
         meeting_speakers: cfg.meeting_speakers,
         diarize_threshold: cfg.diarize_threshold,
+        theme: cfg.theme,
     })
 }
 
@@ -396,6 +399,8 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         diarize_threshold: patch
             .diarize_threshold
             .unwrap_or(previous.diarize_threshold),
+        // O tema muda na hora por `set_ui_theme`, não pelo Salvar.
+        theme: previous.theme.clone(),
         config_version: config::CONFIG_VERSION,
     };
     // Caixa, espaços, vazios e valores fora das listas: a mesma regra única

@@ -24,6 +24,8 @@ atalhos globais, áudio e o atualizador.
 | `smoke.ps1` | Início, Biblioteca, Configurações e indicador abrem sem erros de JS (inclusive violações de CSP); modos do indicador; indicador fixo alterna e volta ao estado original; `home_status` traz detecção de chamada e insights; busca semântica e atualizador respondem | ~45 s |
 | `meeting.ps1` | Reunião com a fixture de duas vozes: ao vivo, legendas, momentos (comando com debounce + atalho global), encerrar, banco, Markdown, DOCX, Biblioteca, limpeza | ~2 min |
 | `updater-local.ps1` | Atualizador completo contra uma release falsa assinada com a sua chave e servida em localhost: checagem, banner, download com assinatura, download adulterado recusado, recusa durante reunião (nada é instalado) | ~6 min |
+| `data.ps1` | Fase 7.4 no app real: schema do banco no Diagnóstico, retenção (aviso de confirmação, salvar e voltar), backup SQLite com o mesmo `user_version`, pacote de diagnóstico (entradas certas, sem texto ditado), log em JSON Lines | ~40 s |
+| `theme.ps1` | Tema da interface: claro, escuro e "seguir o Windows" aplicados na hora nas três janelas (fundo calculado, não só o atributo), o indicador continua escuro, valor inválido volta ao padrão, janela reaberta já nasce no tema salvo. `-Shots <pasta>` grava um PNG de cada janela em cada tema | ~40 s |
 | `soak.ps1` | Reunião longa (10 min por padrão; `-Minutes 120` para as 2 h) com a fixture em loop, medindo a memória do processo a cada 30 s: o áudio dos participantes vai para disco (`%TEMP%\ISPer\*.pcm`), então a memória privada deve ficar estável depois do aquecimento (`-MaxGrowthMB`, padrão 150). Confere também a transcrição ao vivo e a limpeza dos `.pcm`, apaga a reunião de teste e grava um CSV em `target\soak\` | 10 min a 2 h |
 
 ```powershell
@@ -32,6 +34,10 @@ atalhos globais, áudio e o atualizador.
 .\tools\e2e\updater-local.ps1
 .\tools\e2e\soak.ps1 -Minutes 120 -Exe .\target\release\isper-app.exe
 ```
+
+`cdp-shot.mjs <trecho-da-url> <saida.png>` captura a tela de uma janela
+(mesma pré-condição do `cdp.mjs`) — para conferir à vista o que os testes
+medem por número.
 
 ## Banco de testes do Copilot (sem compilar o app)
 

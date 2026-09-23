@@ -31,6 +31,7 @@ mod settings;
 mod shortcuts;
 mod state;
 mod tray;
+mod ui;
 mod updater;
 mod views;
 
@@ -224,6 +225,7 @@ fn main() {
             check_update,
             install_update,
             set_show_home,
+            ui::set_ui_theme,
             dismiss_call_prompt,
             record_call_cmd,
             live_insights_state,

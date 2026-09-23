@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>ISPer — Configurações</title>
+<script src="assets/boot.js"></script>
 <link rel="stylesheet" href="assets/base.css">
 <style>
   body { padding: 20px 20px 84px; user-select: none; }
@@ -33,7 +34,7 @@
   #status.swap { animation: swap-in var(--dur-2) var(--ease-out) both; }
   .footer {
     position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center;
-    padding: 12px 20px; background: rgba(30, 26, 24, .88); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    padding: 12px 20px; background: color-mix(in srgb, var(--panel) 88%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
     border-top: 1px solid var(--line);
   }
   .footer #status { flex: 1; }
@@ -261,6 +262,13 @@
     <label class="switch"><input type="checkbox" id="autoupdate"><span class="track"><span class="thumb"></span></span>Avisar quando houver versão nova (ao abrir e uma vez por dia)</label>
   </div>
   <p class="hint">No início com o Windows o ISPer nasce quieto na bandeja; a tela Início também abre com um clique no ícone da bandeja.</p>
+  <label class="lbl" for="theme">Aparência</label>
+  <select id="theme" class="field">
+    <option value="system">Seguir o Windows (padrão)</option>
+    <option value="light">Clara</option>
+    <option value="dark">Escura</option>
+  </select>
+  <p class="hint">Vale na hora para o Início, a Biblioteca e as Configurações. O indicador flutuante e o Copilot ficam sempre escuros — flutuam sobre outros apps e precisam do contraste próprio.</p>
   <label class="lbl" for="retention">Guardar reuniões e ditados por</label>
   <select id="retention" class="field">
     <option value="0">Para sempre (padrão)</option>
@@ -406,6 +414,7 @@
       $('finalpass').checked = s.final_pass !== false;
       $('diarthr').value = String(s.diarize_threshold || 0);
       $('retention').value = String(s.retention_days || 0);
+      $('theme').value = s.theme || 'system';
       retentionSaved = String(s.retention_days || 0);
       $('retconfirm').hidden = true;
       $('curver').textContent = s.version || '?';
@@ -730,6 +739,11 @@
   });
   $('retyes').addEventListener('click', () => { $('retconfirm').hidden = true; status('prazo de ' + retentionLabel($('retention').value) + ' escolhido — clique em Salvar para valer', 'ok'); });
   $('retno').addEventListener('click', () => { $('retention').value = retentionSaved; $('retconfirm').hidden = true; });
+  // Aparência: vale na hora (sem Salvar), como no Windows.
+  $('theme').addEventListener('change', async () => {
+    try { await invoke('set_ui_theme', { theme: $('theme').value }); }
+    catch (e) { status('não consegui trocar o tema: ' + e, 'err'); }
+  });
   $('reimport').addEventListener('click', async () => {
     const btn = $('reimport'), st = $('reimportstate');
     btn.disabled = true;
