@@ -285,6 +285,62 @@ fn migrate(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Onde fica a cópia de um banco que estava na versão `from` antes de migrar:
+/// `isper.db` → `isper.db.v2.bak`. O nome diz em que versão a cópia abre — é
+/// o arquivo que alguém voltando para o app anterior precisa.
+pub fn pre_migration_backup_path(path: &Path, from: i64) -> std::path::PathBuf {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(format!(".v{from}.bak"));
+    path.with_file_name(name)
+}
+
+/// Antes de levar um banco com dados para um schema mais novo, guarda uma
+/// cópia dele como estava.
+///
+/// A migração é de mão única: `migrate` recusa um banco de versão maior do
+/// que a que conhece, então quem atualiza e depois quer voltar para o app
+/// anterior fica sem a Biblioteca. Esta cópia é o caminho de volta.
+///
+/// Só existe uma por versão de origem (a primeira é a que vale — mais perto do
+/// original), e um banco recém-criado não tem o que guardar. Se a cópia
+/// falhar (disco cheio, permissão), a migração segue mesmo assim: os passos
+/// só acrescentam estrutura, e travar o app por causa do backup seria pior do
+/// que o risco que ele cobre. O aviso fica no log.
+fn backup_before_migration(conn: &Connection, path: &Path) {
+    let Ok(version) = conn.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0)) else {
+        return;
+    };
+    if version >= SCHEMA_VERSION {
+        return; // nada a migrar (ou mais novo, que o migrate recusa)
+    }
+    let has_data = conn
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'meetings')",
+            [],
+            |r| r.get::<_, bool>(0),
+        )
+        .unwrap_or(false);
+    if !has_data {
+        return; // banco novo
+    }
+    let dest = pre_migration_backup_path(path, version);
+    if dest.exists() {
+        return;
+    }
+    match conn.execute("VACUUM INTO ?1", params![dest.to_string_lossy()]) {
+        Ok(_) => tracing::info!(
+            from = version,
+            to = SCHEMA_VERSION,
+            path = %dest.display(),
+            "cópia do banco antes de migrar o schema"
+        ),
+        Err(e) => tracing::warn!(
+            from = version,
+            "não consegui copiar o banco antes de migrar (a migração segue): {e}"
+        ),
+    }
+}
+
 /// Passo 1 — o schema que existia antes da numeração: tabelas e as três
 /// colunas que versões antigas acrescentavam com `ALTER TABLE` ignorando o
 /// erro. Idempotente: um banco antigo já tem parte disto, um novo nada.
@@ -419,6 +475,7 @@ impl MeetingStore {
         let conn = Connection::open(path)?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         let _ = conn.pragma_update(None, "journal_mode", "WAL");
+        backup_before_migration(&conn, path);
         migrate(&conn)?;
         Ok(Self { conn })
     }
@@ -1244,7 +1301,84 @@ mod tests {
         let path =
             std::env::temp_dir().join(format!("isper-store-test-{name}-{}.db", std::process::id()));
         let _ = std::fs::remove_file(&path);
+        // Cópias de antes da migração que um teste anterior tenha deixado.
+        for v in 0..=SCHEMA_VERSION {
+            let _ = std::fs::remove_file(pre_migration_backup_path(&path, v));
+        }
         path
+    }
+
+    #[test]
+    fn migrar_um_banco_com_dados_guarda_a_copia_de_antes() {
+        let path = temp_path("pre-migracao");
+        // Monta um banco na versão anterior: cria na atual e recua um passo
+        // (a v3 só acrescentou a tabela de decisões).
+        {
+            let store = MeetingStore::open(&path).unwrap();
+            store
+                .save("Reunião antiga", "10/09/2026 14:00", &sample_result(), None)
+                .unwrap();
+            store
+                .conn
+                .execute_batch("DROP TABLE decisions; PRAGMA user_version = 2;")
+                .unwrap();
+        }
+        let backup = pre_migration_backup_path(&path, 2);
+        assert!(!backup.exists());
+
+        let store = MeetingStore::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+        assert!(
+            backup.exists(),
+            "a cópia de antes da migração não foi feita"
+        );
+
+        // A cópia é o banco como estava: abre na versão antiga, com os dados.
+        let copia = Connection::open(&backup).unwrap();
+        let v: i64 = copia
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap();
+        assert_eq!(v, 2, "a cópia precisa continuar na versão de origem");
+        let n: i64 = copia
+            .query_row("SELECT COUNT(*) FROM meetings", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 1);
+        let tem_decisoes: bool = copia
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name = 'decisions')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(!tem_decisoes, "a cópia é de ANTES da migração");
+        drop(copia);
+
+        // Reabrir um banco já migrado não mexe na cópia.
+        drop(store);
+        let antes = std::fs::metadata(&backup).unwrap().len();
+        MeetingStore::open(&path).unwrap();
+        assert_eq!(std::fs::metadata(&backup).unwrap().len(), antes);
+    }
+
+    #[test]
+    fn banco_novo_nao_gera_copia() {
+        let path = temp_path("novo-sem-copia");
+        MeetingStore::open(&path).unwrap();
+        for v in 0..SCHEMA_VERSION {
+            assert!(
+                !pre_migration_backup_path(&path, v).exists(),
+                "banco recém-criado não tem o que guardar"
+            );
+        }
+    }
+
+    #[test]
+    fn nome_da_copia_diz_em_que_versao_ela_abre() {
+        let p = Path::new("dados/ISPer/isper.db");
+        assert_eq!(
+            pre_migration_backup_path(p, 2),
+            Path::new("dados/ISPer/isper.db.v2.bak")
+        );
     }
 
     fn temp_store(name: &str) -> MeetingStore {
