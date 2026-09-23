@@ -38,6 +38,8 @@ pub(crate) fn build_settings(app: &AppHandle) -> tauri::Result<tauri::WebviewWin
         tauri::WebviewUrl::App("settings.html".into()),
     )
     .title("ISPer — Configurações")
+    .theme(crate::ui::native_theme(&crate::ui::current(app).theme))
+    .initialization_script(crate::ui::boot_script(&crate::ui::current(app)))
     .inner_size(600.0, 760.0)
     .min_inner_size(480.0, 520.0)
     .build()
@@ -54,6 +56,8 @@ pub(crate) fn build_library(app: &AppHandle) -> tauri::Result<tauri::WebviewWind
         tauri::WebviewUrl::App("library.html".into()),
     )
     .title("ISPer — Biblioteca")
+    .theme(crate::ui::native_theme(&crate::ui::current(app).theme))
+    .initialization_script(crate::ui::boot_script(&crate::ui::current(app)))
     .inner_size(980.0, 680.0)
     .min_inner_size(720.0, 480.0)
     .build()
@@ -78,6 +82,8 @@ pub(crate) fn open_library_at(app: &AppHandle, meeting_id: i64) {
 pub(crate) fn build_home(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
     tauri::WebviewWindowBuilder::new(app, "home", tauri::WebviewUrl::App("home.html".into()))
         .title("ISPer")
+        .theme(crate::ui::native_theme(&crate::ui::current(app).theme))
+        .initialization_script(crate::ui::boot_script(&crate::ui::current(app)))
         .inner_size(960.0, 680.0)
         .min_inner_size(780.0, 560.0)
         .center()
@@ -96,6 +102,8 @@ pub(crate) fn build_copilot(app: &AppHandle) -> tauri::Result<tauri::WebviewWind
         tauri::WebviewUrl::App("copilot.html".into()),
     )
     .title("ISPer Copilot — Decisões e Notetaker")
+    // A página do Copilot é sempre escura (ver `ui.rs`): a barra de título acompanha.
+    .theme(Some(tauri::Theme::Dark))
     .inner_size(980.0, 720.0)
     // 360 px de mínimo porque o HUD foi desenhado para caber acoplado ao lado
     // do Teams; com o mínimo em 520 o modo sidecar não era alcançável.

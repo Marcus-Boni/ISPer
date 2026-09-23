@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>ISPer — Biblioteca</title>
+<script src="assets/boot.js"></script>
 <link rel="stylesheet" href="assets/base.css">
 <style>
   body { display: grid; grid-template-rows: auto 1fr; height: 100vh; overflow: hidden; }
@@ -21,11 +22,11 @@
   .search .clear:hover { color: var(--ink); }
   .count { font-size: 12px; color: var(--muted); min-width: 70px; text-align: right; }
   /* Busca semântica (só aparece com provider de embeddings configurado). */
-  #semantic[aria-pressed="true"] { background: var(--warn-soft); color: var(--warn); border-color: rgba(232, 193, 90, .5); }
+  #semantic[aria-pressed="true"] { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
   #semantic svg { width: 14px; height: 14px; }
 
   main { display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
-  #list { border-right: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; background: rgba(30, 26, 24, .5); }
+  #list { border-right: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; background: color-mix(in srgb, var(--panel) 50%, transparent); }
   /* Ditados: lista de largura inteira — o painel de detalhe não tem o que
      mostrar, e a coluna de 340 px espremia o texto com barra horizontal. */
   main.dictations { grid-template-columns: 1fr; }
@@ -47,8 +48,8 @@
   .item .m { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .item .snip { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; margin-top: 6px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .badge { font-size: 11px; padding: 1px 7px; border-radius: var(--r-pill); border: 1px solid var(--line); color: var(--muted); }
-  .badge.ok { color: var(--good); border-color: rgba(132, 194, 151, .45); }
-  .badge.score { color: var(--warn); border-color: rgba(232, 193, 90, .45); font-variant-numeric: tabular-nums; }
+  .badge.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+  .badge.score { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); font-variant-numeric: tabular-nums; }
 
   #detail { overflow-y: auto; padding: 24px 30px; position: relative; }
   .placeholder { color: var(--muted); padding: 60px 20px; text-align: center; display: grid; gap: 10px; justify-items: center; }
@@ -73,25 +74,25 @@
   .dsearch {
     position: sticky; top: -24px; z-index: 2; margin: 0 -30px 6px; padding: 10px 30px;
     display: flex; align-items: center; gap: 8px;
-    background: rgba(22, 19, 17, .86); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    background: color-mix(in srgb, var(--bg) 86%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--line);
   }
   .dsearch .search { margin-left: 0; width: auto; flex: 1; max-width: 380px; }
   .dsearch .count { min-width: 84px; text-align: left; }
   .dsearch .count.none { color: var(--warn); }
-  .dsearch .filter[aria-pressed="true"] { background: var(--warn-soft); color: var(--warn); border-color: rgba(232, 193, 90, .5); }
+  .dsearch .filter[aria-pressed="true"] { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
   .dsearch kbd { font: 11px var(--font-mono); color: var(--muted-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
-  mark { background: rgba(232, 193, 90, .28); color: inherit; border-radius: 3px; padding: 0 1px; box-shadow: 0 0 0 1px rgba(232, 193, 90, .18); transition: background var(--dur-2); }
-  mark.cur { background: var(--warn); color: var(--accent-ink); box-shadow: 0 0 0 2px rgba(232, 193, 90, .35); }
-  .seg.hit { background: rgba(232, 193, 90, .05); }
+  mark { background: color-mix(in srgb, var(--warn) 28%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 18%, transparent); transition: background var(--dur-2); }
+  mark.cur { background: var(--warn); color: var(--accent-ink); box-shadow: 0 0 0 2px color-mix(in srgb, var(--warn) 35%, transparent); }
+  .seg.hit { background: color-mix(in srgb, var(--warn) 5%, transparent); }
   .seg.hit .ts { color: var(--warn); }
   #detail.filtering .seg:not(.hit), #detail.filtering .sumbox:not(.hit) { display: none; }
   .filtered-note { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; }
 
   /* Momentos marcados durante a reunião */
   .moments { display: flex; flex-wrap: wrap; gap: 8px; }
-  .moment { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: var(--r-pill); border: 1px solid rgba(232, 193, 90, .45); background: var(--warn-soft); color: var(--warn); font: 600 12px var(--font-mono); cursor: pointer; transition: transform var(--dur-1), background var(--dur-2); }
-  .moment:hover { background: rgba(232, 193, 90, .25); }
+  .moment { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: var(--r-pill); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); background: var(--warn-soft); color: var(--warn); font: 600 12px var(--font-mono); cursor: pointer; transition: transform var(--dur-1), background var(--dur-2); }
+  .moment:hover { background: color-mix(in srgb, var(--warn) 25%, transparent); }
   .moment:active { transform: scale(.96); }
   .moment .ex { font: 12px var(--font-body); color: var(--ink-2); max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Decisões validadas no Copilot durante a reunião. Mesma linguagem dos
@@ -111,9 +112,9 @@
   .dec-top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
   .dec-kind { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 6px; border-radius: 4px; }
   .dk-decision { background: var(--good-soft); color: var(--good); }
-  .dk-action   { background: rgba(124, 196, 240, .16); color: var(--info); }
+  .dk-action   { background: color-mix(in srgb, var(--info) 16%, transparent); color: var(--info); }
   .dk-risk     { background: var(--warn-soft); color: var(--warn); }
-  .dk-question { background: rgba(201, 160, 240, .16); color: var(--p2); }
+  .dk-question { background: color-mix(in srgb, var(--p2) 16%, transparent); color: var(--p2); }
   .dec-urg { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
   .dec-at {
     margin-left: auto; font: 11px var(--font-mono); color: var(--muted-2);
@@ -129,7 +130,7 @@
   .dec-pill.alert { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
   .seg.star { box-shadow: inset 3px 0 0 var(--warn); padding-left: 8px; }
   .seg.target { animation: target-flash 1.6s ease-out both; }
-  @keyframes target-flash { 0% { background: rgba(232, 193, 90, .35); } 100% { background: transparent; } }
+  @keyframes target-flash { 0% { background: color-mix(in srgb, var(--warn) 35%, transparent); } 100% { background: transparent; } }
 
   /* Ditados: hora · texto · ações, numa linha que usa a largura inteira. */
   .dict-note { color: var(--muted); font-size: 12.5px; padding: 12px 22px 10px; border-bottom: 1px solid var(--line); line-height: 1.5; }

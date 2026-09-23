@@ -11,6 +11,14 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **Tema claro** (fase 7.5). Configurações → Sistema → *Aparência*: seguir o
+  Windows (padrão), clara ou escura. Vale na hora para o Início, a Biblioteca
+  e as Configurações — inclusive a barra de título — e a janela já nasce no
+  tema certo, sem piscar. A paleta clara passa no contraste WCAG AA em todos
+  os textos. O indicador flutuante e o Copilot continuam escuros: flutuam
+  sobre outros apps e precisam do contraste próprio.
+
 ## [0.18.0] - 2026-09-22
 
 ### Adicionado

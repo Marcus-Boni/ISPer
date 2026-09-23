@@ -116,6 +116,9 @@ pub struct AppConfig {
     /// Configuração avançada: mexer aqui sem medir costuma piorar.
     #[serde(default)]
     pub diarize_threshold: f32,
+    /// Tema da interface: `system` (segue o Windows) · `light` · `dark`.
+    #[serde(default = "default_theme")]
+    pub theme: String,
     /// Versão do formato deste arquivo — ver [`CONFIG_VERSION`].
     #[serde(default)]
     pub config_version: u32,
@@ -150,9 +153,14 @@ impl Default for AppConfig {
             final_pass: true,
             meeting_speakers: 0,
             diarize_threshold: 0.0,
+            theme: default_theme(),
             config_version: CONFIG_VERSION,
         }
     }
+}
+
+fn default_theme() -> String {
+    "system".into()
 }
 
 fn default_call_detect() -> String {
@@ -285,6 +293,7 @@ impl AppConfig {
         if !RETENTION_DAYS.contains(&self.retention_days) {
             self.retention_days = 0;
         }
+        pick(&mut self.theme, &crate::ui::THEMES, "system");
         self.config_version = CONFIG_VERSION;
     }
 }
@@ -404,6 +413,22 @@ mod tests {
         assert!(notes[0].contains("mais nova"));
         assert_eq!(cfg.config_version, CONFIG_VERSION);
         assert_eq!(cfg.lang, "en");
+    }
+
+    #[test]
+    fn tema_normaliza_caixa_e_volta_ao_padrao_fora_da_lista() {
+        let mut cfg = AppConfig {
+            theme: " Light ".into(),
+            ..AppConfig::default()
+        };
+        cfg.normalize();
+        assert_eq!(cfg.theme, "light");
+        cfg.theme = "sepia".into();
+        cfg.normalize();
+        assert_eq!(cfg.theme, "system");
+        // Arquivo antigo, sem o campo: segue o Windows.
+        let old: AppConfig = toml::from_str("lang = \"pt\"\n").unwrap();
+        assert_eq!(old.theme, "system");
     }
 
     #[test]
