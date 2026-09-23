@@ -245,7 +245,16 @@ pub(crate) async fn semantic_search(
             .semantic_search(kind, &emb.id(), &vector, limit)
             .map_err(|e| e.to_string())?;
         let mut out = Vec::with_capacity(hits.len());
+        // Excluídos há instantes (janela do Desfazer aberta) não voltam pela busca.
+        let hidden = if kind == "meeting" {
+            crate::undo::hidden_meetings()
+        } else {
+            crate::undo::hidden_dictations()
+        };
         for hit in hits {
+            if hidden.contains(&hit.ref_id) {
+                continue;
+            }
             let dto = if kind == "meeting" {
                 let Some(row) = store.meeting_row(hit.ref_id).map_err(|e| e.to_string())? else {
                     continue;

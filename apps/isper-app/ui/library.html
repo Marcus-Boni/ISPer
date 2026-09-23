@@ -392,13 +392,24 @@
       }
       const bDel = el('button', 'btn btn-danger ml-auto', 'Excluir do histórico');
       bDel.title = 'o arquivo .md continua na pasta';
-      bDel.addEventListener('click', () => UI.confirmInline(bDel, async () => {
-        try { await invoke('delete_meeting', { id }); selected = null; toast('excluída do histórico — o arquivo .md continua na pasta', 'ok'); }
-        catch (e) { toast('erro: ' + e, 'err'); }
+      // Exclui na hora e oferece Desfazer (o app só apaga de fato depois).
+      bDel.addEventListener('click', async () => {
+        let sched;
+        try { sched = await invoke('delete_meeting', { id }); }
+        catch (e) { toast('erro: ' + e, 'err'); return; }
+        selected = null;
         UI.swap($('detail'), () => $('detail').replaceChildren(placeholder('Selecione uma reunião à esquerda.')));
         $('list').dataset.sig = '';
         loadMeetings(true);
-      }, { label: 'Excluir mesmo?' }));
+        UI.undoable('Reunião excluída do histórico — o arquivo .md continua na pasta', sched, async (ok) => {
+          if (!ok) { toast('não deu tempo: a reunião já foi excluída', 'err'); return; }
+          selected = id;
+          $('list').dataset.sig = '';
+          await loadMeetings(true);
+          showMeeting(id);
+          toast('reunião restaurada', 'ok');
+        });
+      });
       actions.appendChild(bDel);
       d.appendChild(actions);
 
@@ -625,10 +636,18 @@
     const bCopy = el('button', 'btn btn-sm btn-ghost', 'copiar');
     bCopy.addEventListener('click', () => copyText(r.text, bCopy));
     const bDel = el('button', 'btn btn-sm btn-danger', '×'); bDel.title = 'remover do histórico';
-    bDel.addEventListener('click', () => UI.confirmInline(bDel, async () => {
-      try { await invoke('delete_dictation', { id: r.id }); $('list').dataset.sig = ''; loadDictations(true); }
-      catch (e) { toast('erro: ' + e, 'err'); }
-    }, { label: 'remover?' }));
+    bDel.addEventListener('click', async () => {
+      let sched;
+      try { sched = await invoke('delete_dictation', { id: r.id }); }
+      catch (e) { toast('erro: ' + e, 'err'); return; }
+      $('list').dataset.sig = '';
+      loadDictations(true);
+      UI.undoable('Ditado removido do histórico', sched, (ok) => {
+        if (!ok) { toast('não deu tempo: o ditado já foi removido', 'err'); return; }
+        $('list').dataset.sig = '';
+        loadDictations(true);
+      });
+    });
     row.append(bCopy, bDel);
     return row;
   }

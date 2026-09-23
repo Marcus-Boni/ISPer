@@ -180,6 +180,13 @@ jobs:
           ISPER_E2E_CDP_REGISTRY: '1'
         run: .\tools\e2e\theme.ps1 -Exe .\target\release\isper-app.exe
 
+      # Desfazer pela Biblioteca (sem ditados no runner, só confere que a janela abre limpa).
+      - name: E2E desfazer (Biblioteca)
+        shell: pwsh
+        env:
+          ISPER_E2E_CDP_REGISTRY: '1'
+        run: .\tools\e2e\undo.ps1 -Exe .\target\release\isper-app.exe
+
       # Quando o smoke falha, o que interessa e o que o runner tinha na hora:
       # processos do app e do WebView2 (com a linha de comando), quem escuta a
       # porta CDP e o fim do log do ISPer.

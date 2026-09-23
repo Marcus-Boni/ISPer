@@ -19,6 +19,13 @@ bata com ela.
   os textos. O indicador flutuante e o Copilot continuam escuros: flutuam
   sobre outros apps e precisam do contraste próprio.
 
+### Alterado
+- **Excluir agora tem "Desfazer"** no lugar do "clique de novo para
+  confirmar": reuniões e ditados na Biblioteca e modelos nas Configurações
+  somem na hora e um aviso oferece *Desfazer* (ou Ctrl+Z) por 7 segundos —
+  só então o app apaga de fato. Fechar a janela nesse intervalo não perde
+  nada; sair do app aplica o que estava pendente.
+
 ## [0.18.0] - 2026-09-22
 
 ### Adicionado

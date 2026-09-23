@@ -1,7 +1,7 @@
 // ISPer — helpers de interface compartilhados (sem build step; expõe window.UI).
 // Microinterações com estado: toast, count-up, entrada escalonada, botões
-// ocupados/sucesso, confirmação inline em dois passos, abas com indicador
-// deslizante, skeleton. Tudo constrói DOM via createElement (nunca HTML solto).
+// ocupados/sucesso, desfazer (exclusão adiada), abas com indicador deslizante,
+// skeleton. Tudo constrói DOM via createElement (nunca HTML solto).
 (function () {
   'use strict';
 
@@ -28,7 +28,9 @@
 
   // ----------------------------------------------------------------- toast
   let host = null;
-  function toast(msg, kind = 'info', ms = 2800) {
+  // opts.action = { label, run }: um botão no toast (ex.: Desfazer). Com ação,
+  // uma barra mostra o tempo que falta e o toast não some ao passar o mouse.
+  function toast(msg, kind = 'info', ms = 2800, opts = {}) {
     if (!host) {
       host = el('div', 'toast-host');
       host.setAttribute('role', 'status');
@@ -38,6 +40,16 @@
     const t = el('div', 'toast toast-' + kind);
     t.appendChild(el('span', 'toast-ic', kind === 'ok' ? '✓' : kind === 'err' ? '!' : 'i'));
     t.appendChild(el('span', 'toast-msg', msg));
+    if (opts.action) {
+      const b = el('button', 'toast-act', opts.action.label);
+      b.type = 'button';
+      b.addEventListener('click', (ev) => { ev.stopPropagation(); close(); opts.action.run(); });
+      t.appendChild(b);
+      const bar = el('i', 'toast-timer');
+      bar.style.setProperty('--toast-ms', ms + 'ms');
+      t.appendChild(bar);
+      t.classList.add('has-action');
+    }
     host.appendChild(t);
     while (host.children.length > 3) host.firstElementChild.remove();
     requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('in')));
@@ -52,6 +64,38 @@
     const h = setTimeout(close, ms);
     t.addEventListener('click', () => { clearTimeout(h); close(); });
     return close;
+  }
+
+  // ------------------------------------------------------------- desfazer
+  // Exclusão já agendada no app (resposta { token, undo_ms }): mostra o
+  // "Desfazer" pelo tempo que o app espera antes de apagar de fato. Ctrl+Z
+  // também desfaz enquanto o toast está na tela. `onUndo(ok)` recebe se deu
+  // tempo (false = o app já tinha apagado).
+  function undoable(msg, sched, onUndo) {
+    const undoLabel = (window.I18N ? window.I18N.t('common.undo', null, 'Desfazer') : 'Desfazer');
+    let done = false;
+    let closeToast = () => {};
+    const run = async () => {
+      if (done) return;
+      done = true;
+      removeEventListener('keydown', onKey, true);
+      let ok = false;
+      try { ok = await window.__TAURI__.core.invoke('undo_delete', { token: sched.token }); } catch (_) { ok = false; }
+      onUndo(ok);
+    };
+    const onKey = (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.key.toLowerCase() === 'z') {
+        const tag = (ev.target && ev.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return; // o Ctrl+Z do campo é do campo
+        ev.preventDefault();
+        closeToast();
+        run();
+      }
+    };
+    addEventListener('keydown', onKey, true);
+    const ms = Math.max(1500, (sched.undo_ms || 7000) - 400);
+    closeToast = toast(msg, 'ok', ms, { action: { label: undoLabel, run } });
+    setTimeout(() => { if (!done) { done = true; removeEventListener('keydown', onKey, true); } }, ms);
   }
 
   // -------------------------------------------------------------- count-up
@@ -105,30 +149,6 @@
       btn.textContent = prev;
       btn.disabled = wasDisabled;
     }, ms);
-  }
-
-  // ------------------------------------ confirmação inline (sem modal nativo)
-  function confirmInline(btn, onYes, opts = {}) {
-    const { label = 'Confirmar?', ms = 3600 } = opts;
-    const disarm = () => {
-      if (btn.dataset.armed !== '1') return;
-      btn.dataset.armed = '0';
-      btn.classList.remove('is-armed');
-      btn.textContent = btn.dataset.label;
-      delete btn.dataset.label;
-    };
-    if (btn.dataset.armed === '1') {
-      clearTimeout(Number(btn.dataset.timer));
-      disarm();
-      onYes();
-      return;
-    }
-    btn.dataset.armed = '1';
-    btn.dataset.label = btn.textContent;
-    btn.textContent = label;
-    btn.classList.add('is-armed');
-    btn.style.setProperty('--arm-ms', ms + 'ms');
-    btn.dataset.timer = String(setTimeout(disarm, ms));
   }
 
   // ------------------------------------------- abas com indicador deslizante
@@ -193,5 +213,5 @@
   };
   const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 
-  window.UI = { el, toast, countUp, stagger, busy, flash, confirmInline, tabs, swap, skeleton, fmtClock, fmtDur, plural, reduce };
+  window.UI = { el, toast, undoable, countUp, stagger, busy, flash, tabs, swap, skeleton, fmtClock, fmtDur, plural, reduce };
 })();

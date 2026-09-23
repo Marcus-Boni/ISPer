@@ -32,6 +32,7 @@ mod shortcuts;
 mod state;
 mod tray;
 mod ui;
+mod undo;
 mod updater;
 mod views;
 
@@ -226,6 +227,7 @@ fn main() {
             install_update,
             set_show_home,
             ui::set_ui_theme,
+            undo::undo_delete,
             dismiss_call_prompt,
             record_call_cmd,
             live_insights_state,
@@ -528,6 +530,13 @@ fn main() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("erro ao iniciar o ISPer");
+        .build(tauri::generate_context!())
+        .expect("erro ao iniciar o ISPer")
+        .run(|_app, event| {
+            // Exclusões com o "Desfazer" ainda aberto: o usuário pediu para
+            // apagar — aplica antes de sair (sair pela bandeja, atualizar…).
+            if let tauri::RunEvent::Exit = event {
+                undo::flush_all();
+            }
+        });
 }

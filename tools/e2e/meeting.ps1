@@ -153,8 +153,21 @@ $libErrors = if ($lib) { @($lib.errors).Count } else { -1 }
 Check ($null -ne $lib -and $lib.chips -eq 2 -and $lib.starred -in 1, 2 -and $libErrors -eq 0) "Biblioteca: chips=$($lib.chips) (esperado 2), paragrafos destacados=$($lib.starred) (esperado 1 ou 2), erros de JS=$libErrors"
 
 if (-not $KeepMeeting) {
-  Invoke-Isper 'delete_meeting' "{ id: $($row.id) }" | Out-Null
+  # Desfazer (fase 7.5): excluir esconde na hora; desfazer traz de volta; so
+  # depois da janela de desfazer a reuniao sai do banco de fato.
+  $sched = Invoke-Isper 'delete_meeting' "{ id: $($row.id) }"
+  Check ($null -ne $sched -and $sched.token -gt 0 -and $sched.undo_ms -ge 3000) "excluir devolve token e janela de desfazer ($($sched.undo_ms) ms)"
+  Check (@(Invoke-Isper 'list_meetings' '{ query: null }').Count -eq $before) "reuniao excluida some da lista na hora"
+  Check ((Invoke-Isper 'undo_delete' "{ token: $($sched.token) }") -eq $true) "desfazer dentro da janela funciona"
+  Check (@(Invoke-Isper 'list_meetings' '{ query: null }').Count -eq $before + 1) "reuniao de volta na lista depois do desfazer"
+  Check ((Invoke-Isper 'undo_delete' "{ token: $($sched.token) }") -eq $false) "desfazer de novo o mesmo token nao faz nada"
+  $sched = Invoke-Isper 'delete_meeting' "{ id: $($row.id) }"
   foreach ($f in @($det.meeting.md_path, $docx)) { if ($f -and (Test-Path $f)) { Remove-Item $f -Force } }
+  # Espera a janela de desfazer fechar: o Restart abaixo mata o processo, e
+  # uma exclusao pendente morreria com ele (o item ficaria).
+  Start-Sleep -Milliseconds ([int]$sched.undo_ms + 1500)
+  Check ($null -eq (Invoke-Isper 'get_meeting' "{ id: $($row.id) }")) "reuniao sai do banco depois da janela de desfazer"
+  Check ((Invoke-Isper 'undo_delete' "{ token: $($sched.token) }") -eq $false) "desfazer depois da janela nao ressuscita"
   Check (@(Invoke-Isper 'list_meetings' '{ query: null }').Count -eq $before) "reuniao de teste e arquivos apagados"
 } else {
   "reuniao de teste mantida (id $($row.id)): $($det.meeting.md_path)"

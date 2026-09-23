@@ -107,10 +107,12 @@ pub(crate) fn home_status(app: AppHandle) -> HomeStatus {
     );
 
     let (stats, recent) = match open_store() {
-        Ok(store) => (
-            store.stats().unwrap_or_default(),
-            store.recent_meetings(HOME_RECENT).unwrap_or_default(),
-        ),
+        Ok(store) => (store.stats().unwrap_or_default(), {
+            let hidden = crate::undo::hidden_meetings();
+            let mut recent = store.recent_meetings(HOME_RECENT).unwrap_or_default();
+            recent.retain(|r| !hidden.contains(&r.id));
+            recent
+        }),
         Err(e) => {
             tracing::warn!("banco indisponível para a tela Início: {e}");
             Default::default()
