@@ -45,6 +45,17 @@ bata com ela.
   → Sistema → *Refazer a primeira configuração*.
 
 ### Alterado
+- **Acessibilidade** (fase 7.5). Tudo no Início, na Biblioteca, nas
+  Configurações e na primeira configuração se faz pelo teclado, com o foco
+  sempre visível — inclusive nos temas de contraste do Windows, onde o anel
+  do ISPer não aparecia. As abas da Biblioteca seguem o padrão dos leitores
+  de tela (setas trocam de aba), a reunião aberta é anunciada como atual, o
+  título e o nome de cada falante podem ser renomeados com Enter, e os erros
+  são lidos na hora. O texto secundário do tema escuro ficou mais claro para
+  passar no contraste WCAG AA, e as Configurações não abrem mais rolagem
+  horizontal por causa de um caminho longo. Um teste automático confere
+  nomes, contraste, reflow e a volta de Tab nos dois temas; o roteiro com o
+  NVDA está em `docs/TESTES.md`.
 - **Excluir agora tem "Desfazer"** no lugar do "clique de novo para
   confirmar": reuniões e ditados na Biblioteca e modelos nas Configurações
   somem na hora e um aviso oferece *Desfazer* (ou Ctrl+Z) por 7 segundos —

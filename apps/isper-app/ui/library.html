@@ -219,6 +219,18 @@
     try { await navigator.clipboard.writeText(text); UI.flash(btn, label || t('common.copied')); }
     catch (_) { toast(t('library.copy-failed'), 'err'); }
   }
+  // Algo clicável que não é <button> (título, nome de falante): entra no Tab,
+  // ganha papel e nome, e Enter ou Espaço fazem o clique.
+  function keyboardClick(node, label) {
+    node.tabIndex = 0;
+    node.setAttribute('role', 'button');
+    if (label) node.setAttribute('aria-label', label);
+    node.addEventListener('keydown', (ev) => {
+      if (ev.target !== node || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+      ev.preventDefault();
+      node.click();
+    });
+  }
   const pct = (score) => Math.round(Math.max(0, Math.min(1, score)) * 100) + '%';
 
   let tab = 'meetings';
@@ -268,6 +280,8 @@
   function meetingItem(r, extra) {
     const it = el('div', 'item' + (selected === r.id ? ' on' : ''));
     it.tabIndex = 0;
+    it.setAttribute('role', 'button');
+    if (selected === r.id) it.setAttribute('aria-current', 'true');
     it.appendChild(el('div', 't', r.title));
     const m = el('div', 'm');
     m.appendChild(el('span', '', r.started_at));
@@ -313,7 +327,7 @@
         const at = hit && hit.start_secs != null ? hit.start_secs : null;
         if (selected === r.id && at == null) return;
         selected = r.id;
-        list.querySelectorAll('.item').forEach(x => x.classList.toggle('on', x === it));
+        list.querySelectorAll('.item').forEach(x => { x.classList.toggle('on', x === it); if (x === it) x.setAttribute('aria-current', 'true'); else x.removeAttribute('aria-current'); });
         list.dataset.sig = '';
         showMeeting(r.id, { at, semantic: !!hit });
       };
@@ -349,6 +363,7 @@
       const head = el('div', 'dhead');
       const h2 = el('h2', '', m.title);
       h2.title = t('library.rename-title');
+      keyboardClick(h2, t('library.rename-aria', { title: m.title }));
       h2.addEventListener('click', () => {
         const input = el('input'); input.value = m.title;
         head.replaceChild(input, h2); input.focus(); input.select();
@@ -558,6 +573,7 @@
         seg.appendChild(el('div', 'ts', fmtClock(g.start_secs)));
         const sp = el('div', 'sp ' + spClass(g.speaker), speaker(g.speaker));
         sp.title = t('library.speaker.title', { name: speaker(g.speaker) });
+        keyboardClick(sp, t('library.speaker.rename-aria', { name: speaker(g.speaker) }));
         sp.addEventListener('click', () => { if (!sp.querySelector('input')) renameSpeaker(sp, g.speaker); });
         seg.appendChild(sp);
         const tx = el('div', 'tx', g.text); tx.dataset.raw = g.text;

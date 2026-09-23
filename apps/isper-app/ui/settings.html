@@ -40,7 +40,8 @@
     border-top: 1px solid var(--line);
   }
   .footer #status { flex: 1; }
-  code { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); }
+  /* Caminhos longos (%LOCALAPPDATA%\\…) quebram em vez de abrir rolagem horizontal. */
+  code { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); overflow-wrap: anywhere; }
 </style>
 </head>
 <body class="atmos">
@@ -209,7 +210,7 @@
   <h3 data-i18n="settings.inteligencia.insights-vivo">Insights ao vivo</h3>
   <div class="stack mt4">
     <label class="switch"><input type="checkbox" id="insights"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.inteligencia.durante-reuniao-perguntar-ia-ficou">Durante a reunião, perguntar à IA o que ficou pendente, o que eu prometi e o que foi decidido</span></label>
-    <select id="insint" class="field">
+    <select id="insint" class="field" aria-label="intervalo entre as rodadas de insights" data-i18n-attr="aria-label:settings.inteligencia.insint-aria">
       <option value="3" data-i18n="settings.inteligencia.cada-3-minutos">A cada 3 minutos</option>
       <option value="5" data-i18n="settings.inteligencia.cada-5-minutos-padrao">A cada 5 minutos (padrão)</option>
       <option value="10" data-i18n="settings.inteligencia.cada-10-minutos">A cada 10 minutos</option>
@@ -247,7 +248,7 @@
   <h3 data-i18n="settings.inteligencia.polimento-ditado">Polimento do ditado</h3>
   <div class="stack mt4">
     <label class="switch"><input type="checkbox" id="polish"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.inteligencia.polir-ditados-ia-antes-colar">Polir os ditados com IA antes de colar</span></label>
-    <select id="pstyle" class="field">
+    <select id="pstyle" class="field" aria-label="estilo do polimento" data-i18n-attr="aria-label:settings.inteligencia.pstyle-aria">
       <option value="clean" data-i18n="settings.inteligencia.so-limpeza-tira-hesitacoes-arruma">Só limpeza — tira hesitações e arruma pontuação, sem mudar o tom</option>
       <option value="formal" data-i18n="settings.inteligencia.formal-frases-completas-tom-profissional">Formal — frases completas, tom profissional</option>
       <option value="casual" data-i18n="settings.inteligencia.casual-tom-natural-como-mensagem">Casual — tom natural, como uma mensagem para colegas</option>
