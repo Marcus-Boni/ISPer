@@ -18,29 +18,40 @@ use crate::vad::{VadOptions, WindowOptions};
 /// Tempos de cada etapa, em segundos.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct StageTimings {
+    /// Detecção de fala (Silero), sobre o áudio inteiro.
     pub vad_secs: f32,
+    /// Transcrição de todas as janelas.
     pub asr_secs: f32,
+    /// Diarização (segmentação, embeddings e agrupamento).
     pub diarize_secs: f32,
+    /// Atribuição de falante por palavra e montagem das falas.
     pub align_secs: f32,
+    /// A rodada inteira, de ponta a ponta.
     pub total_secs: f32,
 }
 
 /// O que o VAD encontrou.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VadStats {
+    /// Regiões de fala encontradas.
     pub regions: usize,
+    /// Soma da fala detectada, em segundos.
     pub speech_secs: f32,
     /// Silêncio que não foi ao Whisper — economia direta de GPU e a maior
     /// defesa contra alucinação (o Whisper inventa legenda em silêncio).
     pub discarded_silence_secs: f32,
+    /// Janelas enviadas ao Whisper depois de juntar e cortar as regiões.
     pub windows: usize,
+    /// Mediana da duração dessas janelas, em segundos.
     pub median_window_secs: f32,
 }
 
 /// O que o ASR produziu.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct AsrStats {
+    /// Segmentos que o Whisper devolveu (depois do filtro).
     pub segments: usize,
+    /// Palavras com horário.
     pub words: usize,
     /// Média das log-probabilidades dos segmentos (quanto o modelo confiou).
     pub avg_logprob: f32,
@@ -52,7 +63,9 @@ pub struct AsrStats {
     pub failed_windows: usize,
     /// Janelas que herdaram contexto da anterior.
     pub windows_with_context: usize,
+    /// Segmentos com menos de 1 s — fragmentação do texto.
     pub segments_under_1s: usize,
+    /// Mediana da duração dos segmentos, em segundos.
     pub median_segment_secs: f32,
 }
 
@@ -60,25 +73,40 @@ pub struct AsrStats {
 /// o core não pode importar sem puxar o sherpa junto).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DiarizeStats {
+    /// Grupos que o agrupamento criou, antes da limpeza.
     pub raw_clusters: usize,
+    /// Turnos antes da limpeza.
     pub raw_turns: usize,
+    /// Falantes publicados, depois da limpeza.
     pub speakers: usize,
+    /// Turnos publicados.
     pub turns: usize,
+    /// Grupos fracos absorvidos pelo grupo forte mais próximo no tempo.
     pub absorbed_clusters: usize,
+    /// Mediana da duração dos turnos publicados, em segundos.
     pub median_turn_secs: f32,
+    /// Turnos publicados com menos de 500 ms.
     pub very_short_turns: usize,
+    /// Avisos que tornam o resultado pouco confiável (ex.: grupos demais).
     pub warnings: Vec<String>,
 }
 
 /// Todos os parâmetros que produziram esta rodada.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RunParams {
+    /// Perfil de transcrição.
     pub profile: TranscriptionProfile,
+    /// Idioma da fala.
     pub lang: String,
+    /// Decodificação do Whisper.
     pub decode: DecodeConfig,
+    /// Opções do VAD; `None` na segmentação antiga, sem VAD.
     pub vad: Option<VadOptions>,
+    /// Como as regiões viram janelas.
     pub windows: WindowOptions,
+    /// Como palavras e turnos viram falas.
     pub align: AlignOptions,
+    /// Caracteres do texto anterior dados como contexto (0 = sem contexto).
     pub context_chars: usize,
 }
 
@@ -87,24 +115,33 @@ pub struct RunParams {
 pub struct PipelineReport {
     /// Nome livre da configuração ("baseline", "experimental"…).
     pub config: String,
+    /// Arquivo do modelo Whisper usado.
     pub model: String,
     /// "cuda" ou "cpu" — de qual build o binário veio.
     pub device: String,
     /// Alinhamento DTW dos timestamps por token estava ligado.
     pub dtw: bool,
+    /// Duração do áudio processado, em segundos.
     pub audio_secs: f32,
     /// Tempo de processamento ÷ duração do áudio. Menor que 1 = mais rápido
     /// que o tempo real.
     pub realtime_factor: f32,
+    /// Tempo de cada etapa.
     pub timings: StageTimings,
+    /// Todos os parâmetros da rodada, para reproduzi-la.
     pub params: RunParams,
+    /// O que o VAD encontrou.
     pub vad: VadStats,
+    /// O que o ASR produziu.
     pub asr: AsrStats,
+    /// O que a diarização produziu; `None` quando ela não rodou.
     pub diarization: Option<DiarizeStats>,
+    /// Métricas das falas finais, por falante.
     pub speakers: SpeakerMetrics,
 }
 
 impl PipelineReport {
+    /// O relatório em JSON legível (o arquivo que `isper-cli bench` grava).
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).unwrap_or_else(|e| format!("{{\"erro\":\"{e}\"}}"))
     }
@@ -124,7 +161,9 @@ pub const fn device() -> &'static str {
 /// Como normalizar os textos antes de comparar.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Normalization {
+    /// Comparar sem diferenciar maiúsculas.
     pub lowercase: bool,
+    /// Tratar pontuação como espaço.
     pub strip_punct: bool,
     /// Ignorar acentos. Desligado por padrão: em português, "e" e "é" são
     /// palavras diferentes — apagar o acento esconde erro de verdade.
@@ -214,8 +253,11 @@ fn is_droppable_punct(c: char) -> bool {
 /// Erros de uma comparação, abertos por tipo.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct ErrorRate {
+    /// Unidades trocadas por outras (S).
     pub substitutions: usize,
+    /// Unidades da referência que faltaram na hipótese (D).
     pub deletions: usize,
+    /// Unidades a mais na hipótese (I).
     pub insertions: usize,
     /// Unidades da referência (palavras ou caracteres).
     pub reference_len: usize,
@@ -224,6 +266,7 @@ pub struct ErrorRate {
 }
 
 impl ErrorRate {
+    /// Total de erros: `S + D + I`.
     pub fn errors(&self) -> usize {
         self.substitutions + self.deletions + self.insertions
     }
@@ -332,6 +375,7 @@ pub struct DiarizationErrorRate {
     pub confusion_secs: f32,
     /// Fala total na referência.
     pub reference_secs: f32,
+    /// `(perdida + alarme falso + confusão) / fala da referência`.
     pub rate: f32,
 }
 

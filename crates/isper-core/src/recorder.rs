@@ -35,6 +35,7 @@ enum Command {
     SetDevice(Option<String>),
 }
 
+/// O que a thread de áudio avisa a quem a controla.
 pub enum RecorderEvent {
     /// A gravação terminou (Stop manual, VAD ou trava de tempo) — o áudio
     /// completo vem aqui. Erros de captura também chegam por este evento.

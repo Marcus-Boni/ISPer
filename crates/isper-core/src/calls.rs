@@ -29,6 +29,7 @@ pub struct CallSignal {
 }
 
 impl CallSignal {
+    /// Há alguma sessão ativa — de captura ou de reprodução.
     pub fn any(&self) -> bool {
         self.capture || self.render
     }
@@ -37,7 +38,9 @@ impl CallSignal {
 /// Transição detectada pelo [`CallTracker`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CallEvent {
+    /// A chamada começou (o sinal ficou estável por tempo suficiente).
     Started,
+    /// A chamada terminou (o sinal sumiu por tempo suficiente).
     Ended,
 }
 
@@ -54,6 +57,8 @@ pub struct CallTracker {
 }
 
 impl CallTracker {
+    /// Cria o rastreador. `start_polls` sondagens seguidas com sinal abrem a
+    /// chamada; `end_polls` seguidas sem sinal a encerram (mínimo de 1 cada).
     pub fn new(start_polls: u32, end_polls: u32) -> Self {
         Self {
             start_polls: start_polls.max(1),
@@ -64,6 +69,7 @@ impl CallTracker {
         }
     }
 
+    /// Se o rastreador considera que há uma chamada em andamento.
     pub fn in_call(&self) -> bool {
         self.in_call
     }

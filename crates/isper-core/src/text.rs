@@ -258,8 +258,10 @@ const DISCARD_PHRASES: &[&str] = &[
 const UPPER_PHRASES: &[&str] = &["tudo em maiusculas", "tudo maiusculo", "em maiusculas"];
 const LOWER_PHRASES: &[&str] = &["tudo em minusculas", "tudo minusculo", "em minusculas"];
 
+/// O ditado depois dos comandos de voz.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommandResult {
+    /// O texto final, com os símbolos aplicados.
     pub text: String,
     /// O usuário pediu para jogar o ditado fora ("apagar isso").
     pub discard: bool,

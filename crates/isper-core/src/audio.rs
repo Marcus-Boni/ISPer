@@ -75,12 +75,16 @@ pub(crate) fn audio_err(e: impl std::fmt::Display) -> IsperError {
 /// Se stereo, o layout é [esq, dir, esq, dir, ...].
 #[derive(Debug, Clone)]
 pub struct RawAudio {
+    /// Amostras em f32 normalizado (`-1.0..=1.0`), intercaladas por canal.
     pub samples: Vec<f32>,
+    /// Taxa de amostragem original, em Hz.
     pub sample_rate: u32,
+    /// Número de canais intercalados em `samples`.
     pub channels: u16,
 }
 
 impl RawAudio {
+    /// Duração do áudio, em segundos (0 se não houver canais).
     pub fn duration_secs(&self) -> f32 {
         if self.channels == 0 {
             return 0.0;

@@ -28,11 +28,14 @@ use crate::{IsperError, Result};
 /// Um trecho em que o VAD ouviu fala, em segundos do áudio analisado.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpeechRegion {
+    /// Início da região, em segundos.
     pub start_secs: f32,
+    /// Fim da região, em segundos.
     pub end_secs: f32,
 }
 
 impl SpeechRegion {
+    /// Duração da região, em segundos (nunca negativa).
     pub fn secs(&self) -> f32 {
         (self.end_secs - self.start_secs).max(0.0)
     }
@@ -189,6 +192,7 @@ impl Default for WindowOptions {
 pub struct AsrWindow {
     /// Início no relógio do áudio (já com padding).
     pub start_secs: f32,
+    /// Fim no relógio do áudio (já com padding).
     pub end_secs: f32,
     /// Fala útil dentro da janela (sem o padding) — para as métricas.
     pub speech_secs: f32,
@@ -199,6 +203,7 @@ pub struct AsrWindow {
 }
 
 impl AsrWindow {
+    /// Duração da janela, em segundos (nunca negativa).
     pub fn secs(&self) -> f32 {
         (self.end_secs - self.start_secs).max(0.0)
     }

@@ -29,6 +29,10 @@ pub(crate) fn install_whisper_logging() {
     ONCE.call_once(whisper_rs::install_logging_hooks);
 }
 
+/// Um modelo Whisper carregado, pronto para transcrever.
+///
+/// Carregar custa segundos e centenas de MB (ou de VRAM), então o app mantém
+/// um só e o compartilha; as inferências são serializadas internamente.
 pub struct WhisperEngine {
     ctx: WhisperContext,
     /// Serializa inferências: ditado e blocos de reunião compartilham o
@@ -47,17 +51,24 @@ pub struct WhisperEngine {
 /// duas pessoas, uma palavra não.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Word {
+    /// A palavra, como o modelo a escreveu.
     pub text: String,
+    /// Início da palavra, em segundos do áudio transcrito.
     pub start_secs: f32,
+    /// Fim da palavra, em segundos.
     pub end_secs: f32,
     /// Probabilidade média dos tokens que formam a palavra.
     pub prob: f32,
 }
 
+/// Um segmento que o Whisper devolveu: um trecho de texto com horário.
 #[derive(Debug, Clone)]
 pub struct TranscriptSegment {
+    /// Início do segmento, em segundos do áudio transcrito.
     pub start_secs: f32,
+    /// Fim do segmento, em segundos.
     pub end_secs: f32,
+    /// Texto do segmento, já sem espaços nas pontas.
     pub text: String,
     /// Probabilidade, dada pelo próprio modelo, de o trecho NÃO ser fala
     /// (0 = fala certa, 1 = silêncio/ruído). Insumo do filtro de alucinações.
@@ -78,10 +89,12 @@ impl TranscriptSegment {
     }
 }
 
+/// O resultado de uma chamada ao Whisper.
 #[derive(Debug, Clone)]
 pub struct Transcript {
     /// Texto completo, segmentos emendados.
     pub text: String,
+    /// Os segmentos, na ordem do áudio.
     pub segments: Vec<TranscriptSegment>,
     /// Quanto tempo a inferência levou (para medir o fator de tempo real).
     pub infer_secs: f32,
@@ -96,6 +109,7 @@ pub struct Transcript {
 pub struct TranscribeRequest<'a> {
     /// "pt", "en"… ou "auto" (normalizado por [`normalize_lang`]).
     pub lang: &'a str,
+    /// Como decodificar (greedy ou beam search, temperaturas, supressões).
     pub decode: &'a DecodeConfig,
     /// `initial_prompt`: glossário e/ou o fim do bloco anterior.
     pub prompt: Option<&'a str>,
@@ -163,6 +177,7 @@ impl WhisperEngine {
         })
     }
 
+    /// Nome do arquivo do modelo carregado (ex.: `ggml-large-v3-turbo-q5_0.bin`).
     pub fn model_name(&self) -> &str {
         &self.model_name
     }

@@ -56,6 +56,8 @@ impl MeetingContext {
         ctx
     }
 
+    /// Não há nada a dizer ao modelo: sem participantes, cliente, projeto,
+    /// vocabulário nem siglas.
     pub fn is_empty(&self) -> bool {
         self.participants.is_empty()
             && self.client.is_none()

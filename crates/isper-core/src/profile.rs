@@ -33,6 +33,7 @@ pub enum TranscriptionProfile {
 }
 
 impl TranscriptionProfile {
+    /// Nome estável do perfil (o que vai para relatórios e para a CLI).
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Dictation => "dictation",
@@ -41,6 +42,7 @@ impl TranscriptionProfile {
         }
     }
 
+    /// Lê um nome de perfil, em inglês ou português, sem diferenciar caixa.
     pub fn parse(s: &str) -> Option<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
             "dictation" | "ditado" => Some(Self::Dictation),
@@ -50,6 +52,7 @@ impl TranscriptionProfile {
         }
     }
 
+    /// Decodificação padrão do perfil.
     pub fn decode(self) -> DecodeConfig {
         match self {
             Self::Dictation => DecodeConfig::dictation(),
@@ -97,7 +100,7 @@ pub struct DecodeConfig {
     /// Reaproveita o texto do bloco anterior como prompt — só faz sentido em
     /// blocos contíguos (ver [`crate::pipeline`]).
     pub carry_context: bool,
-    /// Suprime tokens não-fala (♪, [Music]…). Default do whisper.cpp: false;
+    /// Suprime tokens não-fala (`♪`, `[Music]`…). Default do whisper.cpp: false;
     /// aqui ligamos por padrão — reunião não tem trilha sonora.
     pub suppress_nst: bool,
 }
