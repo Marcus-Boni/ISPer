@@ -241,16 +241,28 @@ export function getAdjacentDocs(slug: string) {
   };
 }
 
+/**
+ * The synchronous fallback behind the docs search, sent to every docs page.
+ *
+ * In production Pagefind searches the full text, so the fallback carries only
+ * titles, descriptions and sections. The body goes along only under `next dev`,
+ * where Pagefind is not built. Shipping it everywhere put the text of every
+ * doc into every docs page — each new doc added ~7 KiB of raw HTML to all of
+ * them, until the two Copilot guides pushed the docs routes past their budget.
+ */
 export function getDocsSearchIndex() {
+  const withBody = process.env.NODE_ENV === "development";
   return getAllDocs().map((doc) => ({
     title: doc.frontmatter.title,
     description: doc.frontmatter.description,
     section: doc.frontmatter.section,
     href: doc.href,
-    text: doc.raw
-      .replace(/^---[\s\S]*?---/, "")
-      .replace(/[#>*`|_-]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim(),
+    text: withBody
+      ? doc.raw
+          .replace(/^---[\s\S]*?---/, "")
+          .replace(/[#>*`|_-]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+      : "",
   }));
 }
