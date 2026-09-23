@@ -14,6 +14,7 @@
   .card h2 { font-size: 11px; margin: 0 0 12px; color: var(--accent); text-transform: uppercase; letter-spacing: .14em; font-weight: 600; }
   .card h3 { font-size: 12.5px; font-weight: 600; margin: 18px 0 4px; padding-top: 14px; border-top: 1px solid var(--line); }
   .row { display: flex; gap: 8px; align-items: center; }
+  #onboarding { margin-top: 14px; }
   .row > * { flex: 1; }
   .row > button { flex: 0 0 auto; }
   .stack { display: grid; gap: 10px; margin-top: 12px; }
@@ -277,6 +278,8 @@
     <option value="en" lang="en">English</option>
   </select>
   <p class="hint" data-i18n="settings.sistema.ui-lang-hint">Muda os textos do ISPer na hora: janelas, bandeja e notificações. O idioma da fala (o que o Whisper transcreve) fica em Ditado.</p>
+  <button class="btn" id="onboarding" data-i18n="settings.sistema.onboarding">Refazer a primeira configuração</button>
+  <p class="hint" data-i18n="settings.sistema.onboarding-hint">Microfone, modelo, atalho e IA, passo a passo — como na primeira vez.</p>
   <label class="lbl" for="retention" data-i18n="settings.sistema.guardar-reunioes-ditados-por">Guardar reuniões e ditados por</label>
   <select id="retention" class="field">
     <option value="0" data-i18n="settings.sistema.sempre-padrao">Para sempre (padrão)</option>
@@ -372,6 +375,7 @@
     document.addEventListener('keydown', onKey, true);
   }
   $('cap-shortcut').addEventListener('click', () => captureInto($('shortcut'), $('cap-shortcut')));
+  $('onboarding').addEventListener('click', () => invoke('open_onboarding_window').catch(e => status(t('common.error', { e }), 'err')));
   $('cap-mshortcut').addEventListener('click', () => captureInto($('mshortcut'), $('cap-mshortcut')));
   $('cap-markshortcut').addEventListener('click', () => captureInto($('markshortcut'), $('cap-markshortcut')));
   $('cap-copilotshortcut').addEventListener('click', () => captureInto($('copilotshortcut'), $('cap-copilotshortcut')));
@@ -460,7 +464,7 @@
       name.append(m.label + ' · ' + m.approx_mb + ' MB');
       name.appendChild(el('span', 'chip' + (m.installed ? (m.active ? ' chip-accent' : ' chip-ok') : ''), m.installed ? (m.active ? t('settings.msg.in-use') : t('settings.msg.installed')) : t('settings.msg.not-downloaded')));
       info.appendChild(name);
-      info.appendChild(el('div', 'mnote', m.note + (m.needs_gpu ? t('settings.msg.needs-gpu') : '')));
+      info.appendChild(el('div', 'mnote', UI.modelNote(m) + (m.needs_gpu ? t('settings.msg.needs-gpu') : '')));
       const prog = el('div', 'mprog'); const bar = el('div', 'progress'); bar.appendChild(el('i')); prog.append(bar, el('span', 'pct', '0%'));
       info.appendChild(prog);
       const btn = el('button', 'btn btn-sm' + (m.installed ? ' btn-ghost' : ''), m.installed ? t('common.remove') : t('common.download'));

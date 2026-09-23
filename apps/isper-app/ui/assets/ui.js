@@ -224,7 +224,15 @@
     const m = String(label || '').match(/^Participante (\d+)$/);
     return m ? tt('speaker.participant', { n: Number(m[1]) }, label) : (label || tt('speaker.others', null, 'Participantes'));
   };
+  // Descrição do modelo Whisper no idioma da interface (o catálogo do
+  // isper-models, usado também pela CLI, fica em pt-BR).
+  const modelNote = (m) => ({
+    'ggml-large-v3-turbo-q5_0.bin': tt('model.note.turbo', null, m.note),
+    'ggml-small.bin': tt('model.note.small', null, m.note),
+    'ggml-medium-q5_0.bin': tt('model.note.medium', null, m.note),
+    'ggml-large-v3-q5_0.bin': tt('model.note.large', null, m.note),
+  })[m.file] || m.note;
   const keyLabel = (label) => String(label || '').replace(/Espaço/g, window.I18N ? window.I18N.t('keys.space', null, 'Espaço') : 'Espaço');
 
-  window.UI = { el, toast, undoable, keyLabel, speaker, countUp, stagger, busy, flash, tabs, swap, skeleton, fmtClock, fmtDur, plural, reduce, uiLang };
+  window.UI = { el, toast, undoable, keyLabel, speaker, modelNote, countUp, stagger, busy, flash, tabs, swap, skeleton, fmtClock, fmtDur, plural, reduce, uiLang };
 })();

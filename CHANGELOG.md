@@ -32,6 +32,17 @@ bata com ela.
   outra escolha, em Ditado.
 - **README em inglês** ([README.en.md](README.en.md)), com o passo a passo
   para acrescentar um idioma à interface.
+- **Primeira configuração guiada** (fase 7.5). Na primeira vez que o ISPer
+  abre, uma janela leva por cinco passos curtos: idioma e aparência;
+  **microfone com medidor de nível ao vivo** (nada é gravado; um microfone
+  mudo ou bloqueado em Privacidade ganha um aviso claro em vez de silêncio);
+  **modelo Whisper**, com o recomendado para a sua versão (GPU ou CPU) e o
+  download ali mesmo; **atalho**, com um campo para experimentar o primeiro
+  ditado; e **IA opcional**, com a chave testada na hora. Pular ou fechar a
+  janela também contam como feito, e a tela Início assume com o checklist do
+  que faltou. Quem já usa o ISPer não a vê (o `config.toml` passa para a
+  versão 2 marcando a configuração como feita); para refazer, Configurações
+  → Sistema → *Refazer a primeira configuração*.
 
 ### Alterado
 - **Excluir agora tem "Desfazer"** no lugar do "clique de novo para
@@ -50,6 +61,8 @@ bata com ela.
   curto e a dica completa aparece ao passar o mouse.
 - O ícone de Configurações do Início tinha o miolo pintado com a cor do tema
   escuro e ficava com manchas escuras no tema claro.
+- A descrição de cada modelo Whisper nas Configurações aparecia sempre em
+  português; agora segue o idioma da interface.
 
 ## [0.18.0] - 2026-09-22
 

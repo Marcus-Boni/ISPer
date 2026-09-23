@@ -13,7 +13,7 @@ pub(crate) const AFTER_MEETING_MODES: [&str; 3] = ["notify", "open", "silent"];
 /// não existia) e passa por [`AppConfig::migrate`]; um arquivo de versão maior
 /// (gravado por um ISPer mais novo) é lido com os campos que este entende e
 /// regravado nesta versão, com aviso no log.
-pub const CONFIG_VERSION: u32 = 1;
+pub const CONFIG_VERSION: u32 = 2;
 
 /// Opções de retenção, em dias; 0 = guardar para sempre.
 pub(crate) const RETENTION_DAYS: [u32; 5] = [0, 30, 90, 180, 365];
@@ -123,6 +123,10 @@ pub struct AppConfig {
     /// idioma da fala é outro campo (`lang`).
     #[serde(default = "default_ui_lang")]
     pub ui_lang: String,
+    /// A primeira configuração (janela guiada da primeira execução) já foi
+    /// concluída, pulada ou fechada — não abre de novo sozinha.
+    #[serde(default)]
+    pub onboarding_done: bool,
     /// Versão do formato deste arquivo — ver [`CONFIG_VERSION`].
     #[serde(default)]
     pub config_version: u32,
@@ -159,6 +163,7 @@ impl Default for AppConfig {
             diarize_threshold: 0.0,
             theme: default_theme(),
             ui_lang: default_ui_lang(),
+            onboarding_done: false,
             config_version: CONFIG_VERSION,
         }
     }
@@ -242,6 +247,12 @@ impl AppConfig {
                 // 0.14 gravavam exatamente estes campos, com estes nomes e
                 // unidades — nada a converter; `normalize` cuida dos valores.
                 0 => notes.push("config.toml sem versão → 1"),
+                // 1 → 2: a primeira configuração passou a existir. Quem tem um
+                // arquivo de antes dela já usa o ISPer — não a vê.
+                1 => {
+                    self.onboarding_done = true;
+                    notes.push("config.toml 1 → 2: primeira configuração já feita");
+                }
                 _ => break,
             }
             self.config_version += 1;
@@ -392,7 +403,14 @@ mod tests {
         // Um campo desconhecido (versão mais nova gravou) não derruba a leitura.
         let mut cfg: AppConfig = toml::from_str("campo_do_futuro = 1\n").unwrap();
         cfg.migrate();
-        assert_eq!(cfg, AppConfig::default());
+        // Arquivo antigo = alguém que já usa o ISPer: a primeira configuração não abre.
+        assert_eq!(
+            cfg,
+            AppConfig {
+                onboarding_done: true,
+                ..AppConfig::default()
+            }
+        );
     }
 
     #[test]
@@ -416,6 +434,24 @@ mod tests {
         let mut again = cfg.clone();
         assert!(again.migrate().is_empty());
         assert_eq!(again, cfg);
+        let _ = std::fs::remove_dir_all(p.parent().unwrap());
+    }
+
+    #[test]
+    fn primeira_configuracao_so_para_quem_nunca_teve_config() {
+        // Instalação nova: sem arquivo, a primeira configuração abre.
+        let p = temp_config("onboarding");
+        assert!(!load_from(&p).onboarding_done);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        // Arquivo da 0.18 (versão 1, sem o campo): quem já usava não a vê.
+        std::fs::write(&p, "config_version = 1\nlang = \"pt\"\n").unwrap();
+        let cfg = load_from(&p);
+        assert!(cfg.onboarding_done);
+        assert_eq!(cfg.config_version, CONFIG_VERSION);
+        // Gravado na versão atual sem ter concluído: continua pendente.
+        let pending = AppConfig::default();
+        save_to(&p, &pending).unwrap();
+        assert!(!load_from(&p).onboarding_done);
         let _ = std::fs::remove_dir_all(p.parent().unwrap());
     }
 
