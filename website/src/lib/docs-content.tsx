@@ -19,6 +19,9 @@ import Audio from "../../content/docs/solucao-de-problemas/audio.md";
 import Atalhos from "../../content/docs/solucao-de-problemas/atalhos.md";
 import Cuda from "../../content/docs/solucao-de-problemas/cuda.md";
 import Faq from "../../content/docs/solucao-de-problemas/faq.md";
+import PrimeiraConfiguracao from "../../content/docs/primeiros-passos/primeira-configuracao.md";
+import Interface from "../../content/docs/primeiros-passos/interface.md";
+import Arquitetura from "../../content/docs/desenvolvimento/arquitetura.md";
 
 export const docComponents: Record<string, ComponentType> = {
   "busca-semantica/configuracao": BuscaSemantica,
@@ -41,4 +44,7 @@ export const docComponents: Record<string, ComponentType> = {
   "solucao-de-problemas/atalhos": Atalhos,
   "solucao-de-problemas/cuda": Cuda,
   "solucao-de-problemas/faq": Faq,
+  "primeiros-passos/primeira-configuracao": PrimeiraConfiguracao,
+  "primeiros-passos/interface": Interface,
+  "desenvolvimento/arquitetura": Arquitetura,
 };
