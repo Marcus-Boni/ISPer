@@ -399,6 +399,72 @@ dictation is indexed in the background; "Index everything" covers the older
 history and rebuilds the index when the model changes. Vectors from one model
 are never compared with another's.
 
+### Meeting Copilot (Phase 8)
+
+A window of its own (`copilot.html`) that follows the meeting live: the speech
+on one side and, on the other, **decision, action, risk and question** cards
+extracted by the AI. What the user confirms becomes a section of the meeting's
+Markdown and a row in the `decisions` table (schema v3), which the Library
+shows. User guide on the site, in Portuguese:
+[Usar o Copilot](https://isper.pages.dev/docs/copilot/usar-o-copilot/).
+
+Where each part lives:
+
+| File | What |
+|---|---|
+| `crates/isper-llm/src/copilot.rs` | Cards, prompt, JSON parser, stable id, local triggers, minutes section |
+| `crates/isper-llm/src/providers.rs` | `complete_stream` (SSE) for Claude, Groq and Gemini |
+| `apps/isper-app/src-tauri/src/copilot.rs` | Meeting state, analysis loop, memory (RAG), commands |
+| `apps/isper-app/ui/copilot.html` | The HUD |
+| `apps/isper-app/ui/locales/{pt-BR,en}.json` | The HUD's text (`copilot.*` keys) |
+
+Three decisions worth reading before changing anything:
+
+- **The card id is derived from `kind + normalized title`, never the AI's.**
+  The model returns `"c1"`, `"c2"` on every round; ids colliding across rounds
+  would make "Confirm" act on a different card. Reworded titles count as the
+  same card by token similarity (`SAME_CARD_SIMILARITY`).
+- **Each analysis thread carries the generation of the meeting it was born
+  in.** Ending a meeting does not interrupt an HTTP call in flight; without the
+  generation, the late result would land in the next meeting and the old
+  thread's cleanup would wipe the new one's channel.
+- **Two events, not one.** `isper-copilot` carries the whole state and is only
+  sent when it changes; `isper-copilot-metrics` carries the talk dynamics, on
+  every transcribed block, throttled. Sending the whole state on every block
+  cloned the cards and pushed the notepad back onto the screen mid-typing.
+
+The parameters are constants at the top of `apps/isper-app/src-tauri/src/copilot.rs`:
+first read (`FIRST_ROUND_SECS`, 20 s), pulse (`COPILOT_AUTO_INTERVAL_SECS`,
+45 s), floor between rounds (`MIN_GAP_BETWEEN_ROUNDS_SECS`, 15 s), transcript
+window (20 min for analysis, 30 min for Q&A) and the memory cutoff
+(`RECALL_MIN_SCORE`, 0.55 — chosen to err on the side of silence, **not yet
+calibrated with real meetings**). The trigger phrases live in `DECISION_CUES`,
+`ACTION_CUES` and `RISK_CUES`, in `crates/isper-llm/src/copilot.rs`, and are
+Portuguese, like the prompt: with the interface in English, the cards,
+answers and notes still come out in Portuguese.
+
+**Cost:** with a provider configured, the loop runs on **every** meeting,
+with the HUD open or not — unlike Live insights, which only run periodic
+rounds with `live_insights` on. In a continuous conversation that is close to
+80 calls per hour.
+
+**A new window must be added to the ACL.** Outside `capabilities/default.json`,
+Tauri denies `plugin:event|listen` and the window receives no events at all —
+but the app's commands keep answering (the app's own commands don't go through
+the ACL), so it loads its state on open and freezes from there. That is how the
+Copilot was born without live transcription.
+
+To iterate on the HUD without building the app with CUDA:
+
+```bash
+python tools/e2e/copilot-harness.py
+```
+
+Serves `/copilot.html` and `/library.html` with a simulated Tauri and a
+scripted meeting (`__sim.play()`, `__sim.scenario('no-key')`, `__sim.lang('en')`
+in the console; `?lang=en` opens it in English). It does **not** catch the ACL
+— `listen()` is a mock there. Details in `tools/e2e/README.md`.
+
 ### CLI (Phase 1)
 
 ```bash
