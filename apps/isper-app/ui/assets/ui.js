@@ -38,7 +38,10 @@
       document.body.appendChild(host);
     }
     const t = el('div', 'toast toast-' + kind);
-    t.appendChild(el('span', 'toast-ic', kind === 'ok' ? '✓' : kind === 'err' ? '!' : 'i'));
+    if (kind === 'err') t.setAttribute('role', 'alert');
+    const ic = el('span', 'toast-ic', kind === 'ok' ? '✓' : kind === 'err' ? '!' : 'i');
+    ic.setAttribute('aria-hidden', 'true');
+    t.appendChild(ic);
     t.appendChild(el('span', 'toast-msg', msg));
     if (opts.action) {
       const b = el('button', 'toast-act', opts.action.label);
@@ -155,8 +158,32 @@
   }
 
   // ------------------------------------------- abas com indicador deslizante
+  // Abas acessíveis (padrão WAI-ARIA): tablist/tab/aria-selected, só a aba
+  // ativa entra no Tab e as setas (← → Home End) trocam de aba.
   function tabs(container, onChange) {
     const ind = container.querySelector('.tab-ind') || container.appendChild(el('span', 'tab-ind'));
+    ind.setAttribute('aria-hidden', 'true');
+    container.setAttribute('role', 'tablist');
+    const all = () => [...container.querySelectorAll('.tab')];
+    const sync = () => all().forEach((x) => {
+      const on = x.classList.contains('on');
+      x.setAttribute('role', 'tab');
+      x.setAttribute('aria-selected', on ? 'true' : 'false');
+      x.tabIndex = on ? 0 : -1;
+    });
+    sync();
+    container.addEventListener('keydown', (ev) => {
+      const list = all();
+      const i = list.indexOf(document.activeElement);
+      if (i < 0) return;
+      const to = ev.key === 'ArrowRight' ? (i + 1) % list.length
+        : ev.key === 'ArrowLeft' ? (i - 1 + list.length) % list.length
+          : ev.key === 'Home' ? 0 : ev.key === 'End' ? list.length - 1 : -1;
+      if (to < 0) return;
+      ev.preventDefault();
+      list[to].focus();
+      list[to].click();
+    });
     const place = () => {
       const on = container.querySelector('.tab.on');
       if (!on) return;
@@ -168,6 +195,7 @@
     container.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
       if (t.classList.contains('on')) return;
       container.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === t));
+      sync();
       place();
       if (onChange) onChange(t.dataset.tab, t);
     }));

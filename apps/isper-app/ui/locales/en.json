@@ -294,6 +294,7 @@
     "one": "{n} participant",
     "other": "{n} participants"
   },
+  "library.rename-aria": "rename the meeting \"{title}\"",
   "library.rename-title": "click to rename",
   "library.renamed": "renamed — the .md followed",
   "library.restored": "meeting restored",
@@ -308,6 +309,7 @@
   "library.select": "Select a meeting on the left.",
   "library.semantic": "Semantic",
   "library.speaker.aria": "new speaker name",
+  "library.speaker.rename-aria": "rename speaker {name}",
   "library.speaker.renamed": {
     "one": "{n} line renamed to \"{to}\" — the .md followed",
     "other": "{n} lines renamed to \"{to}\" — the .md followed"
@@ -572,6 +574,7 @@
   "settings.inteligencia.gemini-free-tier-usa-chave": "Gemini (free tier) — uses the Gemini key above",
   "settings.inteligencia.groq-free-tier": "Groq (free tier)",
   "settings.inteligencia.insights-vivo": "Live insights",
+  "settings.inteligencia.insint-aria": "interval between insight rounds",
   "settings.inteligencia.inteligencia": "Intelligence",
   "settings.inteligencia.keystate": "saved ✓",
   "settings.inteligencia.listmodels": "List models",
@@ -581,6 +584,7 @@
   "settings.inteligencia.polir-ditados-ia-antes-colar": "Polish dictations with AI before pasting",
   "settings.inteligencia.provider-embeddings": "Embeddings provider",
   "settings.inteligencia.provider-resumo-reunioes-insights-polimento": "Provider (meeting summaries, insights and polishing)",
+  "settings.inteligencia.pstyle-aria": "polishing style",
   "settings.inteligencia.saveembkey": "Save key",
   "settings.inteligencia.savekey": "Save key",
   "settings.inteligencia.so-limpeza-tira-hesitacoes-arruma": "Clean-up only — removes hesitations and fixes punctuation, without changing the tone",

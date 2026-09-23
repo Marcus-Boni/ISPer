@@ -13,7 +13,7 @@ pessoa com um fone na mão. Complementa a seção "Testes e CI" do
 | Golden | `crates/isper-core/tests/golden.rs` + `tests/golden/` | Markdown, SRT e DOCX byte a byte; qualquer mudança de formato aparece como diff no PR (`ISPER_UPDATE_GOLDEN=1 cargo test -p isper-core --test golden` regenera) | idem |
 | Integração sem rede | `crates/isper-llm/src/testing.rs` (`FakeProvider`) | resumo, título, polimento e insights do prompt ao pós-processamento, inclusive erros do provider | idem |
 | Integração com rede | `isper-models` (`#[ignore]`) | API do Hugging Face e download com checksum | à mão: `cargo test --release -p isper-models -- --ignored` |
-| Ponta a ponta | `tools/e2e/*.ps1` (o app real, via CDP) | janelas e indicador, reunião com áudio, exportações, atualizador, memória em reunião longa, dados, tema, desfazer, idioma e primeira configuração | smoke, dados, tema, desfazer, idioma e primeira configuração toda noite no CI (`e2e-nightly.yml`, sem áudio nem GPU); reunião, atualizador e soak à mão, antes de lançar |
+| Ponta a ponta | `tools/e2e/*.ps1` (o app real, via CDP) | janelas e indicador, reunião com áudio, exportações, atualizador, memória em reunião longa, dados, tema, desfazer, idioma, primeira configuração e acessibilidade | smoke, dados, tema, desfazer, idioma, primeira configuração e acessibilidade toda noite no CI (`e2e-nightly.yml`, sem áudio nem GPU); reunião, atualizador e soak à mão, antes de lançar |
 | Manual | roteiro abaixo | o que precisa de hardware: fone, suspensão, outro app em modo exclusivo, monitores | antes de cada release |
 
 Regras que valem para tudo: `cargo clippy --workspace --all-targets -- -D warnings`
@@ -72,3 +72,37 @@ e2e `tools/e2e/data.ps1` faz D2 e D3 no app real (backup válido, zip com as
 entradas certas e sem texto ditado, log em JSON Lines) e roda toda noite no
 CI junto com o smoke. O que só a mão prova é o comportamento do driver de
 verdade e a restauração de um backup — por isso o roteiro.
+
+## Acessibilidade — roteiro com o NVDA
+
+O `tools/e2e/a11y.ps1` roda no app real, nos temas escuro e claro, e cobre o
+que dá para medir sem ouvir:
+
+- todo controle visível tem nome acessível;
+- todo texto passa no contraste WCAG AA;
+- nenhuma janela abre rolagem horizontal no tamanho padrão;
+- a volta de Tab, com teclado de verdade via CDP, alcança todos os controles
+  de Início, Biblioteca, Configurações e primeira configuração, mostra o anel
+  em cada foco e não prende;
+- as abas da Biblioteca trocam pelas setas;
+- Enter abre a reunião e renomeia o falante.
+
+O que ele não prova é como um leitor de tela *fala* cada coisa. Para isso
+existe este roteiro, para rodar antes de uma release com o
+[NVDA](https://www.nvaccess.org/) (gratuito). Com o NVDA aberto, use só o
+teclado: Tab e Shift+Tab, Enter, Espaço, as setas e Esc. `NVDA+T` lê o título
+da janela.
+
+| # | Caso | Como reproduzir | O NVDA deve falar |
+|---|---|---|---|
+| N1 | Início | Abrir o ISPer; Tab pelo cabeçalho, pelos botões de reunião e pelo rodapé | "Indicador, botão de alternância" (pressionado ou não), "Biblioteca, botão", "Configurações, botão"; o interruptor do rodapé como caixa de seleção com o texto dele; cada reunião recente como botão com o título |
+| N2 | Primeira configuração | Configurações → Sistema → *Refazer a primeira configuração*; avançar com Enter em *Começar* e *Continuar* | A cada passo, o título ("Boas-vindas ao ISPer", "Fale alguma coisa", …, como título 1). No microfone, ao falar: "Ouvindo você". Nos modelos: "Small, recomendado, botão de opção, marcado"; as setas trocam de modelo. Em *Pular configuração*: o Início abre |
+| N3 | Avisos (toasts) | Na Biblioteca, remover um ditado; depois, testar a IA com uma chave inválida | A remoção é lida sem interromper ("Ditado removido do histórico"), e *Desfazer* é alcançável; o erro é lido na hora, interrompendo o que estava sendo falado |
+| N4 | Biblioteca | Tab até a lista; Enter numa reunião; Tab até o título e até o nome de um falante; Enter; Esc | Cada reunião como botão (a aberta como "atual"); o título como "renomear a reunião …, botão"; o falante como "renomear o falante Participante 1, botão"; Enter abre "novo nome do falante, editar" e Esc desiste |
+| N5 | Abas | Na Biblioteca, Tab até as abas; seta para a direita e para a esquerda | "Reuniões, guia, selecionado, 1 de 2"; a seta leva a "Ditados, guia, selecionado, 2 de 2" e a lista troca |
+| N6 | Configurações | Tab por todas as seções; em Reuniões, Enter em *Avançado* | Todo campo e toda lista com o rótulo ("intervalo entre as rodadas de insights, caixa de combinação"); *Avançado* como "recolhido" e, depois do Enter, "expandido", com os controles dele na sequência |
+| N7 | Em inglês | Configurações → Sistema → Idioma da interface = English; repetir N1 e N5 | Tudo em inglês ("Library, button", "Meetings, tab, selected"). Com a troca automática de idioma do NVDA ligada, a voz passa a ler em inglês |
+| N8 | Temas de contraste do Windows | Configurações do Windows → Acessibilidade → Temas de contraste (ou Alt+Shift esquerdo+Print Screen); Tab pelo Início e pelas Configurações | O texto segue legível nas cores do tema, e o foco aparece como um contorno ao redor de cada controle (o anel normal do ISPer não sobrevive nesse modo; o contorno o substitui) |
+
+Anote ✅/❌, a versão do NVDA e a do ISPer. Uma falha aqui vira issue com o
+que foi falado e o que era esperado.

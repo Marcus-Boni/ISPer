@@ -24,7 +24,7 @@
   --bg: #161311; --bg-2: #1b1714;
   --panel: #1e1a18; --panel-2: #26211e; --panel-3: #2f2824;
   --line: #372f2b; --line-2: #4a403a;
-  --ink: #ece7e1; --ink-2: #d3cbc3; --muted: #a79e96; --muted-2: #7e756e;
+  --ink: #ece7e1; --ink-2: #d3cbc3; --muted: #a79e96; --muted-2: #9a9189;
   --accent: #f07e72; --accent-2: #f79f94; --accent-ink: #1b0f0d; --accent-soft: rgba(240, 126, 114, .14);
   --good: #84c297; --good-soft: rgba(132, 194, 151, .14);
   --warn: #e8c15a; --warn-soft: rgba(232, 193, 90, .14);
@@ -123,6 +123,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
 :focus-visible { outline: none; box-shadow: var(--ring); }
+/* Temas de contraste do Windows (forced-colors): o navegador descarta
+   box-shadow, e o anel de foco sumiria. Um contorno de verdade no lugar. */
+@media (forced-colors: active) {
+  :focus-visible { outline: 2px solid CanvasText; outline-offset: 2px; }
+  .switch input:focus-visible + .track, .seg label:has(input:focus-visible), .model:has(input:focus-visible) { outline: 2px solid CanvasText; outline-offset: 2px; }
+}
 ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
