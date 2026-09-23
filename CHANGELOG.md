@@ -11,73 +11,64 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-23
+
+A fase 7.5 inteira: o ISPer fica mais fácil de começar a usar, confortável de
+dia e de noite, em português ou em inglês, e utilizável só pelo teclado.
+
 ### Adicionado
-- **Tema claro** (fase 7.5). Configurações → Sistema → *Aparência*: seguir o
-  Windows (padrão), clara ou escura. Vale na hora para o Início, a Biblioteca
-  e as Configurações — inclusive a barra de título — e a janela já nasce no
-  tema certo, sem piscar. A paleta clara passa no contraste WCAG AA em todos
-  os textos. O indicador flutuante e o Copilot continuam escuros: flutuam
-  sobre outros apps e precisam do contraste próprio.
-- **Interface em inglês** (fase 7.5). Configurações → Sistema → *Idioma da
-  interface*: seguir o Windows (padrão), Português (Brasil) ou English. Vale
-  na hora, sem reiniciar: o Início, a Biblioteca, as Configurações, o
-  indicador flutuante, o menu da bandeja, os títulos das janelas, as
-  notificações e as mensagens de erro do ditado e da reunião. Números e
-  durações seguem o idioma escolhido. Os nomes de falante continuam
-  gravados como antes ("Eu", "Participante 1") e só a exibição muda — o
-  `.md` e o banco não se alteram. Os textos moram em dicionários JSON
-  (`ui/locales/`) embutidos no app, e testes garantem que os dois idiomas têm
-  as mesmas chaves, os mesmos marcadores e que toda chave usada por uma tela
-  existe. O Copilot também: rótulos, estados, cards, filtros, avisos e o
-  motivo de cada análise ("acordo detectado" chega do app como um nome
-  estável e a tela escreve no idioma dela). O que a IA escreve — cards,
-  respostas do "Pergunte à Reunião" e notas completadas — continua saindo em
-  português, como o prompt pede; passar a seguir o idioma da interface fica
-  para depois. O idioma da fala continua sendo outra escolha, em Ditado.
-- **README em inglês** ([README.en.md](README.en.md)), com o passo a passo
-  para acrescentar um idioma à interface.
-- **Primeira configuração guiada** (fase 7.5). Na primeira vez que o ISPer
-  abre, uma janela leva por cinco passos curtos: idioma e aparência;
-  **microfone com medidor de nível ao vivo** (nada é gravado; um microfone
-  mudo ou bloqueado em Privacidade ganha um aviso claro em vez de silêncio);
-  **modelo Whisper**, com o recomendado para a sua versão (GPU ou CPU) e o
-  download ali mesmo; **atalho**, com um campo para experimentar o primeiro
-  ditado; e **IA opcional**, com a chave testada na hora. Pular ou fechar a
-  janela também contam como feito, e a tela Início assume com o checklist do
-  que faltou. Quem já usa o ISPer não a vê (o `config.toml` passa para a
-  versão 2 marcando a configuração como feita); para refazer, Configurações
-  → Sistema → *Refazer a primeira configuração*.
+- **Tema claro.** Configurações → Sistema → *Aparência*: seguir o Windows
+  (padrão), clara ou escura. Vale na hora para o Início, a Biblioteca, as
+  Configurações e a primeira configuração — inclusive a barra de título —, e
+  cada janela já nasce no tema certo, sem piscar. A paleta clara passa no
+  contraste WCAG AA em todos os textos. O indicador flutuante e o Copilot
+  continuam escuros: flutuam sobre outros apps e precisam do contraste
+  próprio.
+- **Interface em inglês.** Configurações → Sistema → *Idioma da interface*:
+  seguir o Windows (padrão), Português (Brasil) ou English. Vale na hora, sem
+  reiniciar, em todas as janelas — Início, Biblioteca, Configurações,
+  Copilot e indicador —, no menu da bandeja, nos títulos das janelas, nas
+  notificações e nas mensagens de erro. Números e durações seguem o idioma
+  escolhido. Os nomes de falante continuam gravados como antes ("Eu",
+  "Participante 1") e só a exibição muda: o `.md` e o banco não se alteram.
+  O que a IA escreve (resumo, cards do Copilot, respostas e notas) continua
+  em português por enquanto. O idioma da fala é outra escolha, em Ditado.
+- **Primeira configuração guiada.** Numa instalação nova, o ISPer abre com
+  cinco passos curtos: idioma e aparência; **microfone com medidor de nível
+  ao vivo** (nada é gravado, e um microfone mudo ou bloqueado em Privacidade
+  ganha um aviso claro); **modelo Whisper**, com o recomendado para a sua
+  versão (GPU ou CPU) e o download ali mesmo; **atalho**, com um campo para
+  experimentar o primeiro ditado; e **IA opcional**, com a chave testada na
+  hora. Pular ou fechar a janela também contam como feito, e a tela Início
+  assume com o checklist do que faltou. Quem já usa o ISPer não a vê; para
+  refazer, Configurações → Sistema → *Refazer a primeira configuração*.
+- **README em inglês** ([README.en.md](README.en.md)).
 
 ### Alterado
-- **Acessibilidade** (fase 7.5). Tudo no Início, na Biblioteca, nas
-  Configurações, na primeira configuração e no Copilot se faz pelo teclado, com o foco
-  sempre visível — inclusive nos temas de contraste do Windows, onde o anel
-  do ISPer não aparecia. As abas da Biblioteca seguem o padrão dos leitores
-  de tela (setas trocam de aba), a reunião aberta é anunciada como atual, o
-  título e o nome de cada falante podem ser renomeados com Enter, e os erros
-  são lidos na hora. O texto secundário do tema escuro ficou mais claro para
-  passar no contraste WCAG AA, e as Configurações não abrem mais rolagem
-  horizontal por causa de um caminho longo. Um teste automático confere
-  nomes, contraste, reflow e a volta de Tab nos dois temas; o roteiro com o
-  NVDA está em `docs/TESTES.md`.
 - **Excluir agora tem "Desfazer"** no lugar do "clique de novo para
   confirmar": reuniões e ditados na Biblioteca e modelos nas Configurações
   somem na hora e um aviso oferece *Desfazer* (ou Ctrl+Z) por 7 segundos —
   só então o app apaga de fato. Fechar a janela nesse intervalo não perde
   nada; sair do app aplica o que estava pendente.
+- **Acessibilidade.** Tudo no Início, na Biblioteca, nas Configurações, na
+  primeira configuração e no Copilot se faz pelo teclado, com o foco sempre
+  visível — inclusive nos temas de contraste do Windows, onde o anel do ISPer
+  não aparecia. As abas da Biblioteca seguem o padrão dos leitores de tela
+  (as setas trocam de aba), a reunião aberta é anunciada como atual, o título
+  e o nome de cada falante podem ser renomeados com Enter, e os erros são
+  lidos na hora. O texto secundário do tema escuro ficou mais claro para
+  passar no contraste WCAG AA.
 
 ### Corrigido
 - O Início dizia que "cada bloco de ~20 s aparece assim que é transcrito" e
   que a primeira fala levava até ~30 s: desde a 0.17.0 as legendas chegam em
   segundos. O texto agora descreve o comportamento real.
+- As Configurações abriam rolagem horizontal por causa de um caminho longo
+  (o da pasta de logs).
 - Na Biblioteca, o botão "×" de remover um ditado não tinha nome acessível
   (o leitor de tela lia só o símbolo); agora é "remover do histórico".
 - A busca dentro da reunião cortava o texto de exemplo no meio; ele ficou
   curto e a dica completa aparece ao passar o mouse.
-- O ícone de Configurações do Início tinha o miolo pintado com a cor do tema
-  escuro e ficava com manchas escuras no tema claro.
-- A descrição de cada modelo Whisper nas Configurações aparecia sempre em
-  português; agora segue o idioma da interface.
 
 ## [0.18.0] - 2026-09-22
 
