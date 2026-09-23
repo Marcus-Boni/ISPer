@@ -130,11 +130,16 @@ fn on_call_started(app: &AppHandle, mode: &str) {
             Ok(()) => {
                 app.state::<AppState>().call.lock_or_recover().auto_started = true;
                 let app2 = app.clone();
+                let (title, line1, line2) = (
+                    crate::i18n::tr(app, "notify.call-recording"),
+                    crate::i18n::tr(app, "notify.call-recording-line1"),
+                    crate::i18n::tr(app, "notify.call-recording-line2"),
+                );
                 let _ = notify::show(
                     notify::Toast {
-                        title: "Gravando a chamada do Teams",
-                        line1: "A transcrição começou automaticamente.",
-                        line2: Some("Clique para abrir o ISPer · o áudio nunca sai da sua máquina"),
+                        title: &title,
+                        line1: &line1,
+                        line2: Some(&line2),
                         silent: true,
                     },
                     move || open_home(&app2),
@@ -155,16 +160,22 @@ fn on_call_started(app: &AppHandle, mode: &str) {
         (!label.is_empty() && !label.starts_with('(')).then_some(label)
     };
     let line2 = match &shortcut {
-        Some(label) => {
-            format!("Clique para gravar (ou {label}) · o áudio nunca sai da sua máquina")
-        }
-        None => "Clique para gravar · o áudio nunca sai da sua máquina".to_string(),
+        Some(label) => crate::i18n::trv(
+            app,
+            "notify.call-active-line2-shortcut",
+            &[("label", key_label(app, label))],
+        ),
+        None => crate::i18n::tr(app, "notify.call-active-line2"),
     };
+    let (title, line1) = (
+        crate::i18n::tr(app, "notify.call-active"),
+        crate::i18n::tr(app, "notify.call-active-line1"),
+    );
     let app2 = app.clone();
     if let Err(e) = notify::show(
         notify::Toast {
-            title: "Chamada do Teams em andamento",
-            line1: "Gravar a transcrição desta reunião?",
+            title: &title,
+            line1: &line1,
             line2: Some(&line2),
             silent: false,
         },
@@ -173,8 +184,12 @@ fn on_call_started(app: &AppHandle, mode: &str) {
         tracing::warn!("notificação de chamada indisponível: {e}");
     }
     let hint = match &shortcut {
-        Some(label) => format!("Teams em chamada — gravar? ({label})"),
-        None => "Teams em chamada — gravar? (tela Início)".to_string(),
+        Some(label) => crate::i18n::trv(
+            app,
+            "notify.call-hint-shortcut",
+            &[("label", key_label(app, label))],
+        ),
+        None => crate::i18n::tr(app, "notify.call-hint"),
     };
     show_call_hint(app, &hint);
     notify_status(app);
@@ -198,11 +213,16 @@ fn on_call_ended(app: &AppHandle, mode: &str) {
             let _ = toggle_meeting(app);
         } else {
             let app2 = app.clone();
+            let (title, line1, line2) = (
+                crate::i18n::tr(app, "notify.call-ended"),
+                crate::i18n::tr(app, "notify.call-ended-line1"),
+                crate::i18n::tr(app, "notify.call-ended-line2"),
+            );
             let _ = notify::show(
                 notify::Toast {
-                    title: "A chamada do Teams terminou",
-                    line1: "Encerrar a gravação e transcrever?",
-                    line2: Some("Clique para encerrar agora · ou continue gravando"),
+                    title: &title,
+                    line1: &line1,
+                    line2: Some(&line2),
                     silent: true,
                 },
                 move || {
@@ -211,7 +231,7 @@ fn on_call_ended(app: &AppHandle, mode: &str) {
                     }
                 },
             );
-            show_call_hint(app, "chamada encerrada — encerrar a gravação?");
+            show_call_hint(app, &crate::i18n::tr(app, "notify.call-ended-hint"));
         }
     }
     notify_status(app);

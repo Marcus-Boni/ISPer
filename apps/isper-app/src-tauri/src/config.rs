@@ -119,6 +119,10 @@ pub struct AppConfig {
     /// Tema da interface: `system` (segue o Windows) · `light` · `dark`.
     #[serde(default = "default_theme")]
     pub theme: String,
+    /// Idioma da interface: `auto` (segue o Windows) · `pt-BR` · `en`. O
+    /// idioma da fala é outro campo (`lang`).
+    #[serde(default = "default_ui_lang")]
+    pub ui_lang: String,
     /// Versão do formato deste arquivo — ver [`CONFIG_VERSION`].
     #[serde(default)]
     pub config_version: u32,
@@ -154,6 +158,7 @@ impl Default for AppConfig {
             meeting_speakers: 0,
             diarize_threshold: 0.0,
             theme: default_theme(),
+            ui_lang: default_ui_lang(),
             config_version: CONFIG_VERSION,
         }
     }
@@ -161,6 +166,10 @@ impl Default for AppConfig {
 
 fn default_theme() -> String {
     "system".into()
+}
+
+fn default_ui_lang() -> String {
+    "auto".into()
 }
 
 fn default_call_detect() -> String {
@@ -294,6 +303,12 @@ impl AppConfig {
             self.retention_days = 0;
         }
         pick(&mut self.theme, &crate::ui::THEMES, "system");
+        // `pt-BR` tem caixa própria: compara sem caixa e grava a forma canônica.
+        let wanted = self.ui_lang.trim().to_lowercase();
+        self.ui_lang = crate::i18n::UI_LANGS
+            .iter()
+            .find(|l| l.to_lowercase() == wanted)
+            .map_or_else(default_ui_lang, |l| (*l).to_string());
         self.config_version = CONFIG_VERSION;
     }
 }
@@ -429,6 +444,24 @@ mod tests {
         // Arquivo antigo, sem o campo: segue o Windows.
         let old: AppConfig = toml::from_str("lang = \"pt\"\n").unwrap();
         assert_eq!(old.theme, "system");
+    }
+
+    #[test]
+    fn idioma_da_interface_normaliza_para_a_forma_canonica() {
+        let mut cfg = AppConfig {
+            ui_lang: " PT-br ".into(),
+            ..AppConfig::default()
+        };
+        cfg.normalize();
+        assert_eq!(cfg.ui_lang, "pt-BR");
+        cfg.ui_lang = "EN".into();
+        cfg.normalize();
+        assert_eq!(cfg.ui_lang, "en");
+        cfg.ui_lang = "klingon".into();
+        cfg.normalize();
+        assert_eq!(cfg.ui_lang, "auto");
+        let old: AppConfig = toml::from_str("lang = \"pt\"\n").unwrap();
+        assert_eq!(old.ui_lang, "auto", "arquivo antigo segue o Windows");
     }
 
     #[test]

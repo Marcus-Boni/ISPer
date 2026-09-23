@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>ISPer — Configurações</title>
 <script src="assets/boot.js"></script>
+<script src="assets/i18n.js"></script>
 <link rel="stylesheet" href="assets/base.css">
 <style>
   body { padding: 20px 20px 84px; user-select: none; }
@@ -42,117 +43,117 @@
 </style>
 </head>
 <body class="atmos">
-<h1 class="reveal" data-i="0">Configurações</h1>
-<p class="sub reveal" data-i="0">Atalhos ativos agora: ditado <b id="active">…</b> · reunião <b id="mactive">…</b> · marcar momento <b id="kactive">…</b> · Copilot <b id="cactive">…</b></p>
+<h1 class="reveal" data-i="0" data-i18n="settings.top.configuracoes">Configurações</h1>
+<p class="sub reveal" data-i="0"><span data-i18n="settings.active.lead">Atalhos ativos agora: ditado</span> <b id="active">…</b> <span data-i18n="settings.active.meeting">· reunião</span> <b id="mactive">…</b> <span data-i18n="settings.active.mark">· marcar momento</span> <b id="kactive">…</b> <span data-i18n="settings.active.copilot">· Copilot</span> <b id="cactive">…</b></p>
 
 <div class="card reveal" data-i="1">
-  <h2>Ditado</h2>
-  <label class="lbl mt0" for="shortcut">Atalho global do ditado</label>
+  <h2 data-i18n="settings.ditado.ditado">Ditado</h2>
+  <label class="lbl mt0" for="shortcut" data-i18n="settings.ditado.atalho-global-ditado">Atalho global do ditado</label>
   <div class="row">
     <select id="shortcut" class="field">
-      <option value="">(automático — primeiro livre)</option>
-      <option value="ctrl+alt+space">Ctrl+Alt+Espaço</option>
-      <option value="ctrl+shift+space">Ctrl+Shift+Espaço</option>
+      <option value="" data-i18n="settings.ditado.automatico-primeiro-livre">(automático — primeiro livre)</option>
+      <option value="ctrl+alt+space" data-i18n="settings.opt.ctrl-alt-space">Ctrl+Alt+Espaço</option>
+      <option value="ctrl+shift+space" data-i18n="settings.opt.ctrl-shift-space">Ctrl+Shift+Espaço</option>
       <option value="ctrl+alt+d">Ctrl+Alt+D</option>
       <option value="ctrl+alt+i">Ctrl+Alt+I</option>
       <option value="f9">F9</option>
     </select>
-    <button class="btn" id="cap-shortcut" title="pressione a combinação que quiser">Gravar atalho</button>
+    <button class="btn" id="cap-shortcut" title="pressione a combinação que quiser" data-i18n="settings.ditado.cap-shortcut" data-i18n-attr="title:settings.ditado.pressione-combinacao-quiser.title">Gravar atalho</button>
   </div>
-  <p class="hint">"Gravar atalho": clique e pressione a combinação (ex.: Ctrl+Shift+K). Letras, números, F1–F12 e Espaço, com pelo menos um modificador; F-keys podem ir sozinhas. Se a combinação estiver ocupada por outro programa, o ISPer avisa e usa a próxima livre.</p>
-  <label class="lbl" for="mic">Microfone</label>
-  <select id="mic" class="field"><option value="">(padrão do sistema)</option></select>
-  <p class="hint">Vale para o ditado e para o canal "Eu" das reuniões. Se o aparelho escolhido não estiver conectado na hora, o ISPer usa o padrão e avisa no log.</p>
-  <label class="lbl" for="lang">Idioma da fala</label>
+  <p class="hint" data-i18n="settings.ditado.gravar-atalho-clique-pressione-combinacao">"Gravar atalho": clique e pressione a combinação (ex.: Ctrl+Shift+K). Letras, números, F1–F12 e Espaço, com pelo menos um modificador; F-keys podem ir sozinhas. Se a combinação estiver ocupada por outro programa, o ISPer avisa e usa a próxima livre.</p>
+  <label class="lbl" for="mic" data-i18n="settings.ditado.microfone">Microfone</label>
+  <select id="mic" class="field"><option value="" data-i18n="settings.ditado.padrao-sistema">(padrão do sistema)</option></select>
+  <p class="hint" data-i18n="settings.ditado.vale-ditado-canal-eu-reunioes">Vale para o ditado e para o canal "Eu" das reuniões. Se o aparelho escolhido não estiver conectado na hora, o ISPer usa o padrão e avisa no log.</p>
+  <label class="lbl" for="lang" data-i18n="settings.ditado.idioma-fala">Idioma da fala</label>
   <select id="lang" class="field">
-    <option value="pt">Português</option>
-    <option value="en">Inglês</option>
-    <option value="auto">Detectar automaticamente</option>
+    <option value="pt" data-i18n="settings.ditado.portugues">Português</option>
+    <option value="en" data-i18n="settings.ditado.ingles">Inglês</option>
+    <option value="auto" data-i18n="settings.ditado.detectar-automaticamente">Detectar automaticamente</option>
   </select>
-  <label class="lbl" for="dict">Dicionário pessoal (um termo por linha)</label>
-  <textarea id="dict" class="field" placeholder="OptSolv&#10;ISPer&#10;nomes próprios, siglas, jargões…"></textarea>
-  <p class="hint">Esses termos são mostrados ao Whisper antes de cada transcrição, e o que ele ainda errar por pouco ("ísper", "opt solve") é corrigido para a grafia exata do termo — no ditado e nas reuniões.</p>
-  <label class="lbl">Comandos de voz</label>
+  <label class="lbl" for="dict" data-i18n="settings.ditado.dicionario-pessoal-termo-por-linha">Dicionário pessoal (um termo por linha)</label>
+  <textarea id="dict" class="field" placeholder="OptSolv&#10;ISPer&#10;nomes próprios, siglas, jargões…" data-i18n-attr="placeholder:settings.ditado.optsolv-isper-nomes-proprios-siglas.placeholder"></textarea>
+  <p class="hint" data-i18n="settings.ditado.esses-termos-sao-mostrados-whisper">Esses termos são mostrados ao Whisper antes de cada transcrição, e o que ele ainda errar por pouco ("ísper", "opt solve") é corrigido para a grafia exata do termo — no ditado e nas reuniões.</p>
+  <label class="lbl" data-i18n="settings.ditado.comandos-voz">Comandos de voz</label>
   <div class="stack mt4">
-    <label class="switch"><input type="checkbox" id="voicecmd"><span class="track"><span class="thumb"></span></span>Interpretar comandos falados no ditado</label>
+    <label class="switch"><input type="checkbox" id="voicecmd"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.ditado.interpretar-comandos-falados-ditado">Interpretar comandos falados no ditado</span></label>
   </div>
-  <p class="hint">Diga <b>nova linha</b>, <b>novo parágrafo</b>, <b>ponto final</b>, <b>vírgula</b>, <b>ponto de interrogação</b>, <b>ponto de exclamação</b>, <b>dois pontos</b>, <b>ponto e vírgula</b>, <b>reticências</b>, <b>abre/fecha parênteses</b>, <b>abre/fecha aspas</b>, <b>travessão</b>, <b>arroba</b>. No fim do ditado: <b>apagar isso</b> descarta tudo; <b>tudo em maiúsculas</b> / <b>tudo em minúsculas</b> muda a caixa.</p>
+  <p class="hint" data-i18n-html="settings.ditado.diga-nova-linha-novo-paragrafo">Diga <b>nova linha</b>, <b>novo parágrafo</b>, <b>ponto final</b>, <b>vírgula</b>, <b>ponto de interrogação</b>, <b>ponto de exclamação</b>, <b>dois pontos</b>, <b>ponto e vírgula</b>, <b>reticências</b>, <b>abre/fecha parênteses</b>, <b>abre/fecha aspas</b>, <b>travessão</b>, <b>arroba</b>. No fim do ditado: <b>apagar isso</b> descarta tudo; <b>tudo em maiúsculas</b> / <b>tudo em minúsculas</b> muda a caixa.</p>
 </div>
 
 <div class="card reveal" data-i="2">
-  <h2>Modelos Whisper</h2>
+  <h2 data-i18n="settings.modelos-whisper.modelos-whisper">Modelos Whisper</h2>
   <p class="hint m0 mb8" id="gpuhint"></p>
   <div id="modelslist"></div>
-  <p class="hint">Baixados do Hugging Face com verificação SHA-256 para <code>%LOCALAPPDATA%\com.isper.desktop\models</code>. Marque o que quer usar e clique em Salvar — a troca é a quente.</p>
+  <p class="hint" data-i18n-html="settings.modelos-whisper.baixados-hugging-face-verificacao-sha">Baixados do Hugging Face com verificação SHA-256 para <code>%LOCALAPPDATA%\com.isper.desktop\models</code>. Marque o que quer usar e clique em Salvar — a troca é a quente.</p>
 </div>
 
 <div class="card reveal" data-i="3">
-  <h2>Reuniões</h2>
-  <label class="lbl mt0" for="mshortcut">Atalho global para iniciar/encerrar a gravação</label>
+  <h2 data-i18n="settings.reunioes.reunioes">Reuniões</h2>
+  <label class="lbl mt0" for="mshortcut" data-i18n="settings.reunioes.atalho-global-iniciar-encerrar-gravacao">Atalho global para iniciar/encerrar a gravação</label>
   <div class="row">
     <select id="mshortcut" class="field">
-      <option value="">(automático — Ctrl+Alt+M ou o próximo livre)</option>
+      <option value="" data-i18n="settings.reunioes.automatico-ctrl-alt-m-ou">(automático — Ctrl+Alt+M ou o próximo livre)</option>
       <option value="ctrl+alt+m">Ctrl+Alt+M</option>
       <option value="ctrl+shift+m">Ctrl+Shift+M</option>
       <option value="ctrl+alt+r">Ctrl+Alt+R</option>
     </select>
-    <button class="btn" id="cap-mshortcut" title="pressione a combinação que quiser">Gravar atalho</button>
+    <button class="btn" id="cap-mshortcut" title="pressione a combinação que quiser" data-i18n="settings.reunioes.cap-mshortcut" data-i18n-attr="title:settings.reunioes.pressione-combinacao-quiser.title">Gravar atalho</button>
   </div>
-  <label class="lbl" for="markshortcut">Atalho global para marcar um momento (durante a reunião)</label>
+  <label class="lbl" for="markshortcut" data-i18n="settings.reunioes.atalho-global-marcar-momento-durante">Atalho global para marcar um momento (durante a reunião)</label>
   <div class="row">
     <select id="markshortcut" class="field">
-      <option value="">(automático — Ctrl+Alt+K ou o próximo livre)</option>
+      <option value="" data-i18n="settings.reunioes.automatico-ctrl-alt-k-ou">(automático — Ctrl+Alt+K ou o próximo livre)</option>
       <option value="ctrl+alt+k">Ctrl+Alt+K</option>
       <option value="ctrl+shift+k">Ctrl+Shift+K</option>
       <option value="ctrl+alt+j">Ctrl+Alt+J</option>
     </select>
-    <button class="btn" id="cap-markshortcut" title="pressione a combinação que quiser">Gravar atalho</button>
+    <button class="btn" id="cap-markshortcut" title="pressione a combinação que quiser" data-i18n="settings.reunioes.cap-markshortcut" data-i18n-attr="title:settings.reunioes.pressione-combinacao-quiser-2.title">Gravar atalho</button>
   </div>
-  <p class="hint">Um toque registra o instante ("momento marcado"): os momentos aparecem na Biblioteca, no Markdown e orientam o resumo por IA. Também há o botão de marcar momento no indicador e na tela Início.</p>
-  <label class="lbl" for="copilotshortcut">Atalho global para o Copilot (decisões ao vivo)</label>
+  <p class="hint" data-i18n="settings.reunioes.toque-registra-instante-momento-marcado">Um toque registra o instante ("momento marcado"): os momentos aparecem na Biblioteca, no Markdown e orientam o resumo por IA. Também há o botão de marcar momento no indicador e na tela Início.</p>
+  <label class="lbl" for="copilotshortcut" data-i18n="settings.reunioes.atalho-global-copilot-decisoes-vivo">Atalho global para o Copilot (decisões ao vivo)</label>
   <div class="row">
     <select id="copilotshortcut" class="field">
-      <option value="">(automático — Ctrl+Alt+C ou o próximo livre)</option>
+      <option value="" data-i18n="settings.reunioes.automatico-ctrl-alt-c-ou">(automático — Ctrl+Alt+C ou o próximo livre)</option>
       <option value="ctrl+alt+c">Ctrl+Alt+C</option>
       <option value="ctrl+shift+c">Ctrl+Shift+C</option>
       <option value="ctrl+alt+p">Ctrl+Alt+P</option>
     </select>
-    <button class="btn" id="cap-copilotshortcut" title="pressione a combinação que quiser">Gravar atalho</button>
+    <button class="btn" id="cap-copilotshortcut" title="pressione a combinação que quiser" data-i18n="settings.reunioes.cap-copilotshortcut" data-i18n-attr="title:settings.reunioes.pressione-combinacao-quiser-3.title">Gravar atalho</button>
   </div>
-  <p class="hint">Traz o Copilot para a frente; com ele já na frente, esconde. O que estiver digitado no chat e nas notas continua lá. Também há o botão do Copilot no indicador e na tela Início.</p>
-  <label class="lbl" for="calldetect">Chamadas do Teams</label>
+  <p class="hint" data-i18n="settings.reunioes.traz-copilot-frente-ele-ja">Traz o Copilot para a frente; com ele já na frente, esconde. O que estiver digitado no chat e nas notas continua lá. Também há o botão do Copilot no indicador e na tela Início.</p>
+  <label class="lbl" for="calldetect" data-i18n="settings.reunioes.chamadas-teams">Chamadas do Teams</label>
   <select id="calldetect" class="field">
-    <option value="notify">Avisar quando uma chamada começar e perguntar se gravo (padrão)</option>
-    <option value="auto">Gravar automaticamente ao entrar numa chamada (e encerrar quando ela acabar)</option>
-    <option value="off">Não detectar chamadas</option>
+    <option value="notify" data-i18n="settings.reunioes.avisar-quando-chamada-comecar-perguntar">Avisar quando uma chamada começar e perguntar se gravo (padrão)</option>
+    <option value="auto" data-i18n="settings.reunioes.gravar-automaticamente-entrar-numa-chamada">Gravar automaticamente ao entrar numa chamada (e encerrar quando ela acabar)</option>
+    <option value="off" data-i18n="settings.reunioes.nao-detectar-chamadas">Não detectar chamadas</option>
   </select>
-  <p class="hint">O ISPer percebe a chamada pelas sessões de áudio do Windows: em chamada, o Teams mantém o microfone aberto. Nada de bot nem API do Teams — e nada é gravado sem você pedir, exceto no modo automático. Lembre de avisar os participantes (LGPD).</p>
-  <label class="lbl" for="after">Ao salvar a reunião</label>
+  <p class="hint" data-i18n="settings.reunioes.isper-percebe-chamada-pelas-sessoes">O ISPer percebe a chamada pelas sessões de áudio do Windows: em chamada, o Teams mantém o microfone aberto. Nada de bot nem API do Teams — e nada é gravado sem você pedir, exceto no modo automático. Lembre de avisar os participantes (LGPD).</p>
+  <label class="lbl" for="after" data-i18n="settings.reunioes.salvar-reuniao">Ao salvar a reunião</label>
   <select id="after" class="field">
-    <option value="notify">Notificação do Windows — clicar abre a Biblioteca (padrão)</option>
-    <option value="open">Abrir o arquivo .md no programa padrão</option>
-    <option value="silent">Nada — fica só na Biblioteca</option>
+    <option value="notify" data-i18n="settings.reunioes.notificacao-windows-clicar-abre-biblioteca">Notificação do Windows — clicar abre a Biblioteca (padrão)</option>
+    <option value="open" data-i18n="settings.reunioes.abrir-arquivo-md-programa-padrao">Abrir o arquivo .md no programa padrão</option>
+    <option value="silent" data-i18n="settings.reunioes.nada-fica-so-biblioteca">Nada — fica só na Biblioteca</option>
   </select>
   <div class="row mt8">
-    <span class="hint m0">A identificação de falantes, quando termina, também avisa por notificação silenciosa.</span>
-    <button class="btn btn-sm" id="notifytest">Testar notificação</button>
+    <span class="hint m0" data-i18n="settings.reunioes.identificacao-falantes-quando-termina-tambem">A identificação de falantes, quando termina, também avisa por notificação silenciosa.</span>
+    <button class="btn btn-sm" id="notifytest" data-i18n="settings.reunioes.notifytest">Testar notificação</button>
   </div>
-  <label class="lbl" for="source">Áudio dos participantes</label>
+  <label class="lbl" for="source" data-i18n="settings.reunioes.audio-participantes">Áudio dos participantes</label>
   <select id="source" class="field">
-    <option value="system">Todo o sistema (padrão)</option>
-    <option value="teams">Só o Microsoft Teams</option>
+    <option value="system" data-i18n="settings.reunioes.todo-sistema-padrao">Todo o sistema (padrão)</option>
+    <option value="teams" data-i18n="settings.reunioes.so-microsoft-teams">Só o Microsoft Teams</option>
   </select>
-  <p class="hint">"Só o Teams" usa o process loopback do Windows — ignora notificações, músicas e outros apps. Se o Teams não estiver aberto na hora, o ISPer cai para o sistema e avisa no indicador.</p>
-  <label class="lbl">Quem falou o quê (diarização)</label>
+  <p class="hint" data-i18n="settings.reunioes.so-teams-usa-process-loopback">"Só o Teams" usa o process loopback do Windows — ignora notificações, músicas e outros apps. Se o Teams não estiver aberto na hora, o ISPer cai para o sistema e avisa no indicador.</p>
+  <label class="lbl" data-i18n="settings.reunioes.quem-falou-diarizacao">Quem falou o quê (diarização)</label>
   <div class="row">
     <span class="hint m0" id="diarstate">…</span>
-    <button class="btn" id="diardl">Baixar modelos (~45 MB)</button>
+    <button class="btn" id="diardl" data-i18n="settings.reunioes.diardl">Baixar modelos (~45 MB)</button>
   </div>
   <div class="mprog" id="diarprog"><div class="progress"><i></i></div><span class="pct">0%</span></div>
-  <p class="hint">Com os modelos instalados, "Participantes" vira "Participante 1", "Participante 2"… — pyannote + 3D-Speaker via sherpa-onnx, 100% local, ao encerrar a reunião.</p>
-  <label class="lbl" for="speakers">Quantos participantes costuma ter a reunião</label>
+  <p class="hint" data-i18n="settings.reunioes.modelos-instalados-participantes-vira-participante">Com os modelos instalados, "Participantes" vira "Participante 1", "Participante 2"… — pyannote + 3D-Speaker via sherpa-onnx, 100% local, ao encerrar a reunião.</p>
+  <label class="lbl" for="speakers" data-i18n="settings.reunioes.quantos-participantes-costuma-ter-reuniao">Quantos participantes costuma ter a reunião</label>
   <select id="speakers" class="field">
-    <option value="0">Descobrir sozinho (padrão)</option>
+    <option value="0" data-i18n="settings.reunioes.descobrir-sozinho-padrao">Descobrir sozinho (padrão)</option>
     <option value="2">2</option>
     <option value="3">3</option>
     <option value="4">4</option>
@@ -161,156 +162,163 @@
     <option value="7">7</option>
     <option value="8">8</option>
   </select>
-  <p class="hint">Informar o número é o que mais ajuda: sem ele, o agrupamento decide por distância entre vozes, e numa reunião longa acaba criando gente demais. Com o número, ele corta em exatamente essa quantidade.</p>
+  <p class="hint" data-i18n="settings.reunioes.informar-numero-mais-ajuda-sem">Informar o número é o que mais ajuda: sem ele, o agrupamento decide por distância entre vozes, e numa reunião longa acaba criando gente demais. Com o número, ele corta em exatamente essa quantidade.</p>
 
   <details class="mt8">
-    <summary class="lbl">Avançado</summary>
-    <label class="switch mt8"><input type="checkbox" id="finalpass"><span class="track"><span class="thumb"></span></span>Refazer a transcrição ao encerrar a reunião (passe final)</label>
-    <p class="hint">Ligado por padrão. Ao encerrar, o ISPer transcreve o áudio inteiro de novo com mais capricho — corte guiado por detecção de voz, busca em feixe, contexto entre trechos e falante palavra a palavra — e substitui a transcrição que apareceu ao vivo. Leva alguns minutos por hora de reunião, em segundo plano; a transcrição ao vivo continua no lugar se algo falhar.</p>
-    <label class="lbl" for="diarthr">Limiar do agrupamento de falantes</label>
+    <summary class="lbl" data-i18n="settings.reunioes.avancado">Avançado</summary>
+    <label class="switch mt8"><input type="checkbox" id="finalpass"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.reunioes.refazer-transcricao-encerrar-reuniao-passe">Refazer a transcrição ao encerrar a reunião (passe final)</span></label>
+    <p class="hint" data-i18n="settings.reunioes.ligado-por-padrao-encerrar-isper">Ligado por padrão. Ao encerrar, o ISPer transcreve o áudio inteiro de novo com mais capricho — corte guiado por detecção de voz, busca em feixe, contexto entre trechos e falante palavra a palavra — e substitui a transcrição que apareceu ao vivo. Leva alguns minutos por hora de reunião, em segundo plano; a transcrição ao vivo continua no lugar se algo falhar.</p>
+    <label class="lbl" for="diarthr" data-i18n="settings.reunioes.limiar-agrupamento-falantes">Limiar do agrupamento de falantes</label>
     <select id="diarthr" class="field">
-      <option value="0">Padrão (0,5)</option>
-      <option value="0.35">0,35 — separa mais (mais falantes)</option>
-      <option value="0.65">0,65 — junta mais (menos falantes)</option>
-      <option value="0.8">0,8 — junta bastante</option>
+      <option value="0" data-i18n="settings.reunioes.padrao-0-5">Padrão (0,5)</option>
+      <option value="0.35" data-i18n="settings.reunioes.0-35-separa-mais-mais">0,35 — separa mais (mais falantes)</option>
+      <option value="0.65" data-i18n="settings.reunioes.0-65-junta-mais-menos">0,65 — junta mais (menos falantes)</option>
+      <option value="0.8" data-i18n="settings.reunioes.0-8-junta-bastante">0,8 — junta bastante</option>
     </select>
-    <p class="hint">Distância máxima entre duas vozes para serem a mesma pessoa. Mexer aqui sem comparar o resultado costuma piorar — prefira informar o número de participantes acima.</p>
+    <p class="hint" data-i18n="settings.reunioes.distancia-maxima-entre-duas-vozes">Distância máxima entre duas vozes para serem a mesma pessoa. Mexer aqui sem comparar o resultado costuma piorar — prefira informar o número de participantes acima.</p>
   </details>
 </div>
 
 <div class="card reveal" data-i="4">
-  <h2>Inteligência</h2>
-  <label class="lbl mt0" for="provider">Provider (resumo de reuniões, insights e polimento)</label>
+  <h2 data-i18n="settings.inteligencia.inteligencia">Inteligência</h2>
+  <label class="lbl mt0" for="provider" data-i18n="settings.inteligencia.provider-resumo-reunioes-insights-polimento">Provider (resumo de reuniões, insights e polimento)</label>
   <select id="provider" class="field">
-    <option value="none">Desligado</option>
-    <option value="groq">Groq (free tier)</option>
-    <option value="gemini">Gemini (free tier)</option>
-    <option value="claude">Claude API</option>
+    <option value="none" data-i18n="settings.inteligencia.desligado">Desligado</option>
+    <option value="groq" data-i18n="settings.inteligencia.groq-free-tier">Groq (free tier)</option>
+    <option value="gemini" data-i18n="settings.inteligencia.gemini-free-tier">Gemini (free tier)</option>
+    <option value="claude" data-i18n="settings.inteligencia.claude-api">Claude API</option>
   </select>
-  <label class="lbl" for="model">Modelo (vazio = padrão do provider)</label>
+  <label class="lbl" for="model" data-i18n="settings.inteligencia.modelo-vazio-padrao-provider">Modelo (vazio = padrão do provider)</label>
   <div class="row">
-    <input type="text" id="model" class="field" list="models" placeholder="ex.: openai/gpt-oss-120b">
-    <button class="btn" id="listmodels">Listar modelos</button>
+    <input type="text" id="model" class="field" list="models" placeholder="ex.: openai/gpt-oss-120b" data-i18n-attr="placeholder:settings.inteligencia.ex-openai-gpt-oss-120b.placeholder">
+    <button class="btn" id="listmodels" data-i18n="settings.inteligencia.listmodels">Listar modelos</button>
   </div>
   <datalist id="models"></datalist>
-  <p class="hint">Os catálogos mudam (e variam por conta): "Listar modelos" consulta a API com a sua chave e preenche as opções do campo.</p>
-  <label class="lbl" for="key">Chave de API <span id="keystate" class="chip chip-ok" hidden>guardada ✓</span></label>
+  <p class="hint" data-i18n="settings.inteligencia.catalogos-mudam-variam-por-conta">Os catálogos mudam (e variam por conta): "Listar modelos" consulta a API com a sua chave e preenche as opções do campo.</p>
+  <label class="lbl" for="key"><span data-i18n="settings.inteligencia.api-key">Chave de API</span> <span id="keystate" class="chip chip-ok" hidden data-i18n="settings.inteligencia.keystate">guardada ✓</span></label>
   <div class="row">
-    <input type="password" id="key" class="field" placeholder="cole a chave e clique em Guardar" autocomplete="off">
-    <button class="btn" id="savekey">Guardar chave</button>
+    <input type="password" id="key" class="field" placeholder="cole a chave e clique em Guardar" autocomplete="off" data-i18n-attr="placeholder:settings.inteligencia.cole-chave-clique-guardar.placeholder">
+    <button class="btn" id="savekey" data-i18n="settings.inteligencia.savekey">Guardar chave</button>
   </div>
-  <p class="hint">A chave vai para o Credential Manager do Windows — nunca para arquivo. Só o texto do transcript é enviado à API; áudio, nunca.</p>
+  <p class="hint" data-i18n="settings.inteligencia.chave-vai-credential-manager-windows">A chave vai para o Credential Manager do Windows — nunca para arquivo. Só o texto do transcript é enviado à API; áudio, nunca.</p>
   <div class="row mt10">
-    <button class="btn flex-none" id="test">Testar conexão</button>
+    <button class="btn flex-none" id="test" data-i18n="settings.inteligencia.test">Testar conexão</button>
   </div>
 
-  <h3>Insights ao vivo</h3>
+  <h3 data-i18n="settings.inteligencia.insights-vivo">Insights ao vivo</h3>
   <div class="stack mt4">
-    <label class="switch"><input type="checkbox" id="insights"><span class="track"><span class="thumb"></span></span>Durante a reunião, perguntar à IA o que ficou pendente, o que eu prometi e o que foi decidido</label>
+    <label class="switch"><input type="checkbox" id="insights"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.inteligencia.durante-reuniao-perguntar-ia-ficou">Durante a reunião, perguntar à IA o que ficou pendente, o que eu prometi e o que foi decidido</span></label>
     <select id="insint" class="field">
-      <option value="3">A cada 3 minutos</option>
-      <option value="5">A cada 5 minutos (padrão)</option>
-      <option value="10">A cada 10 minutos</option>
+      <option value="3" data-i18n="settings.inteligencia.cada-3-minutos">A cada 3 minutos</option>
+      <option value="5" data-i18n="settings.inteligencia.cada-5-minutos-padrao">A cada 5 minutos (padrão)</option>
+      <option value="10" data-i18n="settings.inteligencia.cada-10-minutos">A cada 10 minutos</option>
     </select>
   </div>
-  <p class="hint">Usa o provider acima. Cada rodada envia os últimos ~15 minutos de transcrição (só texto) e atualiza o painel "Insights ao vivo" no card de reunião do Início. Rodadas sem fala nova são puladas; "Atualizar agora" força uma. Desligado, o painel ainda aceita rodadas avulsas.</p>
+  <p class="hint" data-i18n="settings.inteligencia.usa-provider-acima-cada-rodada">Usa o provider acima. Cada rodada envia os últimos ~15 minutos de transcrição (só texto) e atualiza o painel "Insights ao vivo" no card de reunião do Início. Rodadas sem fala nova são puladas; "Atualizar agora" força uma. Desligado, o painel ainda aceita rodadas avulsas.</p>
 
-  <h3>Busca semântica</h3>
-  <label class="lbl mt0" for="embprovider">Provider de embeddings</label>
+  <h3 data-i18n="settings.inteligencia.busca-semantica">Busca semântica</h3>
+  <label class="lbl mt0" for="embprovider" data-i18n="settings.inteligencia.provider-embeddings">Provider de embeddings</label>
   <select id="embprovider" class="field">
-    <option value="none">Desligada — só a busca literal</option>
-    <option value="gemini">Gemini (free tier) — usa a chave do Gemini acima</option>
-    <option value="openai">Compatível com OpenAI — Ollama local, LM Studio, OpenAI, Mistral…</option>
+    <option value="none" data-i18n="settings.inteligencia.desligada-so-busca-literal">Desligada — só a busca literal</option>
+    <option value="gemini" data-i18n="settings.inteligencia.gemini-free-tier-usa-chave">Gemini (free tier) — usa a chave do Gemini acima</option>
+    <option value="openai" data-i18n="settings.inteligencia.compativel-openai-ollama-local-lm">Compatível com OpenAI — Ollama local, LM Studio, OpenAI, Mistral…</option>
   </select>
-  <label class="lbl" for="embmodel">Modelo (vazio = padrão: <code id="embdefault">gemini-embedding-001</code>)</label>
-  <input type="text" id="embmodel" class="field" placeholder="ex.: nomic-embed-text, bge-m3, text-embedding-3-small">
+  <label class="lbl" for="embmodel"><span data-i18n="settings.inteligencia.emb-model-lead">Modelo (vazio = padrão:</span> <code id="embdefault">gemini-embedding-001</code>)</label>
+  <input type="text" id="embmodel" class="field" placeholder="ex.: nomic-embed-text, bge-m3, text-embedding-3-small" data-i18n-attr="placeholder:settings.inteligencia.ex-nomic-embed-text-bge.placeholder">
   <div id="embopenai" hidden>
-    <label class="lbl" for="embbase">Base da API</label>
+    <label class="lbl" for="embbase" data-i18n="settings.inteligencia.base-api">Base da API</label>
     <input type="text" id="embbase" class="field" placeholder="http://localhost:11434/v1">
-    <p class="hint">Ollama local: <code>http://localhost:11434/v1</code> com <code>ollama pull nomic-embed-text</code> (ou <code>bge-m3</code>, multilíngue) — nada sai da máquina e não precisa de chave. OpenAI: <code>https://api.openai.com/v1</code> + chave.</p>
-    <label class="lbl" for="embkey">Chave (só se o endpoint exigir) <span id="embkeystate" class="chip chip-ok" hidden>guardada ✓</span></label>
+    <p class="hint" data-i18n-html="settings.inteligencia.ollama-local-http-localhost-11434">Ollama local: <code>http://localhost:11434/v1</code> com <code>ollama pull nomic-embed-text</code> (ou <code>bge-m3</code>, multilíngue) — nada sai da máquina e não precisa de chave. OpenAI: <code>https://api.openai.com/v1</code> + chave.</p>
+    <label class="lbl" for="embkey"><span data-i18n="settings.inteligencia.emb-key">Chave (só se o endpoint exigir)</span> <span id="embkeystate" class="chip chip-ok" hidden data-i18n="settings.inteligencia.embkeystate">guardada ✓</span></label>
     <div class="row">
-      <input type="password" id="embkey" class="field" placeholder="vazio para Ollama; cole e guarde para OpenAI/Mistral" autocomplete="off">
-      <button class="btn" id="saveembkey">Guardar chave</button>
+      <input type="password" id="embkey" class="field" placeholder="vazio para Ollama; cole e guarde para OpenAI/Mistral" autocomplete="off" data-i18n-attr="placeholder:settings.inteligencia.vazio-ollama-cole-guarde-openai.placeholder">
+      <button class="btn" id="saveembkey" data-i18n="settings.inteligencia.saveembkey">Guardar chave</button>
     </div>
   </div>
-  <p class="hint">Na Biblioteca, o botão "Semântica" passa a achar reuniões e ditados pelo sentido ("quando falamos do orçamento?"), não só pela palavra exata. Cada reunião salva e cada ditado colado é indexado sozinho; "Indexar tudo" cobre o histórico anterior e refaz o índice quando o modelo muda. Só o texto dos trechos e da pergunta é enviado ao provider — com o Ollama, nem isso sai da máquina.</p>
+  <p class="hint" data-i18n="settings.inteligencia.biblioteca-botao-semantica-passa-achar">Na Biblioteca, o botão "Semântica" passa a achar reuniões e ditados pelo sentido ("quando falamos do orçamento?"), não só pela palavra exata. Cada reunião salva e cada ditado colado é indexado sozinho; "Indexar tudo" cobre o histórico anterior e refaz o índice quando o modelo muda. Só o texto dos trechos e da pergunta é enviado ao provider — com o Ollama, nem isso sai da máquina.</p>
   <div class="row mt10">
-    <button class="btn btn-sm flex-none" id="embtest">Testar busca</button>
-    <button class="btn btn-sm flex-none" id="embindex">Indexar tudo</button>
+    <button class="btn btn-sm flex-none" id="embtest" data-i18n="settings.inteligencia.embtest">Testar busca</button>
+    <button class="btn btn-sm flex-none" id="embindex" data-i18n="settings.inteligencia.embindex">Indexar tudo</button>
     <span class="hint m0" id="embstate">…</span>
   </div>
   <div class="mprog" id="embprog"><div class="progress"><i></i></div><span class="pct">0%</span></div>
 
-  <h3>Polimento do ditado</h3>
+  <h3 data-i18n="settings.inteligencia.polimento-ditado">Polimento do ditado</h3>
   <div class="stack mt4">
-    <label class="switch"><input type="checkbox" id="polish"><span class="track"><span class="thumb"></span></span>Polir os ditados com IA antes de colar</label>
+    <label class="switch"><input type="checkbox" id="polish"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.inteligencia.polir-ditados-ia-antes-colar">Polir os ditados com IA antes de colar</span></label>
     <select id="pstyle" class="field">
-      <option value="clean">Só limpeza — tira hesitações e arruma pontuação, sem mudar o tom</option>
-      <option value="formal">Formal — frases completas, tom profissional</option>
-      <option value="casual">Casual — tom natural, como uma mensagem para colegas</option>
+      <option value="clean" data-i18n="settings.inteligencia.so-limpeza-tira-hesitacoes-arruma">Só limpeza — tira hesitações e arruma pontuação, sem mudar o tom</option>
+      <option value="formal" data-i18n="settings.inteligencia.formal-frases-completas-tom-profissional">Formal — frases completas, tom profissional</option>
+      <option value="casual" data-i18n="settings.inteligencia.casual-tom-natural-como-mensagem">Casual — tom natural, como uma mensagem para colegas</option>
     </select>
   </div>
-  <p class="hint">Usa o provider acima; só o texto do ditado é enviado. Acrescenta cerca de um segundo antes de colar. Se a API falhar ou não houver chave, o texto original é colado normalmente — o histórico guarda os dois.</p>
+  <p class="hint" data-i18n="settings.inteligencia.usa-provider-acima-so-texto">Usa o provider acima; só o texto do ditado é enviado. Acrescenta cerca de um segundo antes de colar. Se a API falhar ou não houver chave, o texto original é colado normalmente — o histórico guarda os dois.</p>
 </div>
 
 <div class="card reveal" data-i="5">
-  <h2>Sistema</h2>
+  <h2 data-i18n="settings.sistema.sistema">Sistema</h2>
   <div class="stack mt0">
-    <label class="switch"><input type="checkbox" id="autostart"><span class="track"><span class="thumb"></span></span>Iniciar o ISPer junto com o Windows</label>
-    <label class="switch"><input type="checkbox" id="showhome"><span class="track"><span class="thumb"></span></span>Mostrar a tela Início ao abrir o ISPer</label>
-    <label class="switch"><input type="checkbox" id="autoupdate"><span class="track"><span class="thumb"></span></span>Avisar quando houver versão nova (ao abrir e uma vez por dia)</label>
+    <label class="switch"><input type="checkbox" id="autostart"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.sistema.iniciar-isper-junto-windows">Iniciar o ISPer junto com o Windows</span></label>
+    <label class="switch"><input type="checkbox" id="showhome"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.sistema.mostrar-tela-inicio-abrir-isper">Mostrar a tela Início ao abrir o ISPer</span></label>
+    <label class="switch"><input type="checkbox" id="autoupdate"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.sistema.avisar-quando-houver-versao-nova">Avisar quando houver versão nova (ao abrir e uma vez por dia)</span></label>
   </div>
-  <p class="hint">No início com o Windows o ISPer nasce quieto na bandeja; a tela Início também abre com um clique no ícone da bandeja.</p>
-  <label class="lbl" for="theme">Aparência</label>
+  <p class="hint" data-i18n="settings.sistema.inicio-windows-isper-nasce-quieto">No início com o Windows o ISPer nasce quieto na bandeja; a tela Início também abre com um clique no ícone da bandeja.</p>
+  <label class="lbl" for="theme" data-i18n="settings.sistema.aparencia">Aparência</label>
   <select id="theme" class="field">
-    <option value="system">Seguir o Windows (padrão)</option>
-    <option value="light">Clara</option>
-    <option value="dark">Escura</option>
+    <option value="system" data-i18n="settings.sistema.seguir-windows-padrao">Seguir o Windows (padrão)</option>
+    <option value="light" data-i18n="settings.sistema.clara">Clara</option>
+    <option value="dark" data-i18n="settings.sistema.escura">Escura</option>
   </select>
-  <p class="hint">Vale na hora para o Início, a Biblioteca e as Configurações. O indicador flutuante e o Copilot ficam sempre escuros — flutuam sobre outros apps e precisam do contraste próprio.</p>
-  <label class="lbl" for="retention">Guardar reuniões e ditados por</label>
+  <p class="hint" data-i18n="settings.sistema.vale-hora-inicio-biblioteca-configuracoes">Vale na hora para o Início, a Biblioteca e as Configurações. O indicador flutuante e o Copilot ficam sempre escuros — flutuam sobre outros apps e precisam do contraste próprio.</p>
+  <label class="lbl" for="uilang" data-i18n="settings.sistema.ui-lang">Idioma da interface</label>
+  <select id="uilang" class="field">
+    <option value="auto" data-i18n="settings.sistema.ui-lang-auto">Seguir o Windows (padrão)</option>
+    <option value="pt-BR" lang="pt-BR">Português (Brasil)</option>
+    <option value="en" lang="en">English</option>
+  </select>
+  <p class="hint" data-i18n="settings.sistema.ui-lang-hint">Muda os textos do ISPer na hora: janelas, bandeja e notificações. O idioma da fala (o que o Whisper transcreve) fica em Ditado.</p>
+  <label class="lbl" for="retention" data-i18n="settings.sistema.guardar-reunioes-ditados-por">Guardar reuniões e ditados por</label>
   <select id="retention" class="field">
-    <option value="0">Para sempre (padrão)</option>
-    <option value="30">30 dias</option>
-    <option value="90">90 dias</option>
-    <option value="180">180 dias</option>
-    <option value="365">1 ano</option>
+    <option value="0" data-i18n="settings.sistema.sempre-padrao">Para sempre (padrão)</option>
+    <option value="30" data-i18n="settings.sistema.30-dias">30 dias</option>
+    <option value="90" data-i18n="settings.sistema.90-dias">90 dias</option>
+    <option value="180" data-i18n="settings.sistema.180-dias">180 dias</option>
+    <option value="365" data-i18n="settings.sistema.1-ano">1 ano</option>
   </select>
   <div class="row" id="retconfirm" hidden>
-    <span class="hint m0 bad" id="retconfirmtext">Confirmar?</span>
-    <button class="btn btn-sm btn-primary flex-none" id="retyes">Sim, apagar o que passar do prazo</button>
-    <button class="btn btn-sm btn-ghost flex-none" id="retno">Cancelar</button>
+    <span class="hint m0 bad" id="retconfirmtext" data-i18n="settings.sistema.retconfirmtext">Confirmar?</span>
+    <button class="btn btn-sm btn-primary flex-none" id="retyes" data-i18n="settings.sistema.retyes">Sim, apagar o que passar do prazo</button>
+    <button class="btn btn-sm btn-ghost flex-none" id="retno" data-i18n="settings.sistema.retno">Cancelar</button>
   </div>
-  <p class="hint">O padrão é <b>para sempre</b>: nada é apagado sem você escolher um prazo aqui e confirmar. Com um prazo, o ISPer apaga do banco e da pasta de Reuniões o que passou dele — ao abrir, uma vez por dia e ao encurtar o prazo —, e antes de apagar grava um backup automático em <code>Documentos\ISPer\Backups</code> (ficam os três últimos). Transcrições são dados pessoais seus e de quem participou (LGPD).</p>
+  <p class="hint" data-i18n-html="settings.sistema.padrao-sempre-nada-apagado-sem">O padrão é <b>para sempre</b>: nada é apagado sem você escolher um prazo aqui e confirmar. Com um prazo, o ISPer apaga do banco e da pasta de Reuniões o que passou dele — ao abrir, uma vez por dia e ao encurtar o prazo —, e antes de apagar grava um backup automático em <code>Documentos\ISPer\Backups</code> (ficam os três últimos). Transcrições são dados pessoais seus e de quem participou (LGPD).</p>
   <div class="row">
-    <button class="btn btn-sm flex-none" id="backupdb">Fazer backup do banco</button>
-    <span class="hint m0">Cópia íntegra do banco (reuniões, ditados, índice semântico) em <code>Documentos\ISPer\Backups</code>, mesmo com o app aberto. Para restaurar: feche o ISPer e copie o arquivo por cima de <code>%APPDATA%\ISPer\isper.db</code>.</span>
+    <button class="btn btn-sm flex-none" id="backupdb" data-i18n="settings.sistema.backupdb">Fazer backup do banco</button>
+    <span class="hint m0" data-i18n-html="settings.sistema.copia-integra-banco-reunioes-ditados">Cópia íntegra do banco (reuniões, ditados, índice semântico) em <code>Documentos\ISPer\Backups</code>, mesmo com o app aberto. Para restaurar: feche o ISPer e copie o arquivo por cima de <code>%APPDATA%\ISPer\isper.db</code>.</span>
   </div>
   <div class="row">
-    <button class="btn btn-sm flex-none" id="reimport">Reimportar reuniões da pasta</button>
-    <span class="hint m0" id="reimportstate">Se uma reunião sumiu da Biblioteca mas o <code>.md</code> continua em <code>Documentos\ISPer\Reunioes</code>, isto a traz de volta — com falas, horários, falantes e resumo. O Markdown é gravado antes do banco, então ele é a cópia que sobrevive. Repetir é seguro: o que já está na Biblioteca é pulado.</span>
+    <button class="btn btn-sm flex-none" id="reimport" data-i18n="settings.sistema.reimport">Reimportar reuniões da pasta</button>
+    <span class="hint m0" id="reimportstate" data-i18n-html="settings.sistema.reimportstate">Se uma reunião sumiu da Biblioteca mas o <code>.md</code> continua em <code>Documentos\ISPer\Reunioes</code>, isto a traz de volta — com falas, horários, falantes e resumo. O Markdown é gravado antes do banco, então ele é a cópia que sobrevive. Repetir é seguro: o que já está na Biblioteca é pulado.</span>
   </div>
-  <label class="lbl">Atualizações</label>
+  <label class="lbl" data-i18n="settings.sistema.atualizacoes">Atualizações</label>
   <div class="row">
-    <button class="btn btn-sm flex-none" id="checkupd">Verificar agora</button>
-    <button class="btn btn-sm btn-primary flex-none" id="installupd" hidden>Baixar e instalar</button>
-    <span class="hint m0" id="updstate">Versão atual: <span id="curver">…</span>. As atualizações vêm assinadas das releases do ISPer no GitHub; o download só acontece quando você pedir.</span>
+    <button class="btn btn-sm flex-none" id="checkupd" data-i18n="settings.sistema.checkupd">Verificar agora</button>
+    <button class="btn btn-sm btn-primary flex-none" id="installupd" hidden data-i18n="settings.sistema.installupd">Baixar e instalar</button>
+    <span class="hint m0" id="updstate"><span data-i18n="settings.msg.current-version">Versão atual: </span><span id="curver">…</span><span data-i18n="settings.sistema.updates-hint">. As atualizações vêm assinadas das releases do ISPer no GitHub; o download só acontece quando você pedir.</span></span>
   </div>
   <div class="progress mt8" id="updprogress" hidden><div class="bar"></div></div>
   <pre class="hint pre-notes" id="updnotes" hidden></pre>
-  <label class="lbl">Diagnóstico</label>
+  <label class="lbl" data-i18n="settings.sistema.diagnostico">Diagnóstico</label>
   <div id="diag" class="diag"><div class="skeleton sk-line w60"></div></div>
   <div class="row mt10">
-    <button class="btn btn-sm flex-none" id="copydiag">Copiar diagnóstico</button>
-    <button class="btn btn-sm flex-none" id="exportdiag">Exportar diagnóstico (.zip)</button>
-    <button class="btn btn-sm btn-ghost flex-none" id="openlogs">Abrir pasta de logs</button>
-    <span class="hint m0">Os logs ficam em <code>%LOCALAPPDATA%\com.isper.desktop\logs</code> (um arquivo JSON por dia, 14 dias). Ao pedir ajuda, mande o .zip exportado: diagnóstico, configurações (sem chaves), versões, métricas e os três últimos logs — as linhas com texto ditado saem antes. Nada disso é enviado sozinho.</span>
+    <button class="btn btn-sm flex-none" id="copydiag" data-i18n="settings.sistema.copydiag">Copiar diagnóstico</button>
+    <button class="btn btn-sm flex-none" id="exportdiag" data-i18n="settings.sistema.exportdiag">Exportar diagnóstico (.zip)</button>
+    <button class="btn btn-sm btn-ghost flex-none" id="openlogs" data-i18n="settings.sistema.openlogs">Abrir pasta de logs</button>
+    <span class="hint m0" data-i18n-html="settings.sistema.logs-ficam-localappdata-isper-desktop">Os logs ficam em <code>%LOCALAPPDATA%\com.isper.desktop\logs</code> (um arquivo JSON por dia, 14 dias). Ao pedir ajuda, mande o .zip exportado: diagnóstico, configurações (sem chaves), versões, métricas e os três últimos logs — as linhas com texto ditado saem antes. Nada disso é enviado sozinho.</span>
   </div>
 </div>
 
 <div class="footer">
-  <button class="btn btn-primary" id="save">Salvar</button>
+  <button class="btn btn-primary" id="save" data-i18n="settings.sistema.save">Salvar</button>
   <div id="status" role="status" aria-live="polite"></div>
 </div>
 
@@ -322,14 +330,15 @@
   const { el, toast } = UI;
   const status = (msg, cls = '') => { const s = $('status'); s.textContent = msg; s.className = cls; s.classList.remove('swap'); void s.offsetWidth; s.classList.add('swap'); };
   let selectedModel = null;
+  const keyLabel = UI.keyLabel;
   const EMB_DEFAULT = { gemini: 'gemini-embedding-001', openai: 'nomic-embed-text' };
 
   // Um combo salvo que não está entre as opções fixas ganha uma <option> própria.
-  const pretty = (combo) => combo.split('+').map(p => ({ ctrl: 'Ctrl', alt: 'Alt', shift: 'Shift', super: 'Win', space: 'Espaço' })[p] || p.toUpperCase()).join('+');
+  const pretty = (combo) => combo.split('+').map(p => ({ ctrl: 'Ctrl', alt: 'Alt', shift: 'Shift', super: 'Win', space: t('keys.space') })[p] || p.toUpperCase()).join('+');
   function setCombo(select, combo) {
     if (!combo) { select.value = ''; return; }
     if (![...select.options].some(o => o.value === combo)) {
-      const o = document.createElement('option'); o.value = combo; o.textContent = pretty(combo) + ' (personalizado)';
+      const o = document.createElement('option'); o.value = combo; o.textContent = t('settings.msg.custom-combo', { combo: pretty(combo) });
       select.appendChild(o);
     }
     select.value = combo;
@@ -337,11 +346,11 @@
   // "Gravar atalho": lê a próxima combinação de teclas e coloca no select.
   function captureInto(select, btn) {
     const prev = btn.textContent;
-    btn.textContent = 'Pressione a combinação…'; btn.classList.add('is-armed');
+    btn.textContent = t('settings.msg.press-combo'); btn.classList.add('is-armed');
     const done = (combo) => {
       document.removeEventListener('keydown', onKey, true);
       btn.textContent = prev; btn.classList.remove('is-armed');
-      if (combo) { setCombo(select, combo); status('atalho capturado: ' + pretty(combo) + ' — clique em Salvar para aplicar', 'ok'); }
+      if (combo) { setCombo(select, combo); status(t('settings.msg.combo-captured', { combo: pretty(combo) }), 'ok'); }
     };
     const onKey = (ev) => {
       ev.preventDefault(); ev.stopPropagation();
@@ -357,7 +366,7 @@
       else if (/^F([1-9]|1[0-2])$/.test(ev.key)) key = ev.key.toLowerCase();
       else if (ev.key === ' ' || ev.code === 'Space') key = 'space';
       if (!key) return;                          // só modificador ou tecla não suportada: continua ouvindo
-      if (!mods.length && !key.startsWith('f')) { status('use pelo menos um modificador (Ctrl, Alt, Shift) com essa tecla', 'err'); return; }
+      if (!mods.length && !key.startsWith('f')) { status(t('settings.msg.need-modifier'), 'err'); return; }
       done([...mods, key].join('+'));
     };
     document.addEventListener('keydown', onKey, true);
@@ -372,19 +381,19 @@
     let devices = [];
     try { devices = await invoke('list_input_devices'); } catch (_) {}
     sel.replaceChildren();
-    const def = document.createElement('option'); def.value = ''; def.textContent = '(padrão do sistema)'; sel.appendChild(def);
+    const def = document.createElement('option'); def.value = ''; def.textContent = t('settings.msg.mic-default'); sel.appendChild(def);
     for (const d of devices) { const o = document.createElement('option'); o.value = d; o.textContent = d; sel.appendChild(o); }
-    if (selected && !devices.includes(selected)) { const o = document.createElement('option'); o.value = selected; o.textContent = selected + ' (não conectado)'; sel.appendChild(o); }
+    if (selected && !devices.includes(selected)) { const o = document.createElement('option'); o.value = selected; o.textContent = t('settings.msg.mic-missing', { name: selected }); sel.appendChild(o); }
     sel.value = selected || '';
   }
 
   async function load() {
     try {
       const s = await invoke('get_settings');
-      $('active').textContent = s.active_shortcut;
-      $('mactive').textContent = s.active_meeting_shortcut || '(nenhum)';
-      $('kactive').textContent = s.active_mark_shortcut || '(nenhum)';
-      $('cactive').textContent = s.active_copilot_shortcut || '(nenhum)';
+      $('active').textContent = keyLabel(s.active_shortcut);
+      $('mactive').textContent = keyLabel(s.active_meeting_shortcut) || t('common.none');
+      $('kactive').textContent = keyLabel(s.active_mark_shortcut) || t('common.none');
+      $('cactive').textContent = keyLabel(s.active_copilot_shortcut) || t('common.none');
       setCombo($('shortcut'), s.shortcut || '');
       setCombo($('mshortcut'), s.meeting_shortcut || '');
       setCombo($('markshortcut'), s.mark_shortcut || '');
@@ -415,45 +424,46 @@
       $('diarthr').value = String(s.diarize_threshold || 0);
       $('retention').value = String(s.retention_days || 0);
       $('theme').value = s.theme || 'system';
+      $('uilang').value = s.ui_lang || 'auto';
       retentionSaved = String(s.retention_days || 0);
       $('retconfirm').hidden = true;
       $('curver').textContent = s.version || '?';
       currentVersion = s.version || '?';
       $('autostart').checked = !!s.autostart;
       $('gpuhint').textContent = s.has_gpu
-        ? 'Build com CUDA (GPU NVIDIA): os modelos Large rodam em tempo real.'
-        : 'Build sem CUDA: prefira o Small ou o Medium.';
+        ? t('settings.msg.gpu-build')
+        : t('settings.msg.cpu-build');
       selectedModel = s.model || null;
       await renderModels();
       await loadEmbeddings();
     } catch (e) {
-      status('erro ao carregar: ' + e, 'err');
+      status(t('settings.msg.load-failed', { e }), 'err');
     }
   }
 
   async function renderModels(animate = true) {
     const list = $('modelslist');
     let models = [];
-    try { models = await invoke('models_status'); } catch (e) { status('erro ao listar modelos: ' + e, 'err'); return; }
+    try { models = await invoke('models_status'); } catch (e) { status(t('settings.msg.models-failed', { e }), 'err'); return; }
     list.replaceChildren();
-    if (!models.some(m => m.installed)) status('nenhum modelo instalado — baixe um em "Modelos Whisper" para o ISPer funcionar', 'err');
+    if (!models.some(m => m.installed)) status(t('settings.msg.no-model'), 'err');
     for (const m of models) {
       const row = el('div', 'mrow');
       row.dataset.file = m.file;
       const radio = el('input', 'radio');
       radio.type = 'radio'; radio.name = 'model'; radio.value = m.file;
-      radio.disabled = !m.installed; radio.title = m.installed ? 'usar este modelo' : 'baixe para poder escolher';
+      radio.disabled = !m.installed; radio.title = m.installed ? t('settings.msg.use-model') : t('settings.msg.download-to-pick');
       radio.checked = selectedModel ? selectedModel === m.file : m.active;
       radio.addEventListener('change', () => { selectedModel = m.file; });
       const info = el('div');
       const name = el('div', 'mname');
       name.append(m.label + ' · ' + m.approx_mb + ' MB');
-      name.appendChild(el('span', 'chip' + (m.installed ? (m.active ? ' chip-accent' : ' chip-ok') : ''), m.installed ? (m.active ? 'em uso' : 'instalado') : 'não baixado'));
+      name.appendChild(el('span', 'chip' + (m.installed ? (m.active ? ' chip-accent' : ' chip-ok') : ''), m.installed ? (m.active ? t('settings.msg.in-use') : t('settings.msg.installed')) : t('settings.msg.not-downloaded')));
       info.appendChild(name);
-      info.appendChild(el('div', 'mnote', m.note + (m.needs_gpu ? ' · pede GPU' : '')));
+      info.appendChild(el('div', 'mnote', m.note + (m.needs_gpu ? t('settings.msg.needs-gpu') : '')));
       const prog = el('div', 'mprog'); const bar = el('div', 'progress'); bar.appendChild(el('i')); prog.append(bar, el('span', 'pct', '0%'));
       info.appendChild(prog);
-      const btn = el('button', 'btn btn-sm' + (m.installed ? ' btn-ghost' : ''), m.installed ? 'Remover' : 'Baixar');
+      const btn = el('button', 'btn btn-sm' + (m.installed ? ' btn-ghost' : ''), m.installed ? t('common.remove') : t('common.download'));
       if (m.installed) btn.addEventListener('click', () => removeModel(m.file, m.label));
       else btn.addEventListener('click', () => downloadModel(m.file, btn, prog));
       row.append(radio, info, btn);
@@ -463,14 +473,14 @@
   }
 
   async function downloadModel(file, btn, prog) {
-    UI.busy(btn, true, 'Baixando…'); prog.classList.add('on');
-    status('baixando ' + file + '… (SHA-256 conferido ao final)');
+    UI.busy(btn, true, t('common.downloading')); prog.classList.add('on');
+    status(t('settings.msg.downloading-model', { file }));
     try {
       await invoke('download_model', { file });
-      status(file + ' baixado e verificado ✓', 'ok');
-      toast('modelo pronto — já pode marcar e salvar', 'ok');
+      status(t('settings.msg.model-verified', { file }), 'ok');
+      toast(t('settings.msg.model-ready'), 'ok');
     } catch (e) {
-      status('download falhou: ' + e, 'err');
+      status(t('settings.msg.download-failed', { e }), 'err');
       UI.busy(btn, false);
     }
     await renderModels(false);
@@ -480,12 +490,12 @@
   async function removeModel(file, label) {
     let sched;
     try { sched = await invoke('delete_model', { file }); }
-    catch (e) { status('erro: ' + e, 'err'); return; }
+    catch (e) { status(t('common.error', { e }), 'err'); return; }
     await renderModels(false);
-    UI.undoable('Modelo ' + (label || file) + ' removido', sched, async (ok) => {
-      if (!ok) { status('não deu tempo: o modelo já foi removido', 'err'); return; }
+    UI.undoable(t('settings.msg.model-removed', { name: label || file }), sched, async (ok) => {
+      if (!ok) { status(t('settings.msg.model-too-late'), 'err'); return; }
       await renderModels(false);
-      status((label || file) + ' mantido', 'ok');
+      status(t('settings.msg.model-kept', { name: label || file }), 'ok');
     });
   }
 
@@ -507,15 +517,15 @@
   async function refreshDiarize() {
     try {
       const ok = await invoke('diarize_status');
-      $('diarstate').textContent = ok ? 'modelos instalados ✓ — falantes identificados ao encerrar' : 'não instalado — rótulo genérico "Participantes"';
+      $('diarstate').textContent = ok ? t('settings.msg.diar-installed') : t('settings.msg.diar-missing');
       $('diarstate').classList.toggle('text-good', ok);
       $('diardl').hidden = ok;
     } catch (_) {}
   }
   $('diardl').addEventListener('click', async () => {
-    UI.busy($('diardl'), true, 'Baixando…');
-    try { await invoke('download_diarize_models'); status('modelos de diarização instalados ✓', 'ok'); toast('diarização pronta', 'ok'); }
-    catch (e) { status('download falhou: ' + e, 'err'); }
+    UI.busy($('diardl'), true, t('common.downloading'));
+    try { await invoke('download_diarize_models'); status(t('settings.msg.diar-ok'), 'ok'); toast(t('settings.msg.diar-ready'), 'ok'); }
+    catch (e) { status(t('settings.msg.download-failed', { e }), 'err'); }
     UI.busy($('diardl'), false);
     $('diarprog').classList.remove('on');
     await refreshDiarize();
@@ -530,40 +540,40 @@
     $('embmodel').disabled = $('embtest').disabled = $('embindex').disabled = p === 'none';
     if (p === 'openai' && !$('embbase').value) $('embbase').placeholder = 'http://localhost:11434/v1';
   }
-  $('embprovider').addEventListener('change', () => { embProviderChanged(); $('embstate').textContent = 'clique em Salvar para aplicar o provider antes de testar ou indexar'; });
+  $('embprovider').addEventListener('change', () => { embProviderChanged(); $('embstate').textContent = t('settings.msg.emb-apply-first'); });
   async function loadEmbeddings() {
     let s;
-    try { s = await invoke('embeddings_status'); } catch (e) { $('embstate').textContent = 'indisponível: ' + e; return; }
+    try { s = await invoke('embeddings_status'); } catch (e) { $('embstate').textContent = t('common.unavailable', { e }); return; }
     const st = $('embstate');
-    if (!s.configured) { st.textContent = 'desligada — a Biblioteca busca só pela palavra exata'; return; }
-    if (s.indexing) { st.textContent = 'indexando… ' + s.indexing.done + ' de ' + s.indexing.total; setProgress($('embprog'), s.indexing.done, s.indexing.total); return; }
+    if (!s.configured) { st.textContent = t('settings.msg.emb-off'); return; }
+    if (s.indexing) { st.textContent = t('settings.msg.emb-indexing', { done: s.indexing.done, total: s.indexing.total }); setProgress($('embprog'), s.indexing.done, s.indexing.total); return; }
     $('embprog').classList.remove('on');
     const needsKey = s.provider === 'gemini' && !s.key_present;
-    if (needsKey) { st.textContent = 'falta a chave do Gemini (acima) para a busca semântica funcionar'; return; }
+    if (needsKey) { st.textContent = t('settings.msg.emb-needs-key'); return; }
     const x = s.stats;
     st.textContent = x
-      ? x.meetings_indexed + ' de ' + x.meetings_total + ' reuniões e ' + x.dictations_indexed + ' de ' + x.dictations_total + ' ditados indexados · ' + x.chunks + ' trechos · ' + s.model_id
-      : 'pronta · ' + s.model_id;
+      ? t('settings.msg.emb-stats', { mi: x.meetings_indexed, mt: x.meetings_total, di: x.dictations_indexed, dt: x.dictations_total, chunks: x.chunks, model: s.model_id })
+      : t('settings.msg.emb-ready', { model: s.model_id });
   }
   $('embtest').addEventListener('click', async () => {
     const b = $('embtest');
-    UI.busy(b, true, 'Testando…');
-    try { const r = await invoke('test_embeddings'); UI.busy(b, false); UI.flash(b, 'ok ✓'); status(r, 'ok'); }
-    catch (e) { UI.busy(b, false); UI.flash(b, 'Falhou', 'err'); status('teste da busca semântica falhou: ' + e + ' — salve o provider antes de testar', 'err'); }
+    UI.busy(b, true, t('common.testing'));
+    try { const r = await invoke('test_embeddings'); UI.busy(b, false); UI.flash(b, t('common.ok')); status(r, 'ok'); }
+    catch (e) { UI.busy(b, false); UI.flash(b, t('common.failed'), 'err'); status(t('settings.msg.emb-test-failed', { e }), 'err'); }
   });
   $('embindex').addEventListener('click', async () => {
     const b = $('embindex');
-    UI.busy(b, true, 'Indexando…'); $('embprog').classList.add('on');
-    status('indexando o histórico… os trechos vão ao provider em lotes; só texto viaja');
+    UI.busy(b, true, t('common.indexing')); $('embprog').classList.add('on');
+    status(t('settings.msg.emb-indexing-start'));
     try {
       const r = await invoke('index_all');
-      UI.busy(b, false); UI.flash(b, 'pronto ✓');
-      status('índice atualizado: ' + r.meetings + ' reuniões e ' + r.dictations + ' ditados novos (' + r.chunks + ' trechos); ' + r.skipped + ' já estavam · ' + r.model_id, 'ok');
-    } catch (e) { UI.busy(b, false); status('indexação falhou: ' + e, 'err'); }
+      UI.busy(b, false); UI.flash(b, t('common.done'));
+      status(t('settings.msg.emb-indexed', { m: r.meetings, d: r.dictations, chunks: r.chunks, skipped: r.skipped, model: r.model_id }), 'ok');
+    } catch (e) { UI.busy(b, false); status(t('settings.msg.emb-index-failed', { e }), 'err'); }
     $('embprog').classList.remove('on');
     await loadEmbeddings();
   });
-  listen('isper-index-progress', (e) => { const p = e.payload || {}; setProgress($('embprog'), p.done, p.total); $('embstate').textContent = 'indexando… ' + p.done + ' de ' + p.total; });
+  listen('isper-index-progress', (e) => { const p = e.payload || {}; setProgress($('embprog'), p.done, p.total); $('embstate').textContent = t('settings.msg.emb-indexing', { done: p.done, total: p.total }); });
   $('saveembkey').addEventListener('click', async () => {
     const b = $('saveembkey');
     UI.busy(b, true);
@@ -573,14 +583,14 @@
       $('embkey').value = '';
       $('embkeystate').hidden = !had;
       UI.busy(b, false);
-      UI.flash(b, had ? 'Guardada ✓' : 'Removida ✓');
-      status(had ? 'chave do endpoint de embeddings guardada no Credential Manager' : 'chave do endpoint de embeddings removida (Ollama local não precisa)', 'ok');
-    } catch (e) { UI.busy(b, false); status('erro ao guardar chave: ' + e, 'err'); }
+      UI.flash(b, had ? t('common.key-saved') : t('common.key-removed'));
+      status(had ? t('settings.msg.emb-key-saved') : t('settings.msg.emb-key-removed'), 'ok');
+    } catch (e) { UI.busy(b, false); status(t('settings.msg.key-save-failed', { e }), 'err'); }
   });
 
   $('save').addEventListener('click', async () => {
     const b = $('save');
-    UI.busy(b, true, 'Salvando…');
+    UI.busy(b, true, t('common.saving'));
     try {
       const checked = document.querySelector('input[name=model]:checked');
       const label = await invoke('apply_settings', { patch: {
@@ -614,22 +624,22 @@
         emb_model: $('embmodel').value || null,
         emb_base_url: $('embbase').value || null,
       }});
-      $('active').textContent = label;
+      $('active').textContent = keyLabel(label);
       UI.busy(b, false);
-      UI.flash(b, 'Salvo ✓');
-      status('salvo — atalho de ditado ativo: ' + label, 'ok');
-      try { const s = await invoke('get_settings'); $('mactive').textContent = s.active_meeting_shortcut || '(nenhum)'; $('kactive').textContent = s.active_mark_shortcut || '(nenhum)'; $('cactive').textContent = s.active_copilot_shortcut || '(nenhum)'; } catch (_) {}
+      UI.flash(b, t('common.saved'));
+      status(t('settings.msg.saved-shortcut', { label: keyLabel(label) }), 'ok');
+      try { const s = await invoke('get_settings'); $('mactive').textContent = keyLabel(s.active_meeting_shortcut) || t('common.none'); $('kactive').textContent = keyLabel(s.active_mark_shortcut) || t('common.none'); $('cactive').textContent = keyLabel(s.active_copilot_shortcut) || t('common.none'); } catch (_) {}
       setTimeout(() => renderModels(false), 1500);
       await loadEmbeddings();
     } catch (e) {
       UI.busy(b, false);
-      status('erro: ' + e, 'err');
+      status(t('common.error', { e }), 'err');
     }
   });
 
   $('savekey').addEventListener('click', async () => {
     const provider = $('provider').value;
-    if (provider === 'none') { status('escolha um provider antes de guardar a chave', 'err'); return; }
+    if (provider === 'none') { status(t('settings.msg.pick-provider-key'), 'err'); return; }
     const b = $('savekey');
     UI.busy(b, true);
     try {
@@ -637,29 +647,29 @@
       $('key').value = '';
       $('keystate').hidden = false;
       UI.busy(b, false);
-      UI.flash(b, 'Guardada ✓');
-      status('chave guardada no Credential Manager', 'ok');
+      UI.flash(b, t('common.key-saved'));
+      status(t('settings.msg.key-saved'), 'ok');
       await loadEmbeddings();
     } catch (e) {
       UI.busy(b, false);
-      status('erro ao guardar chave: ' + e, 'err');
+      status(t('settings.msg.key-save-failed', { e }), 'err');
     }
   });
 
   $('listmodels').addEventListener('click', async () => {
     const provider = $('provider').value;
-    if (provider === 'none') { status('escolha um provider primeiro', 'err'); return; }
+    if (provider === 'none') { status(t('settings.msg.pick-provider'), 'err'); return; }
     const b = $('listmodels');
-    UI.busy(b, true, 'Consultando…');
+    UI.busy(b, true, t('common.querying'));
     try {
       const models = await invoke('list_llm_models', { provider, model: null });
       const dl = $('models');
       dl.replaceChildren();
       for (const m of models) { const o = document.createElement('option'); o.value = m; dl.appendChild(o); }
-      status(models.length + ' modelos disponíveis — clique no campo Modelo para escolher', 'ok');
+      status(t('settings.msg.models-listed', { n: models.length }), 'ok');
       $('model').focus();
     } catch (e) {
-      status('não consegui listar: ' + e, 'err');
+      status(t('settings.msg.list-failed', { e }), 'err');
     } finally {
       UI.busy(b, false);
     }
@@ -667,16 +677,16 @@
 
   $('test').addEventListener('click', async () => {
     const b = $('test');
-    UI.busy(b, true, 'Testando…');
+    UI.busy(b, true, t('common.testing'));
     try {
       const reply = await invoke('test_llm');
       UI.busy(b, false);
-      UI.flash(b, 'Conectado ✓');
+      UI.flash(b, t('settings.msg.connected'));
       status(reply, 'ok');
     } catch (e) {
       UI.busy(b, false);
-      UI.flash(b, 'Falhou', 'err');
-      status('teste falhou: ' + e, 'err');
+      UI.flash(b, t('common.failed'), 'err');
+      status(t('settings.msg.test-failed', { e }), 'err');
     }
   });
 
@@ -691,82 +701,87 @@
   let retentionSaved = '0';
   async function loadDiagnostics() {
     let d;
-    try { d = await invoke('diagnostics'); } catch (e) { $('diag').replaceChildren(el('span', 'hint', 'indisponível: ' + e)); return; }
+    try { d = await invoke('diagnostics'); } catch (e) { $('diag').replaceChildren(el('span', 'hint', t('common.unavailable', { e }))); return; }
     const box = $('diag');
     box.replaceChildren();
     const lines = [];
     const add = (k, v, cls) => { box.appendChild(el('dt', '', k)); box.appendChild(el('dd', cls || '', v)); lines.push(k + ': ' + v); };
-    const engine = d.engine.kind === 'ready' ? 'pronto — ' + d.engine.label : d.engine.kind === 'loading' ? 'carregando' : d.engine.kind === 'missing' ? 'sem modelo' : 'falhou: ' + d.engine.message;
-    add('Versão', 'ISPer ' + d.version + (d.gpu_build ? ' · build CUDA' : ' · build CPU'));
-    add('Motor Whisper', engine, d.engine.kind === 'ready' ? 'ok' : d.engine.kind === 'loading' ? '' : 'bad');
-    add('Modelo', d.model_path || '(nenhum)');
-    add('Diarização', d.diarize_installed ? 'modelos instalados' : 'não instalada', d.diarize_installed ? 'ok' : '');
-    for (const [dll, found] of d.cuda_dlls) add(dll, found ? 'encontrada' : 'NÃO encontrada', found ? 'ok' : (d.gpu_build ? 'bad' : ''));
-    add('Microfones', d.input_devices.length ? d.input_devices.join(' · ') : '(nenhum detectado)', d.input_devices.length ? '' : 'bad');
-    add('Executável', d.exe_path);
-    add('Modelos', d.models_dir);
+    const engine = d.engine.kind === 'ready' ? t('settings.diag.engine-ready', { label: d.engine.label }) : d.engine.kind === 'loading' ? t('settings.diag.engine-loading') : d.engine.kind === 'missing' ? t('settings.diag.engine-missing') : t('settings.diag.engine-failed', { e: d.engine.message });
+    add(t('settings.diag.version'), 'ISPer ' + d.version + (d.gpu_build ? ' · build CUDA' : ' · build CPU'));
+    add(t('settings.diag.engine'), engine, d.engine.kind === 'ready' ? 'ok' : d.engine.kind === 'loading' ? '' : 'bad');
+    add(t('settings.diag.model'), d.model_path || t('common.none'));
+    add(t('settings.diag.diarization'), d.diarize_installed ? t('settings.diag.diar-installed') : t('settings.diag.diar-missing'), d.diarize_installed ? 'ok' : '');
+    for (const [dll, found] of d.cuda_dlls) add(dll, found ? t('settings.diag.found') : t('settings.diag.not-found'), found ? 'ok' : (d.gpu_build ? 'bad' : ''));
+    add(t('settings.diag.mics'), d.input_devices.length ? d.input_devices.join(' · ') : t('settings.diag.no-mics'), d.input_devices.length ? '' : 'bad');
+    add(t('settings.diag.exe'), d.exe_path);
+    add(t('settings.diag.models'), d.models_dir);
     const fmtBytes = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
     const fmtSecs = (s) => s == null ? '—' : s < 1 ? Math.round(s * 1000) + ' ms' : s.toFixed(1) + ' s';
-    add('Banco', d.db_path + (d.db_schema != null ? ' · schema v' + d.db_schema : '') + (d.db_bytes ? ' · ' + fmtBytes(d.db_bytes) : ''));
-    add('Retenção', d.retention_days ? 'apaga o que passar de ' + d.retention_days + ' dias' : 'guarda para sempre');
-    add('Participantes', d.meeting_speakers ? String(d.meeting_speakers) : 'descobrir sozinho');
-    add('Passe final', d.final_pass === false ? 'desligado' : 'ligado');
+    add(t('settings.diag.db'), d.db_path + (d.db_schema != null ? ' · schema v' + d.db_schema : '') + (d.db_bytes ? ' · ' + fmtBytes(d.db_bytes) : ''));
+    add(t('settings.diag.retention'), d.retention_days ? t('settings.diag.retention-days', { n: d.retention_days }) : t('settings.diag.retention-forever'));
+    add(t('settings.diag.speakers'), d.meeting_speakers ? String(d.meeting_speakers) : t('settings.diag.speakers-auto'));
+    add(t('settings.diag.final-pass'), d.final_pass === false ? t('settings.diag.off') : t('settings.diag.on'));
     for (const m of (d.metrics || [])) {
-      const name = m.kind === 'dictation' ? 'Ditados (30 dias)' : m.kind === 'meeting_block' ? 'Blocos de reunião (30 dias)' : m.kind + ' (30 dias)';
+      const name = m.kind === 'dictation' ? t('settings.diag.dictations-30') : m.kind === 'meeting_block' ? t('settings.diag.blocks-30') : t('settings.diag.kind-30', { kind: m.kind });
       const rate = m.total ? Math.round(m.errors / m.total * 1000) / 10 : 0;
-      const lat = m.p50_secs != null ? ' · inferência p50 ' + fmtSecs(m.p50_secs) + ' · p95 ' + fmtSecs(m.p95_secs) : '';
-      const rtf = m.p50_rtf ? ' · ' + (1 / m.p50_rtf).toFixed(1) + '× tempo real' : '';
-      add(name, m.total + (m.total === 1 ? ' evento' : ' eventos') + ' · ' + m.errors + (m.errors === 1 ? ' falha' : ' falhas') + ' (' + rate + ' %)' + lat + rtf, rate > 10 ? 'bad' : '');
+      const lat = m.p50_secs != null ? t('settings.diag.inference', { p50: fmtSecs(m.p50_secs), p95: fmtSecs(m.p95_secs) }) : '';
+      const rtf = m.p50_rtf ? t('settings.diag.realtime', { x: (1 / m.p50_rtf).toFixed(1) }) : '';
+      add(name, t('settings.diag.events', { n: m.total }) + ' · ' + t('settings.diag.failures', { n: m.errors }) + ' (' + rate + ' %)' + lat + rtf, rate > 10 ? 'bad' : '');
     }
     add('Config', d.config_path);
     add('Logs', d.logs_dir);
-    add('Reuniões', d.meetings_dir);
-    if (d.missing_env && d.missing_env.length) add('Ambiente', 'sem ' + d.missing_env.join(', ') + ' no processo — pastas resolvidas pela API do Windows', 'bad');
+    add(t('settings.diag.meetings'), d.meetings_dir);
+    if (d.missing_env && d.missing_env.length) add(t('settings.diag.env'), t('settings.diag.env-missing', { vars: d.missing_env.join(', ') }), 'bad');
     diagText = lines.join('\n');
   }
   $('copydiag').addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(diagText); UI.flash($('copydiag'), 'copiado ✓'); }
-    catch (_) { status('não consegui copiar', 'err'); }
+    try { await navigator.clipboard.writeText(diagText); UI.flash($('copydiag'), t('common.copied')); }
+    catch (_) { status(t('settings.msg.copy-failed'), 'err'); }
   });
-  $('openlogs').addEventListener('click', () => invoke('open_logs_folder').catch(e => status('erro: ' + e, 'err')));
+  $('openlogs').addEventListener('click', () => invoke('open_logs_folder').catch(e => status(t('common.error', { e }), 'err')));
   $('exportdiag').addEventListener('click', async () => {
     const b = $('exportdiag');
     UI.busy(b, true);
-    try { const p = await invoke('export_diagnostics'); UI.busy(b, false); UI.flash(b, 'exportado ✓'); status('diagnóstico exportado em ' + p, 'ok'); }
-    catch (e) { UI.busy(b, false); status('exportação falhou: ' + e, 'err'); }
+    try { const p = await invoke('export_diagnostics'); UI.busy(b, false); UI.flash(b, t('settings.msg.exported')); status(t('settings.msg.diag-exported', { path: p }), 'ok'); }
+    catch (e) { UI.busy(b, false); status(t('settings.msg.export-failed', { e }), 'err'); }
   });
   // ---- retenção: escolher um prazo pede confirmação explícita (não há lixeira;
   // o backup automático antes de apagar é a rede de segurança, não a permissão).
-  const retentionLabel = (v) => ({ '30': '30 dias', '90': '90 dias', '180': '180 dias', '365': '1 ano' })[v] || v + ' dias';
+  const retentionLabel = (v) => v === '365' ? t('settings.msg.ret-year') : t('settings.msg.ret-days', { n: Number(v) });
   $('retention').addEventListener('change', () => {
     const v = $('retention').value;
     if (v === '0' || v === retentionSaved) { $('retconfirm').hidden = true; return; }
-    $('retconfirmtext').textContent = 'Reuniões e ditados com mais de ' + retentionLabel(v) + ' serão apagados do banco e da pasta de Reuniões (com um backup automático antes). Confirmar?';
+    $('retconfirmtext').textContent = t('settings.msg.ret-confirm', { limit: retentionLabel(v) });
     $('retconfirm').hidden = false;
   });
-  $('retyes').addEventListener('click', () => { $('retconfirm').hidden = true; status('prazo de ' + retentionLabel($('retention').value) + ' escolhido — clique em Salvar para valer', 'ok'); });
+  $('retyes').addEventListener('click', () => { $('retconfirm').hidden = true; status(t('settings.msg.ret-chosen', { limit: retentionLabel($('retention').value) }), 'ok'); });
   $('retno').addEventListener('click', () => { $('retention').value = retentionSaved; $('retconfirm').hidden = true; });
   // Aparência: vale na hora (sem Salvar), como no Windows.
   $('theme').addEventListener('change', async () => {
     try { await invoke('set_ui_theme', { theme: $('theme').value }); }
-    catch (e) { status('não consegui trocar o tema: ' + e, 'err'); }
+    catch (e) { status(t('settings.msg.theme-failed', { e }), 'err'); }
+  });
+  // Idioma da interface: vale na hora — o app manda o dicionário novo a todas as janelas.
+  $('uilang').addEventListener('change', async () => {
+    try { await invoke('set_ui_lang', { lang: $('uilang').value }); }
+    catch (e) { status(t('settings.msg.lang-failed', { e }), 'err'); }
   });
   $('reimport').addEventListener('click', async () => {
     const btn = $('reimport'), st = $('reimportstate');
     btn.disabled = true;
     const antes = st.textContent;
-    st.textContent = 'lendo a pasta…';
+    st.textContent = t('settings.msg.reading-folder');
     try {
       const [novas, existentes, falhas] = await invoke('reimport_meetings');
       const partes = [];
-      partes.push(novas === 1 ? '1 reunião recuperada' : novas + ' reuniões recuperadas');
-      if (existentes) partes.push(existentes + ' já estavam na Biblioteca');
-      if (falhas) partes.push(falhas + ' arquivo(s) não reconhecido(s)');
+      partes.push(t('settings.msg.recovered', { n: novas }));
+      if (existentes) partes.push(t('settings.msg.already-there', { n: existentes }));
+      if (falhas) partes.push(t('settings.msg.unrecognized', { n: falhas }));
       st.textContent = partes.join(' · ') + '.';
-      status(novas ? 'Biblioteca atualizada — abra a Biblioteca para ver' : 'nada a recuperar: a Biblioteca já tem tudo', 'ok');
+      status(novas ? t('settings.msg.library-updated') : t('settings.msg.nothing-recover'), 'ok');
     } catch (e) {
       st.textContent = antes;
-      status('não consegui reimportar: ' + e, 'bad');
+      status(t('settings.msg.reimport-failed', { e }), 'bad');
     } finally {
       btn.disabled = false;
     }
@@ -775,14 +790,14 @@
   $('backupdb').addEventListener('click', async () => {
     const b = $('backupdb');
     UI.busy(b, true);
-    try { const p = await invoke('backup_database'); UI.busy(b, false); UI.flash(b, 'pronto ✓'); status('backup gravado em ' + p, 'ok'); }
-    catch (e) { UI.busy(b, false); status('backup falhou: ' + e, 'err'); }
+    try { const p = await invoke('backup_database'); UI.busy(b, false); UI.flash(b, t('common.done')); status(t('settings.msg.backup-written', { path: p }), 'ok'); }
+    catch (e) { UI.busy(b, false); status(t('settings.msg.backup-failed', { e }), 'err'); }
   });
   $('notifytest').addEventListener('click', async () => {
     const b = $('notifytest');
     UI.busy(b, true);
-    try { await invoke('notify_test'); UI.busy(b, false); UI.flash(b, 'enviada ✓'); status('a notificação apareceu no canto da tela? Se não, veja Configurações do Windows → Notificações', 'ok'); }
-    catch (e) { UI.busy(b, false); status('notificação falhou: ' + e, 'err'); }
+    try { await invoke('notify_test'); UI.busy(b, false); UI.flash(b, t('settings.msg.sent')); status(t('settings.msg.notify-check'), 'ok'); }
+    catch (e) { UI.busy(b, false); status(t('settings.msg.notify-failed', { e }), 'err'); }
   });
   loadDiagnostics();
 
@@ -790,23 +805,23 @@
   let currentVersion = '?';
   $('checkupd').addEventListener('click', async () => {
     const b = $('checkupd');
-    UI.busy(b, true, 'Verificando…');
+    UI.busy(b, true, t('common.checking'));
     $('installupd').hidden = true; $('updnotes').hidden = true;
     try {
       const u = await invoke('check_update');
       UI.busy(b, false);
-      if (!u) { UI.flash(b, 'na última versão ✓'); $('updstate').textContent = 'Você já está na última versão (' + currentVersion + ').'; return; }
-      $('updstate').textContent = 'Nova versão ' + u.version + (u.date ? ' (publicada em ' + u.date + ')' : '') + ' — você está na ' + u.current + '.';
+      if (!u) { UI.flash(b, t('settings.msg.up-to-date-btn')); $('updstate').textContent = t('settings.msg.up-to-date', { v: currentVersion }); return; }
+      $('updstate').textContent = t('settings.msg.new-version', { v: u.version, date: u.date ? t('settings.msg.published', { date: u.date }) : '', current: u.current });
       $('installupd').hidden = false;
       if (u.notes) { $('updnotes').textContent = u.notes; $('updnotes').hidden = false; }
-    } catch (e) { UI.busy(b, false); status('não consegui verificar: ' + e, 'err'); }
+    } catch (e) { UI.busy(b, false); status(t('settings.msg.check-failed', { e }), 'err'); }
   });
   $('installupd').addEventListener('click', async () => {
     const b = $('installupd');
-    UI.busy(b, true, 'Baixando…');
+    UI.busy(b, true, t('common.downloading'));
     const box = $('updprogress'); box.hidden = false; box.classList.add('indeterminate');
-    try { const r = await invoke('install_update'); UI.busy(b, false); UI.flash(b, 'pronto ✓', 'ok', 4000); status('atualização: ' + r, 'ok'); }
-    catch (e) { UI.busy(b, false); box.hidden = true; status('não consegui atualizar: ' + e, 'err'); }
+    try { const r = await invoke('install_update'); UI.busy(b, false); UI.flash(b, t('common.done'), 'ok', 4000); status(t('settings.msg.update-status', { r }), 'ok'); }
+    catch (e) { UI.busy(b, false); box.hidden = true; status(t('settings.msg.update-failed', { e }), 'err'); }
   });
   window.__TAURI__.event.listen('isper-update-progress', (e) => {
     const p = e.payload || {}, box = $('updprogress'), bar = box.querySelector('.bar');
@@ -814,6 +829,10 @@
     if (p.total) { box.classList.remove('indeterminate'); bar.style.width = Math.min(100, Math.round(p.downloaded / p.total * 100)) + '%'; }
     else box.classList.add('indeterminate');
   });
+
+  // Idioma trocado com a janela aberta: o HTML estático já foi traduzido pelo
+  // i18n.js; o que o script monta é refeito aqui.
+  document.addEventListener('isper-i18n', () => { load(); loadDiagnostics(); refreshDiarize(); });
 
   load();
 </script>

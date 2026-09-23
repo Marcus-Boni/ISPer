@@ -51,6 +51,8 @@ pub(crate) struct SettingsDto {
     diarize_threshold: f32,
     /// Tema da interface (`system` · `light` · `dark`) — muda por `set_ui_theme`.
     theme: String,
+    /// Idioma da interface (`auto` · `pt-BR` · `en`) — muda por `set_ui_lang`.
+    ui_lang: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -356,6 +358,7 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         meeting_speakers: cfg.meeting_speakers,
         diarize_threshold: cfg.diarize_threshold,
         theme: cfg.theme,
+        ui_lang: cfg.ui_lang,
     })
 }
 
@@ -404,6 +407,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
             .unwrap_or(previous.diarize_threshold),
         // O tema muda na hora por `set_ui_theme`, não pelo Salvar.
         theme: previous.theme.clone(),
+        ui_lang: previous.ui_lang.clone(),
         config_version: config::CONFIG_VERSION,
     };
     // Caixa, espaços, vazios e valores fora das listas: a mesma regra única
@@ -655,11 +659,13 @@ pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
 #[tauri::command]
 pub(crate) async fn notify_test(app: AppHandle) -> Result<(), String> {
     let app2 = app.clone();
+    let line1 = crate::i18n::tr(&app, "notify.test-line1");
+    let line2 = crate::i18n::tr(&app, "notify.test-line2");
     notify::show(
         notify::Toast {
             title: "ISPer",
-            line1: "As notificações estão funcionando.",
-            line2: Some("É assim que você saberá que uma reunião foi salva."),
+            line1: &line1,
+            line2: Some(&line2),
             silent: false,
         },
         move || open_home(&app2),

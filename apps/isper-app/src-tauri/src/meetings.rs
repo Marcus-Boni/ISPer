@@ -138,7 +138,7 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
         }
     };
     let started = engine
-        .ok_or_else(|| anyhow::anyhow!("o modelo ainda está carregando — tente em instantes"))
+        .ok_or_else(|| anyhow::anyhow!(crate::i18n::tr(app, "errors.model-loading")))
         .and_then(|engine| meeting::start(engine, opts).map_err(anyhow::Error::from));
     match started {
         Ok(handle) => {
@@ -188,11 +188,15 @@ pub(crate) fn finish_meeting(
 ) -> anyhow::Result<String> {
     let result = handle.stop()?;
     if result.segments.is_empty() {
-        anyhow::bail!("nenhuma fala detectada na reunião");
+        anyhow::bail!(crate::i18n::tr(app, "errors.no-speech-meeting"));
     }
     let now = chrono::Local::now();
     let started_at = now.format("%d/%m/%Y %H:%M").to_string();
-    let mut title = format!("Reunião — {started_at}");
+    let mut title = crate::i18n::trv(
+        app,
+        "meeting.default-title",
+        &[("date", started_at.clone())],
+    );
     // Momentos marcados (★) durante a gravação: seção do Markdown (o resumo
     // por IA prioriza esses trechos), tabela no banco e chips na Biblioteca.
     let moments: Vec<f32> = {
@@ -355,15 +359,24 @@ pub(crate) fn notify_meeting_saved(
     has_summary: bool,
     md_path: &Path,
 ) {
-    let line2 = format!(
-        "{}{} · clique para abrir na Biblioteca",
-        meeting::fmt_ts(duration_secs),
-        if has_summary { " · resumo pronto" } else { "" }
+    let summary = if has_summary {
+        crate::i18n::tr(app, "notify.summary-ready")
+    } else {
+        String::new()
+    };
+    let line2 = crate::i18n::trv(
+        app,
+        "notify.meeting-saved-line2",
+        &[
+            ("duration", meeting::fmt_ts(duration_secs)),
+            ("summary", summary),
+        ],
     );
+    let heading = crate::i18n::tr(app, "notify.meeting-saved");
     let app2 = app.clone();
     let shown = notify::show(
         notify::Toast {
-            title: "Reunião salva",
+            title: &heading,
             line1: title,
             line2: Some(&line2),
             silent: false,
@@ -404,7 +417,7 @@ pub(crate) fn mark_moment(app: &AppHandle) -> anyhow::Result<f32> {
     let state = app.state::<AppState>();
     let started = *state.meeting_started.lock_or_recover();
     let Some(started) = started else {
-        anyhow::bail!("nenhuma reunião em andamento");
+        anyhow::bail!(crate::i18n::tr(app, "errors.no-meeting"));
     };
     let at = started.elapsed().as_secs_f32();
     {

@@ -155,13 +155,14 @@
   <div id="status" data-tauri-drag-region>pronto</div>
   <div id="timer" data-tauri-drag-region>00:00</div>
   <div class="ctl">
-    <button id="mark" title="marcar este momento da reunião" aria-label="marcar momento"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z"/></svg></button>
-    <button id="copilot" title="abrir ISPer Copilot (decisões ao vivo)" aria-label="abrir copilot"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg></button>
-    <button id="cap" title="legendas ao vivo (barra larga)" aria-label="alternar legendas ao vivo">CC</button>
-    <button id="mini" title="modo mini / normal" aria-label="alternar modo mini">–</button>
-    <button id="hide" title="ocultar (volta no próximo ditado, pelo Início ou pela bandeja)" aria-label="ocultar indicador">×</button>
+    <button id="mark" title="marcar este momento da reunião" aria-label="marcar momento" data-i18n-attr="title:overlay.top.marcar-este-momento-reuniao.title,aria-label:overlay.top.marcar-momento.aria"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z"/></svg></button>
+    <button id="copilot" title="abrir ISPer Copilot (decisões ao vivo)" aria-label="abrir copilot" data-i18n-attr="title:overlay.top.abrir-isper-copilot-decisoes-vivo.title,aria-label:overlay.top.abrir-copilot.aria"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg></button>
+    <button id="cap" title="legendas ao vivo (barra larga)" aria-label="alternar legendas ao vivo" data-i18n-attr="title:overlay.top.legendas-vivo-barra-larga.title,aria-label:overlay.top.alternar-legendas-vivo.aria">CC</button>
+    <button id="mini" title="modo mini / normal" aria-label="alternar modo mini" data-i18n-attr="title:overlay.top.modo-mini-normal.title,aria-label:overlay.top.alternar-modo-mini.aria">–</button>
+    <button id="hide" title="ocultar (volta no próximo ditado, pelo Início ou pela bandeja)" aria-label="ocultar indicador" data-i18n-attr="title:overlay.top.ocultar-volta-proximo-ditado-pelo.title,aria-label:overlay.top.ocultar-indicador.aria">×</button>
   </div>
 </div>
+<script src="assets/i18n.js"></script>
 <script src="assets/ui.js"></script>
 <script>
   const { listen } = window.__TAURI__.event;
@@ -209,7 +210,7 @@
   let shortcutLabel = '';  // atalho de ditado (o repouso mostra "pronto · <atalho>")
   const idleText = () =>
     (!document.body.classList.contains('mini') && shortcutLabel && !shortcutLabel.startsWith('(')
-      ? 'pronto · ' + shortcutLabel : 'pronto');
+      ? t('overlay.ready-shortcut', { label: UI.keyLabel(shortcutLabel) }) : t('overlay.ready'));
   function setState(s, msg) {
     const wakingUp = RESTING.has(state) && !RESTING.has(s);
     state = s;
@@ -219,22 +220,22 @@
     if (s === 'meeting') startTimer();
     else if (s === 'meeting-done' || s === 'idle' || s === 'error' || s === 'discarded') { stopTimer(); lastLive = null; clearCaptions(); }
 
-    if (s === 'recording') { bars.fill(0); setStatus('gravando… solte para colar'); blip(880, .05); }
-    else if (s === 'recording-handsfree') setStatus('mãos-livres… 1 s de silêncio cola');
-    else if (s === 'call') { setStatus(msg || 'chamada do Teams — gravar?'); blip(990, .05); }
+    if (s === 'recording') { bars.fill(0); setStatus(t('overlay.recording')); blip(880, .05); }
+    else if (s === 'recording-handsfree') setStatus(t('overlay.handsfree'));
+    else if (s === 'call') { setStatus(msg || t('overlay.call')); blip(990, .05); }
     else if (s === 'idle') setStatus(idleText());
-    else if (s === 'meeting') setStatus(msg ? 'reunião — ' + msg : 'gravando reunião — Eu + Participantes');
-    else if (s === 'meeting-processing') { setStatus('transcrevendo a reunião…'); setCaptionHint('encerrando — transcrevendo o que faltava…'); }
-    else if (s === 'meeting-diarize') setStatus('identificando quem falou…');
-    else if (s === 'meeting-final') { setStatus('refazendo a transcrição…'); setCaptionHint('passe final — transcrição definitiva em preparo'); }
-    else if (s === 'meeting-summary') setStatus('resumindo com IA…');
-    else if (s === 'meeting-done') { setStatus('reunião salva ✓'); setCaptionHint('reunião salva ✓'); blip(1320, .07); }
-    else if (s === 'transcribing') setStatus('transcrevendo…');
-    else if (s === 'polishing') setStatus('polindo com IA…');
-    else if (s === 'done') { setStatus(msg ? '“' + truncate(msg, 40) + '”' : 'colado'); blip(1320, .07); }
-    else if (s === 'discarded') setStatus('ditado descartado');
-    else if (s === 'error') setStatus(msg || 'erro');
-    else setStatus('pronto');
+    else if (s === 'meeting') setStatus(msg ? t('overlay.meeting-msg', { msg }) : t('overlay.meeting'));
+    else if (s === 'meeting-processing') { setStatus(t('overlay.meeting-processing')); setCaptionHint(t('overlay.meeting-processing-hint')); }
+    else if (s === 'meeting-diarize') setStatus(t('overlay.meeting-diarize'));
+    else if (s === 'meeting-final') { setStatus(t('overlay.meeting-final')); setCaptionHint(t('overlay.meeting-final-hint')); }
+    else if (s === 'meeting-summary') setStatus(t('overlay.meeting-summary'));
+    else if (s === 'meeting-done') { setStatus(t('overlay.meeting-done')); setCaptionHint(t('overlay.meeting-done')); blip(1320, .07); }
+    else if (s === 'transcribing') setStatus(t('overlay.transcribing'));
+    else if (s === 'polishing') setStatus(t('overlay.polishing'));
+    else if (s === 'done') { setStatus(msg ? '“' + truncate(msg, 40) + '”' : t('overlay.pasted')); blip(1320, .07); }
+    else if (s === 'discarded') setStatus(t('overlay.discarded'));
+    else if (s === 'error') setStatus(msg || t('overlay.error'));
+    else setStatus(t('overlay.ready'));
     syncWave();   // a onda some em reunião: para o laço junto
   }
 
@@ -243,7 +244,7 @@
     node.replaceChildren();
     node.classList.toggle('eu', seg.speaker === 'Eu');
     node.classList.toggle('provisional', !!seg.provisional);
-    const sp = document.createElement('span'); sp.className = 'sp'; sp.textContent = seg.speaker + ':';
+    const sp = document.createElement('span'); sp.className = 'sp'; sp.textContent = speakerName(seg.speaker) + ':';
     node.appendChild(sp);
     node.appendChild(document.createTextNode(seg.text));
   }
@@ -254,7 +255,14 @@
     cur.appendChild(h);
     $('cap-prev').replaceChildren();
   }
-  function clearCaptions() { setCaptionHint('legendas ao vivo — as falas aparecem aqui durante a reunião'); }
+  function clearCaptions() { setCaptionHint(t('overlay.captions-hint')); }
+  // Rótulo de falante é dado (pt-BR no banco); só a exibição traduz.
+  function speakerName(label) {
+    if (label === 'Eu') return t('speaker.me');
+    if (label === 'Participantes') return t('speaker.others');
+    const m = String(label || '').match(/^Participante (\d+)$/);
+    return m ? t('speaker.participant', { n: Number(m[1]) }) : (label || t('speaker.others'));
+  }
   let capCurSeg = null;
   function pushCaption(seg) {
     if (capCurSeg) captionLine($('cap-prev'), capCurSeg);
@@ -289,18 +297,18 @@
   listen('isper-moment', e => {
     const at = UI.fmtClock((e.payload && e.payload.at_secs) || 0);
     statusEl.classList.add('flash');
-    setStatus('momento marcado em ' + at);
+    setStatus(t('overlay.moment', { at }));
     $('cap-prev').replaceChildren();
     const cur = $('cap-cur'); cur.replaceChildren();
-    const h = document.createElement('span'); h.className = 'cap-hint'; h.style.color = 'var(--warn)'; h.textContent = 'momento marcado em ' + at;
+    const h = document.createElement('span'); h.className = 'cap-hint'; h.style.color = 'var(--warn)'; h.textContent = t('overlay.moment', { at });
     cur.appendChild(h);
     blip(1100, .05);
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => {
       statusEl.classList.remove('flash');
       if (state === 'meeting') {
-        if (lastLive) { setStatus((lastLive.speaker === 'Eu' ? 'Eu: ' : '') + truncate(String(lastLive.text || '').trim(), 70)); pushCaption({ speaker: lastLive.speaker, text: String(lastLive.text || '').trim() }); }
-        else { setStatus('gravando reunião — Eu + Participantes'); clearCaptions(); }
+        if (lastLive) { setStatus((lastLive.speaker === 'Eu' ? t('overlay.me-prefix') : '') + truncate(String(lastLive.text || '').trim(), 70)); pushCaption({ speaker: lastLive.speaker, text: String(lastLive.text || '').trim() }); }
+        else { setStatus(t('overlay.meeting')); clearCaptions(); }
       }
     }, 2000);
   });
@@ -316,13 +324,15 @@
     document.body.classList.toggle('mini', mini);
     document.body.classList.toggle('captions', captions);
     $('mini').textContent = mini ? '+' : '–';
-    $('mini').title = mini ? 'voltar ao tamanho normal' : 'modo mini';
+    $('mini').title = mini ? t('overlay.mini-back') : t('overlay.mini');
     $('cap').classList.toggle('on', captions);
-    $('cap').title = captions ? 'voltar ao indicador normal' : 'legendas ao vivo (barra larga)';
+    $('cap').title = captions ? t('overlay.captions-back') : t('overlay.captions');
     if (state === 'idle') setStatus(idleText());   // o atalho só cabe fora do mini
     syncWave();
   }
   addEventListener('resize', applyMode);
+  // Idioma trocado: títulos dos botões e o status em repouso no idioma novo.
+  document.addEventListener('isper-i18n', () => { applyMode(); if (state === 'idle') setStatus(idleText()); else if (state === 'meeting' && !lastLive) setStatus(t('overlay.meeting')); });
   applyMode();
   async function setMode(mode) {
     for (const id of ['mini', 'cap']) $(id).disabled = true;
