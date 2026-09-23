@@ -5,6 +5,8 @@ import Compilar from "../../content/docs/desenvolvimento/compilar.md";
 import Diarizacao from "../../content/docs/identificacao-de-falantes/diarizacao.md";
 import Providers from "../../content/docs/inteligencia-e-resumos/providers.md";
 import Ollama from "../../content/docs/inteligencia-e-resumos/ollama.md";
+import UsarCopilot from "../../content/docs/copilot/usar-o-copilot.md";
+import CopilotMemoria from "../../content/docs/copilot/memoria-privacidade-e-custo.md";
 import Instalacao from "../../content/docs/primeiros-passos/instalacao.md";
 import VisaoGeral from "../../content/docs/primeiros-passos/visao-geral.md";
 import Modelos from "../../content/docs/primeiros-passos/modelos-whisper.md";
@@ -30,6 +32,8 @@ export const docComponents: Record<string, ComponentType> = {
   "identificacao-de-falantes/diarizacao": Diarizacao,
   "inteligencia-e-resumos/providers": Providers,
   "inteligencia-e-resumos/ollama": Ollama,
+  "copilot/usar-o-copilot": UsarCopilot,
+  "copilot/memoria-privacidade-e-custo": CopilotMemoria,
   "primeiros-passos/instalacao": Instalacao,
   "primeiros-passos/visao-geral": VisaoGeral,
   "primeiros-passos/modelos-whisper": Modelos,

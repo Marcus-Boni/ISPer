@@ -25,4 +25,8 @@ Ditados e reuniões ficam no SQLite local e na Biblioteca. A busca textual não 
 
 Resumos e insights usam Groq, Gemini ou Claude somente quando você configura um provedor. Nesse fluxo, o texto necessário é enviado; a transcrição do áudio continua local.
 
+## Copilot
+
+Durante a reunião, o Copilot mostra a fala ao vivo ao lado de um feed de decisões, ações, riscos e perguntas extraídos da conversa. O que você confirmar vai para a ata. Ele usa o mesmo provedor de IA dos resumos — veja [Usar o Copilot durante a reunião](/docs/copilot/usar-o-copilot/).
+
 Comece pelo guia de instalação e faça um ditado curto antes de configurar recursos adicionais.
