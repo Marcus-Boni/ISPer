@@ -36,6 +36,11 @@ export const downloadVariants = currentRelease.assets.filter(
   (asset) => asset.kind === "installer",
 );
 
+/** Os zips da versão portátil. Vazio nas releases até a 0.19.0, que não os tinham. */
+export const portableVariants = currentRelease.assets.filter(
+  (asset) => asset.kind === "portable",
+);
+
 export function getAssetByVariant(variant: ReleaseVariant) {
   return downloadVariants.find((asset) => asset.variant === variant);
 }

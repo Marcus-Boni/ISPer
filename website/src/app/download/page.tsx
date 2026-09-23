@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Code2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { ArrowRight, Code2, FolderArchive, ShieldAlert, ShieldCheck } from "lucide-react";
 import { DownloadSelector } from "@/components/download/download-selector";
 import {
   currentRelease,
   downloadVariants,
+  formatBytes,
   formatReleaseDate,
+  portableVariants,
   releaseIntegrityNotice,
   releaseLinks,
   sourceInstallSteps,
@@ -15,7 +17,7 @@ import { PageTransition } from "@/components/motion/page-transition";
 export const metadata: Metadata = {
   title: "Download",
   description:
-    "Baixe o instalador Windows x64 do ISPer, escolha CPU ou CUDA e confira requisitos, checksums e notas de release.",
+    "Baixe o instalador Windows x64 do ISPer ou a versão portátil, escolha CPU ou CUDA e confira requisitos, checksums e notas de release.",
   alternates: { canonical: "/download/" },
 };
 
@@ -79,15 +81,43 @@ export default function DownloadPage() {
           }
         />
 
+        {/* Only when the release carries the zips (0.20.0 on). The portable
+            build sends people here when a new version is out, so the page has
+            to offer the zip, not just the installers. */}
+        {portableVariants.length > 0 ? (
+          <section className="panel portable-panel" aria-labelledby="portatil">
+            <h2 id="portatil"><FolderArchive aria-hidden="true" />Versão portátil (zip)</h2>
+            <p className="portable-lead">
+              A pasta do ISPer inteira, sem instalador e sem administrador: descompacte e abra o <code>isper-app.exe</code>. Configurações, modelos e reuniões ficam nas mesmas pastas da versão instalada.
+            </p>
+            <ul className="portable-list">
+              {portableVariants.map((asset) => (
+                <li key={asset.name}>
+                  <div className="portable-row">
+                    <a className="text-link" href={asset.downloadUrl}>{asset.name}</a>
+                    <span className="portable-size">{asset.variant === "cuda" ? "CUDA (NVIDIA)" : "CPU"} · {formatBytes(asset.sizeBytes)}</span>
+                  </div>
+                  {asset.sha256 ? <code className="integrity-hash">{asset.sha256}</code> : null}
+                </li>
+              ))}
+            </ul>
+            <p className="panel-note">
+              Para atualizar: quando o ISPer avisar que há versão nova, baixe o zip novo, feche o app e substitua os arquivos da pasta. Não apague o <code>portable.txt</code>: é ele que diz ao ISPer que a cópia é portátil.
+            </p>
+          </section>
+        ) : null}
+
         <div className="download-grid">
           <section className="panel">
             <h2><Code2 aria-hidden="true" />Rodar a partir do código</h2>
             <ol className="ordered-steps">
               {sourceInstallSteps.map((step) => <li key={step}>{step}</li>)}
             </ol>
-            <p className="panel-note">
-              Não há pacote portátil executável no contrato desta release; o ZIP automático de código fonte do GitHub não substitui um.
-            </p>
+            {portableVariants.length === 0 ? (
+              <p className="panel-note">
+                Não há pacote portátil executável no contrato desta release; o ZIP automático de código fonte do GitHub não substitui um.
+              </p>
+            ) : null}
           </section>
 
           <section className="panel">

@@ -14,12 +14,14 @@
  *   node scripts/sync-release.mjs --check    # não grava; sai 1 se estiver defasado
  *
  * Campos editoriais (requirements, authenticodeStatus) são preservados por
- * variante: descrevem o produto, não o arquivo, e mudam por decisão humana.
+ * tipo e variante: descrevem o produto, não o arquivo, e mudam por decisão
+ * humana. Desde a 0.20.0 a release traz também os zips da versão portátil.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { checkAssetSet, classifyAsset, editorialKey, sortAssets } from "./lib/release-assets.mjs";
 import { notesFromBody } from "./lib/release-notes.mjs";
 import { parseArgs } from "./lib/sync-args.mjs";
 
@@ -45,12 +47,6 @@ async function api(url) {
   const response = await fetch(url, { headers });
   if (!response.ok) throw new Error(`GET ${url} devolveu ${response.status} ${response.statusText}`);
   return response.json();
-}
-
-function variantOf(name) {
-  if (/-cpu-setup\.exe$/i.test(name)) return "cpu";
-  if (/-setup\.exe$/i.test(name)) return "cuda";
-  return null;
 }
 
 async function checksums(asset) {
@@ -80,20 +76,21 @@ async function build(previous, tag) {
   if (!sums) throw new Error(`a release ${release.tag_name} não tem ${CHECKSUMS}; sem ele não publico soma nenhuma`);
   const sha256 = await checksums(sums);
 
-  const keep = new Map(previous.assets?.map((asset) => [asset.variant, asset]) ?? []);
-  const assets = [];
+  const keep = new Map(previous.assets?.map((asset) => [editorialKey(asset), asset]) ?? []);
+  let assets = [];
   for (const asset of release.assets) {
-    const variant = variantOf(asset.name);
-    if (!variant) continue;
+    const kind = classifyAsset(asset.name);
+    if (!kind) continue;
+    const { variant } = kind;
     const sum = sha256.get(asset.name);
     if (!sum) throw new Error(`${asset.name} não aparece no ${CHECKSUMS} da release`);
-    const editorial = keep.get(variant) ?? DEFAULTS[variant];
+    const editorial = keep.get(editorialKey(kind)) ?? DEFAULTS[variant];
     assets.push({
       name: asset.name,
       platform: "windows",
       arch: "x64",
       variant,
-      kind: "installer",
+      kind: kind.kind,
       sizeBytes: asset.size,
       downloadUrl: asset.browser_download_url,
       sha256: sum,
@@ -103,13 +100,8 @@ async function build(previous, tag) {
     });
   }
 
-  // A página existe para o leitor escolher entre as duas; uma sozinha é um
-  // erro de empacotamento, não um snapshot válido.
-  const found = assets.map((asset) => asset.variant).sort();
-  if (found.join(",") !== "cpu,cuda") {
-    throw new Error(`esperava instaladores cpu e cuda, encontrei: ${found.join(", ") || "nenhum"}`);
-  }
-  assets.sort((a, b) => a.variant.localeCompare(b.variant));
+  checkAssetSet(assets);
+  assets = sortAssets(assets);
 
   const notes = notesFromBody(release.body);
   if (notes.length === 0) throw new Error(`a release ${release.tag_name} não tem notas legíveis no corpo`);
@@ -153,7 +145,7 @@ async function main() {
   writeFileSync(SNAPSHOT, `${JSON.stringify(next, null, 2)}\n`, "utf8");
   console.log(`Snapshot atualizado (${summary}).`);
   for (const asset of next.assets) {
-    console.log(`  ${asset.variant.padEnd(4)} ${asset.name}  ${asset.sizeBytes} B  ${asset.sha256.slice(0, 12)}…`);
+    console.log(`  ${asset.kind.padEnd(9)} ${asset.variant.padEnd(4)} ${asset.name}  ${asset.sizeBytes} B  ${asset.sha256.slice(0, 12)}…`);
   }
   for (const note of next.notes) console.log(`  nota: ${note}`);
 }
