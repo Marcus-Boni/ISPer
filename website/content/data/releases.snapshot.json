@@ -1,28 +1,26 @@
 {
   "repository": "Marcus-Boni/ISPer",
-  "tag": "v0.19.0",
-  "version": "0.19.0",
+  "tag": "v0.20.0",
+  "version": "0.20.0",
   "channel": "stable",
-  "publishedAt": "2026-09-23T13:55:40Z",
-  "fetchedAt": "2026-09-23T13:55:49.903Z",
-  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.19.0",
+  "publishedAt": "2026-09-23T18:43:15Z",
+  "fetchedAt": "2026-09-23T18:45:20.238Z",
+  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.20.0",
   "notes": [
-    "Adicionado — Tema claro. Configurações → Sistema → *Aparência*: seguir o Windows (padrão), clara ou escura.",
-    "Adicionado — Interface em inglês. Configurações → Sistema → *Idioma da interface*: seguir o Windows (padrão), Português (Brasil) ou English.",
-    "Adicionado — Primeira configuração guiada. Numa instalação nova, o ISPer abre com cinco passos curtos: idioma e aparência; microfone com medidor de nível ao vivo (nada é gravado, e um microfone mudo ou bloqueado em Privacidade ganha um aviso claro); modelo Whisper, com o recomendado para a sua versão (GPU ou CPU) e o download ali mesmo; atalho, com um campo para experimentar o primeiro ditado; e IA opcional, com a chave testada na hora.",
-    "Adicionado — README em inglês (README.en.md)."
+    "Adicionado — Versão portátil (zip), ao lado dos instaladores: a pasta do ISPer inteira, para usar sem instalar.",
+    "Corrigido — Os seletores de *Aparência* e de *Idioma da interface* acompanham a troca feita em outra janela."
   ],
   "assets": [
     {
-      "name": "ISPer_0.19.0_x64-cpu-setup.exe",
+      "name": "ISPer_0.20.0_x64-cpu-setup.exe",
       "platform": "windows",
       "arch": "x64",
       "variant": "cpu",
       "kind": "installer",
-      "sizeBytes": 10069972,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.19.0/ISPer_0.19.0_x64-cpu-setup.exe",
-      "sha256": "ee66a18e8f7741c854b1ac8052b133046bddaa1cde339453d735812b819c62e5",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.19.0/SHA256SUMS.txt",
+      "sizeBytes": 10069769,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/ISPer_0.20.0_x64-cpu-setup.exe",
+      "sha256": "b388a6e60a564a8ee38f2b0420a888101e0f68d4ab0c517bc2459aa06018a2f9",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
@@ -31,15 +29,49 @@
       ]
     },
     {
-      "name": "ISPer_0.19.0_x64-setup.exe",
+      "name": "ISPer_0.20.0_x64-setup.exe",
       "platform": "windows",
       "arch": "x64",
       "variant": "cuda",
       "kind": "installer",
-      "sizeBytes": 423061005,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.19.0/ISPer_0.19.0_x64-setup.exe",
-      "sha256": "e59316f6929a776b80e40332ba28f95ded3b5009b07a30902b8a7f68626f9d4c",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.19.0/SHA256SUMS.txt",
+      "sizeBytes": 423051440,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/ISPer_0.20.0_x64-setup.exe",
+      "sha256": "d9895d1a7cfee0db69f1fdcabcb85ed03961d824575b01dca64ccb8f87bfcd0b",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/SHA256SUMS.txt",
+      "authenticodeStatus": "not-signed",
+      "requirements": [
+        "Windows 10/11 x64",
+        "GPU NVIDIA compatível com CUDA",
+        "VRAM conforme modelo Whisper escolhido"
+      ]
+    },
+    {
+      "name": "ISPer_0.20.0_x64-cpu-portable.zip",
+      "platform": "windows",
+      "arch": "x64",
+      "variant": "cpu",
+      "kind": "portable",
+      "sizeBytes": 14322889,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/ISPer_0.20.0_x64-cpu-portable.zip",
+      "sha256": "9a5777127c4fdde627b97c803333f97ca28fff29a166b9b51eed201442e3fd76",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/SHA256SUMS.txt",
+      "authenticodeStatus": "not-signed",
+      "requirements": [
+        "Windows 10/11 x64",
+        "CPU moderna com AVX2 recomendado",
+        "8 GB de RAM ou mais"
+      ]
+    },
+    {
+      "name": "ISPer_0.20.0_x64-portable.zip",
+      "platform": "windows",
+      "arch": "x64",
+      "variant": "cuda",
+      "kind": "portable",
+      "sizeBytes": 446352935,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/ISPer_0.20.0_x64-portable.zip",
+      "sha256": "0c1f49f5bdc8748a2603e99f3e68b0bc4fe961c7d20f705f7937ce1eec350d0c",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
