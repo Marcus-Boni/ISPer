@@ -1,0 +1,34 @@
+ISPer — versão portátil
+=======================
+
+Esta pasta é o ISPer inteiro, sem instalador. Abra o isper-app.exe.
+
+- Não precisa instalar nem de administrador. O Windows pode avisar na primeira
+  vez ("Mais informações → Executar assim mesmo"), como no instalador.
+- Os seus dados NÃO ficam nesta pasta: configurações e banco em
+  %APPDATA%\ISPer, modelos e logs em %LOCALAPPDATA%\com.isper.desktop,
+  reuniões em Documentos\ISPer. São as mesmas pastas da versão instalada.
+- Atualizar: o ISPer avisa quando sai versão nova e abre a página de download.
+  Baixe o zip novo, feche o ISPer e substitua os arquivos desta pasta.
+- Este arquivo (portable.txt) é o que diz ao ISPer que ele é portátil. Não
+  o apague: sem ele, a atualização tentaria instalar uma segunda cópia.
+
+Download e documentação: https://isper.pages.dev
+
+
+ISPer — portable version
+========================
+
+This folder is the whole of ISPer, with no installer. Open isper-app.exe.
+
+- No installation or administrator rights needed. Windows may warn the first
+  time ("More info → Run anyway"), just like with the installer.
+- Your data is NOT kept in this folder: settings and database in
+  %APPDATA%\ISPer, models and logs in %LOCALAPPDATA%\com.isper.desktop,
+  meetings in Documents\ISPer — the same folders as the installed version.
+- Updating: ISPer tells you when a new version is out and opens the download
+  page. Download the new zip, quit ISPer and replace the files in this folder.
+- This file (portable.txt) is what tells ISPer it is portable. Don't delete
+  it: without it, updating would try to install a second copy.
+
+Download and documentation: https://isper.pages.dev

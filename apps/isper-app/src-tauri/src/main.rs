@@ -232,6 +232,7 @@ fn main() {
             overlay_toggle_pin,
             check_update,
             install_update,
+            open_download_page,
             set_show_home,
             ui::set_ui_theme,
             ui::set_ui_lang,

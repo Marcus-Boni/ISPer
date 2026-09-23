@@ -719,6 +719,7 @@
     for (const [dll, found] of d.cuda_dlls) add(dll, found ? t('settings.diag.found') : t('settings.diag.not-found'), found ? 'ok' : (d.gpu_build ? 'bad' : ''));
     add(t('settings.diag.mics'), d.input_devices.length ? d.input_devices.join(' · ') : t('settings.diag.no-mics'), d.input_devices.length ? '' : 'bad');
     add(t('settings.diag.exe'), d.exe_path);
+    add(t('settings.diag.install'), d.portable ? t('settings.diag.install-portable') : t('settings.diag.install-installer'));
     add(t('settings.diag.models'), d.models_dir);
     const fmtBytes = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
     const fmtSecs = (s) => s == null ? '—' : s < 1 ? Math.round(s * 1000) + ' ms' : s.toFixed(1) + ' s';
@@ -825,11 +826,18 @@
       if (!u) { UI.flash(b, t('settings.msg.up-to-date-btn')); $('updstate').textContent = t('settings.msg.up-to-date', { v: currentVersion }); return; }
       $('updstate').textContent = t('settings.msg.new-version', { v: u.version, date: u.date ? t('settings.msg.published', { date: u.date }) : '', current: u.current });
       $('installupd').hidden = false;
+      $('installupd').textContent = u.portable ? t('settings.msg.portable-download') : t('settings.sistema.installupd');
+      $('installupd').dataset.portable = u.portable ? '1' : '';
       if (u.notes) { $('updnotes').textContent = u.notes; $('updnotes').hidden = false; }
     } catch (e) { UI.busy(b, false); status(t('settings.msg.check-failed', { e }), 'err'); }
   });
   $('installupd').addEventListener('click', async () => {
     const b = $('installupd');
+    if (b.dataset.portable) {
+      invoke('open_download_page').catch((e) => status(t('common.error', { e }), 'err'));
+      status(t('settings.msg.portable-how'), 'ok');
+      return;
+    }
     UI.busy(b, true, t('common.downloading'));
     const box = $('updprogress'); box.hidden = false; box.classList.add('indeterminate');
     try { const r = await invoke('install_update'); UI.busy(b, false); UI.flash(b, t('common.done'), 'ok', 4000); status(t('settings.msg.update-status', { r }), 'ok'); }

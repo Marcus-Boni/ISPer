@@ -655,6 +655,9 @@
     shownUpdate = u || null;
     if (!u || updateDismissed === u.version) { box.hidden = true; return; }
     $('upd-ver').textContent = u.version;
+    // Versão portátil: o botão baixa o zip novo em vez de instalar por cima.
+    $('upd-install').textContent = u.portable ? t('home.upd.download') : t('home.top.upd-install');
+    $('upd-install').dataset.portable = u.portable ? '1' : '';
     $('upd-meta').textContent = (u.date ? t('home.upd.published', { date: u.date }) : '') + t('home.upd.current', { v: u.current });
     $('upd-notes').hidden = !u.notes;
     $('upd-body').textContent = u.notes || '';
@@ -664,6 +667,11 @@
   $('upd-later').addEventListener('click', () => { if (shownUpdate) updateDismissed = shownUpdate.version; $('update').hidden = true; });
   $('upd-install').addEventListener('click', async () => {
     const b = $('upd-install');
+    if (b.dataset.portable) {
+      invoke('open_download_page').catch((e) => toast(t('common.error', { e }), 'err'));
+      toast(t('home.upd.portable-how'), 'info', 7000);
+      return;
+    }
     UI.busy(b, true, t('common.downloading'));
     $('upd-later').disabled = true;
     $('upd-progress').hidden = false;

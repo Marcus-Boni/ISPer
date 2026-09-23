@@ -570,6 +570,8 @@ pub(crate) struct Diagnostics {
     /// (nome da DLL, encontrada?) — o motivo clássico de "o exe não abre".
     cuda_dlls: Vec<(String, bool)>,
     exe_path: String,
+    /// Roda da versão portátil (zip), não de uma instalação.
+    portable: bool,
     /// Variáveis de ambiente ausentes no processo (pastas então vêm da API do Windows).
     missing_env: Vec<String>,
     /// Versão do schema do banco (`PRAGMA user_version`); `None` se ele não abriu.
@@ -649,6 +651,7 @@ pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
         input_devices: isper_core::audio::list_input_devices(),
         cuda_dlls,
         exe_path: exe.map(|p| p.display().to_string()).unwrap_or_default(),
+        portable: crate::paths::is_portable(),
         missing_env: crate::paths::missing_env_vars(),
         db_schema,
         db_bytes,
