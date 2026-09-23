@@ -30,9 +30,18 @@ Na página de Download, escolha a variante conforme o seu hardware:
 
 Depois do download, confira o `SHA256SUMS.txt` publicado na release antes de instalar em ambientes controlados.
 
+## Versão portátil (zip)
+
+Desde a 0.20.0, cada release traz também um zip por variante: a pasta do ISPer inteira, sem instalador. Descompacte onde quiser e abra o `isper-app.exe`. Não precisa de administrador.
+
+- Os dados **não** ficam na pasta do zip: configurações e banco vão para `%APPDATA%\ISPer`, modelos e logs para `%LOCALAPPDATA%\com.isper.desktop` e reuniões para `Documentos\ISPer`, as mesmas pastas da versão instalada.
+- Quando sai versão nova, o ISPer avisa e abre a página de Download em vez de instalar por cima. Baixe o zip novo, feche o app e substitua os arquivos da pasta.
+- O arquivo `portable.txt` dentro da pasta é o que diz ao ISPer que a cópia é portátil. Sem ele, a atualização tentaria instalar uma segunda cópia.
+- Em Configurações → Sistema → Diagnóstico, a linha *Instalação* mostra se o ISPer em uso é a versão instalada ou a portátil.
+
 ## Primeira abertura
 
-Ao abrir, o ISPer fica na bandeja do sistema e mostra a tela Início. Sem modelo Whisper instalado, ele direciona você para Configurações > Modelos Whisper.
+Numa instalação nova, o ISPer abre a [primeira configuração](/docs/primeiros-passos/primeira-configuracao/): idioma e aparência, microfone, modelo Whisper, atalho e IA opcional. Depois ele fica na bandeja do sistema, e a tela Início mostra o que ainda falta configurar.
 
 ## Rodar a partir do código
 
