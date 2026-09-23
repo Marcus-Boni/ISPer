@@ -273,7 +273,7 @@ jobs:
           Compress-Archive -Path $stage -DestinationPath "out-portable/$name" -CompressionLevel Optimal
           "{0}  {1:N1} MB ({2} arquivos)" -f $name, ((Get-Item "out-portable/$name").Length / 1MB), @(Get-ChildItem $stage).Count | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: portable-${{ matrix.variant }}
           path: out-portable/
@@ -408,7 +408,7 @@ jobs:
           pattern: portable-*
           path: artifacts/
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: sbom
           path: artifacts/sbom/
