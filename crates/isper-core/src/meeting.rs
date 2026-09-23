@@ -1285,6 +1285,60 @@ pub fn render_markdown(
     out
 }
 
+/// Título da seção com as decisões validadas no Copilot.
+///
+/// Quem escreve a seção é o `isper-llm` (`render_decisions_markdown`), que não
+/// depende deste crate; o título mora aqui porque o [`crate::import`] precisa
+/// reconhecê-lo para não confundir a seção com o resumo. Um teste no app
+/// confere que os dois continuam iguais.
+pub const COPILOT_DECISIONS_HEADING: &str = "## Decisões e ações validadas no Copilot";
+
+/// Título da seção com as notas que o usuário escreveu no Copilot.
+pub const NOTES_HEADING: &str = "## Notas da reunião";
+
+/// Linha que abre a seção de notas, logo abaixo do título.
+pub(crate) const NOTES_BYLINE: &str = "_Escritas por você no Copilot, durante a reunião._";
+
+/// As notas do Copilot como seção de Markdown. `None` quando não há notas.
+///
+/// O texto vai como o usuário escreveu: são dele, e listas ou títulos que ele
+/// tenha usado continuam valendo.
+pub fn render_notes_markdown(notes: &str) -> Option<String> {
+    let notes = notes.trim();
+    if notes.is_empty() {
+        return None;
+    }
+    Some(format!("{NOTES_HEADING}\n\n{NOTES_BYLINE}\n\n{notes}\n"))
+}
+
+/// Acrescenta ao fim da ata as seções do Copilot — decisões e depois notas —,
+/// separadas do resto por `---`.
+///
+/// Ficam sempre no fim, com ou sem resumo: é o que deixa o [`crate::import`]
+/// cortá-las pelo título, e o que faz a ata sair igual venha ela da reunião
+/// recém-encerrada ou do banco (renomear, passe final).
+pub fn append_copilot_sections(md: &mut String, decisions: Option<&str>, notes: Option<&str>) {
+    let decisions = decisions.map(str::trim).filter(|s| !s.is_empty());
+    let notes = notes.and_then(render_notes_markdown);
+    if decisions.is_none() && notes.is_none() {
+        return;
+    }
+    if !md.ends_with('\n') {
+        md.push('\n');
+    }
+    md.push_str("\n---\n\n");
+    if let Some(d) = decisions {
+        md.push_str(d);
+        md.push('\n');
+    }
+    if let Some(n) = notes {
+        if decisions.is_some() {
+            md.push('\n');
+        }
+        md.push_str(&n);
+    }
+}
+
 /// Para cada momento marcado (em ordem), o parágrafo que estava em curso: o
 /// último que começa até meio segundo depois do instante — quem marca costuma
 /// reagir ao que acabou de ouvir. Texto encurtado para caber numa linha.
@@ -1582,5 +1636,53 @@ mod tests {
         assert!(md.contains("**[00:00] Eu:** Olá.\n"));
         assert!(md.contains("**[00:05] Participante 1:** Oi.\n"));
         assert!(md.contains("---\n\n## Resumo\nCurto.\n\n> Resumo gerado por IA"));
+    }
+
+    #[test]
+    fn secoes_do_copilot_vao_no_fim_decisoes_antes_das_notas() {
+        let mut md = render_markdown(
+            "R",
+            "09/09/2026 10:00",
+            10.0,
+            &[seg("Eu", 0.0, 1.0, "Olá.")],
+            Some("## Resumo\nCurto."),
+            &[],
+        );
+        let decisoes = format!("{COPILOT_DECISIONS_HEADING}\n\n- **Lançar dia 30**\n");
+        append_copilot_sections(&mut md, Some(&decisoes), Some("  - valor: 40 mil\n  "));
+
+        let d = md
+            .find(COPILOT_DECISIONS_HEADING)
+            .expect("seção de decisões");
+        let n = md.find(NOTES_HEADING).expect("seção de notas");
+        assert!(
+            md.find("> Resumo gerado por IA").unwrap() < d,
+            "depois do resumo"
+        );
+        assert!(d < n, "decisões antes das notas");
+        assert!(
+            md.ends_with("- valor: 40 mil\n"),
+            "as notas fecham o arquivo, aparadas"
+        );
+        assert!(md[..d].ends_with("\n---\n\n"), "separadas do resto por ---");
+    }
+
+    #[test]
+    fn sem_decisoes_nem_notas_a_ata_nao_muda() {
+        let original = render_markdown("R", "x", 1.0, &[seg("Eu", 0.0, 1.0, "Oi.")], None, &[]);
+        let mut md = original.clone();
+        append_copilot_sections(&mut md, None, Some("   \n "));
+        append_copilot_sections(&mut md, Some(""), None);
+        assert_eq!(md, original);
+        assert!(render_notes_markdown(" \n").is_none());
+    }
+
+    #[test]
+    fn so_notas_sem_decisoes() {
+        let mut md = render_markdown("R", "x", 1.0, &[seg("Eu", 0.0, 1.0, "Oi.")], None, &[]);
+        append_copilot_sections(&mut md, None, Some("ligar para o fornecedor"));
+        assert!(!md.contains(COPILOT_DECISIONS_HEADING));
+        assert!(md.contains(&format!("\n---\n\n{NOTES_HEADING}\n\n")));
+        assert!(md.ends_with("ligar para o fornecedor\n"));
     }
 }
