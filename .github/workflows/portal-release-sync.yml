@@ -13,6 +13,12 @@ name: Portal — sincronizar release
 # workflows a partir de eventos criados com o token padrão (proteção contra
 # recursão). Um PR aberto por ele nasceria sem check nenhum, e a main exige
 # três — seria um PR impossível de mergear.
+#
+# A mesma regra vale para o GATILHO: o release.yml publica com o GITHUB_TOKEN,
+# então o `release: published` dele não acorda este workflow. Por isso o
+# release.yml dispara este aqui explicitamente (workflow_dispatch, a exceção
+# que o token padrão pode acionar). O gatilho `release` fica para as releases
+# publicadas à mão, pelo release.ps1 — essas nascem do token de uma pessoa.
 
 on:
   release:

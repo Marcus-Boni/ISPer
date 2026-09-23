@@ -348,6 +348,8 @@ jobs:
       && (needs.sign.result == 'success' || needs.sign.result == 'skipped')
     permissions:
       contents: write
+      # Só para disparar o portal-release-sync no fim (ver o último passo).
+      actions: write
     runs-on: windows-latest
     timeout-minutes: 30
     env:
@@ -386,6 +388,7 @@ jobs:
           ./scripts/release-assets.ps1 -Dist $dist -Version $env:VERSION -Sbom $sbom.FullName
 
       - name: Cria ou completa a release
+        id: release
         shell: pwsh
         run: |
           $dist = "dist/$env:TAG"
@@ -403,4 +406,32 @@ jobs:
             gh release create $env:TAG @($files.FullName) --title "ISPer $env:VERSION" --notes-file "$dist/release-notes.md"
             if ($LASTEXITCODE -ne 0) { throw "gh release create falhou ($LASTEXITCODE)" }
             "Release $env:TAG publicada: $(($files | ForEach-Object Name) -join ', ')" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+            "created=true" >> $env:GITHUB_OUTPUT
+          }
+
+      # O `release: published` que o `gh release create` acima gera nasce do
+      # GITHUB_TOKEN, e o GitHub não deixa um evento desses disparar outro
+      # workflow (proteção contra recursão): o portal-release-sync não acordava
+      # sozinho — zero execuções até a 0.18.0, e a página de download ficou
+      # anunciando a versão anterior. `workflow_dispatch` é a exceção
+      # documentada: o token padrão PODE dispará-lo.
+      #
+      # Só quando ESTA run criou a release. No fluxo local (release.ps1
+      # -Publish) a release nasce do token de quem publicou, o evento dispara
+      # o sync normalmente e avisar de novo só duplicaria a run.
+      #
+      # Falhar aqui não derruba a release — ela já saiu. Vira um aviso visível
+      # no resumo da run, com o comando para disparar à mão.
+      - name: Avisa o portal (portal-release-sync)
+        if: steps.release.outputs.created == 'true'
+        shell: pwsh
+        run: |
+          gh workflow run portal-release-sync.yml -f tag=$env:TAG
+          if ($LASTEXITCODE -ne 0) {
+            "::warning title=Portal nao avisado::gh workflow run falhou ($LASTEXITCODE); a pagina de download nao vai se atualizar sozinha. Rode: gh workflow run portal-release-sync.yml -f tag=$env:TAG"
+            # O runner fecha todo passo pwsh com `exit $LASTEXITCODE`: sem isto,
+            # o 1 do gh sobreviveria ao aviso e a release apareceria como falha.
+            exit 0
+          } else {
+            "Portal avisado: portal-release-sync disparado para $env:TAG." | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
           }
