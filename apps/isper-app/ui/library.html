@@ -122,6 +122,12 @@
     background: none; border: none; padding: 2px 5px; border-radius: 4px; cursor: pointer;
   }
   .dec-at:hover { color: var(--accent); background: var(--accent-soft); }
+  /* Notas do Copilot: o texto do usuário, com as quebras de linha dele. */
+  .notes-box {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
+    padding: 10px 13px; white-space: pre-wrap; overflow-wrap: anywhere;
+    font-size: 13px; line-height: 1.5; color: var(--ink-2);
+  }
   .dec-title { font-size: 13.5px; font-weight: 600; color: var(--ink); }
   .dec-desc { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
   .dec-meta { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -526,6 +532,11 @@
           decBox.appendChild(card);
         }
         d.appendChild(decBox);
+      }
+      // Notas do Copilot: o que você escreveu durante a reunião, como deixou.
+      if (det.notes) {
+        d.appendChild(el('h3', 'eyebrow', t('library.notes.heading')));
+        d.appendChild(el('div', 'notes-box', det.notes));
       }
       if (moments.length) {
         d.appendChild(el('h3', 'eyebrow', t('library.moments')));

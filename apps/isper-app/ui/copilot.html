@@ -251,6 +251,7 @@
   .notes-view textarea { flex: 1; min-height: 0; resize: none; padding: 11px; line-height: 1.55; }
   .notes-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; }
   .notes-status { font-size: 11px; color: var(--muted-2); margin-right: auto; }
+  .notes-hint { margin: 0; font-size: 11px; line-height: 1.45; color: var(--muted-2); }
 
   /* ------------------------------------------------------ vazio/ajuda */
   .copilot-empty {
@@ -429,6 +430,7 @@
           <button id="btn-undo-enrich" class="btn btn-sm" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M2.4 6.4h8.2a3.4 3.4 0 0 1 0 6.8H6.8"/><path d="M5.4 3.4 2.4 6.4l3 3"/></svg><span data-i18n="common.undo">Desfazer</span></button>
           <button id="btn-enrich" class="btn btn-sm btn-primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg><span data-i18n="copilot.notes.enrich">Enriquecer com a reunião</span></button>
         </div>
+        <p class="notes-hint" data-i18n="copilot.notes.hint">Entram na ata e na Biblioteca quando a reunião termina — e o que você mudar depois também.</p>
       </div>
     </div>
   </section>
@@ -522,6 +524,8 @@
   let provisionalEl = null;   // a legenda provisória em cena (some quando o bloco fecha)
   let stick = true;           // rolar sozinho só enquanto o usuário está no fim
   let notesTimer = null;
+  let notesGeneration = null;   // de que reunião é o texto no bloco
+  let notesSavedShown = false;
   let notesBefore = null;     // texto anterior ao "enriquecer" (para desfazer)
   let chatBusy = false;
   let liveReply = null;       // resposta em streaming: { id, el|target, buf }
@@ -1056,6 +1060,22 @@
     if (first && d.scratchpad && !$('notes-input').value) {
       $('notes-input').value = d.scratchpad;
     }
+    // Outra reunião começou com a janela aberta. O texto na tela é o da
+    // anterior — que já foi salvo com ela —, e a próxima tecla o gravaria
+    // nesta. O bloco passa a ser o da reunião nova.
+    if (!first && d.generation !== notesGeneration) {
+      clearTimeout(notesTimer);
+      $('notes-input').value = d.scratchpad || '';
+      notesBefore = null;
+      $('btn-undo-enrich').hidden = true;
+      $('notes-status').textContent = '';
+    }
+    // A reunião acabou de ser salva: as notas foram junto.
+    if (d.notes_saved && !notesSavedShown && $('notes-input').value.trim()) {
+      $('notes-status').textContent = t('copilot.notes.saved-to-meeting');
+    }
+    notesSavedShown = d.notes_saved;
+    notesGeneration = d.generation;
     if (typeof d.elapsed_secs === 'number') {
       clockAnchor = { secs: d.elapsed_secs, at: Date.now() };
       tickClock();
@@ -1178,8 +1198,8 @@
     // natural da digitação e garante que nada se perca ao fechar a janela.
     notesTimer = setTimeout(async () => {
       try {
-        await invoke('copilot_save_scratchpad', { text: notes.value });
-        $('notes-status').textContent = t('copilot.notes.saved');
+        const naReuniao = await invoke('copilot_save_scratchpad', { text: notes.value });
+        $('notes-status').textContent = t(naReuniao ? 'copilot.notes.saved-to-meeting' : 'copilot.notes.saved');
       } catch (_) { $('notes-status').textContent = t('copilot.notes.save-failed'); }
     }, 600);
   });

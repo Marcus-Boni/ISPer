@@ -21,6 +21,21 @@
 //! O caminho rápido é [`isper_llm::detect_trigger`]: assim que alguém diz
 //! "então fica combinado", a rodada é antecipada, respeitando um intervalo
 //! mínimo ([`MIN_GAP_BETWEEN_ROUNDS_SECS`]) para não torrar API à toa.
+//!
+//! ## Por que só com a janela aberta
+//!
+//! Até a 0.20 o loop analisava toda reunião gravada com provedor configurado,
+//! com a janela aberta ou não — perto de 80 chamadas por hora que ninguém
+//! estava vendo. Agora rodada, gatilho e memória só acontecem com a janela
+//! visível (e não minimizada); o loop confere a cada [`WATCH_TICK`] e, quando
+//! ela aparece, lê a conversa na hora. O que é local continua sempre: a fala
+//! ao vivo e a dinâmica de fala.
+//!
+//! ## Notas
+//!
+//! O bloco de notas vai com a reunião: entra na ata e no banco quando ela é
+//! salva ([`CopilotWrapUp`]) e, depois disso, cada edição regrava os dois
+//! ([`copilot_save_scratchpad`]).
 
 use crate::prelude::*;
 use std::sync::mpsc;
@@ -45,6 +60,12 @@ const COPILOT_AUTO_INTERVAL_SECS: u64 = 45;
 const FIRST_ROUND_SECS: u64 = 20;
 /// Piso entre duas rodadas de IA, para o gatilho não virar metralhadora.
 const MIN_GAP_BETWEEN_ROUNDS_SECS: f32 = 15.0;
+/// De quanto em quanto tempo o loop confere se a janela está aberta.
+///
+/// É também o atraso máximo entre abrir a janela e a primeira leitura: curto
+/// para parecer imediato, longo o bastante para não ocupar a thread principal
+/// (cada consulta de visibilidade passa por ela).
+const WATCH_TICK: Duration = Duration::from_secs(2);
 /// Garganta do evento de métricas (dinâmica de fala).
 const METRICS_EVERY: Duration = Duration::from_millis(1500);
 /// Fala contínua de "Eu" acima disto acende o aviso de monólogo.
@@ -67,6 +88,39 @@ const STREAM_FLUSH_EVERY: Duration = Duration::from_millis(50);
 pub(crate) enum CopilotCmd {
     Now,
     Stop,
+}
+
+/// O que o loop faz numa volta.
+#[derive(Debug, PartialEq, Eq)]
+enum Turn {
+    /// Nada nesta volta.
+    Idle,
+    /// Pedido explícito — o botão Analisar ou um gatilho: roda mesmo sem
+    /// conversa nova.
+    Forced,
+    /// A janela acabou de aparecer: roda se houver conversa nova.
+    Opened,
+    /// Hora do pulso, com a janela na tela.
+    Pulse,
+    /// Hora do pulso, mas ninguém está olhando: só reagenda.
+    SkipPulse,
+}
+
+/// A regra do custo numa função só: sem a janela na tela, o pulso não chama a
+/// IA. Os pedidos explícitos já chegam filtrados — o botão só existe com a
+/// janela aberta, e o gatilho confere `watching` antes de pedir.
+fn turn(asked: bool, opened: bool, watching: bool, pulse_due: bool) -> Turn {
+    if asked {
+        Turn::Forced
+    } else if opened {
+        Turn::Opened
+    } else if pulse_due && watching {
+        Turn::Pulse
+    } else if pulse_due {
+        Turn::SkipPulse
+    } else {
+        Turn::Idle
+    }
 }
 
 pub(crate) struct CopilotAppState {
@@ -107,6 +161,13 @@ pub(crate) struct CopilotAppState {
     /// desliga os gatilhos em silêncio). Cada thread guarda a geração com
     /// que nasceu e só encosta no estado se ela ainda for a corrente.
     pub(crate) generation: u64,
+    /// A janela está aberta, visível e não minimizada — lido pelo loop a cada
+    /// [`WATCH_TICK`]. Guardado aqui porque o gatilho roda no caminho quente
+    /// da transcrição e não pode perguntar à janela a cada fala.
+    pub(crate) watching: bool,
+    /// Em que reunião do banco estas notas já foram salvas. A partir daí, cada
+    /// edição vai direto para ela.
+    pub(crate) saved_meeting: Option<i64>,
     last_round: Option<Instant>,
     last_metrics_emit: Option<Instant>,
 }
@@ -132,6 +193,8 @@ impl Default for CopilotAppState {
             dismissed_memories: Vec::new(),
             recalled_topic: None,
             generation: 0,
+            watching: false,
+            saved_meeting: None,
             last_round: None,
             last_metrics_emit: None,
         }
@@ -148,6 +211,18 @@ impl CopilotAppState {
         } else {
             self.others_secs += secs;
             self.me_streak_secs = 0.0;
+        }
+    }
+
+    /// As notas mais recentes da reunião que `wrap` fechou: o bloco de agora,
+    /// se o estado ainda é dela (o usuário pode ter continuado escrevendo
+    /// enquanto a transcrição terminava), ou o que havia ao encerrar, se outra
+    /// reunião já começou e zerou o bloco.
+    pub(crate) fn notes_for(&self, wrap: &CopilotWrapUp) -> String {
+        if self.generation == wrap.generation {
+            self.scratchpad.clone()
+        } else {
+            wrap.notes.clone()
         }
     }
 
@@ -270,6 +345,11 @@ pub(crate) struct CopilotDto {
     pub(crate) last_updated: Option<String>,
     pub(crate) last_trigger: Option<String>,
     pub(crate) error: Option<String>,
+    /// Qual reunião a tela está vendo. Quando muda, o bloco de notas da tela
+    /// é da reunião anterior e precisa ser trocado pelo desta.
+    pub(crate) generation: u64,
+    /// As notas já foram salvas com a reunião (e cada edição regrava).
+    pub(crate) notes_saved: bool,
 }
 
 /// Só a dinâmica de fala — o que pode sair a cada bloco transcrito.
@@ -305,6 +385,8 @@ pub(crate) fn copilot_dto(app: &AppHandle) -> CopilotDto {
         last_updated: cop.last_updated.clone(),
         last_trigger: cop.last_trigger.clone(),
         error: cop.error.clone(),
+        generation: cop.generation,
+        notes_saved: cop.saved_meeting.is_some(),
     }
 }
 
@@ -336,7 +418,9 @@ pub(crate) fn on_live_segment(app: &AppHandle, speaker: &str, secs: f32, text: &
                     .last_round
                     .map(|t| t.elapsed().as_secs_f32() >= MIN_GAP_BETWEEN_ROUNDS_SECS)
                     .unwrap_or(true);
-                if ready && !cop.running {
+                // Janela fechada: ninguém está olhando, então nada de gastar
+                // uma chamada — a rodada sai quando ela abrir.
+                if ready && !cop.running && cop.watching {
                     // Nome estável; a tela traduz (copilot.trigger.<nome>).
                     cop.last_trigger = Some(kind.as_str().to_string());
                     cop.tx.clone()
@@ -407,21 +491,100 @@ pub(crate) fn stop_copilot_loop(app: &AppHandle) {
     cop.running = false;
 }
 
-/// Os cards que o usuário validou — viram seção da ata E linhas no banco
-/// (a aba "Decisões" da Biblioteca).
+/// O que o Copilot deixa para a reunião que acabou: os cards validados (seção
+/// da ata e linhas da aba "Decisões") e as notas.
 ///
 /// Precisa ser lido no momento em que a reunião encerra, e não lá dentro do
 /// `finish_meeting` (que roda numa thread e ainda espera o worker do Whisper):
-/// começar outra reunião nesse intervalo zeraria os cards e a ata da reunião
-/// que acabou sairia sem nada.
-pub(crate) fn confirmed_cards(app: &AppHandle) -> Vec<isper_llm::CopilotCard> {
+/// começar outra reunião nesse intervalo zeraria o estado e a ata da reunião
+/// que acabou sairia sem nada. A geração diz, mais tarde, se o estado ainda é
+/// desta reunião — e portanto se as notas podem ter sido editadas depois.
+pub(crate) struct CopilotWrapUp {
+    generation: u64,
+    pub(crate) decisions: Vec<isper_llm::CopilotCard>,
+    notes: String,
+}
+
+pub(crate) fn copilot_wrap_up(app: &AppHandle) -> CopilotWrapUp {
     let state = app.state::<AppState>();
     let cop = state.copilot.lock_or_recover();
-    cop.cards
+    CopilotWrapUp {
+        generation: cop.generation,
+        decisions: cop
+            .cards
+            .iter()
+            .filter(|c| c.status == isper_llm::CardStatus::Confirmed)
+            .cloned()
+            .collect(),
+        notes: cop.scratchpad.clone(),
+    }
+}
+
+/// As notas mais recentes da reunião que `wrap` fechou ([`CopilotAppState::notes_for`]).
+pub(crate) fn wrap_up_notes(app: &AppHandle, wrap: &CopilotWrapUp) -> String {
+    app.state::<AppState>()
+        .copilot
+        .lock_or_recover()
+        .notes_for(wrap)
+}
+
+/// A reunião acabou de entrar no banco: grava as notas nela e, se o estado
+/// ainda é desta reunião, liga o bloco a ela — dali em diante, cada edição
+/// vai direto para o banco e para a ata.
+///
+/// Leitura e gravação acontecem com o estado travado, como em
+/// [`copilot_save_scratchpad`]: uma edição que chegue no meio não pode ser
+/// sobrescrita por um texto mais velho.
+pub(crate) fn attach_saved_meeting(
+    app: &AppHandle,
+    wrap: &CopilotWrapUp,
+    store: &isper_core::store::MeetingStore,
+    meeting_id: i64,
+) {
+    {
+        let state = app.state::<AppState>();
+        let mut cop = state.copilot.lock_or_recover();
+        let current = cop.generation == wrap.generation;
+        let notes = cop.notes_for(wrap);
+        if let Err(e) = store.set_notes(meeting_id, &notes) {
+            tracing::warn!("não consegui guardar as notas do Copilot: {e}");
+            return;
+        }
+        if current {
+            cop.saved_meeting = Some(meeting_id);
+        }
+    }
+    emit_copilot(app);
+}
+
+/// As decisões do banco de volta como seção da ata — o mesmo texto que o
+/// Copilot escreveu quando a reunião acabou.
+///
+/// Sem isto, regravar o `.md` a partir do banco (renomear um falante, o passe
+/// final) apagava a seção: o banco tinha as decisões, a ata não.
+pub(crate) fn decisions_markdown(rows: &[isper_core::store::StoredDecision]) -> Option<String> {
+    let cards: Vec<isper_llm::CopilotCard> = rows
         .iter()
-        .filter(|c| c.status == isper_llm::CardStatus::Confirmed)
-        .cloned()
-        .collect()
+        .filter_map(|d| {
+            let kind: isper_llm::CardKind =
+                serde_json::from_value(serde_json::Value::String(d.kind.clone())).ok()?;
+            let urgency: isper_llm::CardUrgency =
+                serde_json::from_value(serde_json::Value::String(d.urgency.clone()))
+                    .unwrap_or(isper_llm::CardUrgency::Medium);
+            Some(isper_llm::CopilotCard {
+                id: isper_llm::card_id(kind, &d.title),
+                kind,
+                title: d.title.clone(),
+                description: d.description.clone(),
+                owner: d.owner.clone(),
+                due_date: d.due_date.clone(),
+                urgency,
+                at_secs: d.at_secs.max(0.0) as u32,
+                status: isper_llm::CardStatus::Confirmed,
+            })
+        })
+        .collect();
+    isper_llm::render_decisions_markdown(&cards)
 }
 
 /// Converte os cards para as linhas que o banco guarda.
@@ -459,15 +622,15 @@ fn ensure_copilot_loop(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {
         let interval = Duration::from_secs(COPILOT_AUTO_INTERVAL_SECS);
-        // A primeira espera é curta; depois o loop assume o ritmo normal.
-        let mut wait = Duration::from_secs(FIRST_ROUND_SECS);
+        // A primeira leitura sai cedo; depois o loop assume o ritmo normal.
+        let mut next_pulse = Instant::now() + Duration::from_secs(FIRST_ROUND_SECS);
+        let mut was_watching = false;
         loop {
-            let force = match rx.recv_timeout(wait) {
+            let asked = match rx.recv_timeout(WATCH_TICK) {
                 Ok(CopilotCmd::Now) => true,
                 Ok(CopilotCmd::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 Err(mpsc::RecvTimeoutError::Timeout) => false,
             };
-            wait = interval;
 
             if app
                 .state::<AppState>()
@@ -478,7 +641,38 @@ fn ensure_copilot_loop(app: &AppHandle) {
                 break;
             }
 
-            analyze_copilot_step(&app, force, my_gen);
+            let watching = copilot_window_on_screen(&app);
+            {
+                let state = app.state::<AppState>();
+                let mut cop = state.copilot.lock_or_recover();
+                if cop.generation != my_gen {
+                    break; // outra reunião já é dona do estado
+                }
+                cop.watching = watching;
+            }
+            let opened = watching && !was_watching;
+            was_watching = watching;
+
+            match turn(asked, opened, watching, Instant::now() >= next_pulse) {
+                Turn::Forced => {
+                    analyze_copilot_step(&app, true, my_gen);
+                    next_pulse = Instant::now() + interval;
+                }
+                // Lê a conversa agora, se houver o bastante. Sem isso, quem
+                // abre no meio da reunião esperaria o próximo pulso com a tela
+                // parada. Sem conversa nova, o pulso marcado continua valendo.
+                Turn::Opened => {
+                    if analyze_copilot_step(&app, false, my_gen) {
+                        next_pulse = Instant::now() + interval;
+                    }
+                }
+                Turn::Pulse => {
+                    analyze_copilot_step(&app, false, my_gen);
+                    next_pulse = Instant::now() + interval;
+                }
+                Turn::SkipPulse => next_pulse = Instant::now() + interval,
+                Turn::Idle => {}
+            }
         }
 
         // Só limpa se este ainda for o estado desta thread: outra reunião pode
@@ -493,6 +687,15 @@ fn ensure_copilot_loop(app: &AppHandle) {
         drop(cop);
         emit_copilot(&app);
     });
+}
+
+/// A janela do Copilot está na tela: aberta, visível e não minimizada.
+///
+/// Atrás de outra janela conta como aberta — é assim que ela fica ao lado do
+/// Teams. Escondida pelo atalho, fechada ou minimizada, não.
+fn copilot_window_on_screen(app: &AppHandle) -> bool {
+    app.get_webview_window("copilot")
+        .is_some_and(|w| w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false))
 }
 
 /// Conversa recente formatada para o prompt (`[mm:ss] Falante: texto`).
@@ -622,13 +825,15 @@ fn recall_snippet(text: &str) -> String {
     format!("{}…", cut.trim_end())
 }
 
-fn analyze_copilot_step(app: &AppHandle, force: bool, my_gen: u64) {
+/// Uma rodada de análise. Devolve se chegou a chamar a IA — sem conversa
+/// nova o bastante, não chama.
+fn analyze_copilot_step(app: &AppHandle, force: bool, my_gen: u64) -> bool {
     let state = app.state::<AppState>();
     if state.copilot.lock_or_recover().generation != my_gen {
-        return; // esta thread é de uma reunião que já acabou
+        return false; // esta thread é de uma reunião que já acabou
     }
     let Some(started) = *state.meeting_started.lock_or_recover() else {
-        return;
+        return false;
     };
     let elapsed = started.elapsed().as_secs_f32();
     let total_chars: usize = state
@@ -646,7 +851,7 @@ fn analyze_copilot_step(app: &AppHandle, force: bool, my_gen: u64) {
             MIN_NEW_CHARS_COPILOT
         };
         if !force && total_chars.saturating_sub(cop.seen_chars) < minimo {
-            return;
+            return false;
         }
     }
 
@@ -658,7 +863,7 @@ fn analyze_copilot_step(app: &AppHandle, force: bool, my_gen: u64) {
             drop(cop);
             emit_copilot(app);
         }
-        return;
+        return false;
     }
 
     let settings = isper_llm::load_settings();
@@ -675,14 +880,14 @@ fn analyze_copilot_step(app: &AppHandle, force: bool, my_gen: u64) {
             });
             drop(cop);
             emit_copilot(app);
-            return;
+            return false;
         }
     };
 
     let previous_cards = {
         let mut cop = state.copilot.lock_or_recover();
         if cop.generation != my_gen {
-            return;
+            return false;
         }
         cop.running = true;
         cop.error = None;
@@ -709,7 +914,7 @@ fn analyze_copilot_step(app: &AppHandle, force: bool, my_gen: u64) {
         // nesse meio-tempo. O resultado é da reunião anterior: descarta.
         if cop.generation != my_gen {
             tracing::debug!("copilot: análise de uma reunião anterior descartada");
-            return;
+            return true;
         }
         cop.running = false;
         cop.last_round = Some(Instant::now());
@@ -746,6 +951,7 @@ fn analyze_copilot_step(app: &AppHandle, force: bool, my_gen: u64) {
     if let Some(topic) = recall {
         recall_past_meetings(app, &topic, my_gen);
     }
+    true
 }
 
 // ---------------------------------------------------------------- Comandos Tauri
@@ -809,9 +1015,26 @@ pub(crate) fn copilot_dismiss_memory(app: AppHandle, memory_id: String) {
     emit_copilot(&app);
 }
 
+/// Guarda o bloco de notas. Depois que a reunião foi salva, a edição vai
+/// direto para ela — banco e ata — e a resposta é `true`, para a tela dizer
+/// "salvo na reunião".
 #[tauri::command]
-pub(crate) fn copilot_save_scratchpad(app: AppHandle, text: String) {
-    app.state::<AppState>().copilot.lock_or_recover().scratchpad = text;
+pub(crate) fn copilot_save_scratchpad(app: AppHandle, text: String) -> Result<bool, String> {
+    let state = app.state::<AppState>();
+    // Travado até o arquivo ser gravado: duas edições seguidas não podem
+    // chegar ao disco fora de ordem, nem ser atropeladas pelo fim da reunião
+    // (`attach_saved_meeting` trava o mesmo estado).
+    let mut cop = state.copilot.lock_or_recover();
+    cop.scratchpad = text;
+    let Some(id) = cop.saved_meeting else {
+        return Ok(false);
+    };
+    let store = open_store().map_err(|e| e.to_string())?;
+    store
+        .set_notes(id, &cop.scratchpad)
+        .map_err(|e| e.to_string())?;
+    rewrite_markdown(&store, id);
+    Ok(true)
 }
 
 /// Mantém o HUD por cima do Teams/Zoom (modo sidecar).
@@ -1140,6 +1363,102 @@ mod tests {
 
         assert_ne!(state.generation, antes, "a geração precisa avançar");
         assert!(state.cards.is_empty(), "a reunião nova começa limpa");
+    }
+
+    #[test]
+    fn com_a_janela_fechada_o_pulso_nao_chama_a_ia() {
+        // (asked, opened, watching, pulse_due)
+        assert_eq!(turn(false, false, false, true), Turn::SkipPulse);
+        assert_eq!(turn(false, false, false, false), Turn::Idle);
+        assert_eq!(turn(false, false, true, true), Turn::Pulse);
+        assert_eq!(turn(false, false, true, false), Turn::Idle);
+    }
+
+    #[test]
+    fn abrir_a_janela_le_a_conversa_na_hora() {
+        assert_eq!(turn(false, true, true, false), Turn::Opened);
+        // Mesmo que o pulso também esteja vencido: uma leitura só.
+        assert_eq!(turn(false, true, true, true), Turn::Opened);
+    }
+
+    #[test]
+    fn pedido_explicito_sempre_roda() {
+        for (opened, watching, due) in [
+            (false, true, false),
+            (true, true, true),
+            (false, false, false),
+        ] {
+            assert_eq!(turn(true, opened, watching, due), Turn::Forced);
+        }
+    }
+
+    #[test]
+    fn notas_da_reuniao_que_acabou_seguem_o_bloco_ate_outra_comecar() {
+        let mut state = CopilotAppState {
+            scratchpad: "- valor: 40 mil".into(),
+            ..CopilotAppState::default()
+        };
+        let wrap = CopilotWrapUp {
+            generation: state.generation,
+            decisions: Vec::new(),
+            notes: state.scratchpad.clone(),
+        };
+
+        // Ainda escrevendo enquanto a transcrição termina: vale o bloco atual.
+        state.scratchpad.push_str("\n- prazo: sexta");
+        assert_eq!(state.notes_for(&wrap), "- valor: 40 mil\n- prazo: sexta");
+
+        // Outra reunião começou e zerou o bloco: vale o que havia ao encerrar.
+        let next = state.generation.wrapping_add(1);
+        state = CopilotAppState::default();
+        state.generation = next;
+        assert_eq!(state.notes_for(&wrap), "- valor: 40 mil");
+        assert_eq!(
+            state.saved_meeting, None,
+            "a reunião nova não herda a ligação com a anterior"
+        );
+    }
+
+    #[test]
+    fn decisoes_do_banco_voltam_para_a_ata_com_o_mesmo_texto() {
+        let mut acao = card(CardKind::Action, "Enviar proposta");
+        acao.status = CardStatus::Confirmed;
+        acao.owner = Some("Eu".into());
+        acao.due_date = Some("Sexta".into());
+        acao.urgency = CardUrgency::High;
+        let mut decisao = card(CardKind::Decision, "Lançar dia 30");
+        decisao.status = CardStatus::Confirmed;
+        let cards = vec![decisao, acao];
+
+        let ao_encerrar = isper_llm::render_decisions_markdown(&cards).unwrap();
+        let do_banco = decisions_markdown(&stored_decisions(&cards)).unwrap();
+        assert_eq!(
+            do_banco, ao_encerrar,
+            "regravar pelo banco não pode mudar a seção"
+        );
+
+        // Um tipo que este ISPer não conhece é deixado de fora, sem derrubar o resto.
+        let mut linhas = stored_decisions(&cards);
+        linhas[0].kind = "algo-novo".into();
+        let parcial = decisions_markdown(&linhas).unwrap();
+        assert!(parcial.contains("Enviar proposta"));
+        assert!(!parcial.contains("Lançar dia 30"));
+    }
+
+    #[test]
+    fn o_titulo_das_decisoes_e_o_que_o_import_procura() {
+        // O `isper-llm` escreve a seção e o `isper-core` a reconhece; os dois
+        // não se conhecem, então é aqui, onde os dois estão, que se confere.
+        let mut c = card(CardKind::Decision, "X");
+        c.status = CardStatus::Confirmed;
+        let md = isper_llm::render_decisions_markdown(&[c]).unwrap();
+        assert!(
+            md.starts_with(&format!(
+                "{}\n",
+                isper_core::meeting::COPILOT_DECISIONS_HEADING
+            )),
+            "{md}"
+        );
     }
 
     #[test]
