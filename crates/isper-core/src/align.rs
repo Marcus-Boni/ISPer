@@ -19,19 +19,24 @@ use crate::engine::Word;
 ///
 /// `u32` e não `u8`: o `u8` obrigava a saturar em 255 e produzia o famoso
 /// "Participante 255" quando o agrupamento explodia. O número absurdo agora
-/// aparece nas métricas e é tratado por [`crate::diarization`], em vez de
-/// virar um rótulo silencioso.
+/// aparece nas métricas e é barrado pelas guardas da diarização (crate
+/// `isper-diarize`, via [`crate::pipeline::Diarizer`]), em vez de virar um
+/// rótulo silencioso.
 pub type SpeakerId = u32;
 
 /// Um turno de fala: `[start, end)` em segundos, e quem falou.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpeakerTurn {
+    /// Início do turno, em segundos do áudio da reunião.
     pub start_secs: f32,
+    /// Fim do turno (exclusivo), em segundos.
     pub end_secs: f32,
+    /// Falante que o diarizador atribuiu ao turno.
     pub speaker: SpeakerId,
 }
 
 impl SpeakerTurn {
+    /// Duração do turno, em segundos (nunca negativa).
     pub fn secs(&self) -> f32 {
         (self.end_secs - self.start_secs).max(0.0)
     }
@@ -40,6 +45,7 @@ impl SpeakerTurn {
 /// Uma palavra já com dono.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TaggedWord {
+    /// A palavra reconhecida, com texto, horário e probabilidade.
     pub word: Word,
     /// `None` quando nenhum turno cobre a palavra (silêncio do diarizador,
     /// fala sobreposta descartada, áudio fora das regiões analisadas).
@@ -49,9 +55,13 @@ pub struct TaggedWord {
 /// Uma fala reconstruída: palavras consecutivas do mesmo falante.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Utterance {
+    /// Falante da fala; `None` quando nenhuma palavra dela teve dono.
     pub speaker: Option<SpeakerId>,
+    /// Início da primeira palavra, em segundos.
     pub start_secs: f32,
+    /// Fim da última palavra, em segundos.
     pub end_secs: f32,
+    /// Texto da fala: as palavras emendadas.
     pub text: String,
     /// Quantas palavras entraram — usado para descartar falas de uma palavra
     /// solta atribuídas a um falante que não existe.
@@ -59,6 +69,7 @@ pub struct Utterance {
 }
 
 impl Utterance {
+    /// Duração da fala, em segundos (nunca negativa).
     pub fn secs(&self) -> f32 {
         (self.end_secs - self.start_secs).max(0.0)
     }
@@ -239,6 +250,8 @@ pub struct SpeakerMetrics {
     pub unassigned: usize,
 }
 
+/// Calcula as [`SpeakerMetrics`] de um conjunto de falas: falantes distintos,
+/// trocas de falante, mediana da duração, falas curtas demais e falas sem dono.
 pub fn speaker_metrics(utterances: &[Utterance]) -> SpeakerMetrics {
     let mut ids: Vec<SpeakerId> = utterances.iter().filter_map(|u| u.speaker).collect();
     ids.sort_unstable();

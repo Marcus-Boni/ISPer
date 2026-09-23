@@ -102,6 +102,14 @@ jobs:
       - name: Clippy (avisos são erros) — app e CLI sem CUDA
         run: cargo clippy --workspace --all-targets --release --no-default-features -- -D warnings
 
+      # A referência da API do motor: todo item público documentado (o
+      # `#![deny(missing_docs)]` do isper-core) e nenhum link interno quebrado.
+      # `--release` pelo mesmo motivo do clippy: reaproveita o whisper.cpp.
+      - name: Documentação da API do núcleo (avisos são erros)
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --release --no-default-features -p isper-core --no-deps
+
   # Cadeia de suprimentos: vulnerabilidades (RustSec), licenças fora da lista
   # permitida, versões duplicadas e origens desconhecidas — regras em deny.toml.
   deny:

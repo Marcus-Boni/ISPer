@@ -46,14 +46,18 @@ pub enum Segmentation {
     /// reproduzível: blocos de tamanho fixo, cortados no ponto de MENOR
     /// energia do fim do bloco — silêncio ou não.
     LegacyChunks {
+        /// Tamanho de cada bloco, em segundos.
         chunk_secs: f32,
         /// Blocos abaixo deste RMS nem iam ao Whisper.
         silence_rms: f32,
     },
     /// Corte guiado pelo Silero: só onde ninguém está falando.
     Vad {
+        /// Caminho do modelo ONNX do Silero VAD.
         model: PathBuf,
+        /// Limiares e durações mínimas do VAD.
         opts: VadOptions,
+        /// Como as regiões de fala viram janelas para o Whisper.
         windows: WindowOptions,
     },
 }
@@ -63,10 +67,15 @@ pub enum Segmentation {
 pub struct FinalConfig {
     /// Nome livre da rodada, para o relatório ("baseline", "final"…).
     pub name: String,
+    /// Perfil de transcrição (define os padrões de decodificação).
     pub profile: TranscriptionProfile,
+    /// Idioma da fala ("pt", "en"… ou "auto").
     pub lang: String,
+    /// Decodificação usada em cada janela.
     pub decode: DecodeConfig,
+    /// Como o áudio é fatiado antes do Whisper.
     pub segmentation: Segmentation,
+    /// Como palavras e turnos do diarizador viram falas.
     pub align: AlignOptions,
     /// Quantos caracteres do texto anterior entram como contexto da próxima
     /// janela. 0 desliga o contexto.
@@ -134,7 +143,10 @@ pub trait Diarizer {
 /// O que um [`Diarizer`] devolve.
 #[derive(Debug, Clone, Default)]
 pub struct DiarizerOutput {
+    /// Turnos de fala, em segundos do áudio entregue.
     pub turns: Vec<SpeakerTurn>,
+    /// Contagens do agrupamento: grupos e turnos brutos, grupos absorvidos e
+    /// o que foi publicado.
     pub stats: DiarizeStats,
     /// Vazio = resultado confiável. Com avisos, o pipeline mantém os turnos
     /// mas registra tudo no relatório, e quem chama decide se publica.
@@ -156,6 +168,7 @@ pub struct FinalTranscript {
     pub raw_text: String,
     /// Texto corrido depois do glossário (igual ao bruto quando desligado).
     pub normalized_text: String,
+    /// Relatório da rodada: parâmetros, tempos por etapa e métricas.
     pub report: PipelineReport,
 }
 

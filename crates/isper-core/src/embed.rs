@@ -17,7 +17,9 @@ pub const CHUNK_MAX_CHARS: usize = 1400;
 /// não está no relógio da reunião (resumo, ditado).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Chunk {
+    /// Onde o trecho começa no relógio da reunião; `None` fora dela.
     pub start_secs: Option<f32>,
+    /// O texto que vai virar vetor.
     pub text: String,
 }
 
@@ -159,6 +161,8 @@ pub fn to_blob(v: &[f32]) -> Vec<u8> {
     v.iter().flat_map(|x| x.to_le_bytes()).collect()
 }
 
+/// Bytes (f32 little-endian) → vetor; o inverso de [`to_blob`]. Bytes que
+/// sobram no fim (menos de 4) são ignorados.
 pub fn from_blob(bytes: &[u8]) -> Vec<f32> {
     bytes
         .as_chunks::<4>()

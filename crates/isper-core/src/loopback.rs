@@ -34,7 +34,10 @@ pub enum LoopbackSource {
     /// Só o áudio de um processo e seus filhos (ex.: o Teams) — usa a API
     /// de *process loopback* do Windows 10 2004+. Aceita vários nomes
     /// candidatos (Teams novo = `ms-teams.exe`, clássico = `Teams.exe`).
-    Process { names: Vec<String> },
+    Process {
+        /// Nomes de executável aceitos, comparados sem diferenciar caixa.
+        names: Vec<String>,
+    },
 }
 
 impl LoopbackSource {
@@ -53,6 +56,7 @@ impl LoopbackSource {
         }
     }
 
+    /// Só o Microsoft Teams (o novo, `ms-teams.exe`, ou o clássico, `teams.exe`).
     pub fn teams() -> Self {
         Self::Process {
             names: vec!["ms-teams.exe".into(), "teams.exe".into()],
@@ -62,7 +66,9 @@ impl LoopbackSource {
 
 /// Informações devolvidas quando a captura abre.
 pub struct LoopbackReady {
+    /// Taxa de amostragem do loopback, em Hz (a do endpoint).
     pub sample_rate: u32,
+    /// Número de canais intercalados.
     pub channels: u16,
     /// Aviso não-fatal (ex.: processo não encontrado → caiu p/ o sistema).
     pub warning: Option<String>,

@@ -578,7 +578,9 @@ reasons behind the big choices (Rust + Tauri, cloud LLM with text only, the
 WASAPI loopback defenses, post-hoc diarization, the two transcription modes,
 the no-build UI, CI releases, "nothing disappears unless you ask") are
 recorded as architecture decision records in [`docs/adr/`](docs/adr/README.md)
-(in Portuguese).
+(in Portuguese). The engine's API reference is `cargo doc -p isper-core --open`:
+every public item in `isper-core` is documented, and CI fails on a missing doc
+or a broken intra-doc link.
 
 GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs,
 on every push and PR, formatting (`cargo fmt --check`), the tests of every

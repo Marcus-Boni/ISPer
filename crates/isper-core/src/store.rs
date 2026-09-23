@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use crate::meeting::MeetingResult;
 use crate::{IsperError, Result};
 
+/// O banco do ISPer (`isper.db`): reuniões, ditados, decisões, momentos,
+/// embeddings e métricas locais. Abrir migra o schema, com cópia antes.
 pub struct MeetingStore {
     conn: Connection,
 }
@@ -18,14 +20,21 @@ pub struct MeetingStore {
 /// Linha da lista de reuniões (sem o transcript, que pode ser grande).
 #[derive(Debug, Clone, Serialize)]
 pub struct MeetingRow {
+    /// Id da reunião no banco.
     pub id: i64,
+    /// Título (o dado pela IA, o renomeado ou o padrão com a data).
     pub title: String,
+    /// Quando começou, como exibido: `dd/mm/aaaa hh:mm`.
     pub started_at: String,
+    /// Duração da reunião, em segundos.
     pub duration_secs: f32,
+    /// Quantas falas a transcrição tem.
     pub segments: i64,
     /// Falantes distintos além de "Eu".
     pub participants: i64,
+    /// Já tem resumo por IA.
     pub has_summary: bool,
+    /// Caminho do `.md` da reunião, quando ele existe.
     pub md_path: Option<String>,
     /// Momentos marcados durante a reunião.
     pub moments: i64,
@@ -33,18 +42,27 @@ pub struct MeetingRow {
     pub decisions: i64,
 }
 
+/// Uma fala da transcrição, como está no banco.
 #[derive(Debug, Clone, Serialize)]
 pub struct StoredSegment {
+    /// Rótulo do falante ("Eu", "Participante N" ou um nome dado pelo usuário).
     pub speaker: String,
+    /// Início, em segundos da reunião.
     pub start_secs: f32,
+    /// Fim, em segundos da reunião.
     pub end_secs: f32,
+    /// Texto da fala.
     pub text: String,
 }
 
+/// Uma reunião inteira, para a tela da Biblioteca.
 #[derive(Debug, Clone, Serialize)]
 pub struct MeetingDetail {
+    /// Os dados da lista (título, data, contagens).
     pub meeting: MeetingRow,
+    /// O resumo por IA, em Markdown.
     pub summary: Option<String>,
+    /// A transcrição, em ordem cronológica.
     pub segments: Vec<StoredSegment>,
     /// Instantes marcados (segundos desde o início), em ordem.
     pub moments: Vec<f32>,
@@ -61,9 +79,13 @@ pub struct MeetingDetail {
 pub struct StoredDecision {
     /// `decision`, `action`, `risk` ou `question`.
     pub kind: String,
+    /// Título curto do card.
     pub title: String,
+    /// Descrição (pode ser vazia).
     pub description: String,
+    /// Responsável, quando a IA identificou um.
     pub owner: Option<String>,
+    /// Prazo, como a IA escreveu (texto livre).
     pub due_date: Option<String>,
     /// `low`, `medium` ou `high`.
     pub urgency: String,
@@ -71,11 +93,16 @@ pub struct StoredDecision {
     pub at_secs: f32,
 }
 
+/// Um ditado do histórico.
 #[derive(Debug, Clone, Serialize)]
 pub struct DictationRow {
+    /// Id do ditado no banco.
     pub id: i64,
+    /// Quando foi ditado: `dd/mm/aaaa hh:mm:ss`.
     pub at: String,
+    /// O texto colado (o polido, quando houve polimento).
     pub text: String,
+    /// Duração do áudio, em segundos, quando registrada.
     pub audio_secs: Option<f32>,
     /// Texto como saiu do Whisper, quando o polimento por IA o alterou.
     pub raw_text: Option<String>,
@@ -84,10 +111,13 @@ pub struct DictationRow {
 /// Totais para a tela Início (uma consulta por tabela, sem carregar linhas).
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Stats {
+    /// Reuniões no histórico.
     pub meetings: i64,
     /// Soma das durações das reuniões.
     pub meeting_secs: f64,
+    /// Reuniões com resumo por IA.
     pub with_summary: i64,
+    /// Ditados no histórico.
     pub dictations: i64,
     /// Soma do áudio ditado.
     pub dictation_secs: f64,
@@ -98,9 +128,13 @@ pub struct Stats {
 /// Cobertura do índice semântico para um modelo de embeddings.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct EmbeddingStats {
+    /// Reuniões no histórico.
     pub meetings_total: i64,
+    /// Reuniões com vetores deste modelo.
     pub meetings_indexed: i64,
+    /// Ditados no histórico.
     pub dictations_total: i64,
+    /// Ditados com vetores deste modelo.
     pub dictations_indexed: i64,
     /// Trechos (vetores) guardados para o modelo.
     pub chunks: i64,
@@ -111,9 +145,11 @@ pub struct EmbeddingStats {
 pub struct SemanticHit {
     /// `meeting` ou `dictation`.
     pub kind: String,
+    /// Id da reunião ou do ditado.
     pub ref_id: i64,
     /// Cosseno entre a pergunta e o trecho (vetores normalizados).
     pub score: f32,
+    /// O trecho que casou com a pergunta.
     pub text: String,
     /// Instante do trecho no relógio da reunião (`None` para resumo/ditado).
     pub start_secs: Option<f32>,
@@ -169,28 +205,37 @@ pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
 /// Reunião apagada pela retenção: o Markdown é do app apagar.
 #[derive(Debug, Clone, Serialize)]
 pub struct PurgedMeeting {
+    /// Id da reunião apagada.
     pub id: i64,
+    /// O `.md` dela, que o app apaga em seguida.
     pub md_path: Option<String>,
 }
 
 /// O que uma passada de retenção apagou.
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct Purged {
+    /// Reuniões apagadas.
     pub meetings: Vec<PurgedMeeting>,
+    /// Quantos ditados foram apagados.
     pub dictations: usize,
 }
 
 /// Métricas de um tipo de evento (`dictation`, `meeting_block`…) num período.
 #[derive(Debug, Clone, Serialize)]
 pub struct KindMetrics {
+    /// Tipo de evento (`dictation`, `meeting_block`…).
     pub kind: String,
+    /// Eventos no período.
     pub total: i64,
+    /// Eventos que falharam.
     pub errors: i64,
     /// Duração da inferência, em segundos (só eventos com sucesso).
     pub p50_secs: Option<f64>,
+    /// Percentil 95 da duração da inferência, em segundos.
     pub p95_secs: Option<f64>,
     /// Fator de tempo real: inferência ÷ áudio (0,1 = dez vezes mais rápido).
     pub p50_rtf: Option<f64>,
+    /// Percentil 95 do fator de tempo real.
     pub p95_rtf: Option<f64>,
 }
 
@@ -601,6 +646,7 @@ impl MeetingStore {
         Ok(())
     }
 
+    /// Troca o título da reunião (o `.md` é regravado pelo app).
     pub fn rename_meeting(&self, meeting_id: i64, title: &str) -> Result<()> {
         self.conn.execute(
             "UPDATE meetings SET title = ?1 WHERE id = ?2",
@@ -789,6 +835,7 @@ impl MeetingStore {
         Ok(self.conn.last_insert_rowid())
     }
 
+    /// Apaga um ditado e os vetores dele.
     pub fn delete_dictation(&self, id: i64) -> Result<()> {
         self.conn.execute(
             "DELETE FROM embeddings WHERE kind = 'dictation' AND ref_id = ?1",

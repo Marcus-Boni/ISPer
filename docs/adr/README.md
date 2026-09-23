@@ -17,6 +17,7 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0008](0008-release-em-runners-do-github.md) | Releases compiladas em runners do GitHub, em duas variantes | aceita | 14/09/2026 |
 | [0009](0009-nada-some-sem-o-usuario-pedir.md) | Nada some sem o usuário pedir: retenção "para sempre" e Desfazer | aceita | 14/09/2026 · ampliada 23/09/2026 |
 | [0010](0010-criptografia-em-repouso-adiada.md) | Criptografia do banco em repouso adiada | aceita | 13/09/2026 |
+| [0011](0011-opcional-e-configuracao-nao-feature-flag.md) | O que é opcional vira configuração, não feature flag de compilação | aceita | 23/09/2026 |
 
 ## Como escrever um ADR
 

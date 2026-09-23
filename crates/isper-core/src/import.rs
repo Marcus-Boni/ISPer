@@ -26,30 +26,43 @@ use std::path::Path;
 /// Uma fala lida do Markdown.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ImportedSegment {
+    /// Rótulo do falante como está no arquivo ("Eu", "Participante 1"…).
     pub speaker: String,
+    /// Início da fala, em segundos da reunião.
     pub start_secs: f32,
+    /// Fim da fala (o início da seguinte, ou o fim da reunião).
     pub end_secs: f32,
+    /// Texto da fala.
     pub text: String,
 }
 
 /// Uma reunião inteira lida do Markdown.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ImportedMeeting {
+    /// Título da reunião (a primeira linha `# ...`).
     pub title: String,
     /// Como estava escrito no arquivo: `dd/mm/aaaa hh:mm`.
     pub started_at: String,
+    /// Duração declarada no cabeçalho, em segundos.
     pub duration_secs: f32,
+    /// As falas, na ordem do arquivo.
     pub segments: Vec<ImportedSegment>,
+    /// O resumo por IA, se o arquivo tiver a seção.
     pub summary: Option<String>,
+    /// Momentos marcados, em segundos da reunião.
     pub moments: Vec<f32>,
 }
 
+/// Por que um `.md` não pôde ser lido como reunião do ISPer.
 #[derive(Debug, thiserror::Error)]
 pub enum ImportError {
+    /// O arquivo não começa com um título (`# ...`).
     #[error("{0}: sem título (a primeira linha deveria ser `# ...`)")]
     NoTitle(String),
+    /// Falta a linha de data e duração que o ISPer grava.
     #[error("{0}: sem a linha de data/duração do ISPer")]
     NoHeader(String),
+    /// Nenhuma fala no formato do ISPer foi encontrada.
     #[error("{0}: nenhuma fala reconhecida")]
     NoSegments(String),
 }

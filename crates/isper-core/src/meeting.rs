@@ -29,6 +29,7 @@ pub type SegmentSink = Arc<dyn Fn(&MeetingSegment) + Send + Sync>;
 /// Um bloco de áudio que passou pelo Whisper (ou falhou), para métricas locais.
 #[derive(Debug, Clone, Copy)]
 pub struct BlockStats {
+    /// Canal de onde o bloco veio ("Eu" ou "Participantes").
     pub speaker: Speaker,
     /// Duração do áudio do bloco, em segundos.
     pub block_secs: f32,
@@ -42,7 +43,9 @@ pub type BlockSink = Arc<dyn Fn(&BlockStats) + Send + Sync>;
 /// Opções de uma gravação de reunião.
 #[derive(Clone)]
 pub struct MeetingOptions {
+    /// Idioma da fala ("pt", "en"… ou "auto").
     pub lang: String,
+    /// Glossário dado ao Whisper como `initial_prompt` (dicionário pessoal).
     pub initial_prompt: Option<String>,
     /// De onde vem o áudio dos "Participantes" (sistema inteiro ou só um app).
     pub source: LoopbackSource,
@@ -68,27 +71,38 @@ pub struct MeetingOptions {
 /// `GROUP_MAX_SECS` — sem isso, uma hora de "Participantes" vira uma parede
 /// de texto sem horário.
 pub const GROUP_MAX_SECS: f32 = 60.0;
+/// Pausa máxima entre falas do mesmo falante para ficarem no mesmo parágrafo.
 pub const GROUP_GAP_SECS: f32 = 4.0;
 
 /// Visão emprestada de um segmento — serve tanto ao resultado recém-gravado
 /// quanto ao que já está no banco.
 #[derive(Debug, Clone, Copy)]
 pub struct SegmentRef<'a> {
+    /// Rótulo do falante ("Eu", "Participantes", "Participante N" ou um nome).
     pub speaker: &'a str,
+    /// Início da fala, em segundos da reunião.
     pub start_secs: f32,
+    /// Fim da fala, em segundos da reunião.
     pub end_secs: f32,
+    /// Texto da fala.
     pub text: &'a str,
 }
 
 /// Um parágrafo: falas consecutivas do mesmo falante, dentro das regras acima.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpeechGroup {
+    /// Rótulo do falante do parágrafo.
     pub speaker: String,
+    /// Início da primeira fala do parágrafo, em segundos da reunião.
     pub start_secs: f32,
+    /// Fim da última fala do parágrafo.
     pub end_secs: f32,
+    /// As falas emendadas com espaço.
     pub text: String,
 }
 
+/// Agrupa falas em parágrafos pelas regras de [`GROUP_GAP_SECS`] e
+/// [`GROUP_MAX_SECS`] — a mesma regra do `.md`, do DOCX e da Biblioteca.
 pub fn group_speech<'a>(segments: impl IntoIterator<Item = SegmentRef<'a>>) -> Vec<SpeechGroup> {
     let mut groups: Vec<SpeechGroup> = Vec::new();
     for s in segments {
@@ -136,8 +150,10 @@ const PARTIAL_MIN_SECS: f32 = 1.0;
 /// volta aos blocos longos ([`ChunkOptions::relaxed`]) até a fila esvaziar.
 const BACKLOG_RELAX: usize = 2;
 
+/// Quem falou um trecho da reunião.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Speaker {
+    /// O canal do microfone: a pessoa que está gravando.
     Me,
     /// Alguém do loopback, sem identificação individual.
     Others,
@@ -149,6 +165,9 @@ pub enum Speaker {
 }
 
 impl Speaker {
+    /// Rótulo gravado no banco e no `.md` ("Eu", "Participantes",
+    /// "Participante N"). É dado, não texto de interface: fica em pt-BR em
+    /// qualquer idioma, e a interface traduz na exibição.
     pub fn label(&self) -> String {
         match self {
             Speaker::Me => "Eu".into(),
@@ -158,17 +177,25 @@ impl Speaker {
     }
 }
 
+/// Uma fala transcrita da reunião.
 #[derive(Debug, Clone)]
 pub struct MeetingSegment {
+    /// Quem falou.
     pub speaker: Speaker,
+    /// Início, em segundos do relógio da reunião.
     pub start_secs: f32,
+    /// Fim, em segundos do relógio da reunião.
     pub end_secs: f32,
+    /// Texto da fala.
     pub text: String,
 }
 
+/// O que uma reunião encerrada devolve: a transcrição ao vivo e o áudio dos
+/// dois canais em disco, para o passe final e a diarização.
 pub struct MeetingResult {
     /// Segmentos dos dois canais, em ordem cronológica (transcrição AO VIVO).
     pub segments: Vec<MeetingSegment>,
+    /// Duração da reunião, em segundos.
     pub duration_secs: f32,
     /// Áudio dos participantes (16 kHz mono), no RELÓGIO DA REUNIÃO — os
     /// trechos sem entrega viram silêncio, de modo que a posição no arquivo é
@@ -206,6 +233,7 @@ impl ChannelAudio {
         }
     }
 
+    /// O canal não tem nenhuma amostra gravada.
     pub fn is_empty(&self) -> bool {
         self.samples == 0
     }
@@ -433,6 +461,8 @@ impl MeetingResult {
     }
 }
 
+/// Alça de uma reunião em gravação: [`MeetingHandle::stop`] encerra e devolve
+/// o [`MeetingResult`].
 pub struct MeetingHandle {
     stop_txs: Vec<Sender<()>>,
     done_rx: Receiver<Result<MeetingResult>>,
@@ -452,6 +482,7 @@ impl MeetingHandle {
             .map_err(|_| IsperError::Audio("worker da reunião encerrou inesperadamente".into()))?
     }
 
+    /// Tempo desde o início da gravação — o relógio da reunião.
     pub fn elapsed(&self) -> Duration {
         self.started.elapsed()
     }

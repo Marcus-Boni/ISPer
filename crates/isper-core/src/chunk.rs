@@ -89,7 +89,9 @@ pub enum CutReason {
 /// por quê. `None` = ainda não é hora.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Cut {
+    /// Índice do corte, em amostras intercaladas (múltiplo de `channels`).
     pub at: usize,
+    /// Por que o corte aconteceu ali.
     pub reason: CutReason,
 }
 
