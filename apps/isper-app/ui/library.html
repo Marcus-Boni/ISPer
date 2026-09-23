@@ -150,21 +150,21 @@
 <body class="atmos">
 <header class="bar">
   <div class="brand">ISPer<span>.</span></div>
-  <span class="crumb">Biblioteca</span>
+  <span class="crumb" data-i18n="library.top.biblioteca">Biblioteca</span>
   <div class="tabs" id="tabs">
-    <button class="tab on" data-tab="meetings">Reuniões</button>
-    <button class="tab" data-tab="dictations">Ditados</button>
+    <button class="tab on" data-tab="meetings" data-i18n="library.top.reunioes">Reuniões</button>
+    <button class="tab" data-tab="dictations" data-i18n="library.top.ditados">Ditados</button>
   </div>
   <div class="search" id="searchbox">
-    <input id="search" class="field" type="search" placeholder="buscar no título, resumo e transcript…" autocomplete="off">
-    <button class="clear" id="clear" title="limpar" aria-label="limpar busca">×</button>
+    <input id="search" class="field" type="search" placeholder="buscar no título, resumo e transcript…" autocomplete="off" data-i18n-attr="placeholder:library.top.buscar-titulo-resumo-transcript.placeholder">
+    <button class="clear" id="clear" title="limpar" aria-label="limpar busca" data-i18n-attr="title:library.top.limpar.title,aria-label:library.top.limpar-busca.aria">×</button>
   </div>
-  <button class="btn btn-ghost btn-sm" id="semantic" aria-pressed="false" hidden title="busca pelo sentido (embeddings): 'quando falamos do orçamento?' acha o trecho mesmo sem a palavra exata">
+  <button class="btn btn-ghost btn-sm" id="semantic" aria-pressed="false" hidden title="busca pelo sentido (embeddings): 'quando falamos do orçamento?' acha o trecho mesmo sem a palavra exata" data-i18n-attr="title:library.top.busca-pelo-sentido-embeddings-quando.title">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/><path d="M5 7h4M7 5v4" opacity=".7"/></svg>
-    Semântica
+    <span data-i18n="library.semantic">Semântica</span>
   </button>
   <span class="count num" id="count"></span>
-  <button class="btn btn-ghost" id="openfolder">Abrir pasta</button>
+  <button class="btn btn-ghost" id="openfolder" data-i18n="library.top.openfolder">Abrir pasta</button>
 </header>
 <main id="main">
   <div id="list"></div>
@@ -175,7 +175,8 @@
   const { invoke } = window.__TAURI__.core;
   const { listen } = window.__TAURI__.event;
   const $ = (id) => document.getElementById(id);
-  const { el, toast, fmtClock, plural } = UI;
+  const { el, toast, fmtClock } = UI;
+  const speaker = UI.speaker;
 
   // Ícones da tela (mesmo desenho dos do Copilot: 16x16, currentColor).
   const GLYPH_NS = 'http://www.w3.org/2000/svg';
@@ -215,8 +216,8 @@
     return p;
   }
   async function copyText(text, btn, label) {
-    try { await navigator.clipboard.writeText(text); UI.flash(btn, label || 'copiado ✓'); }
-    catch (_) { toast('não consegui copiar', 'err'); }
+    try { await navigator.clipboard.writeText(text); UI.flash(btn, label || t('common.copied')); }
+    catch (_) { toast(t('library.copy-failed'), 'err'); }
   }
   const pct = (score) => Math.round(Math.max(0, Math.min(1, score)) * 100) + '%';
 
@@ -271,11 +272,11 @@
     const m = el('div', 'm');
     m.appendChild(el('span', '', r.started_at));
     m.appendChild(el('span', 'num', fmtClock(r.duration_secs)));
-    if (extra && extra.score != null) { const s = el('span', 'badge score', pct(extra.score)); s.title = 'similaridade entre a sua pergunta e o melhor trecho'; m.appendChild(s); }
-    if (r.participants != null) m.appendChild(el('span', 'badge', plural(r.participants, 'participante', 'participantes')));
-    if (r.has_summary) m.appendChild(el('span', 'badge ok', 'resumo IA'));
-    if (r.moments) { const b = el('span', 'badge warn'); b.append(mkGlyph('star'), document.createTextNode(String(r.moments))); b.title = plural(r.moments, 'momento marcado', 'momentos marcados'); m.appendChild(b); }
-    if (r.decisions) { const b = el('span', 'chip chip-ok', String(r.decisions)); b.title = plural(r.decisions, 'decisão validada no Copilot', 'decisões validadas no Copilot'); m.appendChild(b); }
+    if (extra && extra.score != null) { const s = el('span', 'badge score', pct(extra.score)); s.title = t('library.score-title'); m.appendChild(s); }
+    if (r.participants != null) m.appendChild(el('span', 'badge', t('library.participants', { n: r.participants })));
+    if (r.has_summary) m.appendChild(el('span', 'badge ok', t('library.ai-summary')));
+    if (r.moments) { const b = el('span', 'badge warn'); b.append(mkGlyph('star'), document.createTextNode(String(r.moments))); b.title = t('library.moments-title', { n: r.moments }); m.appendChild(b); }
+    if (r.decisions) { const b = el('span', 'chip chip-ok', String(r.decisions)); b.title = t('library.decisions-title', { n: r.decisions }); m.appendChild(b); }
     it.appendChild(m);
     if (extra && extra.snippet) {
       const snip = el('div', 'snip');
@@ -297,14 +298,14 @@
         rows = hits.map(h => ({ id: h.id, title: h.title, started_at: h.started_at, duration_secs: h.duration_secs, participants: null, has_summary: false, moments: 0 }));
       } else rows = await invoke('list_meetings', { query: q || null });
     }
-    catch (e) { toast('erro: ' + e, 'err'); return; }
-    $('count').textContent = rows.length ? plural(rows.length, 'reunião', 'reuniões') : '';
+    catch (e) { toast(t('common.error', { e }), 'err'); return; }
+    $('count').textContent = rows.length ? t('library.count.meetings', { n: rows.length }) : '';
     const signature = (hits ? 'sem|' : 'lit|') + rows.map(r => r.id + ':' + r.title + ':' + r.has_summary + ':' + (selected === r.id)).join('|') + '|' + q;
     if (list.dataset.sig === signature) return;
     list.dataset.sig = signature;
     const animate = !silent;
     list.replaceChildren();
-    if (!rows.length) { list.appendChild(placeholder(q ? (hits ? 'nada parecido com "' + q + '" — indexe o histórico em Configurações → Inteligência' : 'nada encontrado para "' + q + '"') : 'nenhuma reunião ainda — grave uma pela tela Início ou pela bandeja')); return; }
+    if (!rows.length) { list.appendChild(placeholder(q ? (hits ? t('library.empty.semantic', { q }) : t('library.empty.meetings-query', { q })) : t('library.empty.meetings'))); return; }
     rows.forEach((r, i) => {
       const hit = hits ? hits[i] : null;
       const it = meetingItem(r, hit);
@@ -326,13 +327,13 @@
   async function showMeeting(id, opts = {}) {
     const d = $('detail');
     let det;
-    try { det = await invoke('get_meeting', { id }); } catch (e) { toast('erro: ' + e, 'err'); return; }
+    try { det = await invoke('get_meeting', { id }); } catch (e) { toast(t('common.error', { e }), 'err'); return; }
     const keepScroll = opts.keepScroll ? d.scrollTop : null;
     let jumpTo = null;   // elemento do trecho pedido pela busca semântica
     UI.swap(d, () => {
       d.replaceChildren();
       d.classList.remove('filtering');
-      if (!det) { d.appendChild(placeholder('reunião não encontrada')); return; }
+      if (!det) { d.appendChild(placeholder(t('library.not-found'))); return; }
       const m = det.meeting;
       const groups = groupSpeech(det.segments);
       // Cores por ordem de aparição — nomes personalizados continuam coloridos.
@@ -343,21 +344,21 @@
         if (i < 0) { order.push(sp); i = order.length - 1; }
         return 'p' + (Math.min(i, 4) + 1);
       };
-      const transcriptText = () => groups.map(g => '[' + fmtClock(g.start_secs) + '] ' + g.speaker + ': ' + g.text).join('\n');
+      const transcriptText = () => groups.map(g => '[' + fmtClock(g.start_secs) + '] ' + speaker(g.speaker) + ': ' + g.text).join('\n');
 
       const head = el('div', 'dhead');
       const h2 = el('h2', '', m.title);
-      h2.title = 'clique para renomear';
+      h2.title = t('library.rename-title');
       h2.addEventListener('click', () => {
         const input = el('input'); input.value = m.title;
         head.replaceChild(input, h2); input.focus(); input.select();
         let done = false;
         const commit = async () => {
           if (done) return; done = true;
-          const t = input.value.trim();
-          if (t && t !== m.title) {
-            try { await invoke('rename_meeting', { id, title: t }); toast('renomeada — o .md acompanhou', 'ok'); }
-            catch (e) { toast('erro: ' + e, 'err'); }
+          const title = input.value.trim();
+          if (title && title !== m.title) {
+            try { await invoke('rename_meeting', { id, title }); toast(t('library.renamed'), 'ok'); }
+            catch (e) { toast(t('common.error', { e }), 'err'); }
           }
           await loadMeetings(true); showMeeting(id, { keepScroll: true });
         };
@@ -366,49 +367,49 @@
       });
       head.appendChild(h2);
       d.appendChild(head);
-      d.appendChild(el('div', 'meta', m.started_at + ' · ' + fmtClock(m.duration_secs) + ' · ' + m.segments + ' segmentos · ' + plural(m.participants, 'participante', 'participantes') + ' · clique num nome de falante para renomeá-lo'));
+      d.appendChild(el('div', 'meta', t('library.meta', { at: m.started_at, dur: fmtClock(m.duration_secs), segs: t('library.segments', { n: m.segments }), people: t('library.participants', { n: m.participants }) })));
 
       const actions = el('div', 'actions');
-      const bOpen = el('button', 'btn', 'Abrir .md'); bOpen.disabled = !m.md_path;
-      bOpen.addEventListener('click', () => invoke('open_meeting_file', { id }).catch(e => toast('erro: ' + e, 'err')));
+      const bOpen = el('button', 'btn', t('library.open-md')); bOpen.disabled = !m.md_path;
+      bOpen.addEventListener('click', () => invoke('open_meeting_file', { id }).catch(e => toast(t('common.error', { e }), 'err')));
       actions.appendChild(bOpen);
       if (det.summary) {
-        const bSum = el('button', 'btn btn-ghost', 'Copiar resumo');
-        bSum.addEventListener('click', () => copyText(det.summary, bSum, 'resumo copiado ✓'));
+        const bSum = el('button', 'btn btn-ghost', t('library.copy-summary'));
+        bSum.addEventListener('click', () => copyText(det.summary, bSum, t('library.summary-copied')));
         actions.appendChild(bSum);
       }
-      const bTx = el('button', 'btn btn-ghost', 'Copiar transcript');
-      bTx.addEventListener('click', () => copyText(transcriptText(), bTx, 'transcript copiado ✓'));
+      const bTx = el('button', 'btn btn-ghost', t('library.copy-transcript'));
+      bTx.addEventListener('click', () => copyText(transcriptText(), bTx, t('library.transcript-copied')));
       actions.appendChild(bTx);
-      actions.appendChild(el('span', 'sep', 'Exportar:'));
+      actions.appendChild(el('span', 'sep', t('library.export')));
       for (const fmt of ['srt', 'docx']) {
         const b = el('button', 'btn btn-ghost btn-sm', fmt.toUpperCase());
-        b.title = fmt === 'srt' ? 'legendas com horário (SRT), ao lado do .md' : 'documento Word (DOCX), ao lado do .md';
+        b.title = fmt === 'srt' ? t('library.export.srt') : t('library.export.docx');
         b.addEventListener('click', async () => {
           UI.busy(b, true);
-          try { const path = await invoke('export_meeting', { id, format: fmt }); UI.busy(b, false); UI.flash(b, 'salvo ✓'); toast('exportado e aberto: ' + path, 'ok', 4000); }
-          catch (e) { UI.busy(b, false); toast('erro ao exportar: ' + e, 'err'); }
+          try { const path = await invoke('export_meeting', { id, format: fmt }); UI.busy(b, false); UI.flash(b, t('common.saved')); toast(t('library.exported', { path }), 'ok', 4000); }
+          catch (e) { UI.busy(b, false); toast(t('library.export-failed', { e }), 'err'); }
         });
         actions.appendChild(b);
       }
-      const bDel = el('button', 'btn btn-danger ml-auto', 'Excluir do histórico');
-      bDel.title = 'o arquivo .md continua na pasta';
+      const bDel = el('button', 'btn btn-danger ml-auto', t('library.delete'));
+      bDel.title = t('library.delete-title');
       // Exclui na hora e oferece Desfazer (o app só apaga de fato depois).
       bDel.addEventListener('click', async () => {
         let sched;
         try { sched = await invoke('delete_meeting', { id }); }
-        catch (e) { toast('erro: ' + e, 'err'); return; }
+        catch (e) { toast(t('common.error', { e }), 'err'); return; }
         selected = null;
-        UI.swap($('detail'), () => $('detail').replaceChildren(placeholder('Selecione uma reunião à esquerda.')));
+        UI.swap($('detail'), () => $('detail').replaceChildren(placeholder(t('library.select'))));
         $('list').dataset.sig = '';
         loadMeetings(true);
-        UI.undoable('Reunião excluída do histórico — o arquivo .md continua na pasta', sched, async (ok) => {
-          if (!ok) { toast('não deu tempo: a reunião já foi excluída', 'err'); return; }
+        UI.undoable(t('library.deleted'), sched, async (ok) => {
+          if (!ok) { toast(t('library.too-late-meeting'), 'err'); return; }
           selected = id;
           $('list').dataset.sig = '';
           await loadMeetings(true);
           showMeeting(id);
-          toast('reunião restaurada', 'ok');
+          toast(t('library.restored'), 'ok');
         });
       });
       actions.appendChild(bDel);
@@ -418,13 +419,13 @@
       const bar = el('div', 'dsearch');
       const box = el('div', 'search');
       const input = el('input', 'field'); input.type = 'search'; input.id = 'msearch'; input.autocomplete = 'off';
-      input.placeholder = 'buscar nesta reunião — assuntos, nomes, decisões…';
-      const clear = el('button', 'clear', '×'); clear.title = 'limpar'; clear.setAttribute('aria-label', 'limpar busca na reunião');
+      input.placeholder = t('library.msearch.placeholder'); input.title = t('library.msearch.hint');
+      const clear = el('button', 'clear', '×'); clear.title = t('library.top.limpar.title'); clear.setAttribute('aria-label', t('library.msearch.clear-aria'));
       box.append(input, clear);
       const count = el('span', 'count num');
-      const prev = el('button', 'btn btn-ghost btn-icon', '↑'); prev.title = 'anterior (Shift+Enter)'; prev.setAttribute('aria-label', 'ocorrência anterior');
-      const next = el('button', 'btn btn-ghost btn-icon', '↓'); next.title = 'próxima (Enter)'; next.setAttribute('aria-label', 'próxima ocorrência');
-      const filter = el('button', 'btn btn-sm filter', 'Só trechos'); filter.setAttribute('aria-pressed', 'false'); filter.title = 'mostrar só os trechos que contêm o termo';
+      const prev = el('button', 'btn btn-ghost btn-icon', '↑'); prev.title = t('library.msearch.prev-title'); prev.setAttribute('aria-label', t('library.msearch.prev-aria'));
+      const next = el('button', 'btn btn-ghost btn-icon', '↓'); next.title = t('library.msearch.next-title'); next.setAttribute('aria-label', t('library.msearch.next-aria'));
+      const filter = el('button', 'btn btn-sm filter', t('library.msearch.filter')); filter.setAttribute('aria-pressed', 'false'); filter.title = t('library.msearch.filter-title');
       const hint = el('kbd', '', 'Ctrl+F');
       bar.append(box, count, prev, next, filter, hint);
       d.appendChild(bar);
@@ -432,7 +433,7 @@
       let sumbox = null;
       if (det.summary) {
         sumbox = el('div', 'sumbox');
-        sumbox.appendChild(el('h3', 'eyebrow', 'Resumo (IA)'));
+        sumbox.appendChild(el('h3', 'eyebrow', t('library.summary')));
         const sum = el('div', 'summary'); sum.dataset.raw = det.summary; sum.textContent = det.summary;
         sumbox.appendChild(sum);
         d.appendChild(sumbox);
@@ -450,7 +451,7 @@
       // horário da fala que deu origem a cada uma (clique para ir até lá).
       const decisions = det.decisions || [];
       if (decisions.length) {
-        const DEC_LABEL = { decision: 'Decisão', action: 'Ação', risk: 'Risco', question: 'Pergunta' };
+        const DEC_LABEL = { decision: t('library.dec.decision'), action: t('library.dec.action'), risk: t('library.dec.risk'), question: t('library.dec.question') };
         // Mesmo desenho dos ícones do Copilot: 16x16, traço em currentColor.
         const NS = 'http://www.w3.org/2000/svg';
         const PATHS = {
@@ -481,28 +482,28 @@
           el2.append(mkIcon(name), document.createTextNode(text));
           return el2;
         };
-        d.appendChild(el('h3', 'eyebrow', 'Decisões e alertas (Copilot)'));
+        d.appendChild(el('h3', 'eyebrow', t('library.dec.heading')));
         const decBox = el('div', 'decisions');
         for (const dec of decisions) {
           const card = el('div', 'dec dec-' + dec.kind);
           const top = el('div', 'dec-top');
           top.appendChild(el('span', 'dec-kind dk-' + dec.kind, DEC_LABEL[dec.kind] || dec.kind));
-          if (dec.urgency === 'high') top.appendChild(pill('alert', 'urgente', 'dec-urg'));
+          if (dec.urgency === 'high') top.appendChild(pill('alert', t('library.dec.urgent'), 'dec-urg'));
           const at = el('button', 'dec-at', fmtClock(dec.at_secs));
-          at.title = 'ir para este trecho do transcript';
+          at.title = t('library.dec.goto');
           at.addEventListener('click', () => flashTo(segEls.get(groupAt(dec.at_secs))));
           top.appendChild(at);
           card.appendChild(top);
           card.appendChild(el('div', 'dec-title', dec.title));
           if (dec.description) card.appendChild(el('div', 'dec-desc', dec.description));
           const noDue = dec.kind === 'action'
-            && (!dec.due_date || /sem prazo|n[ãa]o definido/i.test(dec.due_date));
+            && (!dec.due_date || /sem prazo|n[ãa]o definido|no deadline|not set|tbd/i.test(dec.due_date));
           if (dec.owner || dec.kind === 'action') {
             const meta = el('div', 'dec-meta');
             if (dec.owner) meta.appendChild(pill('person', dec.owner, 'dec-pill'));
             if (dec.kind === 'action') {
               meta.appendChild(pill(noDue ? 'alert' : 'calendar',
-                noDue ? 'prazo em aberto' : dec.due_date,
+                noDue ? t('library.dec.no-due') : dec.due_date,
                 'dec-pill' + (noDue ? ' alert' : '')));
             }
             card.appendChild(meta);
@@ -512,37 +513,38 @@
         d.appendChild(decBox);
       }
       if (moments.length) {
-        d.appendChild(el('h3', 'eyebrow', 'Momentos marcados'));
+        d.appendChild(el('h3', 'eyebrow', t('library.moments')));
         const box = el('div', 'moments');
         for (const at of moments) {
           const g = groupAt(at);
           const chip = el('button', 'moment');
           chip.append(mkGlyph('star'), el('span', '', fmtClock(at)));
           if (g) chip.appendChild(el('span', 'ex', g.text));
-          chip.title = 'ir para este trecho';
+          chip.title = t('library.moment-goto');
           chip.addEventListener('click', () => flashTo(g && segEls.get(g)));
           box.appendChild(chip);
         }
         d.appendChild(box);
       }
-      d.appendChild(el('h3', 'eyebrow', 'Transcript'));
+      d.appendChild(el('h3', 'eyebrow', t('library.transcript')));
 
       // Renomear falante: clique no nome → input; Enter aplica em toda a reunião.
       const renameSpeaker = (spEl, from) => {
-        const input = el('input'); input.value = from; input.setAttribute('aria-label', 'novo nome do falante');
+        const shown = speaker(from);
+        const input = el('input'); input.value = shown; input.setAttribute('aria-label', t('library.speaker.aria'));
         spEl.replaceChildren(input); input.focus(); input.select();
         let done = false;
-        const restore = () => { spEl.textContent = from; };
+        const restore = () => { spEl.textContent = shown; };
         const commit = async () => {
           if (done) return; done = true;
           const to = input.value.trim();
-          if (!to || to === from) { restore(); return; }
+          if (!to || to === from || to === shown) { restore(); return; }
           try {
             const n = await invoke('rename_speaker', { id, from, to });
-            toast(plural(n, 'fala renomeada', 'falas renomeadas') + ' para "' + to + '" — o .md acompanhou', 'ok');
+            toast(t('library.speaker.renamed', { n, to }), 'ok');
             await loadMeetings(true);
             showMeeting(id, { keepScroll: true });
-          } catch (e) { toast('erro: ' + e, 'err'); restore(); }
+          } catch (e) { toast(t('common.error', { e }), 'err'); restore(); }
         };
         input.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') { done = true; restore(); } });
         input.addEventListener('blur', commit);
@@ -554,15 +556,15 @@
         segEls.set(g, seg);
         if (n < 14) { seg.classList.add('reveal'); seg.style.setProperty('--i', String(n)); }
         seg.appendChild(el('div', 'ts', fmtClock(g.start_secs)));
-        const sp = el('div', 'sp ' + spClass(g.speaker), g.speaker);
-        sp.title = 'clique para renomear "' + g.speaker + '" em toda a reunião';
+        const sp = el('div', 'sp ' + spClass(g.speaker), speaker(g.speaker));
+        sp.title = t('library.speaker.title', { name: speaker(g.speaker) });
         sp.addEventListener('click', () => { if (!sp.querySelector('input')) renameSpeaker(sp, g.speaker); });
         seg.appendChild(sp);
         const tx = el('div', 'tx', g.text); tx.dataset.raw = g.text;
         seg.appendChild(tx);
         d.appendChild(seg);
       });
-      if (!det.segments.length) d.appendChild(placeholder('sem transcript'));
+      if (!det.segments.length) d.appendChild(placeholder(t('library.no-transcript')));
       const note = el('p', 'filtered-note'); note.hidden = true; d.appendChild(note);
       // Busca semântica: o trecho que casou é a parada da rolagem.
       if (opts.at != null) { const g = groupAt(opts.at); jumpTo = g && segEls.get(g); }
@@ -575,7 +577,7 @@
         cur = (i + marks.length) % marks.length;
         marks[cur].classList.add('cur');
         marks[cur].scrollIntoView({ block: 'center', behavior: UI.reduce() ? 'auto' : 'smooth' });
-        count.textContent = (cur + 1) + ' de ' + marks.length;
+        count.textContent = t('library.msearch.count', { cur: cur + 1, total: marks.length });
       };
       const apply = () => {
         const q = input.value.trim();
@@ -595,13 +597,13 @@
         filter.disabled = !q;
         count.classList.toggle('none', !!q && !marks.length);
         if (!q) { count.textContent = ''; note.hidden = true; return; }
-        if (!marks.length) { count.textContent = 'nada aqui'; note.hidden = true; return; }
+        if (!marks.length) { count.textContent = t('library.msearch.none'); note.hidden = true; return; }
         setCur(0);
         note.hidden = !(filtering);
-        note.textContent = plural(hitSegs, 'trecho contém', 'trechos contêm') + ' "' + q + '" — clique em "Só trechos" de novo para ver a reunião inteira.';
+        note.textContent = t('library.msearch.note', { n: hitSegs, q });
       };
-      let t = null;
-      input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(apply, 150); });
+      let debounce = null;
+      input.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(apply, 150); });
       input.addEventListener('keydown', (ev) => {
         if (ev.key === 'Enter') { ev.preventDefault(); setCur(cur + (ev.shiftKey ? -1 : 1)); }
         else if (ev.key === 'Escape') { ev.stopPropagation(); if (input.value) { input.value = ''; apply(); } else input.blur(); }
@@ -631,20 +633,20 @@
     const row = el('div', 'dict');
     row.appendChild(el('div', 'at', r.at));
     const tx = el('div', 'tx'); tx.dataset.raw = r.text; paint(tx, q);
-    if (extra && extra.score != null) { const s = el('span', 'badge score', pct(extra.score)); s.title = 'similaridade com a sua pergunta'; tx.appendChild(s); }
-    if (r.raw_text) { const c = el('span', 'chip chip-info', 'IA'); c.title = 'Original do Whisper: ' + r.raw_text; tx.appendChild(c); }
+    if (extra && extra.score != null) { const s = el('span', 'badge score', pct(extra.score)); s.title = t('library.score-title-dict'); tx.appendChild(s); }
+    if (r.raw_text) { const c = el('span', 'chip chip-info', t('library.dict.ai')); c.title = t('library.dict.ai-title', { raw: r.raw_text }); tx.appendChild(c); }
     row.appendChild(tx);
-    const bCopy = el('button', 'btn btn-sm btn-ghost', 'copiar');
+    const bCopy = el('button', 'btn btn-sm btn-ghost', t('library.dict.copy'));
     bCopy.addEventListener('click', () => copyText(r.text, bCopy));
-    const bDel = el('button', 'btn btn-sm btn-danger', '×'); bDel.title = 'remover do histórico';
+    const bDel = el('button', 'btn btn-sm btn-danger', '×'); bDel.title = t('library.dict.remove'); bDel.setAttribute('aria-label', t('library.dict.remove'));
     bDel.addEventListener('click', async () => {
       let sched;
       try { sched = await invoke('delete_dictation', { id: r.id }); }
-      catch (e) { toast('erro: ' + e, 'err'); return; }
+      catch (e) { toast(t('common.error', { e }), 'err'); return; }
       $('list').dataset.sig = '';
       loadDictations(true);
-      UI.undoable('Ditado removido do histórico', sched, (ok) => {
-        if (!ok) { toast('não deu tempo: o ditado já foi removido', 'err'); return; }
+      UI.undoable(t('library.dict.removed'), sched, (ok) => {
+        if (!ok) { toast(t('library.dict.too-late'), 'err'); return; }
         $('list').dataset.sig = '';
         loadDictations(true);
       });
@@ -664,14 +666,14 @@
         rows = hits.map(h => ({ id: h.id, at: h.at, text: h.text, raw_text: null }));
       } else rows = await invoke('list_dictations', { query: q || null });
     }
-    catch (e) { toast('erro: ' + e, 'err'); return; }
-    $('count').textContent = rows.length ? plural(rows.length, 'ditado', 'ditados') : '';
+    catch (e) { toast(t('common.error', { e }), 'err'); return; }
+    $('count').textContent = rows.length ? t('library.count.dictations', { n: rows.length }) : '';
     const signature = (hits ? 'sem|' : 'lit|') + rows.map(r => r.id).join('|') + '|' + q;
     if (list.dataset.sig === signature) return;
     list.dataset.sig = signature;
     list.replaceChildren();
-    if (!rows.length) { list.appendChild(placeholder(q ? (hits ? 'nada parecido com "' + q + '" — indexe o histórico em Configurações → Inteligência' : 'nada encontrado') : 'nenhum ditado ainda')); return; }
-    list.appendChild(el('div', 'dict-note', '"copiar" reutiliza um texto ditado; "×" remove do histórico. O selo "IA" marca ditados polidos — passe o mouse para ver o original.'));
+    if (!rows.length) { list.appendChild(placeholder(q ? (hits ? t('library.empty.semantic', { q }) : t('library.empty.dictations-query')) : t('library.empty.dictations'))); return; }
+    list.appendChild(el('div', 'dict-note', t('library.dict.note')));
     rows.forEach((r, i) => list.appendChild(dictationRow(r, hits ? '' : q.trim(), hits ? hits[i] : null)));
     if (!silent) UI.stagger(list.children, 10);
   }
@@ -679,13 +681,16 @@
   // ----------------------------------------------------------------- ui
   function refresh(silent = false) { if (tab === 'meetings') loadMeetings(silent); else loadDictations(silent); }
   const tabsCtl = UI.tabs($('tabs'), (name) => setTab(name));
-  function setTab(t) {
-    tab = t;
-    $('main').classList.toggle('dictations', t === 'dictations');
-    $('search').placeholder = t === 'meetings' ? 'buscar no título, resumo e transcript…' : 'buscar nos ditados…';
+  // Placeholder da busca conforme a aba e o modo (texto ou sentido).
+  const searchPlaceholder = () => (semantic ? t('library.search.semantic')
+    : tab === 'meetings' ? t('library.top.buscar-titulo-resumo-transcript.placeholder') : t('library.search.dictations'));
+  function setTab(name) {
+    tab = name;
+    $('main').classList.toggle('dictations', name === 'dictations');
+    $('search').placeholder = searchPlaceholder();
     $('list').dataset.sig = '';
     $('list').replaceChildren();
-    if (t === 'meetings') UI.swap($('detail'), () => $('detail').replaceChildren(placeholder('Selecione uma reunião à esquerda.')));
+    if (name === 'meetings') UI.swap($('detail'), () => $('detail').replaceChildren(placeholder(t('library.select'))));
     refresh();
   }
   let searchTimer = null;
@@ -698,7 +703,7 @@
   $('semantic').addEventListener('click', () => {
     semantic = !semantic;
     $('semantic').setAttribute('aria-pressed', String(semantic));
-    $('search').placeholder = semantic ? 'pergunte pelo sentido — "quando decidimos o prazo do MRP?"' : (tab === 'meetings' ? 'buscar no título, resumo e transcript…' : 'buscar nos ditados…');
+    $('search').placeholder = searchPlaceholder();
     $('list').dataset.sig = '';
     refresh(true);
     $('search').focus();
@@ -711,7 +716,7 @@
     $('semantic').hidden = !semanticAvailable;
     if (!semanticAvailable && semantic) { semantic = false; $('semantic').setAttribute('aria-pressed', 'false'); }
   }
-  $('openfolder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => toast('erro: ' + e, 'err')));
+  $('openfolder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => toast(t('common.error', { e }), 'err')));
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(true); });
   document.addEventListener('keydown', (ev) => {
     const inField = ['INPUT', 'TEXTAREA'].includes(document.activeElement && document.activeElement.tagName);
@@ -741,7 +746,17 @@
   listen('isper-status', () => { checkSemantic(); refresh(true); });
   listen('isper-state', (e) => { if (e.payload.state === 'done' && tab === 'dictations') setTimeout(() => refresh(true), 300); });
 
-  $('detail').replaceChildren(placeholder('Selecione uma reunião à esquerda.'));
+  document.addEventListener('isper-i18n', () => {
+    $('search').placeholder = searchPlaceholder();
+    $('list').dataset.sig = '';
+    refresh(true);
+    if (tab === 'meetings') {
+      if (selected != null) showMeeting(selected, { keepScroll: true });
+      else $('detail').replaceChildren(placeholder(t('library.select')));
+    }
+  });
+
+  $('detail').replaceChildren(placeholder(t('library.select')));
   checkSemantic();
   refresh();
   selectPending();

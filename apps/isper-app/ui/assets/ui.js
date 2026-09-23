@@ -98,9 +98,12 @@
     setTimeout(() => { if (!done) { done = true; removeEventListener('keydown', onKey, true); } }, ms);
   }
 
+  // Idioma da interface para números e datas (pt-BR antes do i18n.js carregar).
+  const uiLang = () => (window.I18N && window.I18N.lang) || 'pt-BR';
+
   // -------------------------------------------------------------- count-up
   function countUp(node, to, opts = {}) {
-    const { dur = 720, format = (n) => n.toLocaleString('pt-BR') } = opts;
+    const { dur = 720, format = (n) => n.toLocaleString(uiLang()) } = opts;
     const from = Number(node.dataset.value || 0);
     node.dataset.value = String(to);
     if (reduce() || from === to || !isFinite(to)) { node.textContent = format(to); return; }
@@ -209,11 +212,19 @@
   const fmtDur = (secs) => {
     if (secs < 60) return Math.round(secs) + ' s';
     if (secs < 3600) return Math.round(secs / 60) + ' min';
-    return (secs / 3600).toFixed(1).replace('.', ',') + ' h';
+    return (secs / 3600).toLocaleString(uiLang(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' h';
   };
   const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
   // Rótulo de atalho vindo do app ("Ctrl+Alt+Espaço") no idioma da interface.
+  // Rótulo de falante é dado (fica em pt-BR no banco); só a exibição traduz.
+  const tt = (k, v, f) => (window.I18N ? window.I18N.t(k, v, f) : f);
+  const speaker = (label) => {
+    if (label === 'Eu') return tt('speaker.me', null, 'Eu');
+    if (label === 'Participantes') return tt('speaker.others', null, 'Participantes');
+    const m = String(label || '').match(/^Participante (\d+)$/);
+    return m ? tt('speaker.participant', { n: Number(m[1]) }, label) : (label || tt('speaker.others', null, 'Participantes'));
+  };
   const keyLabel = (label) => String(label || '').replace(/Espaço/g, window.I18N ? window.I18N.t('keys.space', null, 'Espaço') : 'Espaço');
 
-  window.UI = { el, toast, undoable, keyLabel, countUp, stagger, busy, flash, tabs, swap, skeleton, fmtClock, fmtDur, plural, reduce };
+  window.UI = { el, toast, undoable, keyLabel, speaker, countUp, stagger, busy, flash, tabs, swap, skeleton, fmtClock, fmtDur, plural, reduce, uiLang };
 })();
