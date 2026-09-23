@@ -33,3 +33,7 @@ Sem provedor configurado, ditado, reuniões, Biblioteca, exportações e transcr
 ## Insights ao vivo
 
 Quando ativados, os insights analisam janelas recentes da transcrição durante a reunião e consolidam pendências, promessas, decisões e perguntas abertas.
+
+## Copilot
+
+O mesmo provedor alimenta o Copilot, que durante a reunião transforma a conversa em cards de decisão, ação, risco e pergunta. Diferente dos insights, ele analisa toda reunião gravada quando há um provedor configurado — veja [Memória, privacidade e custo do Copilot](/docs/copilot/memoria-privacidade-e-custo/).
