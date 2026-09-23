@@ -1,25 +1,28 @@
 {
   "repository": "Marcus-Boni/ISPer",
-  "tag": "v0.17.1",
-  "version": "0.17.1",
+  "tag": "v0.18.0",
+  "version": "0.18.0",
   "channel": "stable",
-  "publishedAt": "2026-09-21T13:23:01Z",
-  "fetchedAt": "2026-09-21T13:34:14.413Z",
-  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.17.1",
+  "publishedAt": "2026-09-23T02:09:36Z",
+  "fetchedAt": "2026-09-23T02:13:06.836Z",
+  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.18.0",
   "notes": [
-    "Corrigido — O instalador da 0.17.0 fechava o app na primeira transcrição (ditado ou reunião) em CPUs sem AVX-512, com instrução ilegal (0xc000001d)."
+    "Adicionado — ISPer Copilot — decisões ao vivo na reunião. Uma janela nova que acompanha a reunião enquanto ela acontece: a fala transcrita de um lado e, do outro, um feed de Decisões, Ações, Riscos e Perguntas recomendadas que a IA extrai da conversa.",
+    "Adicionado — O que você confirma vai para a ata. As decisões validadas durante a chamada entram no Markdown da reunião numa seção própria, com responsáveis, prazos e a lista do que ficou sem prazo.",
+    "Adicionado — Cards em segundos, não em minutos. Antes de gastar uma chamada de IA, o ISPer lê o trecho recém-transcrito procurando marcas de acordo (\"então fica combinado\"), de tarefa (\"eu envio\", \"fica de\") e de objeção (\"discordo\", \"me preocupa\"); quando acha, antecipa a análise.",
+    "Adicionado — \"Pergunte à Reunião\" e bloco de notas aumentado. Uma aba de perguntas sobre o que já foi dito (\"qual valor o cliente citou?\") e um bloco de anotações soltas que a IA completa com os números e as falas exatas da conversa, preservando a sua ordem e marcando o que não foi discutido."
   ],
   "assets": [
     {
-      "name": "ISPer_0.17.1_x64-cpu-setup.exe",
+      "name": "ISPer_0.18.0_x64-cpu-setup.exe",
       "platform": "windows",
       "arch": "x64",
       "variant": "cpu",
       "kind": "installer",
-      "sizeBytes": 9856006,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.17.1/ISPer_0.17.1_x64-cpu-setup.exe",
-      "sha256": "fcd5172225d69c41214215890cd24c2d298f973611524900787d7016a7ed4b61",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.17.1/SHA256SUMS.txt",
+      "sizeBytes": 9947276,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.18.0/ISPer_0.18.0_x64-cpu-setup.exe",
+      "sha256": "56677e2faadf09dcab627cfd3b1bcc073cf8b952a2214c48b45fc98d87796388",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.18.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
@@ -28,15 +31,15 @@
       ]
     },
     {
-      "name": "ISPer_0.17.1_x64-setup.exe",
+      "name": "ISPer_0.18.0_x64-setup.exe",
       "platform": "windows",
       "arch": "x64",
       "variant": "cuda",
       "kind": "installer",
-      "sizeBytes": 422855495,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.17.1/ISPer_0.17.1_x64-setup.exe",
-      "sha256": "690bc113234603448f8429614d3b625a0f09d728710d268b347540f4c5411763",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.17.1/SHA256SUMS.txt",
+      "sizeBytes": 422938563,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.18.0/ISPer_0.18.0_x64-setup.exe",
+      "sha256": "fa23c00c91bd0b13afd0dcf5647203b07123ee4cdb7e7e2394984a96668e4c19",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.18.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
