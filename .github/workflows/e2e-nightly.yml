@@ -194,6 +194,14 @@ jobs:
           ISPER_E2E_CDP_REGISTRY: '1'
         run: .\tools\e2e\i18n.ps1 -Exe .\target\release\isper-app.exe
 
+      # Primeira configuração: abre na primeira execução, os passos montam,
+      # concluir grava e abre o Início (sem microfone, o passo mostra o aviso).
+      - name: E2E primeira configuração
+        shell: pwsh
+        env:
+          ISPER_E2E_CDP_REGISTRY: '1'
+        run: .\tools\e2e\onboarding.ps1 -Exe .\target\release\isper-app.exe
+
       # Quando o smoke falha, o que interessa e o que o runner tinha na hora:
       # processos do app e do WebView2 (com a linha de comando), quem escuta a
       # porta CDP e o fim do log do ISPer.

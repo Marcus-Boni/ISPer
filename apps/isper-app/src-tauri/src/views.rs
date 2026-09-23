@@ -94,6 +94,35 @@ pub(crate) fn open_home(app: &AppHandle) {
     open_or_focus(app, "home", build_home);
 }
 
+/// Primeira configuração (ver `onboarding`). Fechar por qualquer caminho —
+/// Concluir, Pular ou o × — conta como feita e abre o Início.
+pub(crate) fn build_onboarding(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
+    let w = tauri::WebviewWindowBuilder::new(
+        app,
+        crate::onboarding::LABEL,
+        tauri::WebviewUrl::App("onboarding.html".into()),
+    )
+    .title(crate::ui::window_title(app, crate::onboarding::LABEL))
+    .theme(crate::ui::native_theme(&crate::ui::current(app).theme))
+    .initialization_script(crate::ui::boot_script(&crate::ui::current(app)))
+    .inner_size(760.0, 640.0)
+    .min_inner_size(620.0, 560.0)
+    .maximizable(false)
+    .center()
+    .build()?;
+    let handle = app.clone();
+    w.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { .. } = event {
+            crate::onboarding::closed(&handle);
+        }
+    });
+    Ok(w)
+}
+
+pub(crate) fn open_onboarding(app: &AppHandle) {
+    open_or_focus(app, crate::onboarding::LABEL, build_onboarding);
+}
+
 /// Janela do ISPer Copilot: HUD de decisões e notetaker em tempo real durante a reunião.
 pub(crate) fn build_copilot(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
     tauri::WebviewWindowBuilder::new(

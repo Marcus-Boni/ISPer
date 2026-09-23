@@ -64,7 +64,10 @@ $script:CdpRegistryKeys = @(
 
 function Start-Isper {
   # Abre o exe (com a porta CDP, salvo -NoCdp, e variáveis extras) e espera a tela Início.
-  param([Parameter(Mandatory)][string]$Exe, [hashtable]$Env = @{}, [switch]$NoCdp)
+  # Numa máquina sem config.toml (runner novo do CI) quem abre é a primeira
+  # configuração: ela é concluída pelo caminho do usuário (onboarding_finish)
+  # e o Início abre em seguida. Com -KeepOnboarding, para nela.
+  param([Parameter(Mandatory)][string]$Exe, [hashtable]$Env = @{}, [switch]$NoCdp, [switch]$KeepOnboarding)
   $exeName = Split-Path $Exe -Leaf
   $viaRegistry = (-not $NoCdp) -and [bool]$env:ISPER_E2E_CDP_REGISTRY
   if (-not $NoCdp) { $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$script:CdpPort" }
@@ -83,10 +86,25 @@ function Start-Isper {
   if ($NoCdp) { Start-Sleep -Seconds 4; return $true }
   $ok = $false
   $lastError = ''
+  $finished = $false
   for ($i = 0; $i -lt 40; $i++) {
     Start-Sleep -Seconds 1
     try {
-      if ((Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json") | Where-Object { $_.url -like '*home.html*' }) {
+      $targets = @(Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json")
+      $onb = $targets | Where-Object { $_.url -like '*onboarding.html*' }
+      if ($onb -and $KeepOnboarding) {
+        Start-Sleep -Seconds 2
+        $ok = $true
+        break
+      }
+      if ($onb -and -not $finished) {
+        Start-Sleep -Seconds 1
+        Invoke-Isper 'onboarding_finish' 'undefined' 'onboarding.html' | Out-Null
+        Write-Host "  (primeira configuracao aberta: concluida para seguir ao Inicio)"
+        $finished = $true
+        continue
+      }
+      if (-not $KeepOnboarding -and ($targets | Where-Object { $_.url -like '*home.html*' })) {
         Start-Sleep -Seconds 3
         $ok = $true
         break

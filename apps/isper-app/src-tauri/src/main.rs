@@ -24,6 +24,7 @@ mod insights;
 mod library;
 mod meetings;
 mod notify;
+mod onboarding;
 mod overlay;
 mod paths;
 mod prelude;
@@ -134,9 +135,15 @@ fn main() {
 
     tauri::Builder::default()
         // Instância única: um segundo clique no atalho não abre outro ISPer —
-        // o pedido é encaminhado ao já aberto, que responde com a tela Início.
+        // o pedido é encaminhado ao já aberto, que responde com a tela Início
+        // (ou com a primeira configuração, se ela ainda estiver aberta).
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            if !args.iter().any(|a| a == AUTOSTART_FLAG) {
+            if args.iter().any(|a| a == AUTOSTART_FLAG) {
+                return;
+            }
+            if app.get_webview_window(onboarding::LABEL).is_some() {
+                open_onboarding(app);
+            } else {
                 open_home(app);
             }
         }))
@@ -247,7 +254,16 @@ fn main() {
             copilot_query,
             copilot_enrich_notes,
             copilot_set_always_on_top,
-            copilot_dismiss_memory
+            copilot_dismiss_memory,
+            onboarding::onboarding_state,
+            onboarding::mic_test_start,
+            onboarding::mic_test_stop,
+            onboarding::onboarding_set_mic,
+            onboarding::onboarding_set_shortcut,
+            onboarding::onboarding_set_model,
+            onboarding::onboarding_set_provider,
+            onboarding::onboarding_finish,
+            onboarding::open_onboarding_window
         ])
         .setup(|app| {
             let cfg = config::load();
@@ -383,15 +399,18 @@ fn main() {
                 let _ = app.autolaunch().enable();
             }
 
-            // Tela Início: só no lançamento manual (e se o usuário não desligou).
-            // Vem ANTES do carregamento do modelo: sem modelo, é ela quem orienta
-            // o download — as Configurações só abrem sozinhas se ela não existir.
+            // Primeira execução: a configuração guiada; depois, a tela Início —
+            // só no lançamento manual (e se o usuário não a desligou). Vem ANTES
+            // do carregamento do modelo: sem modelo, é uma delas quem orienta o
+            // download — as Configurações só abrem sozinhas se nenhuma existir.
             // (No setup a criação direta é segura; fora dele, ver `open_or_focus`.)
-            if cfg.show_home_on_launch
-                && !autostarted
-                && let Err(e) = build_home(app.handle())
-            {
-                tracing::error!("não consegui abrir a tela Início: {e}");
+            let first_window = match onboarding::launch_window(&cfg, autostarted) {
+                Some(onboarding::LABEL) => build_onboarding(app.handle()).map(drop),
+                Some(_) => build_home(app.handle()).map(drop),
+                None => Ok(()),
+            };
+            if let Err(e) = first_window {
+                tracing::error!("não consegui abrir a primeira janela: {e}");
             }
 
             // O modelo (~0,5 GB) carrega em background p/ não travar o startup.

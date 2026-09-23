@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ISPer</title>
+<script src="assets/boot.js"></script>
+<script src="assets/i18n.js"></script>
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  body { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; overflow: hidden; }
+  .bar { gap: 14px; }
+  .progress-steps { display: flex; gap: 6px; list-style: none; margin: 0 auto 0 8px; padding: 0; }
+  .progress-steps li { width: 26px; height: 4px; border-radius: 999px; background: var(--line); transition: background var(--dur-3) var(--ease-out); }
+  .progress-steps li.done { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .progress-steps li[aria-current="step"] { background: var(--accent); }
+  .steplabel { color: var(--muted); font-size: 12px; }
+
+  main { overflow-y: auto; padding: 30px 40px 20px; }
+  .step { max-width: 600px; margin: 0 auto; }
+  .step h1 { font-family: var(--font-display); font-weight: 500; font-size: 30px; letter-spacing: -.015em; margin: 6px 0 10px; line-height: 1.15; }
+  /* Foco programático no título (para o leitor de tela anunciar o passo): sem anel. */
+  .step h1:focus, .step h1:focus-visible { outline: none; box-shadow: none; }
+  .step .lead { color: var(--ink-2); font-size: 14.5px; line-height: 1.6; margin: 0 0 22px; }
+  .row { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 10px 16px; align-items: center; margin-bottom: 14px; }
+  .row > label, .row > .lbl { color: var(--muted); font-size: 13px; }
+  @media (max-width: 680px) { .row { grid-template-columns: 1fr; } main { padding: 24px 22px 16px; } }
+
+  /* Grupo de opções com rádio nativo (setas do teclado de graça). */
+  .seg { display: inline-flex; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 3px; gap: 2px; }
+  .seg label { position: relative; padding: 6px 14px; border-radius: var(--r-pill); font-size: 13px; color: var(--ink-2); cursor: pointer; }
+  .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .seg label:has(input:checked) { background: var(--panel); color: var(--ink); box-shadow: var(--shadow-1); }
+  .seg label:has(input:focus-visible) { box-shadow: var(--ring); }
+
+  .promise { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--glass); margin-bottom: 22px; }
+  .promise svg { width: 20px; height: 20px; flex: none; color: var(--good); margin-top: 1px; }
+  .promise p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+
+  /* Medidor de nível do microfone. */
+  .meter { position: relative; height: 14px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+  .meter .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--good), color-mix(in srgb, var(--good) 55%, var(--warn))); border-radius: inherit; transition: width 70ms linear; }
+  .meter .peak { position: absolute; top: 0; bottom: 0; width: 2px; left: 0; background: var(--ink-2); opacity: .55; transition: left 120ms linear; }
+  .mic-status { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 20px; }
+  .mic-status.ok { color: var(--good); }
+  .mic-status.warn { color: var(--warn); }
+
+  /* Modelos. */
+  .models { display: grid; gap: 8px; margin-bottom: 14px; }
+  .model { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); cursor: pointer; transition: border-color var(--dur-2), background var(--dur-2); }
+  .model:hover { border-color: var(--line-2); }
+  .model:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
+  .model:has(input:focus-visible) { box-shadow: var(--ring); }
+  .model input { accent-color: var(--accent); margin: 0; }
+  .model .name { font-weight: 600; font-size: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .model .note { grid-column: 2 / 4; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+  .model .size { color: var(--muted-2); font: 12px var(--font-mono); }
+  .dl { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .dl .progress { flex: 1; min-width: 160px; }
+  .dl .hint { margin: 0; }
+  .flabel { display: block; color: var(--muted); font-size: 13px; margin: 4px 0 6px; }
+  .engine { margin-top: 12px; font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+
+  /* Atalho e ditado de teste. */
+  .keys { display: flex; align-items: center; gap: 8px; margin: 4px 0 18px; flex-wrap: wrap; }
+  .keys .plus { color: var(--muted-2); }
+  .keys kbd { font: 600 15px var(--font-body); padding: 8px 14px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line-2); border-bottom-width: 3px; color: var(--ink); transition: transform var(--dur-1), border-bottom-width var(--dur-1); }
+  .keys.pressed kbd { transform: translateY(2px); border-bottom-width: 1px; }
+  #try { min-height: 96px; }
+  .try-status { font-size: 13px; color: var(--muted); margin-top: 8px; min-height: 20px; display: flex; gap: 8px; align-items: center; }
+  .try-status.ok { color: var(--good); }
+
+  /* Provider de IA. */
+  .providers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .providers .model { grid-template-columns: auto minmax(0, 1fr); }
+  .providers .model .note { grid-column: 2; }
+  .keyrow { display: flex; gap: 8px; }
+  .keyrow .field { flex: 1; }
+  .ai-result { font-size: 13px; margin-top: 8px; min-height: 20px; color: var(--muted); }
+  .ai-result.ok { color: var(--good); }
+  .ai-result.err { color: var(--accent); }
+
+  /* Pronto. */
+  .summary { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 8px; }
+  .summary li { display: flex; gap: 10px; align-items: baseline; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); font-size: 13.5px; }
+  .summary li .k { color: var(--muted); min-width: 120px; }
+  .summary li.todo .v { color: var(--warn); }
+
+  footer.nav { display: flex; align-items: center; gap: 10px; padding: 14px 40px; border-top: 1px solid var(--line); background: var(--glass); }
+  footer.nav .spacer { flex: 1; }
+  @media (max-width: 680px) { footer.nav { padding: 12px 22px; } }
+</style>
+</head>
+<body class="atmos">
+<header class="bar">
+  <div class="brand">ISPer<span>.</span></div>
+  <ol class="progress-steps" id="dots" aria-hidden="true"></ol>
+  <span class="steplabel" id="steplabel" aria-live="polite"></span>
+  <button class="btn-link" id="skip" data-i18n="onb.skip">Pular configuração</button>
+</header>
+
+<main id="main">
+  <!-- 1. Boas-vindas -->
+  <section class="step" data-step="welcome" aria-labelledby="h-welcome">
+    <p class="eyebrow" data-i18n="onb.welcome.eyebrow">Primeira configuração</p>
+    <h1 id="h-welcome" tabindex="-1" data-i18n="onb.welcome.title">Boas-vindas ao ISPer.</h1>
+    <p class="lead" data-i18n="onb.welcome.lead">Ditado em qualquer app e transcrição de reuniões, no seu computador. Em quatro passos curtos o ISPer fica pronto: microfone, modelo de transcrição, atalho e, se quiser, IA.</p>
+    <div class="promise">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.5 3.5 5v4.6c0 4 2.8 6.9 6.5 7.9 3.7-1 6.5-3.9 6.5-7.9V5L10 2.5Z"/><path d="m7.2 10.1 1.9 1.9 3.7-3.9"/></svg>
+      <p data-i18n="onb.welcome.promise">100% local: o áudio nunca sai da sua máquina. A transcrição roda aqui mesmo, e a IA só entra se você conectar uma — e, mesmo assim, só com o texto.</p>
+    </div>
+    <div class="row">
+      <label for="uilang" data-i18n="onb.welcome.lang">Idioma da interface</label>
+      <select id="uilang" class="field">
+        <option value="auto" data-i18n="onb.welcome.lang-auto">Seguir o Windows</option>
+        <option value="pt-BR" lang="pt-BR">Português (Brasil)</option>
+        <option value="en" lang="en">English</option>
+      </select>
+    </div>
+    <div class="row">
+      <span class="lbl" id="lbl-theme" data-i18n="onb.welcome.theme">Aparência</span>
+      <div class="seg" role="radiogroup" aria-labelledby="lbl-theme" id="theme">
+        <label><input type="radio" name="theme" value="system"><span data-i18n="onb.welcome.theme-system">Seguir o Windows</span></label>
+        <label><input type="radio" name="theme" value="light"><span data-i18n="onb.welcome.theme-light">Clara</span></label>
+        <label><input type="radio" name="theme" value="dark"><span data-i18n="onb.welcome.theme-dark">Escura</span></label>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Microfone -->
+  <section class="step" data-step="mic" aria-labelledby="h-mic" hidden>
+    <p class="eyebrow" data-i18n="onb.mic.eyebrow">Microfone</p>
+    <h1 id="h-mic" tabindex="-1" data-i18n="onb.mic.title">Fale alguma coisa.</h1>
+    <p class="lead" data-i18n="onb.mic.lead">A barra deve se mexer com a sua voz. Nada é gravado — é só o nível do som. Este microfone vale para o ditado e para o seu lado nas reuniões.</p>
+    <div class="row">
+      <label for="mic" data-i18n="onb.mic.device">Microfone</label>
+      <select id="mic" class="field"><option value="" data-i18n="onb.mic.default">Padrão do Windows</option></select>
+    </div>
+    <div class="meter" id="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-attr="aria-label:onb.mic.meter-aria" aria-label="nível do microfone">
+      <div class="fill" id="meterfill"></div><div class="peak" id="meterpeak"></div>
+    </div>
+    <div class="mic-status" id="micstatus" role="status" aria-live="polite"></div>
+    <p class="hint" data-i18n="onb.mic.hint">Nas reuniões, o áudio dos participantes vem do próprio Windows — não precisa configurar nada para isso.</p>
+  </section>
+
+  <!-- 3. Modelo -->
+  <section class="step" data-step="model" aria-labelledby="h-model" hidden>
+    <p class="eyebrow" data-i18n="onb.model.eyebrow">Transcrição</p>
+    <h1 id="h-model" tabindex="-1" data-i18n="onb.model.title">Escolha o modelo.</h1>
+    <p class="lead" id="modellead"></p>
+    <div class="models" id="models" role="radiogroup" data-i18n-attr="aria-label:onb.model.list-aria" aria-label="modelos Whisper"></div>
+    <div class="dl">
+      <button class="btn btn-primary" id="getmodel"></button>
+      <div class="progress" id="dlprogress" hidden><div class="bar"></div></div>
+      <span class="num hint" id="dltext"></span>
+    </div>
+    <div class="engine" id="engine" role="status" aria-live="polite"></div>
+  </section>
+
+  <!-- 4. Atalho -->
+  <section class="step" data-step="shortcut" aria-labelledby="h-shortcut" hidden>
+    <p class="eyebrow" data-i18n="onb.sc.eyebrow">Ditado</p>
+    <h1 id="h-shortcut" tabindex="-1" data-i18n="onb.sc.title">Segure, fale, solte.</h1>
+    <p class="lead" data-i18n="onb.sc.lead">Em qualquer campo de texto — Teams, e-mail, navegador — segure o atalho enquanto fala. Ao soltar, o texto é colado onde estava o cursor. Um toque rápido liga o modo mãos-livres: fale à vontade e o ISPer cola sozinho depois de uma pausa.</p>
+    <div class="keys" id="keys" aria-live="polite"></div>
+    <div class="row">
+      <label for="shortcut" data-i18n="onb.sc.change">Trocar o atalho</label>
+      <select id="shortcut" class="field">
+        <option value="" data-i18n="onb.sc.auto">Automático — o primeiro livre</option>
+        <option value="ctrl+alt+space" data-i18n="settings.opt.ctrl-alt-space">Ctrl+Alt+Espaço</option>
+        <option value="ctrl+shift+space" data-i18n="settings.opt.ctrl-shift-space">Ctrl+Shift+Espaço</option>
+        <option value="ctrl+alt+d">Ctrl+Alt+D</option>
+        <option value="ctrl+alt+i">Ctrl+Alt+I</option>
+        <option value="f9">F9</option>
+      </select>
+    </div>
+    <label class="flabel" for="try" data-i18n="onb.sc.try-label">Experimente aqui: clique no campo, segure o atalho e diga uma frase.</label>
+    <textarea id="try" class="field" data-i18n-attr="placeholder:onb.sc.try-ph" placeholder="o texto ditado aparece aqui…"></textarea>
+    <div class="try-status" id="trystatus" role="status" aria-live="polite"></div>
+  </section>
+
+  <!-- 5. IA -->
+  <section class="step" data-step="ai" aria-labelledby="h-ai" hidden>
+    <p class="eyebrow" data-i18n="onb.ai.eyebrow">Opcional</p>
+    <h1 id="h-ai" tabindex="-1" data-i18n="onb.ai.title">Resumos com IA.</h1>
+    <p class="lead" data-i18n="onb.ai.lead">Conecte um provedor para receber resumo, decisões e tarefas ao fim de cada reunião. Só o texto da transcrição é enviado — o áudio, nunca. Sem isso, tudo funciona do mesmo jeito.</p>
+    <div class="providers" id="providers" role="radiogroup" data-i18n-attr="aria-label:onb.ai.list-aria" aria-label="provedor de IA">
+      <label class="model"><input type="radio" name="provider" value="none"><span class="name" data-i18n="onb.ai.none">Agora não</span><span class="note" data-i18n="onb.ai.none-note">Dá para conectar depois, em Configurações → Inteligência.</span></label>
+      <label class="model"><input type="radio" name="provider" value="groq"><span class="name">Groq</span><span class="note" data-i18n-html="onb.ai.groq-note">Grátis. Chave em <code>console.groq.com/keys</code></span></label>
+      <label class="model"><input type="radio" name="provider" value="gemini"><span class="name">Gemini</span><span class="note" data-i18n-html="onb.ai.gemini-note">Grátis. Chave em <code>aistudio.google.com/apikey</code></span></label>
+      <label class="model"><input type="radio" name="provider" value="claude"><span class="name">Claude</span><span class="note" data-i18n-html="onb.ai.claude-note">Pago. Chave em <code>console.anthropic.com</code></span></label>
+    </div>
+    <div id="keybox" hidden>
+      <label class="flabel" for="aikey" data-i18n="onb.ai.key">Chave da API</label>
+      <div class="keyrow">
+        <input id="aikey" class="field" type="password" autocomplete="off" spellcheck="false" data-i18n-attr="placeholder:onb.ai.key-ph" placeholder="cole a chave aqui">
+        <button class="btn" id="aitest" data-i18n="onb.ai.test">Guardar e testar</button>
+      </div>
+      <p class="hint" data-i18n="onb.ai.key-hint">A chave fica no Gerenciador de Credenciais do Windows, nunca em arquivo.</p>
+      <div class="ai-result" id="airesult" role="status" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- Pronto -->
+  <section class="step" data-step="done" aria-labelledby="h-done" hidden>
+    <p class="eyebrow" data-i18n="onb.done.eyebrow">Tudo certo</p>
+    <h1 id="h-done" tabindex="-1" data-i18n="onb.done.title">O ISPer está pronto.</h1>
+    <p class="lead" data-i18n="onb.done.lead">Ele fica na bandeja do Windows, perto do relógio. A tela Início mostra o que ainda vale configurar; tudo isto também muda depois, em Configurações.</p>
+    <ul class="summary" id="summary"></ul>
+  </section>
+</main>
+
+<footer class="nav">
+  <button class="btn btn-ghost" id="back" data-i18n="onb.back">Voltar</button>
+  <span class="spacer"></span>
+  <button class="btn btn-primary" id="next"></button>
+</footer>
+
+<script src="assets/ui.js"></script>
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
+  const $ = (id) => document.getElementById(id);
+  const { el, toast } = UI;
+
+  const STEPS = ['welcome', 'mic', 'model', 'shortcut', 'ai', 'done'];
+  let step = 0;
+  let st = null;          // onboarding_state
+  let models = [];        // models_status
+  let engine = null;      // home_status().engine
+  let heard = false;      // o microfone já captou voz nesta sessão
+  let dictated = false;   // o ditado de teste já colou algo
+  let chosenModel = null;
+  let downloading = null;
+
+  // ---------------------------------------------------------------- passos
+  function renderNav() {
+    const dots = $('dots');
+    if (!dots.children.length) STEPS.slice(0, -1).forEach(() => dots.appendChild(el('li')));
+    [...dots.children].forEach((d, i) => {
+      d.classList.toggle('done', i < step);
+      if (i === step) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current');
+    });
+    const last = step === STEPS.length - 1;
+    $('steplabel').textContent = last ? '' : t('onb.step', { n: step + 1, total: STEPS.length - 1 });
+    $('back').hidden = step === 0 || last;
+    $('skip').hidden = last;
+    $('next').textContent = step === 0 ? t('onb.start') : last ? t('onb.finish') : STEPS[step] === 'ai' ? t('onb.review') : t('onb.next');
+  }
+
+  async function go(to) {
+    const from = STEPS[step];
+    if (from === 'mic' && to !== step) invoke('mic_test_stop').catch(() => {});
+    step = Math.max(0, Math.min(STEPS.length - 1, to));
+    document.querySelectorAll('.step').forEach(s => { s.hidden = s.dataset.step !== STEPS[step]; });
+    const sec = document.querySelector('.step:not([hidden])');
+    sec.classList.remove('reveal'); void sec.offsetWidth; sec.classList.add('reveal');
+    renderNav();
+    const name = STEPS[step];
+    if (name === 'mic') startMic();
+    if (name === 'model') await renderModels();
+    if (name === 'shortcut') await renderShortcut();
+    if (name === 'ai') renderAi();
+    if (name === 'done') renderSummary();
+    $('main').scrollTop = 0;
+    // O foco vai para o título do passo: o leitor de tela anuncia onde se está.
+    const h = sec.querySelector('h1'); if (h) h.focus({ preventScroll: true });
+  }
+
+  $('next').addEventListener('click', () => {
+    if (step === STEPS.length - 1) { invoke('onboarding_finish'); return; }
+    go(step + 1);
+  });
+  $('back').addEventListener('click', () => go(step - 1));
+  $('skip').addEventListener('click', () => invoke('onboarding_finish'));
+
+  // ------------------------------------------------------- 1. boas-vindas
+  function renderWelcome() {
+    $('uilang').value = st.ui_lang;
+    const r = document.querySelector('input[name=theme][value="' + st.theme + '"]');
+    if (r) r.checked = true;
+  }
+  $('uilang').addEventListener('change', async () => {
+    try { st.ui_lang = await invoke('set_ui_lang', { lang: $('uilang').value }); }
+    catch (e) { toast(t('common.error', { e }), 'err'); }
+  });
+  document.querySelectorAll('input[name=theme]').forEach(r => r.addEventListener('change', async () => {
+    try { st.theme = await invoke('set_ui_theme', { theme: r.value }); }
+    catch (e) { toast(t('common.error', { e }), 'err'); }
+  }));
+
+  // -------------------------------------------------------- 2. microfone
+  function fillMics() {
+    const sel = $('mic');
+    while (sel.options.length > 1) sel.remove(1);
+    for (const d of st.devices) { const o = document.createElement('option'); o.value = d; o.textContent = d; sel.appendChild(o); }
+    sel.value = st.input_device && st.devices.includes(st.input_device) ? st.input_device : '';
+  }
+  let peak = 0, loudFrames = 0, lastAria = 0, micStart = 0, micMax = 0, silentShown = false;
+  let micMsg = null;
+  function micStatus(kind, key, vars) { micMsg = { kind, key, vars }; const s = $('micstatus'); s.className = 'mic-status ' + kind; s.textContent = t(key, vars); }
+  function startMic() {
+    peak = 0; loudFrames = 0; micMax = 0; silentShown = false; micStart = performance.now();
+    setLevel(0);
+    if (heard) micStatus('ok', 'onb.mic.heard'); else micStatus('', 'onb.mic.waiting');
+    invoke('mic_test_start', { device: $('mic').value || null }).catch(e => micStatus('warn', 'onb.mic.error', { e }));
+  }
+  // RMS → 0..1 numa escala em dB (-60 dB = vazio, 0 dB = cheio): a fala
+  // normal ocupa o meio da barra, em vez de só piscar no começo.
+  const toLevel = (rms) => Math.max(0, Math.min(1, (20 * Math.log10(Math.max(rms, 1e-5)) + 60) / 60));
+  function setLevel(v) {
+    $('meterfill').style.width = (v * 100).toFixed(1) + '%';
+    peak = Math.max(v, peak * 0.97);
+    $('meterpeak').style.left = 'calc(' + (peak * 100).toFixed(1) + '% - 2px)';
+    const now = performance.now();
+    if (now - lastAria > 500) { lastAria = now; $('meter').setAttribute('aria-valuenow', String(Math.round(v * 100))); }
+  }
+  listen('isper-mic-level', (e) => {
+    if (STEPS[step] !== 'mic') return;
+    const rms = Number(e.payload) || 0;
+    const v = toLevel(rms);
+    setLevel(v);
+    // Microfone mudo ou bloqueado em Privacidade não dá erro: entrega zeros.
+    // Silêncio digital (< -120 dB) por 4 s vira aviso; a medição continua.
+    micMax = Math.max(micMax, rms);
+    if (!heard && !silentShown && micMax < 1e-6 && performance.now() - micStart > 4000) {
+      silentShown = true;
+      micStatus('warn', 'onb.mic.silent');
+    }
+    // Voz de verdade: acima de ~-36 dB por 150 ms seguidos (um estalo não conta).
+    loudFrames = v > 0.4 ? loudFrames + 1 : 0;
+    if (!heard && loudFrames >= 3) { heard = true; micStatus('ok', 'onb.mic.heard'); }
+  });
+  listen('isper-mic-end', (e) => {
+    if (STEPS[step] !== 'mic') return;
+    const p = e.payload || {};
+    setLevel(0);
+    if (p.reason === 'no-audio') micStatus('warn', 'onb.mic.no-audio');
+    else if (p.reason === 'error') micStatus('warn', 'onb.mic.error', { e: p.message || '' });
+    else startMic();  // tempo máximo: mede de novo enquanto a pessoa estiver aqui
+  });
+  $('mic').addEventListener('change', async () => {
+    heard = false;
+    try { await invoke('onboarding_set_mic', { device: $('mic').value || null }); st.input_device = $('mic').value || null; }
+    catch (e) { toast(t('common.error', { e }), 'err'); }
+    startMic();
+  });
+
+  // ----------------------------------------------------------- 3. modelo
+  async function refreshEngine() {
+    try { engine = (await invoke('home_status')).engine; } catch (_) { engine = null; }
+    const box = $('engine');
+    box.replaceChildren();
+    if (!engine) return;
+    if (engine.kind === 'ready') { box.appendChild(el('span', 'dot ok')); box.append(t('onb.model.ready', { label: engine.label })); }
+    else if (engine.kind === 'loading') { box.appendChild(el('span', 'dot warn pulse')); box.append(t('onb.model.loading')); }
+    else if (engine.kind === 'missing') { box.appendChild(el('span', 'dot bad')); box.append(t('onb.model.missing')); }
+    else { box.appendChild(el('span', 'dot bad')); box.append(t('onb.model.failed', { e: engine.message || '' })); }
+  }
+  async function renderModels() {
+    try { models = await invoke('models_status'); } catch (e) { toast(t('common.error', { e }), 'err'); return; }
+    // O estado do motor antes do botão: "Em uso ✓" depende de qual está carregado.
+    await refreshEngine();
+    const gpu = st.gpu;
+    $('modellead').textContent = gpu ? t('onb.model.lead-gpu') : t('onb.model.lead-cpu');
+    // Sem GPU, os modelos grandes demoram mais que a própria fala: só aparecem
+    // se já estiverem instalados (quem já tem um funcionando não é empurrado a
+    // baixar outro).
+    const list = models.filter(m => gpu || !m.needs_gpu || m.installed);
+    if (!chosenModel) {
+      const active = list.find(m => m.active && m.installed);
+      chosenModel = active ? active.file : st.recommended;
+    }
+    const box = $('models');
+    box.replaceChildren();
+    for (const m of list) {
+      const lab = el('label', 'model');
+      const r = el('input'); r.type = 'radio'; r.name = 'model'; r.value = m.file; r.checked = m.file === chosenModel;
+      r.addEventListener('change', () => { chosenModel = m.file; renderGetButton(); });
+      const name = el('span', 'name', m.label);
+      if (m.file === st.recommended) name.appendChild(el('span', 'chip chip-accent', t('onb.model.recommended')));
+      if (m.installed) name.appendChild(el('span', 'chip chip-ok', t('onb.model.installed')));
+      lab.append(r, name, el('span', 'size', t('onb.model.size', { mb: m.approx_mb })), el('span', 'note', UI.modelNote(m)));
+      box.appendChild(lab);
+    }
+    renderGetButton();
+  }
+  function renderGetButton() {
+    const m = models.find(x => x.file === chosenModel);
+    const b = $('getmodel');
+    if (downloading) { b.disabled = true; return; }
+    b.disabled = !m;
+    if (!m) return;
+    const inUse = engine && engine.kind === 'ready' && engine.file === m.file;
+    b.textContent = inUse ? t('onb.model.in-use') : m.installed ? t('onb.model.use') : t('onb.model.download', { mb: m.approx_mb });
+    b.disabled = inUse;
+  }
+  $('getmodel').addEventListener('click', async () => {
+    const m = models.find(x => x.file === chosenModel);
+    if (!m) return;
+    const b = $('getmodel');
+    try {
+      await invoke('onboarding_set_model', { file: m.file });
+      if (!m.installed) {
+        downloading = m.file;
+        UI.busy(b, true, t('common.downloading'));
+        $('dlprogress').hidden = false;
+        $('dltext').textContent = '';
+        await invoke('download_model', { file: m.file });
+        // Com outro modelo já carregado, o download não troca sozinho: pede de novo.
+        await invoke('onboarding_set_model', { file: m.file });
+        UI.busy(b, false);
+      }
+      downloading = null;
+      $('dlprogress').hidden = true;
+      $('dltext').textContent = '';
+      await renderModels();
+    } catch (e) {
+      downloading = null;
+      UI.busy(b, false);
+      $('dlprogress').hidden = true;
+      $('dltext').textContent = '';
+      toast(t('onb.model.download-failed', { e }), 'err', 6000);
+      renderGetButton();
+    }
+  });
+  listen('isper-model-progress', (e) => {
+    const p = e.payload || {};
+    if (!downloading || p.file !== downloading || !p.total) return;
+    const pct = Math.round(p.done / p.total * 100);
+    $('dlprogress').querySelector('.bar').style.width = pct + '%';
+    $('dltext').textContent = t('onb.model.progress', { done: Math.round(p.done / 1e6), total: Math.round(p.total / 1e6), pct });
+  });
+
+  // ----------------------------------------------------------- 4. atalho
+  function renderKeys(label) {
+    const k = $('keys');
+    k.replaceChildren();
+    if (!label || label.startsWith('(')) { k.appendChild(el('span', 'hint', t('onb.sc.none'))); return; }
+    label.split('+').forEach((part, i) => {
+      if (i) k.appendChild(el('span', 'plus', '+'));
+      k.appendChild(el('kbd', '', UI.keyLabel(part.trim())));
+    });
+    k.setAttribute('aria-label', t('onb.sc.current', { label: UI.keyLabel(label) }));
+  }
+  async function renderShortcut() {
+    const sel = $('shortcut');
+    const pref = st.shortcut || '';
+    if (pref && ![...sel.options].some(o => o.value === pref)) {
+      const o = document.createElement('option'); o.value = pref; o.textContent = UI.keyLabel(st.active_shortcut); sel.appendChild(o);
+    }
+    sel.value = pref;
+    renderKeys(st.active_shortcut);
+    await refreshEngine();
+    trySetStatus();
+  }
+  function trySetStatus(kind, text) {
+    const s = $('trystatus');
+    s.replaceChildren();
+    if (!kind) {
+      if (dictated) { kind = 'ok'; text = t('onb.sc.worked'); }
+      else if (!engine || engine.kind !== 'ready') { kind = 'warn'; text = engine && engine.kind === 'loading' ? t('onb.sc.wait-model') : t('onb.sc.no-model'); }
+      else { kind = ''; text = t('onb.sc.ready', { label: UI.keyLabel(st.active_shortcut) }); }
+    }
+    s.className = 'try-status ' + (kind || '');
+    if (kind === 'rec') s.appendChild(el('span', 'dot bad pulse'));
+    else if (kind === 'busy') s.appendChild(el('span', 'dot warn pulse'));
+    else if (kind === 'ok') s.appendChild(el('span', 'dot ok'));
+    s.append(text);
+  }
+  $('shortcut').addEventListener('change', async () => {
+    try {
+      const label = await invoke('onboarding_set_shortcut', { shortcut: $('shortcut').value || null });
+      st.shortcut = $('shortcut').value || null;
+      st.active_shortcut = label;
+      renderKeys(label);
+      const wanted = $('shortcut').selectedOptions[0];
+      if (st.shortcut && wanted && UI.keyLabel(label) !== wanted.textContent) toast(t('onb.sc.busy', { label: UI.keyLabel(label) }), 'info', 5000);
+      trySetStatus();
+    } catch (e) { toast(t('common.error', { e }), 'err'); }
+  });
+  listen('isper-state', (e) => {
+    if (STEPS[step] !== 'shortcut') return;
+    const s = e.payload.state;
+    $('keys').classList.toggle('pressed', s === 'recording' || s === 'recording-handsfree');
+    if (s === 'recording' || s === 'recording-handsfree') trySetStatus('rec', t('onb.sc.recording'));
+    else if (s === 'transcribing' || s === 'polishing') trySetStatus('busy', t('onb.sc.transcribing'));
+    else if (s === 'error') trySetStatus('warn', e.payload.message || t('onb.sc.failed'));
+    else if (s === 'discarded') trySetStatus('', t('onb.sc.discarded'));
+    else if (s === 'done' || s === 'idle') setTimeout(() => trySetStatus(), 400);
+  });
+  $('try').addEventListener('input', () => { if ($('try').value.trim()) { dictated = true; trySetStatus(); } });
+  listen('isper-status', () => { if (STEPS[step] === 'shortcut' || STEPS[step] === 'model') refreshEngine().then(() => { if (STEPS[step] === 'shortcut') trySetStatus(); else renderGetButton(); }); });
+
+  // --------------------------------------------------------------- 5. IA
+  function renderAi() {
+    const current = st.llm_provider || 'none';
+    const r = document.querySelector('input[name=provider][value="' + current + '"]') || document.querySelector('input[name=provider][value=none]');
+    r.checked = true;
+    renderKeybox();
+  }
+  function renderKeybox() {
+    const p = document.querySelector('input[name=provider]:checked').value;
+    $('keybox').hidden = p === 'none';
+    const res = $('airesult');
+    if (p !== 'none' && p === st.llm_provider && st.llm_key_present) { res.className = 'ai-result ok'; res.textContent = t('onb.ai.key-present'); }
+    else { res.className = 'ai-result'; res.textContent = ''; }
+  }
+  document.querySelectorAll('input[name=provider]').forEach(r => r.addEventListener('change', async () => {
+    try { st.llm_key_present = await invoke('onboarding_set_provider', { provider: r.value }); st.llm_provider = r.value === 'none' ? '' : r.value; }
+    catch (e) { toast(t('common.error', { e }), 'err'); }
+    renderKeybox();
+  }));
+  $('aitest').addEventListener('click', async () => {
+    const p = document.querySelector('input[name=provider]:checked').value;
+    const key = $('aikey').value.trim();
+    const res = $('airesult');
+    if (!key && !(p === st.llm_provider && st.llm_key_present)) { res.className = 'ai-result err'; res.textContent = t('onb.ai.need-key'); $('aikey').focus(); return; }
+    const b = $('aitest');
+    UI.busy(b, true, t('common.testing'));
+    try {
+      if (key) { await invoke('set_llm_key', { provider: p, key }); $('aikey').value = ''; st.llm_key_present = true; }
+      const r = await invoke('test_llm');
+      UI.busy(b, false);
+      res.className = 'ai-result ok'; res.textContent = t('onb.ai.ok', { r });
+    } catch (e) {
+      UI.busy(b, false);
+      res.className = 'ai-result err'; res.textContent = t('onb.ai.failed', { e });
+    }
+  });
+
+  // ------------------------------------------------------------ pronto
+  function renderSummary() {
+    const list = $('summary');
+    list.replaceChildren();
+    const item = (k, v, todo) => { const li = el('li', todo ? 'todo' : ''); li.append(el('span', 'k', k), el('span', 'v', v)); list.appendChild(li); };
+    item(t('onb.done.mic'), st.input_device || t('onb.mic.default'), false);
+    const ready = engine && engine.kind === 'ready';
+    item(t('onb.done.model'), ready ? engine.label : downloading ? t('onb.done.model-downloading') : t('onb.done.model-missing'), !ready && !downloading);
+    item(t('onb.done.shortcut'), UI.keyLabel(st.active_shortcut), !st.active_shortcut || st.active_shortcut.startsWith('('));
+    const PROVIDER = { groq: 'Groq', gemini: 'Gemini', claude: 'Claude' };
+    item(t('onb.done.ai'), st.llm_provider ? (PROVIDER[st.llm_provider] || st.llm_provider) + (st.llm_key_present ? '' : ' · ' + t('onb.done.no-key')) : t('onb.done.ai-off'), !!st.llm_provider && !st.llm_key_present);
+  }
+
+  // --------------------------------------------------------------- início
+  // Idioma trocado aqui mesmo: refaz o que o script escreveu.
+  document.addEventListener('isper-i18n', () => {
+    renderNav();
+    const name = STEPS[step];
+    if (name === 'mic' && micMsg) micStatus(micMsg.kind, micMsg.key, micMsg.vars);
+    if (name === 'model') renderModels();
+    if (name === 'shortcut') { renderKeys(st.active_shortcut); trySetStatus(); }
+    if (name === 'done') renderSummary();
+  });
+  document.addEventListener('keydown', (ev) => {
+    // Enter avança quando o foco está num rádio ou no título do passo; em
+    // campo de texto, lista ou botão, o Enter é deles.
+    const a = document.activeElement;
+    const own = a && (['TEXTAREA', 'SELECT', 'BUTTON'].includes(a.tagName)
+      || (a.tagName === 'INPUT' && !['radio', 'checkbox'].includes(a.type)));
+    if (ev.key === 'Enter' && !own) { ev.preventDefault(); $('next').click(); }
+  });
+
+  (async () => {
+    try { st = await invoke('onboarding_state'); }
+    catch (e) { toast(t('common.error', { e }), 'err'); return; }
+    renderWelcome();
+    fillMics();
+    await go(0);
+  })();
+</script>
+</body>
+</html>

@@ -18,7 +18,7 @@ use crate::prelude::*;
 pub(crate) const THEMES: [&str; 3] = ["system", "light", "dark"];
 
 /// Janelas que acompanham o tema escolhido. As demais ficam escuras.
-pub(crate) const THEMED_WINDOWS: [&str; 3] = ["home", "library", "settings"];
+pub(crate) const THEMED_WINDOWS: [&str; 4] = ["home", "library", "settings", "onboarding"];
 
 /// O tema da barra de título nativa: `None` segue o Windows.
 pub(crate) fn native_theme(theme: &str) -> Option<tauri::Theme> {
@@ -82,8 +82,9 @@ pub(crate) fn apply(app: &AppHandle, prefs: &UiPrefs) {
 }
 
 /// Título de cada janela, por chave do dicionário.
-pub(crate) const WINDOW_TITLES: [(&str, &str); 4] = [
+pub(crate) const WINDOW_TITLES: [(&str, &str); 5] = [
     ("home", "window.home"),
+    ("onboarding", "window.onboarding"),
     ("library", "window.library"),
     ("settings", "window.settings"),
     ("copilot", "window.copilot"),

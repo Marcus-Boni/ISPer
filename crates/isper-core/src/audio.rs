@@ -129,6 +129,103 @@ pub fn record(duration: Duration) -> Result<RawAudio> {
     })
 }
 
+/// Duração de cada leitura do medidor de nível (~20 por segundo).
+pub const METER_WINDOW: Duration = Duration::from_millis(50);
+
+/// Como terminou uma medição de [`monitor_input`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MonitorEnd {
+    /// Quem mediu pediu para parar.
+    Stopped,
+    /// O tempo máximo passou.
+    Timeout,
+    /// O microfone abriu mas não entregou áudio (desconectado, bloqueado em
+    /// Privacidade → Microfone ou em uso exclusivo por outro programa).
+    NoAudio,
+}
+
+/// Mede o nível do microfone ao vivo, sem gravar nada — o teste de microfone
+/// da primeira execução. Abre `device` (ou o padrão, se `None` ou se ele não
+/// existir mais) e chama `on_level` com o RMS de cada [`METER_WINDOW`] até
+/// `stop` virar `true`, `max` passar ou o microfone parar de entregar áudio.
+/// Bloqueante: o `cpal::Stream` nasce e morre nesta thread (não é `Send`).
+pub fn monitor_input(
+    device: Option<&str>,
+    max: Duration,
+    stop: &std::sync::atomic::AtomicBool,
+    mut on_level: impl FnMut(f32),
+) -> Result<MonitorEnd> {
+    use std::sync::atomic::Ordering;
+    use std::time::Instant;
+
+    let (tx, rx) = crossbeam_channel::unbounded::<Vec<f32>>();
+    let (stream, sample_rate, channels) = open_input_stream_on(device, tx)?;
+    stream.play().map_err(audio_err)?;
+    let per_window =
+        (sample_rate as f32 * METER_WINDOW.as_secs_f32()) as usize * channels.max(1) as usize;
+    let mut window = LevelWindow::new(per_window);
+    let mut levels = Vec::new();
+    let started = Instant::now();
+    let mut last_packet: Option<Instant> = None;
+    // Espera curta: o pedido de parar é atendido em até ~100 ms mesmo sem áudio.
+    let poll = Duration::from_millis(100);
+    loop {
+        if stop.load(Ordering::Relaxed) {
+            return Ok(MonitorEnd::Stopped);
+        }
+        let now = Instant::now();
+        if now.duration_since(started) >= max {
+            return Ok(MonitorEnd::Timeout);
+        }
+        let silent_for = now.duration_since(last_packet.unwrap_or(started));
+        let tolerance = if last_packet.is_some() {
+            MIC_STALL
+        } else {
+            MIC_FIRST_PACKET
+        };
+        if silent_for >= tolerance {
+            return Ok(MonitorEnd::NoAudio);
+        }
+        if let Ok(chunk) = rx.recv_timeout(poll) {
+            last_packet = Some(Instant::now());
+            levels.clear();
+            window.push(&chunk, &mut levels);
+            levels.iter().for_each(|&l| on_level(l));
+        }
+    }
+}
+
+/// Acumula amostras e fecha uma janela de RMS a cada `size` amostras — a
+/// parte pura do medidor de nível, separada da captura para ter teste.
+pub(crate) struct LevelWindow {
+    size: usize,
+    sum: f32,
+    count: usize,
+}
+
+impl LevelWindow {
+    pub(crate) fn new(size: usize) -> Self {
+        Self {
+            size: size.max(1),
+            sum: 0.0,
+            count: 0,
+        }
+    }
+
+    /// Soma `chunk` e acrescenta a `out` o RMS de cada janela que fechou.
+    pub(crate) fn push(&mut self, chunk: &[f32], out: &mut Vec<f32>) {
+        for s in chunk {
+            self.sum += s * s;
+            self.count += 1;
+            if self.count == self.size {
+                out.push((self.sum / self.size as f32).sqrt());
+                self.sum = 0.0;
+                self.count = 0;
+            }
+        }
+    }
+}
+
 /// Abre um stream de captura do microfone padrão. As amostras chegam pelo
 /// canal `tx` já convertidas para f32 normalizado. O chamador dá `.play()`
 /// e encerra a captura dropando o stream.
@@ -324,6 +421,26 @@ pub fn resample_to_16k(mono: &[f32], from_rate: u32) -> Result<Vec<f32>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn medidor_fecha_uma_janela_a_cada_n_amostras_mesmo_entre_pacotes() {
+        let mut w = LevelWindow::new(4);
+        let mut out = Vec::new();
+        // 3 + 3 amostras: a janela fecha no meio do segundo pacote.
+        w.push(&[0.5, -0.5, 0.5], &mut out);
+        assert!(out.is_empty(), "janela incompleta não sai");
+        w.push(&[-0.5, 0.0, 0.0], &mut out);
+        assert_eq!(out.len(), 1);
+        assert!((out[0] - 0.5).abs() < 1e-6, "RMS de ±0,5 é 0,5: {}", out[0]);
+        // Silêncio puro: RMS zero; as duas amostras que sobraram contam na próxima.
+        w.push(&[0.0, 0.0], &mut out);
+        assert_eq!(out.len(), 2);
+        assert!(out[1].abs() < 1e-9);
+        // Tamanho zero não trava nem divide por zero.
+        let mut z = LevelWindow::new(0);
+        z.push(&[1.0], &mut out);
+        assert!((out[2] - 1.0).abs() < 1e-6);
+    }
 
     #[test]
     fn erros_de_dispositivo_ganham_dica_em_portugues() {
