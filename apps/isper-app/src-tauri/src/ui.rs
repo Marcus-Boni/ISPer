@@ -6,7 +6,10 @@
 //! `assets/boot.js` — o primeiro script do `<head>` — aplica o tema no
 //! `<html data-theme>` antes da primeira pintura. Uma mudança nas
 //! Configurações vale na hora: o evento `isper-ui` chega a todas as janelas
-//! abertas, e a barra de título nativa acompanha via `set_theme`.
+//! abertas, e a barra de título nativa acompanha via `set_theme`. As
+//! páginas que têm os seletores (Configurações e primeira configuração)
+//! também os acertam por esse evento, para não mostrar uma escolha velha
+//! quando a mudança veio da outra janela.
 //!
 //! O indicador flutuante e o Copilot continuam sempre escuros: o indicador
 //! flutua sobre qualquer app e precisa de contraste próprio; o Copilot ainda
@@ -34,8 +37,14 @@ pub(crate) fn native_theme(theme: &str) -> Option<tauri::Theme> {
 /// desse idioma — o `i18n.js` traduz a página sem esperar nada.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub(crate) struct UiPrefs {
+    /// O tema escolhido: `system`, `light` ou `dark`.
     pub(crate) theme: String,
+    /// O idioma escolhido, como está na config (`auto` incluído): é o valor
+    /// que os seletores de idioma mostram.
+    pub(crate) ui_lang: String,
+    /// O idioma em uso (`auto` já resolvido para o do Windows).
     pub(crate) lang: String,
+    /// O dicionário do idioma em uso.
     pub(crate) strings: serde_json::Value,
 }
 
@@ -44,6 +53,7 @@ impl UiPrefs {
         let lang = crate::i18n::resolve(&cfg.ui_lang);
         Self {
             theme: cfg.theme.clone(),
+            ui_lang: cfg.ui_lang.clone(),
             lang: lang.to_string(),
             strings: crate::i18n::strings(lang),
         }
@@ -157,6 +167,7 @@ mod tests {
     fn script_de_inicializacao_publica_json_valido() {
         let s = boot_script(&UiPrefs {
             theme: "light".into(),
+            ui_lang: "auto".into(),
             lang: "en".into(),
             strings: serde_json::json!({ "common.undo": "Undo" }),
         });
@@ -166,6 +177,7 @@ mod tests {
             .trim_end_matches(';');
         let v: serde_json::Value = serde_json::from_str(json).unwrap();
         assert_eq!(v["theme"], "light");
+        assert_eq!(v["ui_lang"], "auto");
         assert_eq!(v["lang"], "en");
         assert_eq!(v["strings"]["common.undo"], "Undo");
     }

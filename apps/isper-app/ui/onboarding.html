@@ -287,6 +287,15 @@
     try { st.theme = await invoke('set_ui_theme', { theme: r.value }); }
     catch (e) { toast(t('common.error', { e }), 'err'); }
   }));
+  // Tema ou idioma trocados em outra janela (as Configurações): os seletores
+  // acompanham, senão mostrariam a escolha velha.
+  listen('isper-ui', (e) => {
+    const p = e.payload || {};
+    if (!st) return;
+    if (p.theme) st.theme = p.theme;
+    if (p.ui_lang) st.ui_lang = p.ui_lang;
+    renderWelcome();
+  });
 
   // -------------------------------------------------------- 2. microfone
   function fillMics() {

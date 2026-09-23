@@ -265,7 +265,7 @@ A ordem é impacto ÷ esforço.
 ### 7.6 Distribuição e documentação
 
 - [ ] `winget install ISPer` (manifesto no winget-pkgs) e zip portátil
-- [ ] Vitrine do repositório no GitHub: descrição em inglês revisada, *topics* (rust, tauri, whisper, speech-to-text, windows, meeting-notes), README em inglês com GIF de demonstração, imagem de *social preview*
+- [ ] Vitrine do repositório no GitHub: descrição em inglês revisada, *topics* (rust, tauri, whisper, speech-to-text, windows, meeting-notes), README em inglês com GIF de demonstração, imagem de *social preview* — descrição, 15 *topics*, GIF no `README.en.md` e a imagem em `docs/media/` prontos (23/09), gerados do app real por [`tools/showcase/`](tools/showcase/) só com telas sem dado pessoal; falta subir a imagem em Settings → Social preview (sem API, é à mão)
 - [ ] Site de docs (mdBook no GitHub Pages): guia, FAQ, troubleshooting, arquitetura
 - [x] ADRs em `docs/adr/` (23/09): Rust+Tauri, LLM em nuvem, keepalive do loopback, diarização pós-hoc e mais seis — os dois modos de transcrição, a UI sem build step, releases no CI, retenção "para sempre" com Desfazer, SQLCipher adiado e o próprio registro; índice e modelo em [`docs/adr/README.md`](docs/adr/README.md)
 - [x] `cargo doc` com `#![deny(missing_docs)]` no core; feature flags para o experimental (legendas ao vivo, comandos de voz) (23/09): os 203 itens públicos do `isper-core` documentados, `#![deny(missing_docs)]` e `cargo doc` com avisos como erro no CI; feature flags **não** — os dois recursos já eram maduros e têm interruptor nas Configurações, e cada flag dobraria as variantes de build (decisão em [ADR 0011](docs/adr/0011-opcional-e-configuracao-nao-feature-flag.md))
