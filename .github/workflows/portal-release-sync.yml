@@ -108,6 +108,14 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
+      # A branch do PR anterior pode continuar no remoto: o repositório não
+      # apaga a branch no merge. O checkout é raso e só traz a main, então um
+      # --force-with-lease sem valor não acha referência para comparar e
+      # recusa o push com "stale info" — foi o que derrubou o sync da v0.20.0.
+      # O valor esperado vai explícito, lido do remoto: vazio quando a branch
+      # não existe (o push a cria), o commit atual quando sobrou. A lease
+      # continua valendo: se alguém empurrar para a branch entre a leitura e o
+      # push, ele é recusado.
       - name: Empurra a branch
         if: env.SYNC_TOKEN != '' && steps.diff.outputs.changed == 'true'
         run: |
@@ -117,7 +125,8 @@ jobs:
           git add website/content/data/releases.snapshot.json
           git commit -m "Portal: anunciar a ${{ steps.diff.outputs.tag }}" \
                      -m "Gerado por scripts/sync-release.mjs a partir da release publicada. Tamanhos e URLs vêm da API; as somas SHA-256 vêm do SHA256SUMS.txt da própria release."
-          git push --force-with-lease origin "$BRANCH"
+          expected=$(git ls-remote --heads origin "$BRANCH" | cut -f1)
+          git push --force-with-lease="refs/heads/$BRANCH:$expected" origin "$BRANCH"
 
       - name: Abre o PR, se ainda não houver
         if: env.SYNC_TOKEN != '' && steps.diff.outputs.changed == 'true'
