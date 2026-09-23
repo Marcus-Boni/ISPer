@@ -1,33 +1,135 @@
 //! Ícone e menu da bandeja: textos dinâmicos, ícone de gravação e o "Sair" que salva antes.
 
+use crate::i18n::{tr, trv};
 use crate::prelude::*;
 use tauri::image::Image;
+use tauri::menu::{Menu, MenuItem};
 
-pub(crate) fn hint_text(label: &str) -> String {
-    format!("Segure {label} para ditar (toque rápido = mãos-livres)")
+/// Rótulo de atalho no idioma da interface ("Espaço" → "Space").
+pub(crate) fn key_label(app: &AppHandle, label: &str) -> String {
+    label.replace("Espaço", &tr(app, "keys.space"))
+}
+
+pub(crate) fn hint_text(app: &AppHandle, label: &str) -> String {
+    trv(app, "tray.hint", &[("label", key_label(app, label))])
 }
 
 pub(crate) fn set_hint(app: &AppHandle, label: &str) {
     let state = app.state::<AppState>();
     let guard = state.hint_item.lock_or_recover();
     if let Some(item) = guard.as_ref() {
-        let _ = item.set_text(hint_text(label));
+        let _ = item.set_text(hint_text(app, label));
     }
+}
+
+/// Monta o menu da bandeja no idioma atual e guarda os itens que mudam de
+/// texto (dica do atalho, reunião, indicador).
+pub(crate) fn build_menu(
+    app: &AppHandle,
+    indicator_visible: bool,
+) -> tauri::Result<Menu<tauri::Wry>> {
+    let label = app
+        .state::<AppState>()
+        .active_shortcut
+        .lock_or_recover()
+        .clone();
+    let recording = app.state::<AppState>().meeting.lock_or_recover().is_some();
+    let hint = MenuItem::with_id(app, "hint", hint_text(app, &label), false, None::<&str>)?;
+    let home_item = MenuItem::with_id(app, "home", tr(app, "tray.home"), true, None::<&str>)?;
+    let copilot_item =
+        MenuItem::with_id(app, "copilot", tr(app, "tray.copilot"), true, None::<&str>)?;
+    let library_item =
+        MenuItem::with_id(app, "library", tr(app, "tray.library"), true, None::<&str>)?;
+    let settings_item = MenuItem::with_id(
+        app,
+        "settings",
+        tr(app, "tray.settings"),
+        true,
+        None::<&str>,
+    )?;
+    let meeting_item = MenuItem::with_id(
+        app,
+        "meeting",
+        meeting_item_text(app, recording),
+        true,
+        None::<&str>,
+    )?;
+    let indicator_item = MenuItem::with_id(
+        app,
+        "indicator",
+        indicator_item_text(app, indicator_visible),
+        true,
+        None::<&str>,
+    )?;
+    let quit = MenuItem::with_id(app, "quit", tr(app, "tray.quit"), true, None::<&str>)?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &hint,
+            &home_item,
+            &copilot_item,
+            &library_item,
+            &meeting_item,
+            &indicator_item,
+            &settings_item,
+            &quit,
+        ],
+    )?;
+    let state = app.state::<AppState>();
+    *state.meeting_item.lock_or_recover() = Some(meeting_item);
+    *state.hint_item.lock_or_recover() = Some(hint);
+    *state.indicator_item.lock_or_recover() = Some(indicator_item);
+    Ok(menu)
+}
+
+/// Remonta o menu (idioma trocado) e atualiza o tooltip.
+pub(crate) fn refresh_menu(app: &AppHandle) {
+    let visible = app
+        .get_webview_window("overlay")
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+    let recording = app.state::<AppState>().meeting.lock_or_recover().is_some();
+    let menu = match build_menu(app, visible) {
+        Ok(m) => m,
+        Err(e) => {
+            tracing::warn!("não consegui remontar o menu da bandeja: {e}");
+            return;
+        }
+    };
+    if let Some(tray) = app.state::<AppState>().tray.lock_or_recover().as_ref() {
+        let _ = tray.set_menu(Some(menu));
+        let _ = tray.set_tooltip(Some(tray_tooltip(app, recording)));
+    }
+}
+
+/// Tooltip da bandeja no idioma atual.
+pub(crate) fn tray_tooltip(app: &AppHandle, recording: bool) -> String {
+    tr(
+        app,
+        if recording {
+            "tray.tooltip-recording"
+        } else {
+            "tray.tooltip"
+        },
+    )
 }
 
 /// Texto do item de reunião na bandeja, com o atalho ativo.
 pub(crate) fn meeting_item_text(app: &AppHandle, recording: bool) -> String {
     let state = app.state::<AppState>();
     let label = state.active_meeting_shortcut.lock_or_recover().clone();
-    let base = if recording {
-        "Encerrar e transcrever a reunião"
-    } else {
-        "Iniciar gravação de reunião"
-    };
+    let base = tr(
+        app,
+        if recording {
+            "tray.meeting-stop"
+        } else {
+            "tray.meeting-start"
+        },
+    );
     if label.is_empty() || label.starts_with('(') {
-        base.to_string()
+        base
     } else {
-        format!("{base} ({label})")
+        format!("{base} ({})", key_label(app, &label))
     }
 }
 
@@ -40,19 +142,22 @@ pub(crate) fn set_meeting_text(app: &AppHandle, text: &str) {
 }
 
 /// Texto do item da bandeja que alterna o indicador flutuante.
-pub(crate) fn indicator_item_text(visible: bool) -> &'static str {
-    if visible {
-        "Ocultar indicador flutuante"
-    } else {
-        "Mostrar indicador flutuante"
-    }
+pub(crate) fn indicator_item_text(app: &AppHandle, visible: bool) -> String {
+    tr(
+        app,
+        if visible {
+            "tray.indicator-hide"
+        } else {
+            "tray.indicator-show"
+        },
+    )
 }
 
 pub(crate) fn set_indicator_text(app: &AppHandle, visible: bool) {
     let state = app.state::<AppState>();
     let guard = state.indicator_item.lock_or_recover();
     if let Some(item) = guard.as_ref() {
-        let _ = item.set_text(indicator_item_text(visible));
+        let _ = item.set_text(indicator_item_text(app, visible));
     }
 }
 
@@ -90,11 +195,7 @@ pub(crate) fn set_tray_recording(app: &AppHandle, recording: bool) {
     if let (Some((normal, rec)), Some(tray)) = (icons.as_ref(), tray.as_ref()) {
         let icon = if recording { rec } else { normal };
         let _ = tray.set_icon(Some(icon.clone()));
-        let _ = tray.set_tooltip(Some(if recording {
-            "ISPer — gravando reunião"
-        } else {
-            "ISPer — ditado e reuniões, 100% local"
-        }));
+        let _ = tray.set_tooltip(Some(tray_tooltip(app, recording)));
     }
 }
 
@@ -125,16 +226,30 @@ pub(crate) fn quit_app(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::i18n::tr_lang;
 
     #[test]
-    fn textos_da_bandeja_acompanham_o_estado() {
+    fn textos_da_bandeja_nos_dois_idiomas() {
+        let label = || vec![("label", "Ctrl+Alt+D".to_string())];
         assert_eq!(
-            hint_text("Ctrl+Alt+D"),
+            tr_lang("pt-BR", "tray.hint", &label()),
             "Segure Ctrl+Alt+D para ditar (toque rápido = mãos-livres)"
         );
-        assert_ne!(indicator_item_text(true), indicator_item_text(false));
-        assert!(indicator_item_text(true).starts_with("Ocultar"));
-        assert!(indicator_item_text(false).starts_with("Mostrar"));
+        assert_eq!(
+            tr_lang("en", "tray.hint", &label()),
+            "Hold Ctrl+Alt+D to dictate (quick tap = hands-free)"
+        );
+        for lang in ["pt-BR", "en"] {
+            assert_ne!(
+                tr_lang(lang, "tray.indicator-hide", &[]),
+                tr_lang(lang, "tray.indicator-show", &[])
+            );
+            assert_ne!(
+                tr_lang(lang, "tray.meeting-start", &[]),
+                tr_lang(lang, "tray.meeting-stop", &[])
+            );
+        }
+        assert!(tr_lang("pt-BR", "tray.indicator-hide", &[]).starts_with("Ocultar"));
+        assert!(tr_lang("en", "tray.indicator-show", &[]).starts_with("Show"));
     }
 }

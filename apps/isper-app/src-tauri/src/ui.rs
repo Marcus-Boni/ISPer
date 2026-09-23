@@ -1,5 +1,5 @@
 //! Preferências de interface que valem para todas as janelas: o tema
-//! (seguir o Windows, claro ou escuro).
+//! (seguir o Windows, claro ou escuro) e o idioma (ver `i18n.rs`).
 //!
 //! Como chega à página sem piscar: cada janela nasce com um script de
 //! inicialização ([`boot_script`]) que define `window.__ISPER_UI`, e o
@@ -29,16 +29,23 @@ pub(crate) fn native_theme(theme: &str) -> Option<tauri::Theme> {
     }
 }
 
-/// O que cada janela recebe no nascimento, antes de qualquer script da página.
+/// O que cada janela recebe no nascimento, antes de qualquer script da página:
+/// o tema, o idioma já resolvido (`auto` vira o do Windows) e o dicionário
+/// desse idioma — o `i18n.js` traduz a página sem esperar nada.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub(crate) struct UiPrefs {
     pub(crate) theme: String,
+    pub(crate) lang: String,
+    pub(crate) strings: serde_json::Value,
 }
 
 impl UiPrefs {
     pub(crate) fn from_config(cfg: &config::AppConfig) -> Self {
+        let lang = crate::i18n::resolve(&cfg.ui_lang);
         Self {
             theme: cfg.theme.clone(),
+            lang: lang.to_string(),
+            strings: crate::i18n::strings(lang),
         }
     }
 }
@@ -55,8 +62,9 @@ pub(crate) fn current(app: &AppHandle) -> UiPrefs {
     UiPrefs::from_config(&app.state::<AppState>().config.lock_or_recover())
 }
 
-/// Aplica o tema às janelas abertas: barra de título nativa e evento
-/// `isper-ui` para as páginas trocarem as cores na hora.
+/// Aplica as preferências às janelas abertas: barra de título nativa, títulos
+/// no idioma, menu da bandeja e o evento `isper-ui` para as páginas trocarem
+/// cores e textos na hora.
 pub(crate) fn apply(app: &AppHandle, prefs: &UiPrefs) {
     let native = native_theme(&prefs.theme);
     for label in THEMED_WINDOWS {
@@ -64,7 +72,55 @@ pub(crate) fn apply(app: &AppHandle, prefs: &UiPrefs) {
             let _ = w.set_theme(native);
         }
     }
+    for (label, key) in WINDOW_TITLES {
+        if let Some(w) = app.get_webview_window(label) {
+            let _ = w.set_title(&crate::i18n::tr_lang(&prefs.lang, key, &[]));
+        }
+    }
+    refresh_menu(app);
     let _ = app.emit("isper-ui", prefs);
+}
+
+/// Título de cada janela, por chave do dicionário.
+pub(crate) const WINDOW_TITLES: [(&str, &str); 4] = [
+    ("home", "window.home"),
+    ("library", "window.library"),
+    ("settings", "window.settings"),
+    ("copilot", "window.copilot"),
+];
+
+/// O título da janela `label` no idioma atual.
+pub(crate) fn window_title(app: &AppHandle, label: &str) -> String {
+    let key = WINDOW_TITLES
+        .iter()
+        .find(|(l, _)| *l == label)
+        .map(|(_, k)| *k)
+        .unwrap_or("window.home");
+    crate::i18n::tr(app, key)
+}
+
+/// Preferências para quem nasce sem o script de inicialização (o indicador,
+/// criado pela config do Tauri).
+#[tauri::command]
+pub(crate) fn ui_prefs(app: AppHandle) -> UiPrefs {
+    current(&app)
+}
+
+/// Troca o idioma da interface (Configurações → Sistema). Vale na hora.
+#[tauri::command]
+pub(crate) fn set_ui_lang(app: AppHandle, lang: String) -> Result<String, String> {
+    let state = app.state::<AppState>();
+    let cfg = {
+        let mut c = state.config.lock_or_recover();
+        c.ui_lang = lang;
+        c.normalize();
+        c.clone()
+    };
+    config::save(&cfg).map_err(|e| e.to_string())?;
+    let prefs = UiPrefs::from_config(&cfg);
+    apply(&app, &prefs);
+    tracing::info!(ui_lang = %cfg.ui_lang, lang = %prefs.lang, "idioma da interface trocado");
+    Ok(cfg.ui_lang)
 }
 
 /// Troca o tema (Configurações → Sistema → Aparência). Vale na hora, sem Salvar.
@@ -100,6 +156,8 @@ mod tests {
     fn script_de_inicializacao_publica_json_valido() {
         let s = boot_script(&UiPrefs {
             theme: "light".into(),
+            lang: "en".into(),
+            strings: serde_json::json!({ "common.undo": "Undo" }),
         });
         assert!(s.starts_with("window.__ISPER_UI = "));
         let json = s
@@ -107,6 +165,8 @@ mod tests {
             .trim_end_matches(';');
         let v: serde_json::Value = serde_json::from_str(json).unwrap();
         assert_eq!(v["theme"], "light");
+        assert_eq!(v["lang"], "en");
+        assert_eq!(v["strings"]["common.undo"], "Undo");
     }
 
     /// O tema claro aparece duas vezes no CSS (escolhido à mão e "seguir o

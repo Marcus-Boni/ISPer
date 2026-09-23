@@ -19,6 +19,7 @@ mod data;
 mod dictation;
 mod final_pass;
 mod home;
+mod i18n;
 mod insights;
 mod library;
 mod meetings;
@@ -36,7 +37,6 @@ mod undo;
 mod updater;
 mod views;
 
-use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::ShortcutState;
@@ -227,6 +227,8 @@ fn main() {
             install_update,
             set_show_home,
             ui::set_ui_theme,
+            ui::set_ui_lang,
+            ui::ui_prefs,
             undo::undo_delete,
             dismiss_call_prompt,
             record_call_cmd,
@@ -325,63 +327,12 @@ fn main() {
             }
 
             // Atalhos globais: os preferidos das configurações, senão os primeiros livres.
-            let (label, _meeting_label, _mark_label, _copilot_label) =
+            let (_label, _meeting_label, _mark_label, _copilot_label) =
                 register_shortcuts(app.handle(), &cfg);
 
             // Ícone na bandeja: clique esquerdo abre o Início; direito, o menu.
-            let hint = MenuItem::with_id(app, "hint", hint_text(&label), false, None::<&str>)?;
-            let home_item =
-                MenuItem::with_id(app, "home", "Abrir o ISPer (Início)", true, None::<&str>)?;
-            let copilot_item = MenuItem::with_id(
-                app,
-                "copilot",
-                "ISPer Copilot (Decisões ao vivo)…",
-                true,
-                None::<&str>,
-            )?;
-            let library_item = MenuItem::with_id(
-                app,
-                "library",
-                "Biblioteca de reuniões…",
-                true,
-                None::<&str>,
-            )?;
-            let settings_item =
-                MenuItem::with_id(app, "settings", "Configurações…", true, None::<&str>)?;
-            let meeting_item = MenuItem::with_id(
-                app,
-                "meeting",
-                meeting_item_text(app.handle(), false),
-                true,
-                None::<&str>,
-            )?;
-            let indicator_item = MenuItem::with_id(
-                app,
-                "indicator",
-                indicator_item_text(cfg.overlay_pinned),
-                true,
-                None::<&str>,
-            )?;
-            let quit = MenuItem::with_id(app, "quit", "Sair do ISPer", true, None::<&str>)?;
-            let menu = Menu::with_items(
-                app,
-                &[
-                    &hint,
-                    &home_item,
-                    &copilot_item,
-                    &library_item,
-                    &meeting_item,
-                    &indicator_item,
-                    &settings_item,
-                    &quit,
-                ],
-            )?;
-            {
-                let state = app.state::<AppState>();
-                *state.meeting_item.lock_or_recover() = Some(meeting_item);
-                *state.hint_item.lock_or_recover() = Some(hint);
-                *state.indicator_item.lock_or_recover() = Some(indicator_item);
-            }
+            // O menu mora em tray.rs: é remontado quando o idioma muda.
+            let menu = build_menu(app.handle(), cfg.overlay_pinned)?;
             // Duas versões do ícone: a normal e a com o ponto vermelho de gravação.
             let base_icon = app
                 .default_window_icon()
@@ -393,7 +344,7 @@ fn main() {
                 .icon(base_icon.clone())
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .tooltip("ISPer — ditado e reuniões, 100% local")
+                .tooltip(tray_tooltip(app.handle(), false))
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "quit" => quit_app(app),
                     "home" => open_home(app),

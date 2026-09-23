@@ -37,7 +37,7 @@ pub(crate) fn build_settings(app: &AppHandle) -> tauri::Result<tauri::WebviewWin
         "settings",
         tauri::WebviewUrl::App("settings.html".into()),
     )
-    .title("ISPer — Configurações")
+    .title(crate::ui::window_title(app, "settings"))
     .theme(crate::ui::native_theme(&crate::ui::current(app).theme))
     .initialization_script(crate::ui::boot_script(&crate::ui::current(app)))
     .inner_size(600.0, 760.0)
@@ -55,7 +55,7 @@ pub(crate) fn build_library(app: &AppHandle) -> tauri::Result<tauri::WebviewWind
         "library",
         tauri::WebviewUrl::App("library.html".into()),
     )
-    .title("ISPer — Biblioteca")
+    .title(crate::ui::window_title(app, "library"))
     .theme(crate::ui::native_theme(&crate::ui::current(app).theme))
     .initialization_script(crate::ui::boot_script(&crate::ui::current(app)))
     .inner_size(980.0, 680.0)
@@ -81,7 +81,7 @@ pub(crate) fn open_library_at(app: &AppHandle, meeting_id: i64) {
 /// ações principais, totais e reuniões recentes.
 pub(crate) fn build_home(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
     tauri::WebviewWindowBuilder::new(app, "home", tauri::WebviewUrl::App("home.html".into()))
-        .title("ISPer")
+        .title(crate::ui::window_title(app, "home"))
         .theme(crate::ui::native_theme(&crate::ui::current(app).theme))
         .initialization_script(crate::ui::boot_script(&crate::ui::current(app)))
         .inner_size(960.0, 680.0)
@@ -101,7 +101,7 @@ pub(crate) fn build_copilot(app: &AppHandle) -> tauri::Result<tauri::WebviewWind
         "copilot",
         tauri::WebviewUrl::App("copilot.html".into()),
     )
-    .title("ISPer Copilot — Decisões e Notetaker")
+    .title(crate::ui::window_title(app, "copilot"))
     // A página do Copilot é sempre escura (ver `ui.rs`): a barra de título acompanha.
     .theme(Some(tauri::Theme::Dark))
     .inner_size(980.0, 720.0)

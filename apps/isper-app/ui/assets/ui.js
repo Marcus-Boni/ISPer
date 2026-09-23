@@ -212,6 +212,8 @@
     return (secs / 3600).toFixed(1).replace('.', ',') + ' h';
   };
   const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  // Rótulo de atalho vindo do app ("Ctrl+Alt+Espaço") no idioma da interface.
+  const keyLabel = (label) => String(label || '').replace(/Espaço/g, window.I18N ? window.I18N.t('keys.space', null, 'Espaço') : 'Espaço');
 
-  window.UI = { el, toast, undoable, countUp, stagger, busy, flash, tabs, swap, skeleton, fmtClock, fmtDur, plural, reduce };
+  window.UI = { el, toast, undoable, keyLabel, countUp, stagger, busy, flash, tabs, swap, skeleton, fmtClock, fmtDur, plural, reduce };
 })();

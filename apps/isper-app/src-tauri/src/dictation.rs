@@ -59,7 +59,7 @@ pub(crate) fn on_released(app: &AppHandle) {
 /// comando de voz ("apagar isso"), sem colar nada.
 pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<String>> {
     if raw.duration_secs() < 0.4 {
-        anyhow::bail!("segure o atalho enquanto fala");
+        anyhow::bail!(crate::i18n::tr(app, "errors.hold-shortcut"));
     }
     let _ = app.emit("isper-state", json!({"state": "transcribing"}));
 
@@ -68,7 +68,7 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<S
         let guard = state.engine.lock_or_recover();
         guard
             .clone()
-            .ok_or_else(|| anyhow::anyhow!("o modelo ainda está carregando — tente em instantes"))?
+            .ok_or_else(|| anyhow::anyhow!(crate::i18n::tr(app, "errors.model-loading")))?
     };
     let (lang, prompt) = {
         let cfg = state.config.lock_or_recover();
@@ -88,7 +88,7 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<S
     record_event(EVENT_DICTATION, true, Some(t.infer_secs), Some(audio_secs));
     let raw_text = t.text.trim().to_string();
     if raw_text.is_empty() {
-        anyhow::bail!("não entendi — tente de novo");
+        anyhow::bail!(crate::i18n::tr(app, "errors.not-understood"));
     }
     tracing::info!(
         audio_secs,
@@ -116,7 +116,7 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<S
         return Ok(None);
     }
     if cmd.text.trim().is_empty() {
-        anyhow::bail!("não entendi — tente de novo");
+        anyhow::bail!(crate::i18n::tr(app, "errors.not-understood"));
     }
 
     // Polimento opcional por IA (só o texto viaja). Qualquer falha cola o original.

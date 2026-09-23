@@ -18,6 +18,15 @@ bata com ela.
   tema certo, sem piscar. A paleta clara passa no contraste WCAG AA em todos
   os textos. O indicador flutuante e o Copilot continuam escuros: flutuam
   sobre outros apps e precisam do contraste próprio.
+- **Interface em inglês** (fase 7.5, primeira parte). Configurações → Sistema →
+  *Idioma da interface*: seguir o Windows (padrão), Português (Brasil) ou
+  English. Vale na hora, sem reiniciar: as Configurações, o indicador
+  flutuante, o menu da bandeja, os títulos das janelas, as notificações e as
+  mensagens de erro do ditado e da reunião. Os textos moram em dicionários
+  JSON (`ui/locales/`) embutidos no app, e testes garantem que os dois
+  idiomas têm as mesmas chaves e os mesmos marcadores. O Início, a Biblioteca
+  e o Copilot entram na próxima leva. O idioma da fala continua sendo outra
+  escolha, em Ditado.
 
 ### Alterado
 - **Excluir agora tem "Desfazer"** no lugar do "clique de novo para

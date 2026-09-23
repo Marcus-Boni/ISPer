@@ -95,11 +95,11 @@ pub(crate) async fn check(app: &AppHandle) -> anyhow::Result<Option<UpdateInfo>>
 /// ISPer e o instalador (modo passivo) reabre o app na versão nova.
 pub(crate) async fn install(app: &AppHandle) -> anyhow::Result<String> {
     if app.state::<AppState>().meeting.lock_or_recover().is_some() {
-        anyhow::bail!("encerre a reunião antes de atualizar");
+        anyhow::bail!(crate::i18n::tr(app, "errors.update-in-meeting"));
     }
     let updater = build_updater(app)?;
     let Some(update) = updater.check().await.map_err(friendly)? else {
-        anyhow::bail!("você já está na última versão");
+        anyhow::bail!(crate::i18n::tr(app, "errors.already-latest"));
     };
     let version = update.version.clone();
 
@@ -158,13 +158,17 @@ fn announce(app: &AppHandle, info: &UpdateInfo) {
         }
         *announced = Some(info.version.clone());
     }
-    let line1 = format!("ISPer {} está pronto para instalar", info.version);
+    let line1 = crate::i18n::trv(app, "notify.update-line1", &[("v", info.version.clone())]);
+    let (title, line2) = (
+        crate::i18n::tr(app, "notify.update"),
+        crate::i18n::tr(app, "notify.update-line2"),
+    );
     let app2 = app.clone();
     let _ = notify::show(
         notify::Toast {
-            title: "Atualização disponível",
+            title: &title,
             line1: &line1,
-            line2: Some("Abra o Início para atualizar quando quiser."),
+            line2: Some(&line2),
             silent: true,
         },
         move || open_home(&app2),
