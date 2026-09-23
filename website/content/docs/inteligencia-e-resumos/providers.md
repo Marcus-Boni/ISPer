@@ -36,4 +36,4 @@ Quando ativados, os insights analisam janelas recentes da transcrição durante 
 
 ## Copilot
 
-O mesmo provedor alimenta o Copilot, que durante a reunião transforma a conversa em cards de decisão, ação, risco e pergunta. Diferente dos insights, ele analisa toda reunião gravada quando há um provedor configurado — veja [Memória, privacidade e custo do Copilot](/docs/copilot/memoria-privacidade-e-custo/).
+O mesmo provedor alimenta o Copilot, que durante a reunião transforma a conversa em cards de decisão, ação, risco e pergunta. Ele só consome o provedor enquanto a janela dele está aberta — veja [Memória, privacidade e custo do Copilot](/docs/copilot/memoria-privacidade-e-custo/).

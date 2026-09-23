@@ -443,10 +443,21 @@ calibrated with real meetings**). The trigger phrases live in `DECISION_CUES`,
 Portuguese, like the prompt: with the interface in English, the cards,
 answers and notes still come out in Portuguese.
 
-**Cost:** with a provider configured, the loop runs on **every** meeting,
-with the HUD open or not — unlike Live insights, which only run periodic
-rounds with `live_insights` on. In a continuous conversation that is close to
-80 calls per hour.
+**Cost:** rounds, triggers and memory only happen with the HUD window on
+screen — visible, even behind another one, and not minimized. The loop checks
+every 2 s (`WATCH_TICK`) and, when the window appears, reads the conversation
+right away; the decision for each turn lives in `turn()`, with tests. With the
+window open, a continuous conversation comes to about 80 calls per hour. Up to
+0.20.0 the loop ran on every meeting, with the HUD open or not.
+
+**Notes:** the notepad goes with the meeting — a "Notas da reunião" section at
+the end of the `.md`, a `notes` column in the database (schema v4) and the
+Library. Ending the meeting captures the state (`CopilotWrapUp`) with its
+generation; while the state still belongs to that meeting the latest text
+wins, and once it is saved every edit rewrites the database and the minutes.
+Notes are not sent to the summary provider, only to "Enrich". Every rewrite of
+the `.md` goes through `meeting_markdown` (in `library.rs`), one at a time,
+and puts decisions and notes at the end.
 
 **A new window must be added to the ACL.** Outside `capabilities/default.json`,
 Tauri denies `plugin:event|listen` and the window receives no events at all —

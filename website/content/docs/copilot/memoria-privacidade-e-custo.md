@@ -31,28 +31,30 @@ O **áudio nunca sai**. A transcrição acontece localmente, e o que o Copilot e
 
 | O quê | Para onde | Quanto |
 |---|---|---|
-| Leitura da conversa (os cards) | Provedor de IA | Os últimos 20 minutos de transcrição |
-| Pergunte à Reunião e Notas | Provedor de IA | Os últimos 30 minutos, só quando você pede |
+| Leitura da conversa (os cards) | Provedor de IA | Os últimos 20 minutos de transcrição, só com a janela aberta |
+| Pergunte à Reunião e Enriquecer notas | Provedor de IA | Os últimos 30 minutos, só quando você pede |
 | Memória | Provedor de embeddings | Uma frase com o assunto do momento |
 
 Com o **Ollama** como provedor de embeddings, a memória não envia nada para fora. O provedor de IA dos cards é o mesmo dos resumos.
+
+As **notas** que você escreve ficam na máquina: vão para a ata e para a Biblioteca, mas não para o resumo da reunião. Elas só saem quando você pede para enriquecê-las.
 
 > [!WARNING/Atenção]
 > Antes de usar o Copilot numa reunião de trabalho, confirme se a política da sua organização permite enviar transcrições para o provedor configurado.
 
 ## Custo
 
-**Com um provedor de IA configurado, o Copilot analisa toda reunião gravada — com a janela dele aberta ou não.** É o que permite abrir o Copilot no meio da reunião e já encontrar os cards prontos.
+**O Copilot só consome o provedor de IA enquanto a janela dele está aberta** — visível, mesmo atrás de outra janela. Fechada, escondida pelo atalho ou minimizada, ele não faz leituras: a fala ao vivo e a dinâmica da conversa continuam sendo registradas, sem custo, e ao reabrir a janela ele lê de uma vez o que foi dito (até os últimos 20 minutos).
 
-Na prática, numa conversa contínua:
+Com a janela aberta, numa conversa contínua:
 
 - a primeira leitura acontece cerca de 20 segundos depois do início;
 - depois, o Copilot relê a conversa a cada 45 segundos, enquanto houver fala nova;
 - as frases que marcam acordos, tarefas e objeções antecipam leituras, com um intervalo mínimo entre elas.
 
-Isso dá algo perto de **80 leituras por hora de reunião**, cada uma com até 20 minutos de transcrição. Perguntas, enriquecimento de notas e a busca da memória são chamadas extras, feitas só quando acontecem.
+Isso dá algo perto de **80 leituras por hora com a janela aberta**, cada uma com até 20 minutos de transcrição. Perguntas, enriquecimento de notas e a busca da memória são chamadas extras, feitas só quando acontecem.
 
 - **Com provedores gratuitos** (Groq, Gemini), reuniões longas podem esbarrar no limite de uso da conta. Quando isso acontece, a faixa no topo da janela mostra o erro e oferece **Tentar de novo**.
-- **Com provedores pagos**, o consumo é proporcional ao tempo de reunião gravada.
+- **Com provedores pagos**, o consumo é proporcional ao tempo com a janela do Copilot aberta.
 
-Os **Insights ao vivo** do Início são outro recurso, com comportamento diferente: eles só fazem leituras periódicas se você ativá-los em **Configurações → Inteligência**. O Copilot hoje não tem uma opção equivalente — para ele não consumir o provedor, é preciso deixar o provedor de IA sem configuração, o que desliga também os resumos.
+Os **Insights ao vivo** do Início são outro recurso: eles só fazem leituras periódicas se você ativá-los em **Configurações → Inteligência**. No Copilot, o interruptor é a própria janela. Até a versão 0.20.0, ele analisava toda reunião gravada com provedor configurado, com a janela aberta ou não.
