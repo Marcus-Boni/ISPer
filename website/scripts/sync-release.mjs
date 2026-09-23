@@ -21,6 +21,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { notesFromBody } from "./lib/release-notes.mjs";
+import { parseArgs } from "./lib/sync-args.mjs";
 
 const SNAPSHOT = path.join(process.cwd(), "content", "data", "releases.snapshot.json");
 const CHECKSUMS = "SHA256SUMS.txt";
@@ -36,20 +37,6 @@ const DEFAULTS = {
     requirements: ["Windows 10/11 x64", "GPU NVIDIA compatível com CUDA", "VRAM conforme modelo Whisper escolhido"],
   },
 };
-
-function parseArgs(argv) {
-  const args = { check: false, tag: null };
-  for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === "--check") args.check = true;
-    else if (argv[i] === "--tag") args.tag = argv[i + 1] ?? null;
-    else if (argv[i].startsWith("--tag=")) args.tag = argv[i].slice("--tag=".length);
-    else throw new Error(`argumento desconhecido: ${argv[i]}`);
-  }
-  if (args.tag !== null && !/^v\d+\.\d+\.\d+/.test(args.tag)) {
-    throw new Error(`--tag precisa parecer uma tag de versão, recebi: ${args.tag}`);
-  }
-  return args;
-}
 
 async function api(url) {
   const headers = { accept: "application/vnd.github+json", "user-agent": "isper-portal-sync" };
