@@ -7,6 +7,7 @@
 <script src="assets/i18n.js"></script>
 <link rel="stylesheet" href="assets/base.css">
 <style>
+  #b-settings .knob { fill: var(--panel); }
   body { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; overflow: hidden; }
 
   /* ---- cabeçalho ---- */
@@ -122,30 +123,30 @@
 <header class="bar">
   <div class="brand">ISPer<span>.</span></div>
   <span class="ver" id="ver">…</span>
-  <div class="state" id="state" role="status" aria-live="polite"><span class="dot" id="statedot"></span><span id="statetext">carregando…</span></div>
+  <div class="state" id="state" role="status" aria-live="polite"><span class="dot" id="statedot"></span><span id="statetext" data-i18n="home.top.statetext">carregando…</span></div>
   <div class="spacer"></div>
-  <button class="btn btn-ghost" id="b-indicator" aria-pressed="false" title="Mostrar o indicador flutuante (fica na tela até você ocultar)">
+  <button class="btn btn-ghost" id="b-indicator" aria-pressed="false" title="Mostrar o indicador flutuante (fica na tela até você ocultar)" data-i18n-attr="title:home.top.mostrar-indicador-flutuante-fica-tela.title">
     <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".45"/></svg>
-    Indicador
+    <span data-i18n="home.btn.indicator">Indicador</span>
   </button>
   <button class="btn btn-ghost" id="b-library">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h7.5A1.5 1.5 0 0 1 12 4v9.5H4.5A1.5 1.5 0 0 0 3 15z"/><path d="M3 12.5A1.5 1.5 0 0 1 4.5 11H12"/></svg>
-    Biblioteca
+    <span data-i18n="home.btn.library">Biblioteca</span>
   </button>
   <button class="btn btn-ghost" id="b-settings">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 4.5h12M2 11.5h12"/><circle cx="6" cy="4.5" r="1.9" fill="#1e1a18"/><circle cx="10" cy="11.5" r="1.9" fill="#1e1a18"/></svg>
-    Configurações
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 4.5h12M2 11.5h12"/><circle class="knob" cx="6" cy="4.5" r="1.9"/><circle class="knob" cx="10" cy="11.5" r="1.9"/></svg>
+    <span data-i18n="home.btn.settings">Configurações</span>
   </button>
 </header>
 
 <main>
   <section class="card update" id="update" hidden role="status" aria-live="polite">
     <span class="dot-new" aria-hidden="true"></span>
-    <div class="text"><b>ISPer <span id="upd-ver"></span> disponível</b><span class="hint" id="upd-meta"></span></div>
-    <button class="btn-link" id="upd-notes" hidden>novidades</button>
+    <div class="text"><b>ISPer <span id="upd-ver"></span> <span data-i18n="home.update-available">disponível</span></b><span class="hint" id="upd-meta"></span></div>
+    <button class="btn-link" id="upd-notes" hidden data-i18n="home.top.upd-notes">novidades</button>
     <div class="spacer"></div>
-    <button class="btn btn-ghost btn-sm" id="upd-later" title="Esconder até a próxima abertura do ISPer">Depois</button>
-    <button class="btn btn-primary btn-sm" id="upd-install">Atualizar agora</button>
+    <button class="btn btn-ghost btn-sm" id="upd-later" title="Esconder até a próxima abertura do ISPer" data-i18n="home.top.upd-later" data-i18n-attr="title:home.top.esconder-ate-proxima-abertura-isper.title">Depois</button>
+    <button class="btn btn-primary btn-sm" id="upd-install" data-i18n="home.top.upd-install">Atualizar agora</button>
     <div class="progress" id="upd-progress" hidden><div class="bar"></div></div>
     <pre class="notes" id="upd-body" hidden></pre>
   </section>
@@ -154,57 +155,57 @@
     <span class="dot warn pulse" aria-hidden="true"></span>
     <div class="text"><b id="call-title"></b><span class="hint" id="call-meta"></span></div>
     <div class="spacer"></div>
-    <button class="btn btn-ghost btn-sm" id="call-later">Agora não</button>
-    <button class="btn btn-primary btn-sm" id="call-record">Gravar transcrição</button>
+    <button class="btn btn-ghost btn-sm" id="call-later" data-i18n="home.top.call-later">Agora não</button>
+    <button class="btn btn-primary btn-sm" id="call-record" data-i18n="home.top.call-record">Gravar transcrição</button>
   </section>
 
   <section class="hero">
     <div class="card reveal" data-i="0">
-      <p class="eyebrow">Ditado em qualquer app</p>
-      <div class="keys" id="keys" aria-label="atalho global"></div>
-      <p class="lead">Segure para falar, solte para colar.</p>
-      <p class="desc">Um toque rápido liga o modo mãos-livres: fale à vontade e o ISPer cola sozinho após ~1,2 s de silêncio (ou um segundo toque). Funciona em qualquer campo de texto — Teams, e-mail, terminal.</p>
+      <p class="eyebrow" data-i18n="home.top.ditado-qualquer-app">Ditado em qualquer app</p>
+      <div class="keys" id="keys" aria-label="atalho global" data-i18n-attr="aria-label:home.top.atalho-global.aria"></div>
+      <p class="lead" data-i18n="home.top.segure-falar-solte-colar">Segure para falar, solte para colar.</p>
+      <p class="desc" data-i18n="home.top.toque-rapido-liga-modo-maos">Um toque rápido liga o modo mãos-livres: fale à vontade e o ISPer cola sozinho após ~1,2 s de silêncio (ou um segundo toque). Funciona em qualquer campo de texto — Teams, e-mail, terminal.</p>
       <dl class="specs">
-        <dt>Modelo</dt><dd id="s-model">…</dd>
-        <dt>Idioma</dt><dd id="s-lang">…</dd>
-        <dt>Microfone</dt><dd id="s-mic">…</dd>
-        <dt>Dicionário</dt><dd id="s-dict">…</dd>
-        <dt>Comandos de voz</dt><dd id="s-voice">…</dd>
-        <dt>Polimento IA</dt><dd id="s-polish">…</dd>
+        <dt data-i18n="home.top.modelo">Modelo</dt><dd id="s-model">…</dd>
+        <dt data-i18n="home.top.idioma">Idioma</dt><dd id="s-lang">…</dd>
+        <dt data-i18n="home.top.microfone">Microfone</dt><dd id="s-mic">…</dd>
+        <dt data-i18n="home.top.dicionario">Dicionário</dt><dd id="s-dict">…</dd>
+        <dt data-i18n="home.top.comandos-voz">Comandos de voz</dt><dd id="s-voice">…</dd>
+        <dt data-i18n="home.top.polimento-ia">Polimento IA</dt><dd id="s-polish">…</dd>
       </dl>
-      <button class="btn btn-link" id="l-dictate">Ajustar atalho, idioma, microfone e dicionário →</button>
+      <button class="btn btn-link" id="l-dictate" data-i18n="home.top.l-dictate">Ajustar atalho, idioma, microfone e dicionário →</button>
     </div>
 
     <div class="card reveal" data-i="1">
-      <p class="eyebrow">Reuniões</p>
-      <p class="lead" id="m-lead">Grave, transcreva e resuma.</p>
-      <p class="desc" id="m-desc">Seu microfone vira "Eu"; o áudio dos participantes vem do próprio Windows. Ao encerrar, o transcript vai para a Biblioteca e para um arquivo .md.</p>
+      <p class="eyebrow" data-i18n="home.top.reunioes">Reuniões</p>
+      <p class="lead" id="m-lead" data-i18n="home.top.m-lead">Grave, transcreva e resuma.</p>
+      <p class="desc" id="m-desc" data-i18n="home.top.m-desc">Seu microfone vira "Eu"; o áudio dos participantes vem do próprio Windows. Ao encerrar, o transcript vai para a Biblioteca e para um arquivo .md.</p>
       <div class="row actions-row">
-        <button class="btn btn-primary" id="b-meeting">Iniciar gravação de reunião</button>
+        <button class="btn btn-primary" id="b-meeting" data-i18n="home.top.b-meeting">Iniciar gravação de reunião</button>
         <span class="timer" id="m-timer"></span>
-        <button class="btn btn-sm btn-subtle" id="b-copilot" title="Abrir ISPer Copilot (decisões ao vivo, transcrição e notetaker)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg>Copilot HUD</button>
-        <button class="btn btn-sm" id="b-mark" title="registra o instante para o resumo e a Biblioteca" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z"/></svg>Marcar momento</button>
-        <label class="switch" id="cap-switch" title="barra larga de legendas no indicador flutuante" hidden><input type="checkbox" id="captions"><span class="track"><span class="thumb"></span></span>Legendas ao vivo</label>
+        <button class="btn btn-sm btn-subtle" id="b-copilot" title="Abrir ISPer Copilot (decisões ao vivo, transcrição e notetaker)" data-i18n-attr="title:home.top.abrir-isper-copilot-decisoes-vivo.title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg><span data-i18n="home.btn.copilot">Copilot HUD</span></button>
+        <button class="btn btn-sm" id="b-mark" title="registra o instante para o resumo e a Biblioteca" hidden data-i18n-attr="title:home.top.registra-instante-resumo-biblioteca.title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z"/></svg><span data-i18n="home.btn.mark">Marcar momento</span></button>
+        <label class="switch" id="cap-switch" title="barra larga de legendas no indicador flutuante" hidden data-i18n-attr="title:home.top.barra-larga-legendas-indicador-flutuante.title"><input type="checkbox" id="captions"><span class="track"><span class="thumb"></span></span><span data-i18n="home.top.legendas-vivo">Legendas ao vivo</span></label>
       </div>
       <dl class="specs">
-        <dt>Atalho</dt><dd id="s-mshortcut">…</dd>
-        <dt>Marcar momento</dt><dd id="s-markshortcut">…</dd>
-        <dt>Copilot</dt><dd id="s-copilotshortcut">…</dd>
-        <dt>Áudio</dt><dd id="s-source">…</dd>
-        <dt>Falantes</dt><dd id="s-diar">…</dd>
-        <dt>Resumo por IA</dt><dd id="s-llm">…</dd>
-        <dt>Chamadas do Teams</dt><dd id="s-call">…</dd>
+        <dt data-i18n="home.top.atalho">Atalho</dt><dd id="s-mshortcut">…</dd>
+        <dt data-i18n="home.top.marcar-momento">Marcar momento</dt><dd id="s-markshortcut">…</dd>
+        <dt data-i18n="home.top.copilot">Copilot</dt><dd id="s-copilotshortcut">…</dd>
+        <dt data-i18n="home.top.audio">Áudio</dt><dd id="s-source">…</dd>
+        <dt data-i18n="home.top.falantes">Falantes</dt><dd id="s-diar">…</dd>
+        <dt data-i18n="home.top.resumo-por-ia">Resumo por IA</dt><dd id="s-llm">…</dd>
+        <dt data-i18n="home.top.chamadas-teams">Chamadas do Teams</dt><dd id="s-call">…</dd>
       </dl>
-      <p class="desc desc-sm">Avise os participantes de que a reunião está sendo transcrita (LGPD).</p>
+      <p class="desc desc-sm" data-i18n="home.top.avise-participantes-reuniao-esta-sendo">Avise os participantes de que a reunião está sendo transcrita (LGPD).</p>
       <div class="live" id="live" hidden>
-        <div class="head"><p class="eyebrow">Ao vivo</p><p class="hint">cada bloco de ~20 s aparece assim que é transcrito</p></div>
+        <div class="head"><p class="eyebrow" data-i18n="home.top.vivo">Ao vivo</p><p class="hint" data-i18n="home.live.hint">as falas aparecem em segundos; o texto definitivo entra quando cada trecho fecha</p></div>
         <div class="live-list" id="live-list"></div>
       </div>
       <div class="insights" id="insights" hidden>
         <div class="head">
-          <p class="eyebrow">Insights ao vivo</p>
+          <p class="eyebrow" data-i18n="home.top.insights-vivo">Insights ao vivo</p>
           <span class="hint" id="ins-meta"></span>
-          <button class="btn btn-sm btn-ghost" id="ins-now" title="pede uma rodada agora — só o texto do transcript viaja ao provider">Atualizar agora</button>
+          <button class="btn btn-sm btn-ghost" id="ins-now" title="pede uma rodada agora — só o texto do transcript viaja ao provider" data-i18n="home.top.ins-now" data-i18n-attr="title:home.top.pede-rodada-agora-so-texto.title">Atualizar agora</button>
         </div>
         <div class="ins-body" id="ins-body"></div>
         <div class="ins-error" id="ins-error" hidden></div>
@@ -213,26 +214,26 @@
   </section>
 
   <section class="card todo reveal" id="todo" data-i="2" hidden>
-    <p class="eyebrow" id="todo-title">Para aproveitar tudo</p>
+    <p class="eyebrow" id="todo-title" data-i18n="home.top.todo-title">Para aproveitar tudo</p>
     <div id="todo-list"></div>
   </section>
 
-  <section class="stats reveal" id="stats" data-i="3" aria-label="totais"></section>
+  <section class="stats reveal" id="stats" data-i="3" aria-label="totais" data-i18n-attr="aria-label:home.stats-aria"></section>
 
   <section class="card recent reveal" data-i="4">
     <div class="head">
-      <p class="eyebrow">Reuniões recentes</p>
-      <button class="btn btn-link" id="l-all">Ver todas na Biblioteca →</button>
+      <p class="eyebrow" data-i18n="home.top.reunioes-recentes">Reuniões recentes</p>
+      <button class="btn btn-link" id="l-all" data-i18n="home.top.l-all">Ver todas na Biblioteca →</button>
     </div>
     <div id="recent"></div>
   </section>
 </main>
 
 <footer class="bar bar-bottom">
-  <span>100% local — o áudio nunca sai da sua máquina.</span>
-  <button class="btn btn-link" id="l-folder">Abrir pasta de reuniões</button>
+  <span data-i18n="home.top.100-local-audio-nunca-sai">100% local — o áudio nunca sai da sua máquina.</span>
+  <button class="btn btn-link" id="l-folder" data-i18n="home.top.l-folder">Abrir pasta de reuniões</button>
   <span class="spacer"></span>
-  <label class="switch"><input type="checkbox" id="showhome"><span class="track"><span class="thumb"></span></span>Mostrar esta tela ao abrir o ISPer</label>
+  <label class="switch"><input type="checkbox" id="showhome"><span class="track"><span class="thumb"></span></span><span data-i18n="home.top.mostrar-esta-tela-abrir-isper">Mostrar esta tela ao abrir o ISPer</span></label>
 </footer>
 
 <script src="assets/ui.js"></script>
@@ -240,11 +241,13 @@
   const { invoke } = window.__TAURI__.core;
   const { listen } = window.__TAURI__.event;
   const $ = (id) => document.getElementById(id);
-  const { el, toast, countUp, fmtClock, fmtDur, plural } = UI;
-  const LANG = { pt: 'Português', en: 'Inglês', auto: 'Detecção automática' };
-  const SOURCE = { system: 'Todo o sistema', teams: 'Só o Microsoft Teams' };
+  const { el, toast, countUp, fmtClock, fmtDur } = UI;
+  // Rótulos por valor da config, lidos na hora (o idioma pode mudar com a janela aberta).
+  const LANG = { pt: () => t('home.lang.pt'), en: () => t('home.lang.en'), auto: () => t('home.lang.auto') };
+  const SOURCE = { system: () => t('home.source.system'), teams: () => t('home.source.teams') };
   const PROVIDER = { groq: 'Groq', gemini: 'Gemini', claude: 'Claude' };
-  const CALL_DETECT = { notify: 'avisa quando uma chamada começa', auto: 'grava automaticamente', off: 'detecção desligada' };
+  const CALL_DETECT = { notify: () => t('home.call.notify'), auto: () => t('home.call.auto'), off: () => t('home.call.off') };
+  const label = (map, key) => (map[key] ? map[key]() : key);
 
   let meetingStart = null;   // ms; null = sem reunião
   let callSince = null;      // ms; null = sem chamada em andamento (banner)
@@ -253,8 +256,8 @@
   let dictation = null;      // 'recording' | 'transcribing' | 'done' | null — feedback ao vivo do ditado
   let firstRender = true;
 
-  const openSettings = () => invoke('open_settings_window').catch(e => toast('erro: ' + e, 'err'));
-  const openLibrary = (meeting = null) => invoke('open_library_window', { meeting }).catch(e => toast('erro: ' + e, 'err'));
+  const openSettings = () => invoke('open_settings_window').catch(e => toast(t('common.error', { e }), 'err'));
+  const openLibrary = (meeting = null) => invoke('open_library_window', { meeting }).catch(e => toast(t('common.error', { e }), 'err'));
 
   // ------------------------------------------------------------ render
   function setState(cls, dotCls, text) {
@@ -267,25 +270,25 @@
   function renderKeys(label) {
     const keys = $('keys');
     keys.replaceChildren();
-    if (!label || label.startsWith('(')) { keys.appendChild(el('span', 'desc', 'Nenhum atalho livre — escolha outro nas Configurações.')); return; }
+    if (!label || label.startsWith('(')) { keys.appendChild(el('span', 'desc', t('home.no-shortcut'))); return; }
     label.split('+').forEach((k, i) => {
       if (i) keys.appendChild(el('span', 'plus', '+'));
-      keys.appendChild(el('kbd', 'key', k.trim()));
+      keys.appendChild(el('kbd', 'key', UI.keyLabel(k.trim())));
     });
   }
   const pressKeys = (on) => $('keys').querySelectorAll('kbd').forEach(k => k.classList.toggle('pressed', on));
 
   function renderStatePill(st) {
     const e = st.engine;
-    if (dictation === 'recording') setState('dictating', 'bad pulse', 'ditando… solte para colar');
-    else if (dictation === 'transcribing') setState('dictating', 'warn pulse', 'transcrevendo…');
-    else if (dictation === 'polishing') setState('dictating', 'warn pulse', 'polindo com IA…');
-    else if (dictation === 'done') setState('done', 'ok burst', 'colado ✓');
-    else if (st.meeting_active) setState('meeting', 'bad pulse', 'gravando reunião' + (meetingStart ? ' · ' + fmtClock((Date.now() - meetingStart) / 1000) : ''));
-    else if (e.kind === 'ready') setState('ready', 'ok', 'pronto para ditar');
-    else if (e.kind === 'loading') setState('loading', 'warn pulse', 'carregando o modelo…');
-    else if (e.kind === 'missing') setState('missing', 'bad', 'nenhum modelo instalado');
-    else setState('failed', 'bad', 'o modelo não carregou');
+    if (dictation === 'recording') setState('dictating', 'bad pulse', t('home.state.dictating'));
+    else if (dictation === 'transcribing') setState('dictating', 'warn pulse', t('home.state.transcribing'));
+    else if (dictation === 'polishing') setState('dictating', 'warn pulse', t('home.state.polishing'));
+    else if (dictation === 'done') setState('done', 'ok burst', t('home.state.pasted'));
+    else if (st.meeting_active) setState('meeting', 'bad pulse', t('home.state.meeting') + (meetingStart ? ' · ' + fmtClock((Date.now() - meetingStart) / 1000) : ''));
+    else if (e.kind === 'ready') setState('ready', 'ok', t('home.state.ready'));
+    else if (e.kind === 'loading') setState('loading', 'warn pulse', t('home.state.loading'));
+    else if (e.kind === 'missing') setState('missing', 'bad', t('home.state.missing'));
+    else setState('failed', 'bad', t('home.state.failed'));
   }
 
   function renderDictation(st) {
@@ -294,27 +297,27 @@
     const model = $('s-model');
     model.replaceChildren();
     if (e.kind === 'ready') { model.append(e.label); model.appendChild(el('span', 'chip chip-ok', st.gpu ? 'GPU · CUDA' : 'CPU')); }
-    else if (e.kind === 'loading') { model.append('carregando…'); }
-    else if (e.kind === 'missing') { model.append('nenhum instalado'); model.appendChild(el('span', 'chip chip-warn', 'ação necessária')); }
-    else model.textContent = 'falhou: ' + e.message;
-    $('s-lang').textContent = LANG[st.lang] || st.lang;
-    $('s-mic').textContent = st.input_device || 'padrão do sistema';
+    else if (e.kind === 'loading') { model.append(t('home.dict.loading')); }
+    else if (e.kind === 'missing') { model.append(t('home.dict.none-installed')); model.appendChild(el('span', 'chip chip-warn', t('home.dict.action-needed'))); }
+    else model.textContent = t('home.dict.failed', { e: e.message });
+    $('s-lang').textContent = label(LANG, st.lang);
+    $('s-mic').textContent = st.input_device || t('home.dict.mic-default');
     $('s-dict').textContent = st.dictionary_terms
-      ? plural(st.dictionary_terms, 'termo', 'termos') + ' que o Whisper deve grafar certo'
-      : 'vazio — adicione nomes e siglas que o Whisper costuma errar';
+      ? t('home.dict.terms', { n: st.dictionary_terms })
+      : t('home.dict.empty');
     const voice = $('s-voice');
     voice.replaceChildren();
-    if (st.voice_commands) { voice.append('ligados'); voice.appendChild(el('span', 'chip chip-ok', '"nova linha", "ponto final", "apagar isso"…')); }
-    else { voice.append('desligados'); voice.appendChild(el('span', 'chip', 'Configurações → Ditado')); }
+    if (st.voice_commands) { voice.append(t('home.dict.voice-on')); voice.appendChild(el('span', 'chip chip-ok', t('home.dict.voice-chip'))); }
+    else { voice.append(t('home.dict.voice-off')); voice.appendChild(el('span', 'chip', t('home.dict.voice-where'))); }
     const pol = $('s-polish');
     pol.replaceChildren();
     if (st.polish) {
-      const STYLE = { clean: 'só limpeza', formal: 'tom formal', casual: 'tom casual' };
-      pol.append('ligado · ' + (STYLE[st.polish_style] || st.polish_style));
-      pol.appendChild(el('span', 'chip ' + (st.llm_provider && st.llm_key_present ? 'chip-ok' : 'chip-warn'), st.llm_provider && st.llm_key_present ? 'via ' + (PROVIDER[st.llm_provider] || st.llm_provider) : 'sem provider — cola o original'));
+      const STYLE = { clean: () => t('home.polish.clean'), formal: () => t('home.polish.formal'), casual: () => t('home.polish.casual') };
+      pol.append(t('home.polish.on', { style: label(STYLE, st.polish_style) }));
+      pol.appendChild(el('span', 'chip ' + (st.llm_provider && st.llm_key_present ? 'chip-ok' : 'chip-warn'), st.llm_provider && st.llm_key_present ? t('home.polish.via', { provider: PROVIDER[st.llm_provider] || st.llm_provider }) : t('home.polish.no-provider')));
     } else {
-      pol.append('desligado');
-      pol.appendChild(el('span', 'chip', 'opcional'));
+      pol.append(t('home.off'));
+      pol.appendChild(el('span', 'chip', t('home.optional')));
     }
   }
 
@@ -324,7 +327,7 @@
     const row = el('div', 'live-row' + (seg.speaker === 'Eu' ? ' eu' : ''));
     row.appendChild(el('span', 'ts num', fmtClock(seg.start_secs)));
     const body = el('span');
-    body.appendChild(el('span', 'sp', seg.speaker + ':'));
+    body.appendChild(el('span', 'sp', UI.speaker(seg.speaker) + ':'));
     body.appendChild(el('span', 'tx', seg.text));
     row.appendChild(body);
     return row;
@@ -344,7 +347,7 @@
     const row = el('div', 'live-row');
     row.appendChild(el('span', 'ts num', fmtClock(atSecs)));
     const body = el('span');
-    body.appendChild(el('span', 'sp text-warn', 'momento marcado'));
+    body.appendChild(el('span', 'sp text-warn', t('home.live.moment')));
     row.appendChild(body);
     list.appendChild(row);
     list.scrollTop = list.scrollHeight;
@@ -357,7 +360,7 @@
     if (!rows.length) {
       const w = el('div', 'live-wait');
       w.appendChild(el('span', 'dot warn pulse'));
-      w.appendChild(el('span', '', 'ouvindo… a primeira fala aparece em até ~30 s'));
+      w.appendChild(el('span', '', t('home.live.waiting')));
       list.appendChild(w);
       return;
     }
@@ -385,12 +388,12 @@
         let text = b[1]; let cls = '';
         const task = text.match(/^\[( |x|X)\]\s*(.*)$/);
         if (task) { cls = task[1] === ' ' ? 'task' : 'done'; text = task[2]; }
-        if (/^nenhum[a]?\.?$/i.test(text)) cls += ' none';
+        if (/^(nenhum[a]?|none)\.?$/i.test(text)) cls += ' none';
         const li = el('li', cls.trim()); inline(text, li); ul.appendChild(li);
         continue;
       }
       ul = null;
-      const p = el('p', /^nenhum[a]?\.?$/i.test(line) ? 'none' : ''); inline(line, p); box.appendChild(p);
+      const p = el('p', /^(nenhum[a]?|none)\.?$/i.test(line) ? 'none' : ''); inline(line, p); box.appendChild(p);
     }
   }
   let insightsSig = '';
@@ -406,17 +409,17 @@
       meta.textContent = '';
       body.replaceChildren();
       const e = el('div', 'ins-empty');
-      e.append('Conecte um provider de IA para receber pendências, compromissos e decisões durante a reunião.');
-      const b = el('button', 'btn btn-sm', 'Configurar IA'); b.addEventListener('click', openSettings); e.appendChild(b);
+      e.append(t('home.ins.connect'));
+      const b = el('button', 'btn btn-sm', t('home.ins.configure')); b.addEventListener('click', openSettings); e.appendChild(b);
       body.appendChild(e);
       insightsSig = '';
       return;
     }
-    const nextIn = ins.next_in_secs != null ? (ins.next_in_secs < 60 ? 'menos de 1 min' : Math.round(ins.next_in_secs / 60) + ' min') : null;
-    if (ins.running) meta.textContent = 'gerando…';
-    else if (ins.last) meta.textContent = 'atualizado às ' + ins.last.updated_at + (ins.enabled && nextIn ? ' · próximo em ' + nextIn : '') + ' · via ' + (PROVIDER[ins.last.provider] || ins.last.provider);
-    else if (ins.enabled) meta.textContent = 'primeira rodada em ' + (nextIn || (ins.interval_min + ' min'));
-    else meta.textContent = 'desligados nas Configurações — "Atualizar agora" faz uma rodada avulsa';
+    const nextIn = ins.next_in_secs != null ? (ins.next_in_secs < 60 ? t('home.ins.less-than-min') : t('home.ins.min', { n: Math.round(ins.next_in_secs / 60) })) : null;
+    if (ins.running) meta.textContent = t('home.ins.generating');
+    else if (ins.last) meta.textContent = t('home.ins.updated', { at: ins.last.updated_at }) + (ins.enabled && nextIn ? t('home.ins.next', { next: nextIn }) : '') + ' · ' + t('home.polish.via', { provider: PROVIDER[ins.last.provider] || ins.last.provider });
+    else if (ins.enabled) meta.textContent = t('home.ins.first', { next: nextIn || t('home.ins.min', { n: ins.interval_min }) });
+    else meta.textContent = t('home.ins.off');
     if (ins.last) {
       const sig = ins.last.updated_at + '|' + ins.last.text;
       if (sig !== insightsSig) { insightsSig = sig; renderMarkdownLite(ins.last.text, body); body.classList.remove('swap'); void body.offsetWidth; body.classList.add('swap'); }
@@ -425,13 +428,13 @@
       body.replaceChildren();
       const e = el('div', 'ins-empty');
       e.appendChild(el('span', 'dot warn pulse'));
-      e.append(ins.enabled ? 'a cada ' + ins.interval_min + ' min o ISPer pergunta à IA o que ficou pendente, o que você prometeu e o que foi decidido.' : 'pendências, compromissos e decisões enquanto a reunião acontece.');
+      e.append(ins.enabled ? t('home.ins.every', { n: ins.interval_min }) : t('home.ins.idle'));
       body.appendChild(e);
     }
   }
   $('ins-now').addEventListener('click', async () => {
     const b = $('ins-now');
-    UI.busy(b, true, 'Gerando…');
+    UI.busy(b, true, t('home.ins.generating-btn'));
     try { await invoke('insights_now'); } catch (e) { toast(String(e), 'err'); }
     UI.busy(b, false);
   });
@@ -446,29 +449,29 @@
     box.hidden = false;
     if (started) {
       callSince = Date.now() - (st.call.since_secs || 0) * 1000;
-      $('call-title').textContent = 'Chamada do Teams em andamento';
-      $('call-meta').textContent = 'há ' + fmtClock(st.call.since_secs || 0) + ' · gravar a transcrição?';
-      $('call-record').textContent = 'Gravar transcrição';
-      $('call-later').textContent = 'Agora não';
+      $('call-title').textContent = t('home.callb.active');
+      $('call-meta').textContent = t('home.callb.active-meta', { t: fmtClock(st.call.since_secs || 0) });
+      $('call-record').textContent = t('home.callb.record');
+      $('call-later').textContent = t('home.callb.later');
     } else {
       callSince = null;
-      $('call-title').textContent = 'A chamada do Teams terminou';
-      $('call-meta').textContent = 'a gravação continua — encerrar e transcrever?';
-      $('call-record').textContent = 'Encerrar e transcrever';
-      $('call-later').textContent = 'Continuar gravando';
+      $('call-title').textContent = t('home.callb.ended');
+      $('call-meta').textContent = t('home.callb.ended-meta');
+      $('call-record').textContent = t('home.callb.stop');
+      $('call-later').textContent = t('home.callb.keep');
     }
     const call = $('s-call');
     call.replaceChildren();
-    call.append(CALL_DETECT[st.call_detect] || st.call_detect);
+    call.append(label(CALL_DETECT, st.call_detect));
   }
-  $('call-later').addEventListener('click', () => invoke('dismiss_call_prompt').catch(e => toast('erro: ' + e, 'err')));
+  $('call-later').addEventListener('click', () => invoke('dismiss_call_prompt').catch(e => toast(t('common.error', { e }), 'err')));
   $('call-record').addEventListener('click', async () => {
     const b = $('call-record');
     const stopping = current && current.meeting_active;
-    UI.busy(b, true, stopping ? 'Encerrando…' : 'Abrindo áudio…');
+    UI.busy(b, true, stopping ? t('home.callb.stopping') : t('home.callb.opening'));
     try {
-      if (stopping) { await invoke('toggle_meeting_cmd'); toast('transcrevendo — a notificação avisa quando a reunião estiver salva', 'ok'); }
-      else { await invoke('record_call_cmd'); toast('gravando a chamada — o indicador flutuante mostra o andamento', 'ok'); }
+      if (stopping) { await invoke('toggle_meeting_cmd'); toast(t('home.callb.transcribing-toast'), 'ok'); }
+      else { await invoke('record_call_cmd'); toast(t('home.callb.recording-toast'), 'ok'); }
     } catch (e) { toast(String(e), 'err'); }
     finally { UI.busy(b, false); refresh(); }
   });
@@ -479,59 +482,59 @@
     const live = $('live');
     if (st.meeting_active) {
       meetingStart = Date.now() - (st.meeting_elapsed_secs || 0) * 1000;
-      b.textContent = 'Encerrar e transcrever'; b.className = 'btn btn-stop';
-      $('m-lead').textContent = 'Reunião em gravação.';
-      $('m-desc').textContent = 'Pode fechar esta janela — o indicador flutuante continua na tela e a bandeja ou o atalho também encerram. Ao encerrar, a transcrição (e o resumo, se ativo) leva alguns segundos.';
+      b.textContent = t('home.meet.stop'); b.className = 'btn btn-stop';
+      $('m-lead').textContent = t('home.meet.lead-rec');
+      $('m-desc').textContent = t('home.meet.desc-rec');
       if (live.hidden) { live.hidden = false; liveFill(); }
     } else {
       meetingStart = null;
       $('m-timer').textContent = '';
-      b.textContent = 'Iniciar gravação de reunião'; b.className = 'btn btn-primary';
-      $('m-lead').textContent = 'Grave, transcreva e resuma.';
-      $('m-desc').textContent = 'Seu microfone vira "Eu"; o áudio dos participantes vem do próprio Windows. Ao encerrar, o transcript vai para a Biblioteca e para um arquivo .md.';
+      b.textContent = t('home.meet.start'); b.className = 'btn btn-primary';
+      $('m-lead').textContent = t('home.meet.lead');
+      $('m-desc').textContent = t('home.meet.desc');
       live.hidden = true;
       $('live-list').replaceChildren();
     }
     const keycaps = (dd, label, suffix, fallback) => {
       dd.replaceChildren();
       if (label && !label.startsWith('(')) {
-        label.split('+').forEach((k, i) => { if (i) dd.append(' + '); dd.appendChild(el('kbd', 'key-sm', k.trim())); });
+        label.split('+').forEach((k, i) => { if (i) dd.append(' + '); dd.appendChild(el('kbd', 'key-sm', UI.keyLabel(k.trim()))); });
         dd.append(' ' + suffix);
       } else dd.textContent = fallback;
     };
-    keycaps($('s-mshortcut'), st.meeting_shortcut, 'inicia e encerra', 'nenhum atalho livre — só pela bandeja ou por aqui');
-    keycaps($('s-markshortcut'), st.mark_shortcut, 'durante a reunião, ou o botão de marcar momento aqui e no indicador', 'sem atalho livre — use o botão de marcar momento');
-    keycaps($('s-copilotshortcut'), st.copilot_shortcut, 'mostra e esconde as decisões ao vivo', 'sem atalho livre — use o botão Copilot HUD');
+    keycaps($('s-mshortcut'), st.meeting_shortcut, t('home.meet.shortcut-start'), t('home.meet.shortcut-none'));
+    keycaps($('s-markshortcut'), st.mark_shortcut, t('home.meet.mark-suffix'), t('home.meet.mark-none'));
+    keycaps($('s-copilotshortcut'), st.copilot_shortcut, t('home.meet.copilot-suffix'), t('home.meet.copilot-none'));
     $('b-mark').hidden = !st.meeting_active;
     $('cap-switch').hidden = !st.meeting_active;
     $('captions').checked = !!st.overlay_captions;
     b.disabled = busyMeeting || (!st.meeting_active && !ready);
-    b.title = (!st.meeting_active && !ready) ? 'disponível assim que o modelo carregar' : '';
+    b.title = (!st.meeting_active && !ready) ? t('home.meet.wait-model') : '';
     tick();
 
     const src = st.meeting_source || 'system';
-    $('s-source').textContent = SOURCE[src] || (src.startsWith('process:') ? 'Só ' + src.slice(8) : src);
+    $('s-source').textContent = SOURCE[src] ? SOURCE[src]() : (src.startsWith('process:') ? t('home.source.process', { name: src.slice(8) }) : src);
 
     const diar = $('s-diar');
     diar.replaceChildren();
-    if (st.diarize_installed) { diar.append('identificados ao encerrar'); diar.appendChild(el('span', 'chip chip-ok', 'Participante 1, 2…')); }
-    else { diar.append('rótulo genérico "Participantes"'); diar.appendChild(el('span', 'chip', 'opcional')); }
+    if (st.diarize_installed) { diar.append(t('home.meet.diar-on')); diar.appendChild(el('span', 'chip chip-ok', t('home.meet.diar-chip'))); }
+    else { diar.append(t('home.meet.diar-off')); diar.appendChild(el('span', 'chip', t('home.optional'))); }
 
     const llm = $('s-llm');
     llm.replaceChildren();
     if (st.llm_provider) {
       llm.append(PROVIDER[st.llm_provider] || st.llm_provider);
       if (st.llm_model) llm.append(' · ' + st.llm_model);
-      llm.appendChild(el('span', 'chip ' + (st.llm_key_present ? 'chip-ok' : 'chip-warn'), st.llm_key_present ? 'chave guardada' : 'sem chave'));
+      llm.appendChild(el('span', 'chip ' + (st.llm_key_present ? 'chip-ok' : 'chip-warn'), st.llm_key_present ? t('home.meet.key-saved') : t('home.meet.no-key')));
     } else {
-      llm.append('desligado');
-      llm.appendChild(el('span', 'chip', 'opcional'));
+      llm.append(t('home.off'));
+      llm.appendChild(el('span', 'chip', t('home.optional')));
     }
 
     const call = $('s-call');
     call.replaceChildren();
-    call.append(CALL_DETECT[st.call_detect] || st.call_detect);
-    if (st.call) call.appendChild(el('span', 'chip chip-warn', 'em chamada agora'));
+    call.append(label(CALL_DETECT, st.call_detect));
+    if (st.call) call.appendChild(el('span', 'chip chip-warn', t('home.meet.in-call')));
     else if (st.call_detect !== 'off') call.appendChild(el('span', 'chip chip-ok', 'Teams'));
     renderInsights(st.insights, st.meeting_active);
   }
@@ -540,27 +543,27 @@
     const b = $('b-indicator');
     b.classList.toggle('on', !!st.overlay_visible);
     b.setAttribute('aria-pressed', st.overlay_visible ? 'true' : 'false');
-    b.title = st.overlay_visible ? 'Ocultar o indicador flutuante' : 'Mostrar o indicador flutuante (fica na tela até você ocultar)';
+    b.title = st.overlay_visible ? t('home.ind.hide') : t('home.ind.show');
   }
   $('b-indicator').addEventListener('click', async () => {
     try {
       const visible = await invoke('overlay_toggle_pin');
-      toast(visible ? 'indicador na tela — fica até você ocultar (× nele, aqui ou na bandeja)' : 'indicador oculto — ele volta sozinho no próximo ditado ou reunião', 'ok');
-    } catch (e) { toast('erro: ' + e, 'err'); }
+      toast(visible ? t('home.ind.shown-toast') : t('home.ind.hidden-toast'), 'ok');
+    } catch (e) { toast(t('common.error', { e }), 'err'); }
     refresh();
   });
 
   function renderTodo(st) {
     const e = st.engine, items = [];
-    if (e.kind === 'missing') items.push({ must: true, t: 'Baixe um modelo Whisper', d: 'Sem ele o ISPer não transcreve. ' + (st.gpu ? 'Com GPU, o Large v3 Turbo (q5) é o recomendado.' : 'Sem GPU, o Small é o recomendado.'), a: 'Baixar nas Configurações', f: openSettings });
-    if (e.kind === 'failed') items.push({ must: true, t: 'O modelo não carregou', d: e.message, a: 'Ver modelos', f: openSettings });
-    if (!st.shortcut || st.shortcut.startsWith('(')) items.push({ must: true, t: 'Nenhum atalho global livre', d: 'Outro programa ocupa todos os candidatos — escolha um diferente nas Configurações.', a: 'Escolher atalho', f: openSettings });
-    if (e.kind === 'ready' && st.stats.dictations === 0) items.push({ t: 'Faça o primeiro ditado', d: 'Clique em qualquer campo de texto, segure ' + st.shortcut + ', fale e solte. O texto aparece colado onde estava o cursor.' });
-    if (st.stats.meetings === 0) items.push({ t: 'Grave a primeira reunião', d: 'Use o botão acima (ou a bandeja) ao entrar na reunião e encerre ao fim — o transcript abre sozinho e fica na Biblioteca.' });
-    if (!st.llm_provider) items.push({ t: 'Resumos automáticos (opcional)', d: 'Conecte Groq, Gemini ou Claude para receber resumo, decisões e action items ao fim de cada reunião. Só o texto do transcript é enviado — áudio, nunca.', a: 'Configurar IA', f: openSettings });
-    else if (!st.llm_key_present) items.push({ must: true, t: 'Falta a chave do provider de IA', d: 'O resumo está ligado (' + (PROVIDER[st.llm_provider] || st.llm_provider) + '), mas não há chave guardada — as reuniões ficam sem resumo.', a: 'Guardar chave', f: openSettings });
-    if (!st.diarize_installed) items.push({ t: 'Quem falou o quê (opcional)', d: 'Baixe os modelos de diarização (~45 MB) e "Participantes" vira "Participante 1", "Participante 2"… — 100% local.', a: 'Baixar nas Configurações', f: openSettings });
-    if (st.llm_provider && st.llm_key_present && !st.semantic_search && st.stats.meetings > 0) items.push({ t: 'Busca semântica (opcional)', d: 'Encontre reuniões e ditados pelo sentido, não só pela palavra exata — com Gemini (grátis) ou um Ollama local. Configure em Inteligência → Busca semântica.', a: 'Configurar', f: openSettings });
+    if (e.kind === 'missing') items.push({ must: true, t: t('home.todo.model-t'), d: t('home.todo.model-d', { rec: st.gpu ? t('home.todo.model-gpu') : t('home.todo.model-cpu') }), a: t('home.todo.download-in-settings'), f: openSettings });
+    if (e.kind === 'failed') items.push({ must: true, t: t('home.todo.failed-t'), d: e.message, a: t('home.todo.see-models'), f: openSettings });
+    if (!st.shortcut || st.shortcut.startsWith('(')) items.push({ must: true, t: t('home.todo.shortcut-t'), d: t('home.todo.shortcut-d'), a: t('home.todo.shortcut-a'), f: openSettings });
+    if (e.kind === 'ready' && st.stats.dictations === 0) items.push({ t: t('home.todo.first-dictation-t'), d: t('home.todo.first-dictation-d', { label: UI.keyLabel(st.shortcut) }) });
+    if (st.stats.meetings === 0) items.push({ t: t('home.todo.first-meeting-t'), d: t('home.todo.first-meeting-d') });
+    if (!st.llm_provider) items.push({ t: t('home.todo.ai-t'), d: t('home.todo.ai-d'), a: t('home.ins.configure'), f: openSettings });
+    else if (!st.llm_key_present) items.push({ must: true, t: t('home.todo.key-t'), d: t('home.todo.key-d', { provider: PROVIDER[st.llm_provider] || st.llm_provider }), a: t('home.todo.key-a'), f: openSettings });
+    if (!st.diarize_installed) items.push({ t: t('home.todo.diar-t'), d: t('home.todo.diar-d'), a: t('home.todo.download-in-settings'), f: openSettings });
+    if (st.llm_provider && st.llm_key_present && !st.semantic_search && st.stats.meetings > 0) items.push({ t: t('home.todo.sem-t'), d: t('home.todo.sem-d'), a: t('home.todo.configure'), f: openSettings });
 
     const box = $('todo'), list = $('todo-list');
     const signature = items.map(i => i.t).join('|');
@@ -568,7 +571,7 @@
     list.dataset.sig = signature;
     list.replaceChildren();
     box.hidden = items.length === 0;
-    $('todo-title').textContent = items.some(i => i.must) ? 'Precisa de atenção' : 'Para aproveitar tudo';
+    $('todo-title').textContent = items.some(i => i.must) ? t('home.todo.attention') : t('home.todo.all');
     items.forEach((it, i) => {
       const row = el('div', 'item' + (it.must ? ' must' : ''));
       row.appendChild(el('div', 'n', String(i + 1)));
@@ -601,10 +604,10 @@
       if (animate) countUp(v, value); else if (v.textContent !== value) { v.textContent = value; v.classList.remove('swap'); void v.offsetWidth; v.classList.add('swap'); }
       l.textContent = label;
     };
-    set('meetings', s.meetings, s.with_summary ? 'reuniões · ' + s.with_summary + ' com resumo' : 'reuniões gravadas', true);
-    set('meeting_secs', s.meeting_secs ? fmtDur(s.meeting_secs) : '0 min', 'de reunião transcrita', false);
-    set('dictations', s.dictations, 'ditados', true);
-    set('dictation_words', s.dictation_words, s.dictation_secs ? 'palavras ditadas · ' + fmtDur(s.dictation_secs) + ' de fala' : 'palavras ditadas', true);
+    set('meetings', s.meetings, s.with_summary ? t('home.stats.meetings-summary', { n: s.with_summary }) : t('home.stats.meetings'), true);
+    set('meeting_secs', s.meeting_secs ? fmtDur(s.meeting_secs) : t('home.stats.zero-min'), t('home.stats.meeting-time'), false);
+    set('dictations', s.dictations, t('home.stats.dictations'), true);
+    set('dictation_words', s.dictation_words, s.dictation_secs ? t('home.stats.words-time', { t: fmtDur(s.dictation_secs) }) : t('home.stats.words'), true);
   }
 
   function renderRecent(rows, diarizing) {
@@ -616,7 +619,7 @@
     if (!rows.length) {
       const e = el('div', 'empty');
       const art = el('div', 'empty-art'); art.append(el('i'), el('i'), el('i'));
-      e.append(art, el('span', '', 'Nenhuma reunião ainda. A primeira aparece aqui assim que você encerrar a gravação.'));
+      e.append(art, el('span', '', t('home.recent.empty')));
       box.appendChild(e);
       return;
     }
@@ -629,13 +632,13 @@
       m.appendChild(el('span', 'num', fmtClock(r.duration_secs)));
       if (diarizing === r.id) {
         const b = el('span', 'badge warn');
-        b.appendChild(el('span', 'dot warn pulse')); b.append('refazendo a transcrição…');
-        b.title = 'o passe final roda em segundo plano: transcreve o áudio inteiro de novo com mais capricho e identifica quem falou. A transcrição ao vivo já está disponível e é substituída quando ele terminar.';
+        b.appendChild(el('span', 'dot warn pulse')); b.append(t('home.recent.final-pass'));
+        b.title = t('home.recent.final-pass-title');
         m.appendChild(b);
       } else {
-        m.appendChild(el('span', 'badge', plural(r.participants, 'participante', 'participantes')));
+        m.appendChild(el('span', 'badge', t('home.recent.participants', { n: r.participants })));
       }
-      if (r.has_summary) m.appendChild(el('span', 'badge ok', 'resumo IA'));
+      if (r.has_summary) m.appendChild(el('span', 'badge ok', t('home.recent.ai-summary')));
       it.appendChild(m);
       const open = () => openLibrary(r.id);
       it.addEventListener('click', open);
@@ -652,7 +655,7 @@
     shownUpdate = u || null;
     if (!u || updateDismissed === u.version) { box.hidden = true; return; }
     $('upd-ver').textContent = u.version;
-    $('upd-meta').textContent = (u.date ? 'publicada em ' + u.date + ' · ' : '') + 'você está na ' + u.current;
+    $('upd-meta').textContent = (u.date ? t('home.upd.published', { date: u.date }) : '') + t('home.upd.current', { v: u.current });
     $('upd-notes').hidden = !u.notes;
     $('upd-body').textContent = u.notes || '';
     box.hidden = false;
@@ -661,7 +664,7 @@
   $('upd-later').addEventListener('click', () => { if (shownUpdate) updateDismissed = shownUpdate.version; $('update').hidden = true; });
   $('upd-install').addEventListener('click', async () => {
     const b = $('upd-install');
-    UI.busy(b, true, 'Baixando…');
+    UI.busy(b, true, t('common.downloading'));
     $('upd-later').disabled = true;
     $('upd-progress').hidden = false;
     $('upd-progress').classList.add('indeterminate');
@@ -669,13 +672,13 @@
       const r = await invoke('install_update');
       UI.busy(b, false);
       $('upd-later').disabled = false;
-      UI.flash(b, 'pronto ✓', 'ok', 4000);
-      toast('atualização: ' + r, 'ok', 5000);
+      UI.flash(b, t('common.done'), 'ok', 4000);
+      toast(t('home.upd.status', { r }), 'ok', 5000);
     } catch (e) {
       UI.busy(b, false);
       $('upd-later').disabled = false;
       $('upd-progress').hidden = true;
-      toast('não consegui atualizar: ' + e, 'err', 6000);
+      toast(t('home.upd.failed', { e }), 'err', 6000);
     }
   });
   listen('isper-update-progress', (e) => {
@@ -704,28 +707,28 @@
 
   // Cronômetro da reunião (1 Hz) — o backend só informa o instante inicial.
   function tick() {
-    if (callSince != null && !$('callbanner').hidden) $('call-meta').textContent = 'há ' + fmtClock((Date.now() - callSince) / 1000) + ' · gravar a transcrição?';
+    if (callSince != null && !$('callbanner').hidden) $('call-meta').textContent = t('home.callb.active-meta', { t: fmtClock((Date.now() - callSince) / 1000) });
     if (meetingStart == null) return;
     const t = fmtClock((Date.now() - meetingStart) / 1000);
     $('m-timer').textContent = t;
-    if (!dictation) $('statetext').textContent = 'gravando reunião · ' + t;
+    if (!dictation) $('statetext').textContent = I18N.t('home.state.meeting') + ' · ' + t;
   }
   setInterval(tick, 1000);
 
   // ------------------------------------------------------------ ações
   async function refresh() {
     try { render(await invoke('home_status')); }
-    catch (e) { toast('não consegui ler o estado: ' + e, 'err'); }
+    catch (e) { toast(t('home.state-read-failed', { e }), 'err'); }
   }
 
   $('b-meeting').addEventListener('click', async () => {
     const b = $('b-meeting');
     const stopping = current && current.meeting_active;
     busyMeeting = true;
-    UI.busy(b, true, stopping ? 'Encerrando…' : 'Abrindo áudio…');
+    UI.busy(b, true, stopping ? t('home.callb.stopping') : t('home.callb.opening'));
     try {
       await invoke('toggle_meeting_cmd');
-      toast(stopping ? 'transcrevendo — o arquivo abre sozinho ao terminar' : 'gravando — o indicador flutuante mostra o andamento', 'ok');
+      toast(stopping ? t('home.meet.stop-toast') : t('home.meet.start-toast'), 'ok');
     } catch (e) {
       toast(String(e), 'err');
     } finally {
@@ -738,12 +741,12 @@
   $('l-all').addEventListener('click', () => openLibrary());
   $('b-settings').addEventListener('click', openSettings);
   $('l-dictate').addEventListener('click', openSettings);
-  $('l-folder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => toast('erro: ' + e, 'err')));
+  $('l-folder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => toast(t('common.error', { e }), 'err')));
   $('showhome').addEventListener('change', (ev) => {
     const show = ev.target.checked;
     invoke('set_show_home', { show })
-      .then(() => toast(show ? 'esta tela volta a abrir com o ISPer' : 'o ISPer passa a abrir só na bandeja — clique no ícone para ver esta tela', 'ok'))
-      .catch(e => toast('erro: ' + e, 'err'));
+      .then(() => toast(show ? t('home.showhome.on') : t('home.showhome.off'), 'ok'))
+      .catch(e => toast(t('common.error', { e }), 'err'));
   });
   document.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape') window.__TAURI__.window.getCurrentWindow().close();
@@ -759,7 +762,7 @@
     else if (s === 'transcribing') { dictation = 'transcribing'; pressKeys(false); }
     else if (s === 'polishing') { dictation = 'polishing'; pressKeys(false); }
     else if (s === 'done') { dictation = 'done'; pressKeys(false); dictationTimer = setTimeout(() => { dictation = null; refresh(); }, 1600); }
-    else if (s === 'discarded') { dictation = null; pressKeys(false); toast('ditado descartado por comando de voz', 'info'); }
+    else if (s === 'discarded') { dictation = null; pressKeys(false); toast(t('home.discarded'), 'info'); }
     else if (s === 'error') { dictation = null; pressKeys(false); if (e.payload.message) toast(e.payload.message, 'err'); }
     else if (s === 'idle') { dictation = null; pressKeys(false); }
     else { pressKeys(false); }  // estados de reunião: o isper-status já dispara o refresh
@@ -769,14 +772,17 @@
   // Falas da reunião chegando (bloco a bloco) — só enquanto o painel existe.
   // Provisórias (bloco ainda aberto) ficam só no indicador; aqui entra a final.
   listen('isper-live', (e) => { if (!$('live').hidden && !(e.payload && e.payload.provisional)) liveAppend(e.payload); });
-  listen('isper-moment', (e) => { if (!$('live').hidden) liveMoment((e.payload && e.payload.at_secs) || 0); toast('momento marcado em ' + fmtClock((e.payload && e.payload.at_secs) || 0), 'ok', 1800); });
-  $('b-mark').addEventListener('click', () => invoke('mark_moment_cmd').catch(e => toast('erro: ' + e, 'err')));
+  listen('isper-moment', (e) => { if (!$('live').hidden) liveMoment((e.payload && e.payload.at_secs) || 0); toast(t('home.moment-toast', { at: fmtClock((e.payload && e.payload.at_secs) || 0) }), 'ok', 1800); });
+  $('b-mark').addEventListener('click', () => invoke('mark_moment_cmd').catch(e => toast(t('common.error', { e }), 'err')));
   $('b-copilot').addEventListener('click', () => invoke('open_copilot_window').catch(e => toast(String(e), 'err')));
   $('captions').addEventListener('change', (ev) => {
     invoke('overlay_set_mode', { mode: ev.target.checked ? 'captions' : 'normal' })
       .then(() => { if (ev.target.checked) invoke('show_indicator_cmd').catch(() => {}); })
-      .catch(e => toast('erro: ' + e, 'err'));
+      .catch(e => toast(t('common.error', { e }), 'err'));
   });
+
+  // Idioma trocado com a janela aberta: tudo o que o script monta é refeito.
+  document.addEventListener('isper-i18n', () => { if (current) { $('todo-list').dataset.sig = ''; $('recent').dataset.sig = ''; insightsSig = ''; render(current); } });
 
   // Estado sempre atual: evento do backend + voltar para a janela.
   listen('isper-status', refresh);

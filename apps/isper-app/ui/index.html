@@ -257,12 +257,7 @@
   }
   function clearCaptions() { setCaptionHint(t('overlay.captions-hint')); }
   // Rótulo de falante é dado (pt-BR no banco); só a exibição traduz.
-  function speakerName(label) {
-    if (label === 'Eu') return t('speaker.me');
-    if (label === 'Participantes') return t('speaker.others');
-    const m = String(label || '').match(/^Participante (\d+)$/);
-    return m ? t('speaker.participant', { n: Number(m[1]) }) : (label || t('speaker.others'));
-  }
+  const speakerName = UI.speaker;
   let capCurSeg = null;
   function pushCaption(seg) {
     if (capCurSeg) captionLine($('cap-prev'), capCurSeg);

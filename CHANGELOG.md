@@ -18,15 +18,20 @@ bata com ela.
   tema certo, sem piscar. A paleta clara passa no contraste WCAG AA em todos
   os textos. O indicador flutuante e o Copilot continuam escuros: flutuam
   sobre outros apps e precisam do contraste próprio.
-- **Interface em inglês** (fase 7.5, primeira parte). Configurações → Sistema →
-  *Idioma da interface*: seguir o Windows (padrão), Português (Brasil) ou
-  English. Vale na hora, sem reiniciar: as Configurações, o indicador
-  flutuante, o menu da bandeja, os títulos das janelas, as notificações e as
-  mensagens de erro do ditado e da reunião. Os textos moram em dicionários
-  JSON (`ui/locales/`) embutidos no app, e testes garantem que os dois
-  idiomas têm as mesmas chaves e os mesmos marcadores. O Início, a Biblioteca
-  e o Copilot entram na próxima leva. O idioma da fala continua sendo outra
-  escolha, em Ditado.
+- **Interface em inglês** (fase 7.5). Configurações → Sistema → *Idioma da
+  interface*: seguir o Windows (padrão), Português (Brasil) ou English. Vale
+  na hora, sem reiniciar: o Início, a Biblioteca, as Configurações, o
+  indicador flutuante, o menu da bandeja, os títulos das janelas, as
+  notificações e as mensagens de erro do ditado e da reunião. Números e
+  durações seguem o idioma escolhido. Os nomes de falante continuam
+  gravados como antes ("Eu", "Participante 1") e só a exibição muda — o
+  `.md` e o banco não se alteram. Os textos moram em dicionários JSON
+  (`ui/locales/`) embutidos no app, e testes garantem que os dois idiomas têm
+  as mesmas chaves, os mesmos marcadores e que toda chave usada por uma tela
+  existe. O Copilot entra na próxima leva. O idioma da fala continua sendo
+  outra escolha, em Ditado.
+- **README em inglês** ([README.en.md](README.en.md)), com o passo a passo
+  para acrescentar um idioma à interface.
 
 ### Alterado
 - **Excluir agora tem "Desfazer"** no lugar do "clique de novo para
@@ -34,6 +39,17 @@ bata com ela.
   somem na hora e um aviso oferece *Desfazer* (ou Ctrl+Z) por 7 segundos —
   só então o app apaga de fato. Fechar a janela nesse intervalo não perde
   nada; sair do app aplica o que estava pendente.
+
+### Corrigido
+- O Início dizia que "cada bloco de ~20 s aparece assim que é transcrito" e
+  que a primeira fala levava até ~30 s: desde a 0.17.0 as legendas chegam em
+  segundos. O texto agora descreve o comportamento real.
+- Na Biblioteca, o botão "×" de remover um ditado não tinha nome acessível
+  (o leitor de tela lia só o símbolo); agora é "remover do histórico".
+- A busca dentro da reunião cortava o texto de exemplo no meio; ele ficou
+  curto e a dica completa aparece ao passar o mouse.
+- O ícone de Configurações do Início tinha o miolo pintado com a cor do tema
+  escuro e ficava com manchas escuras no tema claro.
 
 ## [0.18.0] - 2026-09-22
 
