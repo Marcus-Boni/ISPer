@@ -7,7 +7,7 @@
 
 ---
 
-## Estado atual — 18/09/2026 · v0.16.0 (fases 7.1 a 7.4; 7.3 e 7.4 com 3 de 4; F4 revisada a fundo)
+## Estado atual — 23/09/2026 · v0.18.0 (Copilot de reunião entregue; F7 segue com 7.5 e 7.6)
 
 | Fase | Estado | Resumo |
 |---|---|---|
@@ -19,8 +19,9 @@
 | F5 Inteligência | ✅ | resumo, título, polimento, insights ao vivo e busca semântica (Gemini ou Ollama local) — 10/09 |
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
 | F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (13/09; criptografia em repouso adiada com decisão registrada); 7.5 com 2 itens entregues; 7.6 não começada |
+| F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; 4 itens em aberto — validar a memória, custo com a janela fechada, notas que não são salvas, disparo do portal |
 
-**86 itens entregues · 14 em aberto** (2 deles de estudo pessoal). Ordem sugerida: validar a v0.16.0 numa reunião real (é o único jeito de medir a qualidade em voz de verdade) → 7.5 → 7.6, enquanto a candidatura à SignPath tramita.
+**99 itens entregues · 18 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: decidir o custo do Copilot com a janela fechada e salvar as notas dele (8.3) → validar a v0.18.0 numa reunião real, com a busca semântica ligada para a memória → 7.5 → 7.6, enquanto a candidatura à SignPath tramita.
 
 ---
 
@@ -269,6 +270,45 @@ A ordem é impacto ÷ esforço.
 - [x] Site de docs (mdBook no GitHub Pages): guia, FAQ, troubleshooting, arquitetura (23/09): o portal [isper.pages.dev/docs](https://isper.pages.dev/docs/) já fazia o papel do mdBook, com busca (Next estático no Cloudflare Pages, checagem de links e orçamento no CI), e já tinha guia, FAQ e solução de problemas; entraram **Arquitetura** (as peças, os fluxos de ditado e de reunião, onde ficam os dados, os ADRs), **Primeira configuração** e **Tema, idioma e acessibilidade** (com o Desfazer)
 - [x] ADRs em `docs/adr/` (23/09): Rust+Tauri, LLM em nuvem, keepalive do loopback, diarização pós-hoc e mais seis — os dois modos de transcrição, a UI sem build step, releases no CI, retenção "para sempre" com Desfazer, SQLCipher adiado e o próprio registro; índice e modelo em [`docs/adr/README.md`](docs/adr/README.md)
 - [x] `cargo doc` com `#![deny(missing_docs)]` no core; feature flags para o experimental (legendas ao vivo, comandos de voz) (23/09): os 203 itens públicos do `isper-core` documentados, `#![deny(missing_docs)]` e `cargo doc` com avisos como erro no CI; feature flags **não** — os dois recursos já eram maduros e têm interruptor nas Configurações, e cada flag dobraria as variantes de build (decisão em [ADR 0011](docs/adr/0011-opcional-e-configuracao-nao-feature-flag.md))
+
+## Fase 8 — Copilot de reunião (21 e 22/09/2026 · v0.18.0)
+
+Durante a reunião, uma janela própria mostra a fala ao vivo ao lado de um feed
+de decisões, ações, riscos e perguntas extraídos pela IA; o que o usuário
+confirma vai para a ata e para a Biblioteca. Começou de um plano escrito por
+outro agente (`implementation_plan.md`, fora do repositório) com ~1.600 linhas
+implementadas; a revisão encontrou colisão de ids entre rodadas, notas que se
+perdiam, legenda provisória duplicada, rede bloqueante no comando, cinco campos
+do estado calculados e nunca mostrados na tela e, no app real, a janela fora da
+ACL. Guia de uso em [isper.pages.dev/docs/copilot](https://isper.pages.dev/docs/copilot/usar-o-copilot/).
+
+### 8.1 O Copilot ✅ (v0.18.0, 22/09/2026)
+
+- [x] HUD (`copilot.html`) com a fala ao vivo e o feed de cards — Decisão, Ação (responsável e prazo, com aviso de prazo em aberto), Risco e Pergunta —, confirmar, descartar e desfazer. **O id do card é derivado de `kind` + título normalizado**, nunca o da IA: o modelo devolve `"c1"`, `"c2"` a cada rodada, e "Confirmar" mexia no card errado; títulos reformulados mesclam por semelhança de tokens
+- [x] Gatilhos locais: frases de acordo, tarefa e objeção antecipam a análise, sem rede. Primeira leitura aos 20 s, pulso de 45 s, piso de 15 s entre rodadas
+- [x] O que o usuário confirma entra na ata (seção do `.md`, com a cobrança dos prazos em aberto) e na tabela `decisions` (schema v3) — lido no instante em que a reunião encerra, e não no salvamento em segundo plano, que ainda espera o worker do Whisper
+- [x] Streaming SSE: `LlmProvider::complete_stream` para Claude, Groq e Gemini, com a implementação padrão caindo no `complete`. O protocolo ficou separado do HTTP (`read_sse` sobre `BufRead`) para ser testado com bytes de cada API; "Pergunte à Reunião" e o bloco de notas escrevem na tela conforme o modelo gera
+- [x] Memória de reuniões passadas sobre a busca semântica: disparada quando o tópico muda, até três cards, uma por reunião, com o resumo de uma frase do tópico como consulta
+- [x] Dinâmica de fala acumulada — a lista `live` é podada em 400 segmentos, então somar a partir dela mostraria só o fim de uma reunião longa — e aviso de monólogo pela sequência contígua, não pelo total
+- [x] Modo acoplado de 380 px com fixar por cima, e atalho global `Ctrl+Alt+C` no mesmo mecanismo dos outros três
+- [x] Seção "Decisões e alertas" no detalhe da reunião, na Biblioteca, com salto para a fala que originou cada card
+- [x] Ícones SVG no lugar de emojis e glifos em todas as janelas (os marcadores da lista de pendências por máscara CSS, porque `::marker` só aceita texto)
+- [x] Geração da reunião em cada thread de análise: encerrar não interrompe uma chamada HTTP em voo, e sem ela o resultado atrasado caía na reunião seguinte e a limpeza da thread velha apagava o canal da nova
+- [x] Janela na ACL (`capabilities/default.json`). Fora dela o Tauri nega `plugin:event|listen` e a janela não recebe evento nenhum — mas os comandos do app continuam respondendo, então ela carrega o estado ao abrir e congela, parecendo viva. **Janela nova precisa entrar nessa lista**
+- [x] Banco de testes da janela (`tools/e2e/copilot-harness.py`): o HUD e a Biblioteca num Tauri simulado, sem compilar com CUDA. Não pega a ACL — lá `listen()` é mock
+- [x] Cópia do banco antes de migrar o schema (`isper.db.v2.bak`, `VACUUM INTO`): até a v0.18.0 a migração era de mão única sem cópia nenhuma — o backup automático só existia antes da retenção
+
+### 8.2 Lançamento ✅ (22 e 23/09/2026)
+
+- [x] v0.18.0 publicada pelo `release.yml`: instaladores GPU e CPU, `latest*.json` assinados, SBOM e `SHA256SUMS.txt` conferidos no que foi publicado. O CHANGELOG da versão foi reescrito para quem vem da 0.17.1 — saíram as correções de bugs que só existiram durante o desenvolvimento do próprio Copilot
+- [x] Sincronização do portal, que **nunca tinha funcionado** (zero execuções): o `release: published` nascia do `GITHUB_TOKEN` e não disparava o sync (o `release.yml` agora o dispara por `workflow_dispatch`, #41); o secret `PORTAL_SYNC_TOKEN` não existia (criado em 23/09); e `--tag v1.2.3` com espaço matava o script (#40). Caminho completo verificado com um PR de teste (#42) aberto pelo token, com os checks disparando, fechado sem merge
+
+### 8.3 Em aberto
+
+- [ ] Validar a memória com reuniões reais e calibrar `RECALL_MIN_SCORE` (0,55 foi escolhido para errar para o lado de calado, sem medição). Depende de ligar a busca semântica e indexar o histórico
+- [ ] Decidir se o Copilot analisa com a janela fechada. Hoje ele roda em toda reunião gravada com provedor configurado — perto de 80 chamadas por hora —, ao contrário dos Insights ao vivo, que só fazem rodadas periódicas se ativados
+- [ ] Salvar as notas do Copilot com a reunião. Hoje elas ficam só na memória do app e somem quando a reunião seguinte começa
+- [ ] Ver o disparo automático do portal (#41) funcionar na próxima release: o resumo da run deve dizer "Portal avisado"
 
 ## Boas práticas transversais
 
