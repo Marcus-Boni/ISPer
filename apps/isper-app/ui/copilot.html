@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>ISPer Copilot — Decisões e Notetaker</title>
+<script src="assets/i18n.js"></script>
 <link rel="stylesheet" href="assets/base.css">
 <style>
   /* O HUD é a única janela que roda ao lado do Teams: tudo aqui foi medido
@@ -102,6 +103,8 @@
     transition: border-color var(--dur-2), box-shadow var(--dur-2);
   }
   .search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  /* Tema de contraste do Windows: o box-shadow some e o campo ficaria sem foco visível. */
+  @media (forced-colors: active) { .search-box:focus-within { outline: 2px solid CanvasText; outline-offset: 2px; } }
   .search-box input { background: transparent; border: none; font-size: 12px; width: 100%; min-width: 0; color: var(--ink); }
   /* O anel de foco é da CAIXA, não do input: o base.css dá box-shadow em
      :focus-visible e, somado ao :focus-within daqui, saíam dois anéis
@@ -300,31 +303,31 @@
 <header class="copilot-header">
   <div class="brand-group">
     <span class="copilot-spark" id="spark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg></span>
-    <h1>ISPer Copilot</h1>
+    <h1 data-i18n="copilot.top.isper-copilot">ISPer Copilot</h1>
     <span class="meeting-badge" id="meeting-badge">
       <span class="dot" id="meeting-dot"></span>
-      <span class="badge-label" id="meeting-status-label">Aguardando reunião</span>
+      <span class="badge-label" id="meeting-status-label" data-i18n="copilot.top.meeting-status-label">Aguardando reunião</span>
     </span>
     <span class="meeting-clock" id="meeting-clock" hidden></span>
   </div>
 
-  <div class="talk-meter" id="talk-meter" title="Tempo de fala acumulado: você vs. os participantes">
-    <span class="meter-hide">Dinâmica</span>
-    <div class="meter-bar" role="img" aria-label="proporção de tempo de fala" id="meter-img">
+  <div class="talk-meter" id="talk-meter" title="Tempo de fala acumulado: você vs. os participantes" data-i18n-attr="title:copilot.top.tempo-fala-acumulado-voce-vs.title">
+    <span class="meter-hide" data-i18n="copilot.top.dinamica">Dinâmica</span>
+    <div class="meter-bar" role="img" aria-label="proporção de tempo de fala" id="meter-img" data-i18n-attr="aria-label:copilot.top.proporcao-tempo-fala.aria">
       <div class="meter-me" id="meter-me"></div>
       <div class="meter-others" id="meter-others"></div>
     </div>
     <span class="meter-label" id="meter-label">—</span>
-    <span id="meter-warn" class="meter-warn" title="Você está falando há alguns minutos sem pausa" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 2.4 14.6 13.6H1.4L8 2.4Z"/><path d="M8 6.4v3.2M8 11.8h.01"/></svg></span>
+    <span id="meter-warn" class="meter-warn" title="Você está falando há alguns minutos sem pausa" hidden data-i18n-attr="title:copilot.top.voce-esta-falando-ha-alguns.title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 2.4 14.6 13.6H1.4L8 2.4Z"/><path d="M8 6.4v3.2M8 11.8h.01"/></svg></span>
   </div>
 
   <div class="header-actions">
-    <button id="btn-analyze" class="btn btn-sm btn-primary" title="Analisar agora — pede uma leitura da conversa à IA"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg>Analisar</button>
-    <button id="btn-pin" class="btn btn-sm btn-icon pin-btn" aria-pressed="false" title="Manter o Copilot sempre por cima (modo sidecar)" aria-label="manter sempre por cima"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M6 2h4v4l2.5 3.2v1h-9v-1L6 6V2Z"/><path d="M8 10.2V14"/></svg></button>
-    <div class="view-toggles" role="group" aria-label="Disposição das colunas">
-      <button class="view-btn" id="v-trans" aria-pressed="false" title="Fala — só a transcrição">Fala</button>
-      <button class="view-btn" id="v-split" aria-pressed="true">Dividido</button>
-      <button class="view-btn" id="v-copilot" aria-pressed="false" title="Decisões — só o Copilot">Decisões</button>
+    <button id="btn-analyze" class="btn btn-sm btn-primary" title="Analisar agora — pede uma leitura da conversa à IA" data-i18n-attr="title:copilot.top.analisar-agora-pede-leitura-conversa.title"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg><span data-i18n="copilot.btn.analyze">Analisar</span></button>
+    <button id="btn-pin" class="btn btn-sm btn-icon pin-btn" aria-pressed="false" title="Manter o Copilot sempre por cima (modo sidecar)" aria-label="manter sempre por cima" data-i18n-attr="title:copilot.top.manter-copilot-sempre-por-cima.title,aria-label:copilot.top.manter-sempre-por-cima.aria"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M6 2h4v4l2.5 3.2v1h-9v-1L6 6V2Z"/><path d="M8 10.2V14"/></svg></button>
+    <div class="view-toggles" role="group" aria-label="Disposição das colunas" data-i18n-attr="aria-label:copilot.top.disposicao-colunas.aria">
+      <button class="view-btn" id="v-trans" aria-pressed="false" title="Fala — só a transcrição" data-i18n="copilot.top.v-trans" data-i18n-attr="title:copilot.top.fala-so-transcricao.title">Fala</button>
+      <button class="view-btn" id="v-split" aria-pressed="true" data-i18n="copilot.top.v-split">Dividido</button>
+      <button class="view-btn" id="v-copilot" aria-pressed="false" title="Decisões — só o Copilot" data-i18n="copilot.top.v-copilot" data-i18n-attr="title:copilot.top.decisoes-so-copilot.title">Decisões</button>
     </div>
   </div>
 </header>
@@ -337,66 +340,66 @@
 
 <main class="copilot-main">
   <!-- ------------------------------------------------ coluna 1: a fala -->
-  <section class="pane pane-transcript" aria-label="Transcrição ao vivo">
+  <section class="pane pane-transcript" aria-label="Transcrição ao vivo" data-i18n-attr="aria-label:copilot.pane.transcript-aria">
     <div class="pane-header">
-      <span class="pane-title">Fala ao vivo</span>
+      <span class="pane-title" data-i18n="copilot.top.fala-vivo">Fala ao vivo</span>
       <div class="search-box">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 14 14"/></svg>
-        <input id="trans-search" type="search" placeholder="Buscar… (/)" aria-label="Buscar na transcrição">
+        <input id="trans-search" type="search" placeholder="Buscar… (/)" aria-label="Buscar na transcrição" data-i18n-attr="placeholder:copilot.top.buscar.placeholder,aria-label:copilot.top.buscar-transcricao.aria">
         <span class="search-count" id="search-count" aria-live="polite"></span>
       </div>
-      <button id="btn-mark" class="btn btn-sm" title="Marcar momento — registra este instante para o resumo e a Biblioteca" aria-label="marcar momento"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="m8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z"/></svg></button>
+      <button id="btn-mark" class="btn btn-sm" title="Marcar momento — registra este instante para o resumo e a Biblioteca" aria-label="marcar momento" data-i18n-attr="title:copilot.top.marcar-momento-registra-este-instante.title,aria-label:copilot.top.marcar-momento.aria"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="m8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z"/></svg></button>
     </div>
     <div class="stream-wrap">
-      <div class="transcript-stream" id="stream-list" tabindex="0" aria-label="Falas transcritas">
+      <div class="transcript-stream" id="stream-list" tabindex="0" aria-label="Falas transcritas" data-i18n-attr="aria-label:copilot.top.falas-transcritas.aria">
         <div class="copilot-empty" id="trans-empty">
           <div class="empty-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico ico-lg"><rect x="6" y="1.6" width="4" height="7.4" rx="2"/><path d="M3.4 7.6a4.6 4.6 0 0 0 9.2 0M8 12v2.4"/></svg></div>
-          <h2>Nada transcrito ainda</h2>
-          <p>Cada fala da reunião aparece aqui em segundos, separando <strong>você</strong> dos <strong>participantes</strong>.</p>
+          <h2 data-i18n="copilot.nada-transcrito.nada-transcrito-ainda">Nada transcrito ainda</h2>
+          <p data-i18n-html="copilot.empty.trans-text">Cada fala da reunião aparece aqui em segundos, separando <b>você</b> dos <b>participantes</b>.</p>
         </div>
       </div>
-      <button class="btn btn-sm jump-live" id="jump-live" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 2.8v9.4M4.4 8.6 8 12.2l3.6-3.6"/></svg>Voltar ao vivo</button>
+      <button class="btn btn-sm jump-live" id="jump-live" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 2.8v9.4M4.4 8.6 8 12.2l3.6-3.6"/></svg><span data-i18n="copilot.jump-live">Voltar ao vivo</span></button>
     </div>
   </section>
 
   <!-- --------------------------------------------- coluna 2: o copilot -->
   <section class="pane pane-copilot" aria-label="Copilot">
     <div class="topic-banner">
-      <span class="topic-badge">Agora</span>
-      <span class="topic-text" id="topic-text" aria-live="polite">Aguardando início da discussão…</span>
+      <span class="topic-badge" data-i18n="copilot.nada-transcrito.agora">Agora</span>
+      <span class="topic-text" id="topic-text" aria-live="polite" data-i18n="copilot.topic.waiting">Aguardando início da discussão…</span>
     </div>
 
-    <div class="copilot-tabs" role="tablist" aria-label="Painéis do Copilot">
+    <div class="copilot-tabs" role="tablist" aria-label="Painéis do Copilot" data-i18n-attr="aria-label:copilot.nada-transcrito.paineis-copilot.aria">
       <button class="c-tab" id="tab-cards" role="tab" aria-selected="true" aria-controls="view-cards" data-tab="cards">
-        Decisões <span class="tab-count" id="cards-count">0</span>
+        <span data-i18n="copilot.tab.cards">Decisões</span> <span class="tab-count" id="cards-count">0</span>
       </button>
-      <button class="c-tab" id="tab-chat" role="tab" aria-selected="false" aria-controls="view-chat" data-tab="chat" tabindex="-1">
+      <button class="c-tab" id="tab-chat" role="tab" aria-selected="false" aria-controls="view-chat" data-tab="chat" tabindex="-1" data-i18n="copilot.nada-transcrito.tab-chat">
         Perguntar
       </button>
-      <button class="c-tab" id="tab-notes" role="tab" aria-selected="false" aria-controls="view-notes" data-tab="notes" tabindex="-1">
+      <button class="c-tab" id="tab-notes" role="tab" aria-selected="false" aria-controls="view-notes" data-tab="notes" tabindex="-1" data-i18n="copilot.nada-transcrito.tab-notes">
         Notas
       </button>
     </div>
 
     <!-- ---------------------------------------------------- feed -->
     <div class="c-view on" id="view-cards" role="tabpanel" aria-labelledby="tab-cards">
-      <div class="card-filters" role="group" aria-label="Filtrar cards por tipo">
-        <button class="filter-chip" data-filter="all" aria-pressed="true">Tudo <span class="n" id="n-all">0</span></button>
-        <button class="filter-chip" data-filter="decision" aria-pressed="false">Decisões <span class="n" id="n-decision">0</span></button>
-        <button class="filter-chip" data-filter="action" aria-pressed="false">Ações <span class="n" id="n-action">0</span></button>
-        <button class="filter-chip" data-filter="risk" aria-pressed="false">Riscos <span class="n" id="n-risk">0</span></button>
-        <button class="filter-chip" data-filter="question" aria-pressed="false">Perguntas <span class="n" id="n-question">0</span></button>
-        <button class="filter-chip" data-filter="memory" aria-pressed="false" title="Memória — reuniões anteriores sobre o mesmo assunto">Memória <span class="n" id="n-memory">0</span></button>
+      <div class="card-filters" role="group" aria-label="Filtrar cards por tipo" data-i18n-attr="aria-label:copilot.nada-transcrito.filtrar-cards-por-tipo.aria">
+        <button class="filter-chip" data-filter="all" aria-pressed="true"><span data-i18n="copilot.filter.all">Tudo</span> <span class="n" id="n-all">0</span></button>
+        <button class="filter-chip" data-filter="decision" aria-pressed="false"><span data-i18n="copilot.filter.decision">Decisões</span> <span class="n" id="n-decision">0</span></button>
+        <button class="filter-chip" data-filter="action" aria-pressed="false"><span data-i18n="copilot.filter.action">Ações</span> <span class="n" id="n-action">0</span></button>
+        <button class="filter-chip" data-filter="risk" aria-pressed="false"><span data-i18n="copilot.filter.risk">Riscos</span> <span class="n" id="n-risk">0</span></button>
+        <button class="filter-chip" data-filter="question" aria-pressed="false"><span data-i18n="copilot.filter.question">Perguntas</span> <span class="n" id="n-question">0</span></button>
+        <button class="filter-chip" data-filter="memory" aria-pressed="false" title="Memória — reuniões anteriores sobre o mesmo assunto" data-i18n-attr="title:copilot.nada-transcrito.memoria-reunioes-anteriores-sobre-mesmo.title"><span data-i18n="copilot.filter.memory">Memória</span> <span class="n" id="n-memory">0</span></button>
       </div>
       <div class="cards-feed" id="cards-list">
         <div id="cards-items" aria-live="polite" aria-relevant="additions"></div>
         <div class="copilot-empty" id="cards-empty">
           <div class="empty-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico ico-lg"><path d="M8 1.6a4.4 4.4 0 0 0-2.6 8c.4.3.6.7.6 1.2h4c0-.5.2-.9.6-1.2A4.4 4.4 0 0 0 8 1.6Z"/><path d="M6.4 12.8h3.2M7 14.4h2"/></svg></div>
-          <h2 id="cards-empty-title">Ouvindo a conversa</h2>
-          <p id="cards-empty-text">Assim que um acordo for firmado, uma tarefa for combinada ou uma objeção ficar sem resposta, o card aparece aqui.</p>
+          <h2 id="cards-empty-title" data-i18n="copilot.ouvindo-conversa.cards-empty-title">Ouvindo a conversa</h2>
+          <p id="cards-empty-text" data-i18n="copilot.ouvindo-conversa.cards-empty-text">Assim que um acordo for firmado, uma tarefa for combinada ou uma objeção ficar sem resposta, o card aparece aqui.</p>
         </div>
         <div class="feed-footer" id="feed-footer" hidden>
-          <button class="btn-link" id="btn-copy-all">Copiar decisões validadas</button>
+          <button class="btn-link" id="btn-copy-all" data-i18n="copilot.ouvindo-conversa.btn-copy-all">Copiar decisões validadas</button>
           <button class="btn-link" id="btn-show-discarded" aria-pressed="false"></button>
         </div>
       </div>
@@ -406,13 +409,13 @@
     <div class="c-view" id="view-chat" role="tabpanel" aria-labelledby="tab-chat" hidden>
       <div class="chat-messages" id="chat-messages" aria-live="polite">
         <div class="chat-bubble chat-ai">
-          <p>Pergunte qualquer coisa sobre o que já foi dito nesta reunião.</p>
-          <p class="chat-hint">Ex.: “qual valor o cliente citou?”, “o que ficou pendente?”, “dê 2 argumentos contra essa proposta”.</p>
+          <p data-i18n="copilot.ouvindo-conversa.pergunte-qualquer-coisa-sobre-ja">Pergunte qualquer coisa sobre o que já foi dito nesta reunião.</p>
+          <p class="chat-hint" data-i18n="copilot.ouvindo-conversa.ex-qual-valor-cliente-citou">Ex.: “qual valor o cliente citou?”, “o que ficou pendente?”, “dê 2 argumentos contra essa proposta”.</p>
         </div>
       </div>
       <div class="chat-input-area">
-        <textarea id="chat-input" class="field" rows="1" placeholder="Pergunte sobre a reunião…" aria-label="Pergunta sobre a reunião"></textarea>
-        <button id="chat-send" class="btn btn-sm btn-primary">Enviar</button>
+        <textarea id="chat-input" class="field" rows="1" placeholder="Pergunte sobre a reunião…" aria-label="Pergunta sobre a reunião" data-i18n-attr="placeholder:copilot.ouvindo-conversa.pergunte-sobre-reuniao.placeholder,aria-label:copilot.ouvindo-conversa.pergunta-sobre-reuniao.aria"></textarea>
+        <button id="chat-send" class="btn btn-sm btn-primary" data-i18n="copilot.ouvindo-conversa.chat-send">Enviar</button>
       </div>
     </div>
 
@@ -420,11 +423,11 @@
     <div class="c-view" id="view-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
       <div class="notes-view">
         <textarea id="notes-input" class="field" aria-label="Suas anotações da reunião"
-          placeholder="Anote solto — a IA completa depois com os números e as falas exatas.&#10;&#10;- prazo da entrega&#10;- valor combinado&#10;- quem ficou com o quê"></textarea>
+          placeholder="Anote solto — a IA completa depois com os números e as falas exatas.&#10;&#10;- prazo da entrega&#10;- valor combinado&#10;- quem ficou com o quê" data-i18n-attr="aria-label:copilot.ouvindo-conversa.suas-anotacoes-reuniao.aria,placeholder:copilot.ouvindo-conversa.anote-solto-ia-completa-depois.placeholder"></textarea>
         <div class="notes-actions">
           <span class="notes-status" id="notes-status" aria-live="polite"></span>
-          <button id="btn-undo-enrich" class="btn btn-sm" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M2.4 6.4h8.2a3.4 3.4 0 0 1 0 6.8H6.8"/><path d="M5.4 3.4 2.4 6.4l3 3"/></svg>Desfazer</button>
-          <button id="btn-enrich" class="btn btn-sm btn-primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg>Enriquecer com a reunião</button>
+          <button id="btn-undo-enrich" class="btn btn-sm" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M2.4 6.4h8.2a3.4 3.4 0 0 1 0 6.8H6.8"/><path d="M5.4 3.4 2.4 6.4l3 3"/></svg><span data-i18n="common.undo">Desfazer</span></button>
+          <button id="btn-enrich" class="btn btn-sm btn-primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ico"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg><span data-i18n="copilot.notes.enrich">Enriquecer com a reunião</span></button>
         </div>
       </div>
     </div>
@@ -507,7 +510,10 @@
   }
 
   const KINDS = ['decision', 'action', 'risk', 'question'];
-  const KIND_LABEL = { decision: 'Decisão', action: 'Ação', risk: 'Risco', question: 'Pergunta' };
+  // Rótulos lidos na hora: o idioma pode mudar com a janela aberta.
+  const kindLabel = (k) => ({ decision: t('library.dec.decision'), action: t('library.dec.action'), risk: t('library.dec.risk'), question: t('library.dec.question') })[k] || k;
+  // O gatilho chega como nome estável ("decision"); a frase é da interface.
+  const triggerLabel = (k) => ({ decision: t('copilot.trigger.decision'), action: t('copilot.trigger.action'), risk: t('copilot.trigger.risk') })[k] || k;
 
   let dto = null;             // último CopilotDto do Rust
   let filter = 'all';
@@ -561,9 +567,7 @@
     $('v-split').setAttribute('aria-pressed', String(mode === 'split'));
     $('v-copilot').setAttribute('aria-pressed', String(mode === 'copilot'));
     $('v-split').disabled = narrow.matches;
-    $('v-split').title = narrow.matches
-      ? 'Dividido — a janela está estreita demais para duas colunas'
-      : 'Dividido — fala e decisões lado a lado';
+    $('v-split').title = narrow.matches ? t('copilot.view.split-narrow') : t('copilot.view.split');
   }
 
   function setView(mode) {
@@ -627,7 +631,9 @@
     meta.className = 'stream-meta';
     const sp = document.createElement('span');
     sp.className = 'speaker-tag ' + (seg.speaker === 'Eu' ? 'speaker-me' : 'speaker-others');
-    sp.textContent = seg.speaker;
+    // Rótulo é dado (pt-BR no banco); a exibição segue o idioma da interface.
+    sp.dataset.raw = seg.speaker || '';
+    sp.textContent = UI.speaker(seg.speaker);
     meta.appendChild(sp);
     const time = document.createElement('span');
     time.className = 'stream-time';
@@ -665,7 +671,7 @@
       if (searchTerm && found) hits++;
       el.classList.toggle('hit-out', !!searchTerm && !found);
     });
-    $('search-count').textContent = searchTerm ? (hits + (hits === 1 ? ' fala' : ' falas')) : '';
+    $('search-count').textContent = searchTerm ? t('copilot.search.count', { n: hits }) : '';
   }
   $('trans-search').addEventListener('input', (e) => {
     searchTerm = e.target.value.trim().toLowerCase();
@@ -692,7 +698,7 @@
   $('btn-mark').addEventListener('click', async () => {
     try {
       const at = await invoke('mark_moment_cmd');
-      UI.toast('momento marcado em ' + UI.fmtClock(at || 0), 'ok', 1800);
+      UI.toast(t('home.moment-toast', { at: UI.fmtClock(at || 0) }), 'ok', 1800);
     } catch (e) { UI.toast(String(e), 'err'); }
   });
 
@@ -705,29 +711,29 @@
 
     if (!d.configured) {
       strip.classList.add('warn');
-      text.textContent = 'Sem provider de IA configurado — o Copilot não consegue analisar a conversa.';
+      text.textContent = t('copilot.status.no-provider');
       action.hidden = false;
-      action.textContent = 'Abrir Configurações';
+      action.textContent = t('copilot.status.open-settings');
       action.onclick = () => invoke('open_settings_window').catch((e) => UI.toast(String(e), 'err'));
       return;
     }
     if (d.error) {
       strip.classList.add('err');
-      text.textContent = 'A última análise falhou: ' + d.error;
+      text.textContent = t('copilot.status.failed', { e: d.error });
       action.hidden = false;
-      action.textContent = 'Tentar de novo';
+      action.textContent = t('copilot.status.retry');
       action.onclick = () => $('btn-analyze').click();
       return;
     }
     if (d.running) {
       spin.hidden = false;
       text.textContent = d.last_trigger
-        ? 'Analisando — ' + d.last_trigger + '…'
-        : 'Analisando a conversa…';
+        ? t('copilot.status.analyzing-trigger', { trigger: triggerLabel(d.last_trigger) })
+        : t('copilot.status.analyzing');
       return;
     }
     if (!d.meeting_active) {
-      text.textContent = 'Nenhuma reunião em andamento. Inicie a gravação para o Copilot acompanhar.';
+      text.textContent = t('copilot.status.no-meeting');
       return;
     }
     if (d.dynamics_note) {
@@ -736,7 +742,7 @@
       return;
     }
     if (d.last_updated) {
-      text.textContent = 'Acompanhando a conversa · última leitura às ' + d.last_updated;
+      text.textContent = t('copilot.status.following', { at: d.last_updated });
       return;
     }
     strip.hidden = true;
@@ -748,7 +754,7 @@
       $('meter-me').style.width = '50%';
       $('meter-others').style.width = '50%';
       $('meter-label').textContent = '—';
-      $('meter-img').setAttribute('aria-label', 'tempo de fala ainda insuficiente para medir');
+      $('meter-img').setAttribute('aria-label', t('copilot.meter.too-short-aria'));
       $('talk-meter').classList.remove('text-warn');
       return;
     }
@@ -757,11 +763,9 @@
     $('meter-others').style.width = (100 - me) + '%';
     $('meter-label').textContent = me + '% / ' + (100 - me) + '%';
     $('meter-warn').hidden = !m.monologue;
-    $('meter-img').setAttribute('aria-label', 'você falou ' + me + ' por cento do tempo');
+    $('meter-img').setAttribute('aria-label', t('copilot.meter.aria', { pct: me }));
     $('talk-meter').classList.toggle('text-warn', !!m.monologue);
-    $('talk-meter').title = m.monologue
-      ? 'Você está falando há alguns minutos sem pausa — talvez seja hora de abrir espaço.'
-      : 'Tempo de fala acumulado: você vs. os participantes';
+    $('talk-meter').title = m.monologue ? t('copilot.meter.monologue') : t('copilot.top.tempo-fala-acumulado-voce-vs.title');
   }
 
   // ------------------------------------------------------------- cards
@@ -775,20 +779,20 @@
     top.className = 'card-top';
     const tag = document.createElement('span');
     tag.className = 'card-kind-tag kind-' + card.kind;
-    tag.textContent = KIND_LABEL[card.kind] || card.kind;
+    tag.textContent = kindLabel(card.kind);
     top.appendChild(tag);
 
     if (card.urgency === 'high' && card.status !== 'discarded') {
       const u = document.createElement('span');
       u.className = 'urgency-high';
-      withIcon(u, 'alert', 'urgente');
+      withIcon(u, 'alert', t('library.dec.urgent'));
       top.appendChild(u);
     }
     if (card.status === 'confirmed') {
       const ok = document.createElement('span');
       ok.className = 'chip chip-ok';
-      withIcon(ok, 'check', 'na ata');
-      ok.title = 'Vai entrar no arquivo da reunião quando a gravação terminar';
+      withIcon(ok, 'check', t('copilot.card.confirmed'));
+      ok.title = t('copilot.card.confirmed-title');
       top.appendChild(ok);
     }
 
@@ -796,7 +800,7 @@
     at.className = 'card-at';
     at.type = 'button';
     at.textContent = UI.fmtClock(card.at_secs || 0);
-    at.title = 'Ir para ' + at.textContent + ' na transcrição';
+    at.title = t('copilot.card.goto', { at: at.textContent });
     at.addEventListener('click', () => jumpTo(card.at_secs || 0));
     top.appendChild(at);
     el.appendChild(top);
@@ -814,7 +818,7 @@
     }
 
     const noDue = card.kind === 'action'
-      && (!card.due_date || /sem prazo|não definido|nao definido/i.test(card.due_date));
+      && (!card.due_date || /sem prazo|não definido|nao definido|no deadline|not set|tbd/i.test(card.due_date));
     if (card.owner || card.kind === 'action') {
       const row = document.createElement('div');
       row.className = 'card-meta-row';
@@ -828,7 +832,7 @@
         const p = document.createElement('span');
         p.className = 'card-pill' + (noDue ? ' alert' : '');
         withIcon(p, noDue ? 'alert' : 'calendar',
-          noDue ? 'prazo em aberto' : card.due_date);
+          noDue ? t('library.dec.no-due') : card.due_date);
         row.appendChild(p);
       }
       el.appendChild(row);
@@ -847,24 +851,24 @@
       acts.appendChild(b);
     };
     if (card.status === 'proposed') {
-      act('Confirmar', 'act-confirm', 'confirm', 'Confirmar — marca como validado e leva para a ata da reunião', 'check');
-      act('Descartar', 'act-discard', 'discard', 'Descartar — some do feed e a IA para de sugerir de novo', 'close');
+      act(t('copilot.card.confirm'), 'act-confirm', 'confirm', t('copilot.card.confirm-title'), 'check');
+      act(t('copilot.card.discard'), 'act-discard', 'discard', t('copilot.card.discard-title'), 'close');
     } else {
-      act('Desfazer', '', 'reset', 'Desfazer — volta o card para a fila', 'undo');
+      act(t('common.undo'), '', 'reset', t('copilot.card.reset-title'), 'undo');
     }
     const copy = document.createElement('button');
     copy.className = 'card-act-btn';
     copy.type = 'button';
-    withIcon(copy, 'copy', 'Copiar');
+    withIcon(copy, 'copy', t('copilot.card.copy'));
     copy.addEventListener('click', async () => {
-      const parts = [(KIND_LABEL[card.kind] || card.kind) + ': ' + card.title];
+      const parts = [kindLabel(card.kind) + ': ' + card.title];
       if (card.description) parts.push(card.description);
-      if (card.owner) parts.push('Responsável: ' + card.owner);
-      if (card.due_date) parts.push('Prazo: ' + card.due_date);
+      if (card.owner) parts.push(t('copilot.card.owner', { v: card.owner }));
+      if (card.due_date) parts.push(t('copilot.card.due', { v: card.due_date }));
       try {
         await navigator.clipboard.writeText(parts.join('\n'));
-        UI.flash(copy, 'copiado', 'ok', 1200);
-      } catch (_) { UI.toast('não consegui copiar', 'err'); }
+        UI.flash(copy, t('common.copied'), 'ok', 1200);
+      } catch (_) { UI.toast(t('library.copy-failed'), 'err'); }
     });
     acts.appendChild(copy);
     el.appendChild(acts);
@@ -880,7 +884,7 @@
     top.className = 'card-top';
     const tag = document.createElement('span');
     tag.className = 'card-kind-tag kind-memory';
-    withIcon(tag, 'history', 'Memória');
+    withIcon(tag, 'history', t('copilot.filter.memory'));
     top.appendChild(tag);
     const when = document.createElement('span');
     when.className = 'memory-source';
@@ -903,8 +907,8 @@
     const abrir = document.createElement('button');
     abrir.className = 'card-act-btn';
     abrir.type = 'button';
-    withIcon(abrir, 'open', 'Abrir reunião');
-    abrir.title = 'Abrir reunião — ver esta conversa inteira na Biblioteca';
+    withIcon(abrir, 'open', t('copilot.mem.open'));
+    abrir.title = t('copilot.mem.open-title');
     abrir.addEventListener('click', () => {
       invoke('open_library_window', { meeting: m.meeting_id })
         .catch((e) => UI.toast(String(e), 'err'));
@@ -914,8 +918,8 @@
     const sair = document.createElement('button');
     sair.className = 'card-act-btn act-discard';
     sair.type = 'button';
-    withIcon(sair, 'close', 'Dispensar');
-    sair.title = 'Dispensar — não mostrar esta reunião de novo nesta chamada';
+    withIcon(sair, 'close', t('copilot.mem.dismiss'));
+    sair.title = t('copilot.mem.dismiss-title');
     sair.addEventListener('click', () => {
       invoke('copilot_dismiss_memory', { memoryId: m.id })
         .catch((e) => UI.toast(String(e), 'err'));
@@ -962,22 +966,22 @@
     const empty = $('cards-empty');
     empty.hidden = nos.length > 0;
     if (!nos.length) {
-      const t = $('cards-empty-title'), p = $('cards-empty-text');
+      const h = $('cards-empty-title'), p = $('cards-empty-text');
       if (!d.configured) {
-        t.textContent = 'Falta configurar a IA';
-        p.textContent = 'Escolha um provider e informe a chave em Configurações → Inteligência. A transcrição continua 100% local; só o texto vai para a análise.';
+        h.textContent = t('copilot.empty.no-ai-t');
+        p.textContent = t('copilot.empty.no-ai-d');
       } else if (!d.meeting_active) {
-        t.textContent = 'Nenhuma reunião em andamento';
-        p.textContent = 'Inicie a gravação pelo Início, pelo indicador flutuante ou pela bandeja — o Copilot entra junto.';
+        h.textContent = t('copilot.empty.no-meeting-t');
+        p.textContent = t('copilot.empty.no-meeting-d');
       } else if (filter === 'memory') {
-        t.textContent = 'Nenhuma reunião anterior sobre isto';
-        p.textContent = 'Quando o assunto de agora aparecer em alguma reunião já gravada, ela surge aqui. Depende da busca semântica estar ligada em Configurações → Inteligência.';
+        h.textContent = t('copilot.empty.no-memory-t');
+        p.textContent = t('copilot.empty.no-memory-d');
       } else if (live.length && filter !== 'all') {
-        t.textContent = 'Nada deste tipo ainda';
-        p.textContent = 'Há outros cards no feed. Toque em “Tudo” para ver todos.';
+        h.textContent = t('copilot.empty.none-kind-t');
+        p.textContent = t('copilot.empty.none-kind-d');
       } else {
-        t.textContent = 'Ouvindo a conversa';
-        p.textContent = 'Assim que um acordo for firmado, uma tarefa for combinada ou uma objeção ficar sem resposta, o card aparece aqui.';
+        h.textContent = t('copilot.ouvindo-conversa.cards-empty-title');
+        p.textContent = t('copilot.ouvindo-conversa.cards-empty-text');
       }
     }
 
@@ -986,14 +990,14 @@
     $('btn-copy-all').hidden = !live.some((c) => c.status === 'confirmed');
     const btnD = $('btn-show-discarded');
     btnD.hidden = discarded.length === 0;
-    btnD.textContent = (showDiscarded ? 'Ocultar' : 'Mostrar') + ' descartados (' + discarded.length + ')';
+    btnD.textContent = showDiscarded ? t('copilot.discarded.hide', { n: discarded.length }) : t('copilot.discarded.show', { n: discarded.length });
     btnD.setAttribute('aria-pressed', String(showDiscarded));
   }
 
   async function cardAction(cardId, action) {
     try {
       await invoke('copilot_card_action', { cardId, action });
-      if (action === 'confirm') announce('card confirmado e marcado para a ata');
+      if (action === 'confirm') announce(t('copilot.card.confirmed-announce'));
     } catch (e) { UI.toast(String(e), 'err'); }
   }
 
@@ -1015,18 +1019,18 @@
   $('btn-copy-all').addEventListener('click', async () => {
     const ok = (dto.cards || []).filter((c) => c.status === 'confirmed');
     const txt = ok.map((c) => {
-      let s = '- [' + (KIND_LABEL[c.kind] || c.kind) + '] ' + c.title;
+      let s = '- [' + kindLabel(c.kind) + '] ' + c.title;
       if (c.description) s += ' — ' + c.description;
       const meta = [];
-      if (c.owner) meta.push('responsável: ' + c.owner);
-      if (c.due_date) meta.push('prazo: ' + c.due_date);
+      if (c.owner) meta.push(t('copilot.copy.owner', { v: c.owner }));
+      if (c.due_date) meta.push(t('copilot.copy.due', { v: c.due_date }));
       if (meta.length) s += ' (' + meta.join(' · ') + ')';
       return s;
     }).join('\n');
     try {
       await navigator.clipboard.writeText(txt);
-      UI.toast('decisões validadas copiadas', 'ok');
-    } catch (_) { UI.toast('não consegui copiar', 'err'); }
+      UI.toast(t('copilot.copy.done'), 'ok');
+    } catch (_) { UI.toast(t('library.copy-failed'), 'err'); }
   });
 
   // ------------------------------------------------------- render geral
@@ -1036,12 +1040,12 @@
 
     $('meeting-badge').classList.toggle('active', d.meeting_active);
     $('meeting-dot').className = 'dot' + (d.meeting_active ? ' bad pulse' : '');
-    $('meeting-status-label').textContent = d.meeting_active ? 'Gravando' : 'Aguardando reunião';
+    $('meeting-status-label').textContent = d.meeting_active ? t('copilot.status.recording') : t('copilot.top.meeting-status-label');
     $('spark').classList.toggle('live', d.meeting_active);
     $('meeting-clock').hidden = !d.meeting_active;
     $('btn-analyze').disabled = !d.meeting_active || !d.configured || d.running;
     $('btn-mark').disabled = !d.meeting_active;
-    $('topic-text').textContent = d.active_topic || 'Em andamento';
+    $('topic-text').textContent = d.active_topic || (d.last_updated ? t('copilot.topic.ongoing') : t('copilot.topic.waiting'));
 
     renderStatus(d);
     renderMetrics(d);
@@ -1070,7 +1074,7 @@
 
   $('btn-analyze').addEventListener('click', async () => {
     const btn = $('btn-analyze');
-    UI.busy(btn, true, 'Analisando…');
+    UI.busy(btn, true, t('copilot.btn.analyzing'));
     try { await invoke('copilot_analyze_now'); }
     catch (e) { UI.toast(String(e), 'err'); }
     finally { UI.busy(btn, false); }
@@ -1083,7 +1087,7 @@
     try {
       await invoke('copilot_set_always_on_top', { on });
       btn.setAttribute('aria-pressed', String(on));
-      UI.toast(on ? 'Copilot fixado por cima das outras janelas' : 'Copilot desafixado', 'ok', 1600);
+      UI.toast(on ? t('copilot.pin.on') : t('copilot.pin.off'), 'ok', 1600);
     } catch (e) { UI.toast(String(e), 'err'); }
   });
 
@@ -1146,7 +1150,7 @@
       ai.classList.add('is-err');
       // Se o modelo chegou a dizer algo antes de falhar, não jogue fora.
       ai.textContent = liveReply.buf
-        ? liveReply.buf + '\n\n(interrompido: ' + e + ')'
+        ? liveReply.buf + '\n\n' + t('copilot.chat.interrupted', { e })
         : String(e);
     } finally {
       liveReply = null;
@@ -1168,15 +1172,15 @@
   notes.addEventListener('input', () => {
     $('btn-undo-enrich').hidden = true;
     notesBefore = null;
-    $('notes-status').textContent = 'editando…';
+    $('notes-status').textContent = t('copilot.notes.editing');
     clearTimeout(notesTimer);
     // Guardar a cada tecla seria uma IPC por caractere; 600 ms cobre a pausa
     // natural da digitação e garante que nada se perca ao fechar a janela.
     notesTimer = setTimeout(async () => {
       try {
         await invoke('copilot_save_scratchpad', { text: notes.value });
-        $('notes-status').textContent = 'salvo';
-      } catch (_) { $('notes-status').textContent = 'não consegui salvar'; }
+        $('notes-status').textContent = t('copilot.notes.saved');
+      } catch (_) { $('notes-status').textContent = t('copilot.notes.save-failed'); }
     }, 600);
   });
   window.addEventListener('beforeunload', () => {
@@ -1185,9 +1189,9 @@
 
   $('btn-enrich').addEventListener('click', async () => {
     const raw = notes.value.trim();
-    if (!raw) { UI.toast('escreva algumas anotações primeiro', 'err'); notes.focus(); return; }
+    if (!raw) { UI.toast(t('copilot.notes.empty'), 'err'); notes.focus(); return; }
     const btn = $('btn-enrich');
-    UI.busy(btn, true, 'Enriquecendo…');
+    UI.busy(btn, true, t('copilot.notes.enriching'));
 
     // O texto reescrito vai substituindo o original enquanto chega. Guardamos
     // o anterior antes da primeira letra: se falhar no meio, ele volta.
@@ -1196,14 +1200,14 @@
     liveReply = { id, target: notes, buf: '' };
     notes.readOnly = true;
     clearTimeout(notesTimer);   // o autosave não pode gravar um texto pela metade
-    $('notes-status').textContent = 'escrevendo…';
+    $('notes-status').textContent = t('copilot.notes.writing');
 
     try {
       const enriched = await invoke('copilot_enrich_notes', { rawNotes: raw, streamId: id });
       notesBefore = antes;
       notes.value = enriched;
       $('btn-undo-enrich').hidden = false;
-      $('notes-status').textContent = 'enriquecido com as falas da reunião';
+      $('notes-status').textContent = t('copilot.notes.enriched');
       await invoke('copilot_save_scratchpad', { text: enriched });
     } catch (e) {
       notes.value = antes;      // nada de deixar o texto do usuário pela metade
@@ -1222,7 +1226,7 @@
     notes.value = notesBefore;
     notesBefore = null;
     $('btn-undo-enrich').hidden = true;
-    $('notes-status').textContent = 'voltou ao texto anterior';
+    $('notes-status').textContent = t('copilot.notes.reverted');
     try { await invoke('copilot_save_scratchpad', { text: notes.value }); } catch (_) {}
   });
 
@@ -1269,6 +1273,13 @@
       stick = true;
     }
     invoke('copilot_get_state').then(render).catch(() => {});
+  });
+
+  document.addEventListener('isper-i18n', () => {
+    applyView();
+    stream.querySelectorAll('.speaker-tag').forEach((el) => { el.textContent = UI.speaker(el.dataset.raw); });
+    if (searchTerm) applySearch();
+    if (dto) render(dto);
   });
 
   // -------------------------------------------------------- inicialização

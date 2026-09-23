@@ -114,7 +114,8 @@ pub(crate) struct CopilotAppState {
 impl Default for CopilotAppState {
     fn default() -> Self {
         Self {
-            active_topic: "Aguardando início da discussão…".into(),
+            // Vazio até a primeira leitura: a tela mostra "aguardando" no idioma dela.
+            active_topic: String::new(),
             cards: Vec::new(),
             dynamics_note: None,
             running: false,
@@ -336,7 +337,8 @@ pub(crate) fn on_live_segment(app: &AppHandle, speaker: &str, secs: f32, text: &
                     .map(|t| t.elapsed().as_secs_f32() >= MIN_GAP_BETWEEN_ROUNDS_SECS)
                     .unwrap_or(true);
                 if ready && !cop.running {
-                    cop.last_trigger = Some(kind.label_pt().to_string());
+                    // Nome estável; a tela traduz (copilot.trigger.<nome>).
+                    cop.last_trigger = Some(kind.as_str().to_string());
                     cop.tx.clone()
                 } else {
                     None

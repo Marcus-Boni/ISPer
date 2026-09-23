@@ -42,6 +42,8 @@
   // O anel pode estar no proprio controle ou no rotulo que o desenha.
   const ringOf = (el) => {
     const hosts = [el];
+    // Campo cujo anel fica no contorno em volta (:focus-within), p.ex. a busca do Copilot.
+    if (el.parentElement && el.parentElement.matches(':focus-within')) hosts.push(el.parentElement);
     if (el.tagName === 'INPUT') {
       const sw = el.closest('.switch');
       if (sw) hosts.push(sw.querySelector('.track'));

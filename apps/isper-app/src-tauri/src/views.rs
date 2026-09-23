@@ -133,6 +133,8 @@ pub(crate) fn build_copilot(app: &AppHandle) -> tauri::Result<tauri::WebviewWind
     .title(crate::ui::window_title(app, "copilot"))
     // A página do Copilot é sempre escura (ver `ui.rs`): a barra de título acompanha.
     .theme(Some(tauri::Theme::Dark))
+    // Só o dicionário (a página não carrega o boot.js do tema): nasce no idioma certo.
+    .initialization_script(crate::ui::boot_script(&crate::ui::current(app)))
     .inner_size(980.0, 720.0)
     // 360 px de mínimo porque o HUD foi desenhado para caber acoplado ao lado
     // do Teams; com o mínimo em 520 o modo sidecar não era alcançável.

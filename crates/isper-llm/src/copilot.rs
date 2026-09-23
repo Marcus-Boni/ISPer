@@ -246,7 +246,17 @@ pub enum TriggerKind {
 }
 
 impl TriggerKind {
-    /// Rótulo curto para o log e para a UI ("o que acordou o Copilot").
+    /// Nome estável ("decision", "action", "risk") — é o que vai para a UI,
+    /// que mostra a frase no idioma da interface.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Decision => "decision",
+            Self::Action => "action",
+            Self::Risk => "risk",
+        }
+    }
+
+    /// Rótulo curto para o log ("o que acordou o Copilot").
     pub fn label_pt(&self) -> &'static str {
         match self {
             Self::Decision => "acordo detectado",
