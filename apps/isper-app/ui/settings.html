@@ -771,6 +771,13 @@
     try { await invoke('set_ui_lang', { lang: $('uilang').value }); }
     catch (e) { status(t('settings.msg.lang-failed', { e }), 'err'); }
   });
+  // Tema ou idioma trocados em outra janela (a primeira configuração): os
+  // seletores acompanham, senão mostrariam a escolha velha.
+  listen('isper-ui', (e) => {
+    const p = e.payload || {};
+    if (p.theme) $('theme').value = p.theme;
+    if (p.ui_lang) $('uilang').value = p.ui_lang;
+  });
   $('reimport').addEventListener('click', async () => {
     const btn = $('reimport'), st = $('reimportstate');
     btn.disabled = true;

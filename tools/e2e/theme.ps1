@@ -54,6 +54,33 @@ foreach ($t in @('light', 'dark')) {
   Check ($null -ne $ov -and $ov.bg -eq '#161311') "indicador continua escuro com o tema '$t' (--bg $($ov.bg))"
 }
 
+# Os seletores acompanham a troca feita na OUTRA janela: Configuracoes <->
+# primeira configuracao abertas juntas (antes, o seletor ficava na escolha velha).
+Invoke-Isper 'open_onboarding_window' | Out-Null
+Wait-IsperWindow 'onboarding.html' | Out-Null
+Start-Sleep -Seconds 1
+$onbSel = 'JSON.stringify({ theme: (document.querySelector("input[name=theme]:checked") || {}).value || null, lang: document.getElementById("uilang").value })'
+Invoke-Isper 'set_ui_theme' "{ theme: 'light' }" 'settings.html' | Out-Null
+Start-Sleep -Milliseconds 600
+$o = EvJson 'onboarding.html' $onbSel
+Check ($null -ne $o -and $o.theme -eq 'light') "trocado nas Configuracoes, o seletor da primeira configuracao vai para 'light' ($($o.theme))"
+EvJson 'onboarding.html' '(() => { const r = document.querySelector("input[name=theme][value=dark]"); r.click(); return "ok"; })()' | Out-Null
+Start-Sleep -Milliseconds 600
+$s = EvJson 'settings.html' 'JSON.stringify({ theme: document.getElementById("theme").value })'
+Check ($null -ne $s -and $s.theme -eq 'dark') "trocado na primeira configuracao, o seletor das Configuracoes vai para 'dark' ($($s.theme))"
+$origLang = (Invoke-Isper 'get_settings' 'undefined' 'settings.html').ui_lang
+$otherLang = if ($origLang -eq 'en') { 'pt-BR' } else { 'en' }
+Invoke-Isper 'set_ui_lang' "{ lang: '$otherLang' }" 'settings.html' | Out-Null
+Start-Sleep -Milliseconds 600
+$o = EvJson 'onboarding.html' $onbSel
+Check ($null -ne $o -and $o.lang -eq $otherLang) "o seletor de idioma da primeira configuracao acompanha ('$($o.lang)')"
+Invoke-Isper 'set_ui_lang' "{ lang: '$origLang' }" 'settings.html' | Out-Null
+Start-Sleep -Milliseconds 600
+$o = EvJson 'onboarding.html' $onbSel
+Check ($null -ne $o -and $o.lang -eq $origLang) "e volta com o idioma original ('$($o.lang)')"
+EvJson 'onboarding.html' '(async () => { await window.__TAURI__.window.getCurrentWindow().close(); return "ok"; })()' | Out-Null
+Start-Sleep -Seconds 1
+
 # "Seguir o Windows": o data-theme vira system e o fundo acompanha o prefers-color-scheme.
 $r = Invoke-Isper 'set_ui_theme' "{ theme: 'system' }" 'settings.html'
 Start-Sleep -Milliseconds 600

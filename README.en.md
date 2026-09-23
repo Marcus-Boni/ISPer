@@ -8,6 +8,11 @@ roadmap is in [ROADMAP.md](ROADMAP.md) (in Portuguese).
 [download the installer](https://isper.pages.dev/download/) ·
 [documentation](https://isper.pages.dev/docs/)
 
+![ISPer's first-time setup in the dark and light themes, the dictation shortcut step, and the meeting Copilot listing a decision, a risk and an action item](docs/media/isper-demo.gif)
+
+<sub>Screens from the app itself. The meeting in the Copilot is a made-up
+example; [`tools/showcase/`](tools/showcase/) regenerates the GIF.</sub>
+
 > This is the English translation of [README.md](README.md). The Portuguese
 > README is the reference; if the two disagree, it wins.
 

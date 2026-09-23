@@ -11,6 +11,12 @@ bata com ela.
 
 ## [Unreleased]
 
+### Corrigido
+- Os seletores de *Aparência* e de *Idioma da interface* acompanham a troca
+  feita em outra janela. Com as Configurações e a primeira configuração
+  abertas juntas, a janela que não fez a troca mudava de cor e de idioma, mas
+  o seletor continuava marcando a escolha antiga.
+
 ## [0.19.0] - 2026-09-23
 
 A fase 7.5 inteira: o ISPer fica mais fácil de começar a usar, confortável de

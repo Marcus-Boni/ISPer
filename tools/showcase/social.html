@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- Imagem de prévia social do GitHub (1280×640). Renderizada pelo compose.ps1
+     com o Edge headless; a captura do Copilot vem de ?shot= (reunião fictícia). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "Fraunces"; src: url("../../apps/isper-app/ui/assets/fonts/fraunces-latin.woff2") format("woff2"); font-weight: 300 900; }
+  @font-face { font-family: "Hanken Grotesk"; src: url("../../apps/isper-app/ui/assets/fonts/hanken-grotesk-latin.woff2") format("woff2"); font-weight: 300 800; }
+  :root {
+    --bg: #161311; --panel: #1e1a18; --line: #372f2b; --line-2: #4a403a;
+    --ink: #ece7e1; --ink-2: #d3cbc3; --muted: #a79e96;
+    --accent: #f07e72; --good: #84c297;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    background:
+      radial-gradient(900px 520px at 8% -10%, rgba(240, 126, 114, .20), transparent 60%),
+      radial-gradient(700px 480px at 100% 110%, rgba(232, 193, 90, .10), transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    font-family: "Hanken Grotesk", "Segoe UI", sans-serif;
+    position: relative;
+  }
+  .copy { position: absolute; left: 80px; top: 92px; width: 560px; }
+  .eyebrow { font-size: 17px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .brand { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 124px; line-height: 1; letter-spacing: -.02em; margin-top: 22px; }
+  .brand b { color: var(--accent); font-weight: 600; }
+  h1 { font-family: "Fraunces", Georgia, serif; font-weight: 500; font-size: 40px; line-height: 1.16; margin-top: 26px; letter-spacing: -.01em; }
+  .sub { font-size: 21px; line-height: 1.45; color: var(--ink-2); margin-top: 20px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+  .chip { font-size: 16px; font-weight: 600; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--ink-2); background: rgba(30, 26, 24, .7); }
+  .chip.good { color: var(--good); border-color: rgba(132, 194, 151, .45); }
+  .shot {
+    position: absolute; left: 690px; top: 76px; width: 760px;
+    border-radius: 16px; border: 1px solid var(--line-2);
+    box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .85), 0 0 0 8px rgba(255, 255, 255, .025);
+  }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <div class="eyebrow">Free &amp; open source · Windows</div>
+    <div class="brand">ISPer<b>.</b></div>
+    <h1>Dictation and meeting notes that never leave your PC.</h1>
+    <p class="sub">Hold a shortcut and speak in any app. Record Teams meetings and get a searchable transcript.</p>
+    <div class="chips">
+      <span class="chip good">100% local</span>
+      <span class="chip">whisper.cpp</span>
+      <span class="chip">Rust + Tauri 2</span>
+      <span class="chip">CPU or CUDA</span>
+    </div>
+  </div>
+  <img class="shot" id="shot" alt="">
+  <script>
+    document.getElementById('shot').src = new URLSearchParams(location.search).get('shot') || '';
+  </script>
+</body>
+</html>

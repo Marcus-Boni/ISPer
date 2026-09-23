@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- Um quadro do GIF de demonstração (1080×800): a legenda em cima e a captura
+     centralizada. O compose.ps1 passa ?shot=, ?step= e ?cap= e renderiza com
+     o Edge headless. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "Fraunces"; src: url("../../apps/isper-app/ui/assets/fonts/fraunces-latin.woff2") format("woff2"); font-weight: 300 900; }
+  @font-face { font-family: "Hanken Grotesk"; src: url("../../apps/isper-app/ui/assets/fonts/hanken-grotesk-latin.woff2") format("woff2"); font-weight: 300 800; }
+  :root { --bg: #161311; --line-2: #4a403a; --ink: #ece7e1; --muted: #a79e96; --accent: #f07e72; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1080px; height: 800px; overflow: hidden; }
+  body {
+    background:
+      radial-gradient(760px 420px at 0% 0%, rgba(240, 126, 114, .16), transparent 60%),
+      radial-gradient(640px 420px at 100% 100%, rgba(232, 193, 90, .08), transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    font-family: "Hanken Grotesk", "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  header { height: 96px; display: flex; align-items: center; gap: 16px; }
+  .step { font-family: "Fraunces", Georgia, serif; font-size: 22px; font-weight: 600; color: var(--accent); }
+  .cap { font-family: "Fraunces", Georgia, serif; font-size: 30px; font-weight: 500; letter-spacing: -.01em; }
+  main { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding-bottom: 36px; min-height: 0; }
+  img {
+    max-width: 1000px; max-height: 660px; border-radius: 14px; border: 1px solid var(--line-2);
+    box-shadow: 0 34px 80px -30px rgba(0, 0, 0, .85);
+  }
+</style>
+</head>
+<body>
+  <header><span class="step" id="step"></span><span class="cap" id="cap"></span></header>
+  <main><img id="shot" alt=""></main>
+  <script>
+    const q = new URLSearchParams(location.search);
+    document.getElementById('shot').src = q.get('shot') || '';
+    document.getElementById('step').textContent = q.get('step') || '';
+    document.getElementById('cap').textContent = q.get('cap') || '';
+  </script>
+</body>
+</html>
