@@ -19,6 +19,10 @@ No console da página:
     __sim.step()                # avança uma fala
     __sim.analyzing(true)       # liga/desliga o estado "analisando"
     __sim.failStream(true)      # a próxima resposta cai no meio do streaming
+    __sim.lang('en')            # troca o idioma na hora, como o app faz
+
+A página recebe o mesmo dicionário que o app injeta no nascimento da janela
+(`ui/locales/`); `?lang=en` na URL abre direto em inglês.
 
 O que o mock NÃO cobre: a captura de áudio, o Whisper e as chamadas de IA
 de verdade. Ele exercita a camada de tela — que é onde mora a maior parte
@@ -26,9 +30,11 @@ dos detalhes de usabilidade.
 """
 
 import http.server
+import json
 import os
 import socketserver
 import sys
+import urllib.parse
 
 ROOT = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -114,7 +120,7 @@ MOCK = r"""
       meeting_active: meeting,
       configured: S.scenario !== 'no-key',
       running: S.analyzing,
-      active_topic: S.cursor > 3 ? 'Escopo e data de entrega da fase dois' : 'Aguardando início da discussão…',
+      active_topic: S.cursor > 3 ? 'Escopo e data de entrega da fase dois' : '',
       cards: S.scenario === 'idle' ? [] : S.cards,
       dynamics_note: null,
       memories: S.cursor > 3 ? S.memories : [],
@@ -124,7 +130,7 @@ MOCK = r"""
       elapsed_secs: spoken.length ? SPEECH[S.cursor - 1][2] : 0,
       scratchpad: S.scratchpad,
       last_updated: S.cursor > 3 ? '10:42:07' : null,
-      last_trigger: S.cursor > 5 ? 'acordo detectado' : null,
+      last_trigger: S.cursor > 5 ? 'decision' : null,
       error: S.scenario === 'error' ? 'status 429: limite de requisições do provider' : S.error,
     };
   }
@@ -241,6 +247,13 @@ MOCK = r"""
     },
     reset() { S.cursor = 0; S.cards = JSON.parse(JSON.stringify(CARDS)); S.failStream = false; push(); },
     failStream(on) { S.failStream = !!on; return S.failStream; },
+    // Troca o idioma como o app faz (evento isper-ui com o dicionário novo).
+    lang(name) {
+      const strings = (window.__ISPER_LOCALES || {})[name];
+      if (!strings) return 'idioma desconhecido: ' + name;
+      emit('isper-ui', { theme: 'dark', lang: name, strings });
+      return name;
+    },
     state: () => dto(),
   };
 })();
@@ -322,6 +335,23 @@ LIB_MOCK = r"""
 """
 
 
+def ui_prefs_script(path):
+    """window.__ISPER_UI com o dicionário do idioma pedido (?lang=, padrão
+    pt-BR) e window.__ISPER_LOCALES com os dois, para __sim.lang()."""
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(path).query)
+    lang = (query.get("lang") or ["pt-BR"])[0]
+    locales = {}
+    for name in ("pt-BR", "en"):
+        with open(os.path.join(ROOT, "locales", name + ".json"), encoding="utf-8") as fh:
+            locales[name] = json.load(fh)
+    if lang not in locales:
+        lang = "pt-BR"
+    prefs = {"theme": "dark", "lang": lang, "strings": locales[lang]}
+    return ("<script>window.__ISPER_UI = " + json.dumps(prefs, ensure_ascii=False)
+            + "; window.__ISPER_LOCALES = " + json.dumps(locales, ensure_ascii=False)
+            + ";</script>\n")
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     # HTTP/1.1 + servidor com threads: o navegador abre várias conexões em
     # paralelo (css, js, fontes) e um servidor de uma thread só trava.
@@ -339,7 +369,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             with open(path, encoding="utf-8") as fh:
                 html = fh.read()
             mock = LIB_MOCK if alvo == "library.html" else MOCK
-            html = html.replace("<head>", "<head>\n" + mock, 1)
+            # O app injeta o dicionário no nascimento da janela (ui.rs,
+            # boot_script); aqui, o mesmo: ?lang=en abre em inglês.
+            html = html.replace("<head>", "<head>\n" + ui_prefs_script(self.path) + mock, 1)
             body = html.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")

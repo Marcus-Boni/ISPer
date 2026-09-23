@@ -1,6 +1,6 @@
 # E2E de acessibilidade (fase 7.5) no app real, via CDP, nas janelas Inicio,
-# Biblioteca (reuniao aberta e aba Ditados), Configuracoes e primeira
-# configuracao, nos temas escuro e claro:
+# Biblioteca (reuniao aberta e aba Ditados), Configuracoes, primeira
+# configuracao e Copilot (sempre escuro), nos temas escuro e claro:
 #  - todo controle visivel tem nome acessivel;
 #  - todo texto visivel passa no contraste WCAG AA (4,5:1; 3:1 texto grande);
 #  - teclado de verdade (Input.dispatchKeyEvent): a volta de Tab alcanca todo
@@ -32,6 +32,8 @@ Invoke-Isper 'open_settings_window' | Out-Null
 Wait-IsperWindow 'settings.html' | Out-Null
 Invoke-Isper 'open_onboarding_window' | Out-Null
 Wait-IsperWindow 'onboarding.html' | Out-Null
+Invoke-Isper 'open_copilot_window' | Out-Null
+Wait-IsperWindow 'copilot.html' | Out-Null
 Start-Sleep -Seconds 1
 $hasMeeting = [bool](EvJson 'library.html' 'JSON.stringify(!!document.querySelector("#list .item"))')
 if ($hasMeeting) {
@@ -59,9 +61,10 @@ foreach ($theme in 'dark', 'light') {
 }
 Invoke-Isper 'set_ui_theme' "{ theme: '$origTheme' }" 'settings.html' | Out-Null
 Test-Page 'http://tauri.localhost/' 'Indicador'
+Test-Page 'copilot.html' 'Copilot'
 
 # ---- reflow (WCAG 1.4.10): nenhuma janela abre rolagem horizontal no tamanho padrao
-foreach ($w in @('home.html', 'library.html', 'settings.html', 'onboarding.html')) {
+foreach ($w in @('home.html', 'library.html', 'settings.html', 'onboarding.html', 'copilot.html')) {
   $rf = EvJson $w 'JSON.stringify({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth })'
   Check ($rf.sw -le $rf.cw + 1) "$w sem rolagem horizontal ($($rf.sw) de $($rf.cw) px)"
 }
@@ -92,6 +95,8 @@ Test-Keyboard 'onboarding.html' 'Primeira configuracao'
 # Tema de contraste do Windows: o navegador descarta box-shadow; o foco tem de
 # continuar visivel (contorno de verdade, base.css).
 Test-Keyboard 'home.html' 'Inicio num tema de contraste do Windows' 'forced-colors:active'
+Test-Keyboard 'copilot.html' 'Copilot'
+Test-Keyboard 'copilot.html' 'Copilot num tema de contraste do Windows' 'forced-colors:active'
 
 # ---- abas da Biblioteca pelas setas (padrao WAI-ARIA)
 $tabs = EvJson 'library.html' 'JSON.stringify({ role: document.getElementById("tabs").getAttribute("role"), tabs: [...document.querySelectorAll("#tabs .tab")].map(t => ({ role: t.getAttribute("role"), sel: t.getAttribute("aria-selected"), ti: t.tabIndex })) })'

@@ -28,8 +28,12 @@ bata com ela.
   `.md` e o banco não se alteram. Os textos moram em dicionários JSON
   (`ui/locales/`) embutidos no app, e testes garantem que os dois idiomas têm
   as mesmas chaves, os mesmos marcadores e que toda chave usada por uma tela
-  existe. O Copilot entra na próxima leva. O idioma da fala continua sendo
-  outra escolha, em Ditado.
+  existe. O Copilot também: rótulos, estados, cards, filtros, avisos e o
+  motivo de cada análise ("acordo detectado" chega do app como um nome
+  estável e a tela escreve no idioma dela). O que a IA escreve — cards,
+  respostas do "Pergunte à Reunião" e notas completadas — continua saindo em
+  português, como o prompt pede; passar a seguir o idioma da interface fica
+  para depois. O idioma da fala continua sendo outra escolha, em Ditado.
 - **README em inglês** ([README.en.md](README.en.md)), com o passo a passo
   para acrescentar um idioma à interface.
 - **Primeira configuração guiada** (fase 7.5). Na primeira vez que o ISPer
@@ -46,7 +50,7 @@ bata com ela.
 
 ### Alterado
 - **Acessibilidade** (fase 7.5). Tudo no Início, na Biblioteca, nas
-  Configurações e na primeira configuração se faz pelo teclado, com o foco
+  Configurações, na primeira configuração e no Copilot se faz pelo teclado, com o foco
   sempre visível — inclusive nos temas de contraste do Windows, onde o anel
   do ISPer não aparecia. As abas da Biblioteca seguem o padrão dos leitores
   de tela (setas trocam de aba), a reunião aberta é anunciada como atual, o

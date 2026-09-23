@@ -257,7 +257,7 @@ A ordem é impacto ÷ esforço.
 
 - [x] Onboarding de primeira execução (testar mic → escolher modelo → atalho → IA opcional) (23/09): janela guiada com medidor de nível, download do modelo recomendado, ditado de teste e chave de IA testada; `config.toml` versão 2 (quem já usava não a vê); Configurações → Sistema reabre
 - [x] `desfazer` em toast no lugar de `confirm()` para exclusões; tema claro/escuro seguindo o sistema (23/09)
-- [ ] i18n desde já (dicionário JSON, pt-BR primeiro) e README em inglês — Início, Biblioteca, Configurações, primeira configuração, indicador, bandeja, notificações e README.en entregues (23/09); falta o Copilot
+- [x] i18n desde já (dicionário JSON, pt-BR primeiro) e README em inglês (23/09): todas as janelas (Copilot inclusive), bandeja, notificações, erros e README.en; pendente: o texto que a IA do Copilot escreve segue o idioma do prompt (pt-BR), não o da interface
 - [ ] Acessibilidade: navegação completa por teclado e teste com NVDA — teclado, contraste AA, nomes acessíveis e reflow entregues e cobertos pelo `a11y.ps1` (23/09); roteiro do NVDA em `docs/TESTES.md`, falta a rodada com o leitor de tela
 - [x] Detecção de reunião ativa → "Gravar transcrição?" (10/09; detalhes na Fase 4)
 - [x] Indicador flutuante fixo em repouso (10/09): "Indicador" no Início e na bandeja alternam mostrar/ocultar; antes o preview sumia em 2,5 s. Configurações redimensionável; Ditados em largura inteira
