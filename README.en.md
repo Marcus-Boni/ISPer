@@ -573,7 +573,12 @@ cases (headset unplugged, sleep, exclusive mode, monitors), is in
 [`docs/TESTES.md`](docs/TESTES.md). The transcription pipeline architecture —
 live and final modes, VAD, decoding, diarization, speaker attribution and how
 to measure all of it — is in
-[`docs/transcription-pipeline.md`](docs/transcription-pipeline.md).
+[`docs/transcription-pipeline.md`](docs/transcription-pipeline.md). The
+reasons behind the big choices (Rust + Tauri, cloud LLM with text only, the
+WASAPI loopback defenses, post-hoc diarization, the two transcription modes,
+the no-build UI, CI releases, "nothing disappears unless you ask") are
+recorded as architecture decision records in [`docs/adr/`](docs/adr/README.md)
+(in Portuguese).
 
 GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs,
 on every push and PR, formatting (`cargo fmt --check`), the tests of every
