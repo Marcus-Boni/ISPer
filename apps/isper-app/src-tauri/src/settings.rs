@@ -200,6 +200,8 @@ pub(crate) fn models_status(app: AppHandle) -> Vec<ModelDto> {
     let active_file =
         isper_models::resolve_whisper_model(preferred.as_deref(), cfg!(feature = "cuda"), &dirs)
             .and_then(|p| p.file_name().map(|f| f.to_string_lossy().into_owned()));
+    // Removido há instantes (janela do Desfazer aberta): já aparece como não instalado.
+    let hidden_models = crate::undo::hidden_models();
     isper_models::WHISPER_CATALOG
         .iter()
         .map(|m| ModelDto {
@@ -208,7 +210,8 @@ pub(crate) fn models_status(app: AppHandle) -> Vec<ModelDto> {
             approx_mb: m.approx_mb,
             note: m.note.to_string(),
             needs_gpu: m.needs_gpu,
-            installed: isper_models::installed_path(m.file).is_some()
+            installed: !hidden_models.iter().any(|f| f == m.file)
+                && isper_models::installed_path(m.file).is_some()
                 || dirs.iter().any(|d| d.join("models").join(m.file).exists()),
             active: active_file.as_deref() == Some(m.file),
         })
@@ -247,8 +250,8 @@ pub(crate) async fn download_model(app: AppHandle, file: String) -> Result<(), S
 }
 
 #[tauri::command]
-pub(crate) fn delete_model(file: String) -> Result<(), String> {
-    isper_models::remove(&file).map_err(|e| e.to_string())
+pub(crate) fn delete_model(file: String) -> crate::undo::Scheduled {
+    crate::undo::schedule(crate::undo::Doomed::Model(file))
 }
 
 #[tauri::command]

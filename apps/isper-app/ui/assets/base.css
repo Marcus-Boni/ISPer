@@ -404,6 +404,17 @@ input[type=radio].radio:disabled { opacity: .35; cursor: default; }
   font-size: 11px; font-weight: 700; background: var(--panel-3); color: var(--muted);
 }
 .toast-ok .toast-ic { background: var(--good-soft); color: var(--good); }
+/* Toast com ação (Desfazer): o botão e a barra do tempo que falta. */
+.toast.has-action { position: relative; overflow: hidden; padding-right: 8px; }
+.toast-act {
+  margin-left: 4px; padding: 4px 10px; border-radius: var(--r-sm); border: 1px solid var(--line-2);
+  background: var(--panel-3); color: var(--ink); font-weight: 600; font-size: 12px; cursor: pointer;
+}
+.toast-act:hover { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
+.toast-timer {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 2px; transform-origin: left;
+  background: var(--accent); animation: arm var(--toast-ms, 7000ms) linear forwards;
+}
 .toast-err .toast-ic { background: var(--accent-soft); color: var(--accent); }
 
 /* ------------------------------------------------------------- vazio */

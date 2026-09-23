@@ -128,8 +128,10 @@ if ($rows.Count -gt $before) {
     "reuniao do soak mantida (id $($row.id))"
   } else {
     $det = Invoke-Isper 'get_meeting' "{ id: $($row.id) }"
-    Invoke-Isper 'delete_meeting' "{ id: $($row.id) }" | Out-Null
+    $sched = Invoke-Isper 'delete_meeting' "{ id: $($row.id) }"
     if ($det.meeting.md_path -and (Test-Path $det.meeting.md_path)) { Remove-Item $det.meeting.md_path -Force }
+    # A exclusao e adiada (Desfazer): espera a janela antes de reiniciar o app.
+    Start-Sleep -Milliseconds ([int]$sched.undo_ms + 1500)
     Check (@(Invoke-Isper 'list_meetings' '{ query: null }').Count -eq $before) "reuniao do soak apagada"
   }
 }

@@ -7,11 +7,15 @@ use isper_core::store::{MeetingDetail, MeetingRow, MeetingStore};
 #[tauri::command]
 pub(crate) fn list_meetings(query: Option<String>) -> Result<Vec<MeetingRow>, String> {
     let store = open_store().map_err(|e| e.to_string())?;
-    match query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
+    let mut rows = match query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
         Some(q) => store.search_meetings(q),
         None => store.list_meetings(),
     }
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+    // Excluída há instantes (janela do Desfazer aberta): já não aparece.
+    let hidden = crate::undo::hidden_meetings();
+    rows.retain(|r| !hidden.contains(&r.id));
+    Ok(rows)
 }
 
 #[tauri::command]
@@ -154,11 +158,8 @@ pub(crate) fn export_meeting(id: i64, format: String) -> Result<String, String> 
 
 /// Remove do histórico; o arquivo .md continua na pasta (decisão do usuário).
 #[tauri::command]
-pub(crate) fn delete_meeting(id: i64) -> Result<(), String> {
-    open_store()
-        .map_err(|e| e.to_string())?
-        .delete_meeting(id)
-        .map_err(|e| e.to_string())
+pub(crate) fn delete_meeting(id: i64) -> crate::undo::Scheduled {
+    crate::undo::schedule(crate::undo::Doomed::Meeting(id))
 }
 
 #[tauri::command]
@@ -196,16 +197,16 @@ pub(crate) fn open_meetings_folder() -> Result<(), String> {
 pub(crate) fn list_dictations(
     query: Option<String>,
 ) -> Result<Vec<isper_core::store::DictationRow>, String> {
-    open_store()
+    let mut rows = open_store()
         .map_err(|e| e.to_string())?
         .list_dictations(query.as_deref(), 300)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    let hidden = crate::undo::hidden_dictations();
+    rows.retain(|r| !hidden.contains(&r.id));
+    Ok(rows)
 }
 
 #[tauri::command]
-pub(crate) fn delete_dictation(id: i64) -> Result<(), String> {
-    open_store()
-        .map_err(|e| e.to_string())?
-        .delete_dictation(id)
-        .map_err(|e| e.to_string())
+pub(crate) fn delete_dictation(id: i64) -> crate::undo::Scheduled {
+    crate::undo::schedule(crate::undo::Doomed::Dictation(id))
 }
