@@ -34,7 +34,10 @@ $id = 'MarcusBoni.ISPer'
 $repo = 'Marcus-Boni/ISPer'
 $tag = "v$Version"
 $setup = "ISPer_${Version}_x64-cpu-setup.exe"
-$schema = '1.9.0'
+# O que fica e o que sai da máquina, no portal (SECURITY.md é sobre vulnerabilidades).
+$privacy = 'https://isper.pages.dev/docs/reunioes-e-sistema/privacidade/'
+# O schema que o modelo de PR do winget-pkgs pede.
+$schema = '1.12.0'
 
 if (-not $Sums) {
   $tmp = Join-Path ([IO.Path]::GetTempPath()) "isper-winget-$Version"
@@ -56,7 +59,8 @@ $dir = Join-Path $Out "manifests\m\MarcusBoni\ISPer\$Version"
 New-Item -ItemType Directory -Force $dir | Out-Null
 $utf8 = New-Object System.Text.UTF8Encoding $false
 function Write-Manifest([string]$name, [string]$kind, [string]$body) {
-  $header = "# Gerado por scripts/winget-manifests.ps1 — não edite à mão.`n# yaml-language-server: `$schema=https://aka.ms/winget-manifest.$kind.$schema.schema.json`n`n"
+  # Os comentários vão em inglês: os manifestos são lidos no microsoft/winget-pkgs.
+  $header = "# Created with scripts/winget-manifests.ps1 (https://github.com/$repo)`n# yaml-language-server: `$schema=https://aka.ms/winget-manifest.$kind.$schema.schema.json`n`n"
   [IO.File]::WriteAllText((Join-Path $dir $name), ($header + $body.Trim() + "`n"), $utf8)
 }
 
@@ -74,7 +78,7 @@ PackageVersion: $Version
 InstallerLocale: pt-BR
 Platform:
 - Windows.Desktop
-# Captura de áudio por processo (só o Teams) exige o Windows 10 2004.
+# Per-process audio capture (Teams only) needs Windows 10 2004.
 MinimumOSVersion: 10.0.19041.0
 InstallerType: nullsoft
 Scope: user
@@ -84,10 +88,11 @@ InstallModes:
 - silentWithProgress
 UpgradeBehavior: install
 ReleaseDate: $ReleaseDate
-# O que o instalador grava no registro (o Tauri deriva o publicador do identificador).
+# What the Tauri NSIS installer writes under HKCU\...\Uninstall\ISPer.
 AppsAndFeaturesEntries:
 - DisplayName: ISPer
   Publisher: isper
+  ProductCode: ISPer
 Installers:
 - Architecture: x64
   InstallerUrl: https://github.com/$repo/releases/download/$tag/$setup
@@ -105,7 +110,7 @@ PackageLocale: pt-BR
 Publisher: Marcus Boni
 PublisherUrl: https://github.com/Marcus-Boni
 PublisherSupportUrl: https://github.com/$repo/issues
-PrivacyUrl: https://github.com/$repo/blob/main/SECURITY.md
+PrivacyUrl: $privacy
 Author: Marcus Boni
 PackageName: ISPer
 PackageUrl: https://isper.pages.dev
@@ -136,7 +141,7 @@ PackageLocale: en-US
 Publisher: Marcus Boni
 PublisherUrl: https://github.com/Marcus-Boni
 PublisherSupportUrl: https://github.com/$repo/issues
-PrivacyUrl: https://github.com/$repo/blob/main/SECURITY.md
+PrivacyUrl: $privacy
 Author: Marcus Boni
 PackageName: ISPer
 PackageUrl: https://isper.pages.dev

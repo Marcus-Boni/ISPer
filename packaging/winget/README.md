@@ -47,8 +47,11 @@ dias; as seguintes, menos.
 
 - `InstallerType: nullsoft`, `Scope: user` (sem UAC), modos interativo e
   silencioso — o instalador do Tauri aceita `/S`.
-- `AppsAndFeaturesEntries` com `DisplayName: ISPer` e `Publisher: isper`: é o
-  que o instalador grava no registro, e é por aí que o winget reconhece o app
-  já instalado (inclusive o instalado pelo site).
+- `AppsAndFeaturesEntries` com `DisplayName: ISPer`, `Publisher: isper` e
+  `ProductCode: ISPer` (a chave `HKCU\...\Uninstall\ISPer`): é o que o
+  instalador grava no registro, e é por aí que o winget reconhece o app já
+  instalado (inclusive o instalado pelo site).
+- Schema 1.12.0, o que o modelo de PR do `winget-pkgs` pede, e comentários em
+  inglês, porque os manifestos são lidos lá.
 - `MinimumOSVersion: 10.0.19041.0` (Windows 10 2004): a captura de áudio só
   do Teams usa uma API dessa versão.
