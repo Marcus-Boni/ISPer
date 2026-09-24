@@ -78,6 +78,40 @@ pub const WHISPER_CATALOG: &[ModelInfo] = &[
     },
 ];
 
+/// Modelos candidatos para o celular (Fase 9.1), do menor ao maior. O spike
+/// mede cada um no aparelho antes de o app escolher por nível de aparelho —
+/// os tamanhos quantizados cabem na memória de um intermediário.
+pub const MOBILE_CATALOG: &[ModelInfo] = &[
+    ModelInfo {
+        file: "ggml-tiny-q5_1.bin",
+        label: "Tiny (q5)",
+        approx_mb: 31,
+        note: "Só para medir o piso: rápido, mas erra muito em pt-BR",
+        needs_gpu: false,
+    },
+    ModelInfo {
+        file: "ggml-base-q5_1.bin",
+        label: "Base (q5)",
+        approx_mb: 57,
+        note: "Aparelho de entrada",
+        needs_gpu: false,
+    },
+    ModelInfo {
+        file: "ggml-small-q5_1.bin",
+        label: "Small (q5)",
+        approx_mb: 181,
+        note: "Candidato para intermediários: o small do PC, quantizado",
+        needs_gpu: false,
+    },
+    ModelInfo {
+        file: "ggml-large-v3-turbo-q5_0.bin",
+        label: "Large v3 Turbo (q5)",
+        approx_mb: 574,
+        note: "O modelo do PC: só em topo de linha, e vale medir o calor",
+        needs_gpu: false,
+    },
+];
+
 /// Modelo de VAD (Silero v5.1.2 em ggml) que o whisper.cpp usa para achar os
 /// trechos de fala. São 0,9 MB — cabem junto dos modelos Whisper sem pesar.
 ///
@@ -92,6 +126,18 @@ pub const VAD_APPROX_MB: u32 = 1;
 /// Caminho do modelo de VAD (exista ele ou não).
 pub fn vad_path() -> Result<PathBuf> {
     Ok(models_dir()?.join(VAD_FILE))
+}
+
+/// Baixa o modelo de VAD para `dir`, se ainda não estiver lá (o celular
+/// guarda os modelos na pasta do próprio app). Devolve o caminho.
+pub fn download_vad_to(dir: &Path, on_progress: &mut dyn FnMut(u64, u64)) -> Result<PathBuf> {
+    let dest = dir.join(VAD_FILE);
+    if dest.exists() {
+        return Ok(dest);
+    }
+    tracing::info!("baixando {VAD_FILE}");
+    download_asset(VAD_URL, &dest, None, None, on_progress)?;
+    Ok(dest)
 }
 
 /// O modelo de VAD já está instalado?
@@ -114,6 +160,11 @@ const HF_REPO: &str = "ggerganov/whisper.cpp";
 
 pub fn catalog_entry(file: &str) -> Option<&'static ModelInfo> {
     WHISPER_CATALOG.iter().find(|m| m.file == file)
+}
+
+/// O modelo está em algum dos catálogos (desktop ou celular)?
+fn known_model(file: &str) -> bool {
+    catalog_entry(file).is_some() || MOBILE_CATALOG.iter().any(|m| m.file == file)
 }
 
 /// Identificador do app (o mesmo `identifier` do tauri.conf.json): nomeia a
@@ -260,9 +311,22 @@ pub fn download_whisper(file: &str, on_progress: &mut dyn FnMut(u64, u64)) -> Re
     if catalog_entry(file).is_none() {
         return Err(ModelsError::NotInCatalog(file.to_string()));
     }
+    download_whisper_to(file, &models_dir()?, on_progress)
+}
+
+/// Como [`download_whisper`], para uma pasta escolhida por quem chama e
+/// aceitando também os modelos de [`MOBILE_CATALOG`].
+pub fn download_whisper_to(
+    file: &str,
+    dir: &Path,
+    on_progress: &mut dyn FnMut(u64, u64),
+) -> Result<PathBuf> {
+    if !known_model(file) {
+        return Err(ModelsError::NotInCatalog(file.to_string()));
+    }
     let (expected_sha, expected_size) = hf_expected(file)?;
     let url = format!("https://huggingface.co/{HF_REPO}/resolve/main/{file}");
-    let dest = models_dir()?.join(file);
+    let dest = dir.join(file);
     download_asset(
         &url,
         &dest,

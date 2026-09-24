@@ -361,41 +361,7 @@ fn score_against_reference(args: &BenchArgs, out: &FinalTranscript) -> anyhow::R
 pub(crate) fn read_turns(path: &Path) -> anyhow::Result<Vec<SpeakerTurn>> {
     let texto = std::fs::read_to_string(path)
         .with_context(|| format!("falha ao ler {}", path.display()))?;
-    let mut out = Vec::new();
-    let mut nomes: Vec<String> = Vec::new();
-    for (i, linha) in texto.lines().enumerate() {
-        let linha = linha.trim();
-        if linha.is_empty() || linha.starts_with('#') {
-            continue;
-        }
-        let campos: Vec<&str> = linha.split(['\t', ';']).map(str::trim).collect();
-        anyhow::ensure!(
-            campos.len() >= 3,
-            "{}:{}: esperava início<TAB>fim<TAB>falante",
-            path.display(),
-            i + 1
-        );
-        let start: f32 = campos[0]
-            .parse()
-            .with_context(|| format!("linha {}", i + 1))?;
-        let end: f32 = campos[1]
-            .parse()
-            .with_context(|| format!("linha {}", i + 1))?;
-        let nome = campos[2].to_string();
-        let id = match nomes.iter().position(|n| *n == nome) {
-            Some(k) => k,
-            None => {
-                nomes.push(nome);
-                nomes.len() - 1
-            }
-        };
-        out.push(SpeakerTurn {
-            start_secs: start,
-            end_secs: end,
-            speaker: id as u32,
-        });
-    }
-    Ok(out)
+    metrics::parse_turns(&texto).map_err(|e| anyhow::anyhow!("{}: {e}", path.display()))
 }
 
 /// Compara dois relatórios lado a lado — é o entregável "antes/depois".

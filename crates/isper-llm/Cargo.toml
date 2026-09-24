@@ -11,11 +11,19 @@ ureq = { version = "3", default-features = false, features = ["rustls", "gzip", 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-keyring = { version = "3", features = ["windows-native"] }
 toml = "1"
 tracing = "0.1"
 # Pastas conhecidas do Windows — ver config_path().
 dirs = "6"
+
+# Cofre de senhas do sistema para a chave do provedor: o Credential Manager
+# no Windows. Nas outras plataformas o `keyring` compila sem cofre nativo (a
+# chave vive só na memória); no celular a chave vem do app (Keystore/Keychain).
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(not(windows))'.dependencies]
+keyring = "3"
 
 [lints]
 workspace = true

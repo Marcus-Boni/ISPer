@@ -379,6 +379,47 @@ pub struct DiarizationErrorRate {
     pub rate: f32,
 }
 
+/// Lê turnos de referência: `início<TAB>fim<TAB>falante` por linha (`;`
+/// também separa; `#` começa comentário; linha vazia é ignorada). Os nomes
+/// dos falantes viram ids na ordem em que aparecem — o DER não depende do
+/// nome, só de quem é quem.
+///
+/// É o formato do `.turns.tsv` do corpus; o erro diz a linha que não fecha.
+pub fn parse_turns(text: &str) -> Result<Vec<SpeakerTurn>, String> {
+    let mut out = Vec::new();
+    let mut names: Vec<&str> = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let fields: Vec<&str> = line.split(['\t', ';']).map(str::trim).collect();
+        let [start, end, name, ..] = fields[..] else {
+            return Err(format!(
+                "linha {}: esperava início<TAB>fim<TAB>falante",
+                i + 1
+            ));
+        };
+        let number = |v: &str| {
+            v.parse::<f32>()
+                .map_err(|_| format!("linha {}: \"{v}\" não é um número", i + 1))
+        };
+        let id = match names.iter().position(|n| *n == name) {
+            Some(k) => k,
+            None => {
+                names.push(name);
+                names.len() - 1
+            }
+        };
+        out.push(SpeakerTurn {
+            start_secs: number(start)?,
+            end_secs: number(end)?,
+            speaker: id as u32,
+        });
+    }
+    Ok(out)
+}
+
 /// Calcula o DER comparando turnos de referência com os do sistema.
 ///
 /// Discretiza em quadros de 10 ms e procura o casamento de falantes que
@@ -639,6 +680,21 @@ mod tests {
     #[test]
     fn der_vazio_nao_explode() {
         assert_eq!(der(&[], &[]).rate, 0.0);
+    }
+
+    #[test]
+    fn turnos_de_referencia_viram_ids_na_ordem_de_aparicao() {
+        let t = parse_turns("# corpus\n0.0\t2.5\tAna\n2.5;4\t Beto\n\n4\t6\tAna\n").unwrap();
+        assert_eq!(t.len(), 3);
+        assert_eq!((t[0].speaker, t[1].speaker, t[2].speaker), (0, 1, 0));
+        assert_eq!((t[1].start_secs, t[1].end_secs), (2.5, 4.0));
+    }
+
+    #[test]
+    fn turno_quebrado_diz_a_linha() {
+        let e = parse_turns("0\t1\tAna\n1\tdois\tBeto\n").unwrap_err();
+        assert!(e.starts_with("linha 2"), "{e}");
+        assert!(parse_turns("0\t1\n").unwrap_err().starts_with("linha 1"));
     }
 
     #[test]

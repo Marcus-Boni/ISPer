@@ -92,12 +92,7 @@ impl Vad {
         // o Whisper — disputar contexto CUDA por 0,9 MB não paga.
         let mut params = WhisperVadContextParams::new();
         params.set_use_gpu(false);
-        params.set_n_threads(
-            std::thread::available_parallelism()
-                .map(|n| n.get() as i32)
-                .unwrap_or(4)
-                .clamp(1, 4),
-        );
+        params.set_n_threads(vad_threads());
         let ctx = WhisperVadContext::new(path, params)
             .map_err(|e| IsperError::Whisper(format!("VAD: {e}")))?;
         Ok(Self { ctx })
@@ -141,6 +136,22 @@ impl Vad {
         }
         Ok(out)
     }
+}
+
+/// Threads do VAD: **uma**, ou `ISPER_VAD_THREADS` para medir.
+///
+/// O Silero roda um grafo minúsculo a cada quadro de 32 ms, e sincronizar
+/// threads a cada quadro custa mais que a conta. Medido nos 190 s do corpus
+/// (24/09/2026), com as mesmas 37 regiões e o mesmo texto: Ryzen 7 7735HS,
+/// 1 thread 0,4 s · 2 → 1,2 s · 4 → 2,1 s; no emulador Android (4 núcleos
+/// virtuais) e o PC ocupado, 4 threads levaram 135 s, mais que a própria
+/// transcrição; com uma, 1,1 s.
+fn vad_threads() -> i32 {
+    std::env::var("ISPER_VAD_THREADS")
+        .ok()
+        .and_then(|v| v.parse::<i32>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(1)
 }
 
 /// Regras de montagem das janelas que vão ao Whisper.
