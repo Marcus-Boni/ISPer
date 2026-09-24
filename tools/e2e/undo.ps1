@@ -1,7 +1,8 @@
 # E2E do "Desfazer" (fase 7.5) pela interface real da Biblioteca, via CDP:
 # excluir um ditado some com ele na hora e mostra o toast com Desfazer; o
 # botao Desfazer e o Ctrl+Z trazem de volta. Nada e apagado: cada exclusao
-# do roteiro e desfeita. Sem ditados no historico (runner do CI), pula.
+# do roteiro e desfeita. O perfil de teste nasce vazio: tres ditados de
+# exemplo entram no banco dele (Python 3, sqlite3); sem Python, pula.
 # A exclusao de reuniao (inclusive a que expira) e coberta pelo meeting.ps1.
 #
 #   .\tools\e2e\undo.ps1 -Exe <caminho do exe>
@@ -13,8 +14,31 @@ param([string]$Exe)
 $exe = Get-IsperExe $Exe
 "undo: $exe"
 
+function Add-SampleDictations {
+  # Direto no banco do perfil, com as colunas do save_dictation (isper-core).
+  $py = @'
+import sqlite3, sys, time
+con = sqlite3.connect(sys.argv[1])
+now = int(time.time())
+for i, text in enumerate(["Ditado de teste um.", "Ditado de teste dois.", "Ditado de teste tres."]):
+    ts = now - 60 * (i + 1)
+    at = time.strftime("%d/%m/%Y %H:%M:%S", time.localtime(ts))
+    con.execute("INSERT INTO dictations (at, at_ts, text, audio_secs, infer_secs) VALUES (?, ?, ?, 2.0, 0.3)", (at, ts, text))
+con.commit()
+print(con.execute("SELECT COUNT(*) FROM dictations").fetchone()[0])
+'@
+  $n = $py | & python - (Get-E2EDataPath 'isper.db') 2>&1
+  Write-Host "  (ditados de exemplo no perfil de teste: $n)"
+}
+
 Stop-Isper
+# A primeira abertura cria o banco do perfil; os ditados entram com o app fechado.
+Start-Isper -Exe $exe | Out-Null
+Stop-Isper
+Add-SampleDictations
 Check (Start-Isper -Exe $exe) "app abriu com a tela Inicio (CDP)"
+# O roteiro confere o rotulo "Desfazer": fixa o pt-BR (o runner do CI e en-US).
+Invoke-Isper 'set_ui_lang' "{ lang: 'pt-BR' }" | Out-Null
 Invoke-Isper 'open_library_window' '{ meeting: null }' | Out-Null
 Wait-IsperWindow 'library.html' | Out-Null
 Start-Sleep -Seconds 1

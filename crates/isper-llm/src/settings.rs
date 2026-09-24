@@ -21,9 +21,26 @@ pub struct LlmSettings {
     pub embeddings: EmbeddingSettings,
 }
 
+/// O perfil de dados dos testes ponta a ponta (`ISPER_PROFILE_DIR`, ver o
+/// `paths.rs` do app): com ele, nem o `llm.toml` nem as chaves são as do usuário.
+const PROFILE_ENV: &str = "ISPER_PROFILE_DIR";
+
+fn profile_dir() -> Option<PathBuf> {
+    std::env::var_os(PROFILE_ENV)
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+}
+
 /// `%APPDATA%\ISPer\llm.toml` — pela API de pastas conhecidas do Windows, com
 /// a variável de ambiente como reserva (um processo pode nascer sem ela).
 fn config_path() -> Result<PathBuf> {
+    if let Some(profile) = profile_dir() {
+        return Ok(profile
+            .join("AppData")
+            .join("Roaming")
+            .join("ISPer")
+            .join("llm.toml"));
+    }
     let appdata = dirs::config_dir()
         .or_else(|| std::env::var_os("APPDATA").map(PathBuf::from))
         .ok_or_else(|| LlmError::Keyring("APPDATA não definido".into()))?;
@@ -56,9 +73,17 @@ pub fn save_settings(settings: &LlmSettings) -> Result<()> {
 }
 
 const KEYRING_SERVICE: &str = "ISPer";
+/// O cofre do perfil de teste: um e2e que salve ou apague uma chave nunca
+/// toca na do usuário.
+const KEYRING_SERVICE_TEST: &str = "ISPer (perfil de teste)";
 
 fn entry(provider: &str) -> Result<keyring::Entry> {
-    keyring::Entry::new(KEYRING_SERVICE, provider).map_err(|e| LlmError::Keyring(e.to_string()))
+    let service = if profile_dir().is_some() {
+        KEYRING_SERVICE_TEST
+    } else {
+        KEYRING_SERVICE
+    };
+    keyring::Entry::new(service, provider).map_err(|e| LlmError::Keyring(e.to_string()))
 }
 
 /// Guarda a chave no Credential Manager do Windows.

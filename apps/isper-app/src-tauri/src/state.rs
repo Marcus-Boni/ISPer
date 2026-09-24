@@ -191,7 +191,7 @@ pub(crate) fn notify_status(app: &AppHandle) {
 
 /// `%LOCALAPPDATA%\com.isper.desktop\logs` — um arquivo por dia, 14 dias guardados.
 pub(crate) fn logs_dir() -> Option<PathBuf> {
-    let dir = crate::paths::local_dir()?.join("logs");
+    let dir = crate::paths::logs_dir()?;
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir)
 }

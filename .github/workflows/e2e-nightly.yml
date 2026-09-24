@@ -180,7 +180,7 @@ jobs:
           ISPER_E2E_CDP_REGISTRY: '1'
         run: .\tools\e2e\theme.ps1 -Exe .\target\release\isper-app.exe
 
-      # Desfazer pela Biblioteca (sem ditados no runner, só confere que a janela abre limpa).
+      # Desfazer pela Biblioteca, com ditados de exemplo no perfil de teste.
       - name: E2E desfazer (Biblioteca)
         shell: pwsh
         env:
@@ -236,6 +236,10 @@ jobs:
           "--- log do ISPer ---"
           Get-ChildItem "$env:LOCALAPPDATA\com.isper.desktop\logs" -ErrorAction SilentlyContinue |
             ForEach-Object { "== $($_.Name) =="; Get-Content $_.FullName -Tail 80 }
+          # O app testado loga no perfil de teste do tools/e2e (mantido quando o roteiro falha).
+          "--- logs dos perfis de teste ---"
+          Get-ChildItem "$env:TEMP\isper-e2e-*\AppData\Local\com.isper.desktop\logs\isper.log*" -ErrorAction SilentlyContinue |
+            ForEach-Object { "== $($_.FullName) =="; Get-Content $_.FullName -Tail 80 }
 
       # O contexto `env` do Actions não enxerga as variáveis da máquina
       # (LOCALAPPDATA): o caminho do log é exportado pelo shell.

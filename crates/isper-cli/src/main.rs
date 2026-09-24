@@ -204,17 +204,27 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
+/// O perfil de dados de teste (`ISPER_PROFILE_DIR`), como no app: com ele, as
+/// pastas padrão abaixo são as do perfil, e não as do usuário.
+fn profile_dir() -> Option<PathBuf> {
+    std::env::var_os("ISPER_PROFILE_DIR")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+}
+
 /// Pasta padrão dos Markdowns: `Documentos\ISPer\Reunioes`.
 fn default_meetings_dir() -> Option<PathBuf> {
-    let home = std::env::var_os("USERPROFILE").map(PathBuf::from)?;
+    let home = profile_dir().or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))?;
     Some(home.join("Documents").join("ISPer").join("Reunioes"))
 }
 
 /// Banco padrão do app: `%APPDATA%\ISPer\isper.db`.
 fn default_db() -> Option<PathBuf> {
-    std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .map(|p| p.join("ISPer").join("isper.db"))
+    let appdata = match profile_dir() {
+        Some(profile) => profile.join("AppData").join("Roaming"),
+        None => std::env::var_os("APPDATA").map(PathBuf::from)?,
+    };
+    Some(appdata.join("ISPer").join("isper.db"))
 }
 
 fn run_import(dir: Option<&Path>, db: Option<&Path>, apply: bool) -> anyhow::Result<()> {

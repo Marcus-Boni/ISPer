@@ -15,7 +15,7 @@ param([string]$Exe, [string]$Shots)
 $exe = Get-IsperExe $Exe
 "onboarding: $exe"
 
-$cfgPath = Join-Path $env:APPDATA 'ISPer\config.toml'
+$cfgPath = Get-E2EDataPath 'config.toml'
 # CONFIG_VERSION de apps/isper-app/src-tauri/src/config.rs.
 $ConfigVersion = 2
 $utf8 = New-Object System.Text.UTF8Encoding $false

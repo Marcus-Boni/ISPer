@@ -21,6 +21,16 @@ bata com ela.
   interface ficavam no fim da seção Sistema, depois de tudo, e eram difíceis
   de achar; agora têm um bloco próprio, o primeiro da janela.
 
+### Corrigido
+- Os testes ponta a ponta (`tools/e2e`) rodam num perfil de dados próprio, em
+  `%TEMP%`, e não mais sobre os dados de quem os roda. Um e2e tinha deixado
+  atas de teste em `Documentos\ISPer\Reunioes`. Com `ISPER_PROFILE_DIR`, o app
+  lê e grava banco, configurações, `llm.toml`, atas, backups, importação e logs
+  dentro dessa pasta. Também não mexe no registro de iniciar com o Windows (um
+  build de desenvolvimento regravava a entrada com o próprio caminho) e guarda
+  chaves de IA num cofre à parte. Um exe que não conhece o perfil é fechado, e
+  o roteiro para. A variável `ISPER_IMPORT_DIR`, que só os testes usavam, saiu.
+
 ## [0.21.0] - 2026-09-23
 
 A Fase 9 começa pelo PC: as gravações de fora — do Plaud, do celular, de

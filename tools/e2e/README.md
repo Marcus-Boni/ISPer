@@ -25,6 +25,35 @@ atalhos globais, áudio e o atualizador.
   `ISPER_E2E_RELAUNCH=1`), para não ficar na bandeja no lugar do app de
   verdade.
 
+## Perfil de dados próprio
+
+Os testes nunca usam os dados de quem os roda. O `Start-Isper` abre o app com
+`ISPER_PROFILE_DIR` apontando para uma pasta nova em `%TEMP%`
+(`isper-e2e-<data>-<pid>`), e o app lê e grava tudo lá dentro, no mesmo
+desenho das pastas do Windows:
+
+| No perfil | No lugar de |
+|---|---|
+| `AppData\Roaming\ISPer` | `config.toml`, `llm.toml` e o banco em `%APPDATA%\ISPer` |
+| `AppData\Local\com.isper.desktop\logs` | os logs em `%LOCALAPPDATA%\com.isper.desktop\logs` |
+| `Documents\ISPer` | `Reunioes`, `Backups`, `Importar` e o zip de diagnóstico em `Documentos\ISPer` |
+
+Um perfil vale para todos os `Start-Isper` de um mesmo roteiro, porque um
+teste que reabre o app encontra o que deixou. Ele é apagado no fim quando tudo
+passa. Quando algo falha, fica, e o caminho aparece na última linha.
+
+Com o perfil, o app também não mexe no registro de iniciar com o Windows (um
+build de desenvolvimento regravaria a entrada com o caminho dele) e guarda
+chaves de IA num cofre à parte, `ISPer (perfil de teste)`. Os modelos continuam
+os da máquina, porque são grandes e o app só os lê. O WebView2 também continua
+com a pasta dele.
+
+Numa máquina nova, a primeira configuração abre (não há `config.toml`) e o
+`Start-Isper` a conclui, como no CI. `Get-E2EDataPath`, `Get-E2EDocsPath` e
+`Get-TodayLog` dão os caminhos dentro do perfil. O `Start-Isper` confere que o
+log nasceu no perfil. Um exe que não conhece a variável (0.21.0 e anteriores)
+usaria os seus dados, e por isso o roteiro é fechado e para ali.
+
 ## Scripts
 
 | Script | O que cobre | Duração |
@@ -34,10 +63,10 @@ atalhos globais, áudio e o atualizador.
 | `updater-local.ps1` | Atualizador completo contra uma release falsa assinada com a sua chave e servida em localhost: checagem, banner, download com assinatura, download adulterado recusado, recusa durante reunião (nada é instalado) | ~6 min |
 | `data.ps1` | Fase 7.4 no app real: schema do banco no Diagnóstico, retenção (aviso de confirmação, salvar e voltar), backup SQLite com o mesmo `user_version`, pacote de diagnóstico (entradas certas, sem texto ditado), log em JSON Lines | ~40 s |
 | `theme.ps1` | Tema da interface: claro, escuro e "seguir o Windows" aplicados na hora nas três janelas (fundo calculado, não só o atributo), o indicador continua escuro, os seletores de tema e idioma das Configurações e da primeira configuração acompanham a troca feita na outra janela, valor inválido volta ao padrão, janela reaberta já nasce no tema salvo. `-Shots <pasta>` grava um PNG de cada janela em cada tema | ~40 s |
-| `undo.ps1` | Desfazer pela interface real da Biblioteca: excluir um ditado some com ele na hora e mostra o toast; o botão Desfazer e o Ctrl+Z trazem de volta (nada é apagado; sem ditados no histórico, pula). A exclusão de reunião que expira fica no `meeting.ps1` | ~20 s |
+| `undo.ps1` | Desfazer pela interface real da Biblioteca: excluir um ditado some com ele na hora e mostra o toast; o botão Desfazer e o Ctrl+Z trazem de volta (nada é apagado). Três ditados de exemplo entram no perfil de teste, com o Python; sem ele, o roteiro pula. A exclusão de reunião que expira fica no `meeting.ps1` | ~20 s |
 | `a11y.ps1` | Acessibilidade em Início, Biblioteca (reunião aberta e Ditados), Configurações, primeira configuração, Copilot e indicador, nos temas escuro e claro: todo controle com nome acessível, todo texto no contraste WCAG AA, nenhuma rolagem horizontal; volta de Tab com teclado de verdade (`cdp-keys.mjs`) alcança todos os controles, com anel em cada foco e sem prender (também num tema de contraste do Windows, emulado); abas pelas setas; Enter abre a reunião e renomeia o falante. Verificadores em `a11y-probe.js` e `a11y-tab.js`, sem dependência externa | ~60 s |
 | `portable.ps1` | Versão portátil: uma pasta montada como o zip da release (exe, DLLs e `portable.txt`) abre, o Diagnóstico diz "versão portátil" (também na tela), o atualizador recusa instalar por cima e, sem o marcador, a mesma pasta volta a ser uma cópia comum. A pasta fica em `%TEMP%` e é apagada no fim | ~25 s |
-| `import.ps1` | Importar gravações (fase 9.0), com um modelo Whisper instalado: um MP3 entregue à fila (como o botão e o arrastar) vira reunião com a origem no banco e no `.md`; o mesmo áudio aponta a reunião que já existe; um `.opus` é recusado na entrada; um OGG deixado na pasta vigiada vira reunião com data e título do nome e vai para `Importados`; um "mp3" que não é áudio vai para `Não importados` com o motivo; o selo na Biblioteca e a opção nas Configurações. A pasta vigiada do teste fica em `%TEMP%` (`ISPER_IMPORT_DIR`) | ~2 min |
+| `import.ps1` | Importar gravações (fase 9.0), com um modelo Whisper instalado: um MP3 entregue à fila (como o botão e o arrastar) vira reunião com a origem no banco e no `.md`; o mesmo áudio aponta a reunião que já existe; um `.opus` é recusado na entrada; um OGG deixado na pasta vigiada vira reunião com data e título do nome e vai para `Importados`; um "mp3" que não é áudio vai para `Não importados` com o motivo; o selo na Biblioteca e a opção nas Configurações. A pasta vigiada é a do perfil de teste | ~2 min |
 | `onboarding.ps1` | Primeira configuração: com `onboarding_done = false` o app abre nela e não no Início; os cinco passos montam (medidor do microfone — ou o aviso, sem microfone —, modelos com um recomendado, atalho, IA, resumo), foco no título de cada passo, Enter avança, o idioma troca na hora, concluir grava `onboarding_done = true` e abre o Início, Configurações → Sistema a reabre e o × também conta como concluída. `-Shots <pasta>` grava os passos | ~40 s |
 | `i18n.ps1` | Idioma da interface: trocar para inglês e de volta vale na hora nas Configurações (HTML estático, texto montado por script, placeholders, Diagnóstico), no Início, na Biblioteca (lista, reunião aberta, falantes exibidos em inglês), no Copilot (estado ocioso e uma reunião sintética pelo próprio `render()`: cards, ações, gatilho da análise; reaberto nasce em inglês) e no indicador, nenhuma chave falta, a janela reaberta nasce no idioma salvo, valor inválido vira `auto`. `-Shots <pasta>` grava a tela em inglês | ~30 s |
 | `soak.ps1` | Reunião longa (10 min por padrão; `-Minutes 120` para as 2 h) com a fixture em loop, medindo a memória do processo a cada 30 s: o áudio dos participantes vai para disco (`%TEMP%\ISPer\*.pcm`), então a memória privada deve ficar estável depois do aquecimento (`-MaxGrowthMB`, padrão 150). Confere também a transcrição ao vivo e a limpeza dos `.pcm`, apaga a reunião de teste e grava um CSV em `target\soak\` | 10 min a 2 h |
@@ -100,8 +129,9 @@ WebView2 que tem de ter os mesmos argumentos do browser já aberto (senão
 roteiro de verificações não pode abortar na primeira janela que demora.
 
 Sem `-Exe`, os scripts usam o app instalado em `%LOCALAPPDATA%\Programs\ISPer`
-se existir, senão `target\release\isper-app.exe`. Cada verificação imprime
-`OK`/`FALHA`; o código de saída é 1 se algo falhou.
+se existir, senão `target\release\isper-app.exe`. O instalado precisa conhecer
+o perfil de teste; se não conhecer, o roteiro para no início. Cada verificação
+imprime `OK`/`FALHA`, e o código de saída é 1 se algo falhou.
 
 ## Assistentes empacotados (MSIX) veem outro AppData
 
@@ -117,6 +147,12 @@ estar "sem modelo" enquanto os testes dizem que está tudo certo. O repositório
 Para agir na visão real, lance um `.cmd` pelo `explorer.exe` (filho do Explorer,
 fora do pacote) e leia a saída num caminho não virtualizado, como uma pasta do
 repositório.
+
+A virtualização nunca protegeu os dados do usuário. `Documentos` não é
+virtualizado, e antes do perfil próprio um e2e rodado daqui deixou atas de
+teste na `Documentos\ISPer\Reunioes` de verdade. Hoje o perfil em `%TEMP%` cobre
+os dois casos. Só os modelos seguem no `%LOCALAPPDATA%` que o assistente
+enxerga.
 
 ## Cuidados
 
