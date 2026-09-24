@@ -387,44 +387,156 @@ pub fn to_mono(interleaved: &[f32], channels: u16) -> Vec<f32> {
 /// alta — resample "ingênuo" por interpolação linear cria aliasing que
 /// degrada a transcrição).
 pub fn resample_to_16k(mono: &[f32], from_rate: u32) -> Result<Vec<f32>> {
-    if from_rate == WHISPER_SAMPLE_RATE {
-        return Ok(mono.to_vec());
+    let mut resampler = Resampler16k::new(from_rate)?;
+    let mut out = Vec::with_capacity(resampler.expected_len(mono.len()));
+    resampler.push(mono, &mut out)?;
+    resampler.finish(&mut out)?;
+    Ok(out)
+}
+
+/// Tamanho do bloco que o filtro processa de cada vez.
+const RESAMPLE_CHUNK: usize = 1024;
+
+/// Reamostrador para 16 kHz que recebe o áudio aos pedaços.
+///
+/// É o mesmo filtro do [`resample_to_16k`] — que, aliás, é feito com ele —,
+/// para quem não tem o áudio inteiro na memória: um arquivo de duas horas
+/// decodificado em 48 kHz estéreo ocuparia 2,8 GB antes de ser convertido; em
+/// fluxo, só o resultado em 16 kHz fica guardado. Entregar o áudio inteiro de
+/// uma vez ou em pedaços de qualquer tamanho dá exatamente a mesma saída.
+pub struct Resampler16k {
+    /// `None` quando o áudio já está em 16 kHz: passa direto.
+    inner: Option<SincFixedIn<f32>>,
+    /// O que ainda não completou um bloco do filtro.
+    pending: Vec<f32>,
+    ratio: f64,
+}
+
+impl Resampler16k {
+    /// Um reamostrador de `from_rate` Hz para 16 kHz.
+    pub fn new(from_rate: u32) -> Result<Self> {
+        if from_rate == 0 {
+            return Err(IsperError::Resample("taxa de amostragem zero".into()));
+        }
+        if from_rate == WHISPER_SAMPLE_RATE {
+            return Ok(Self {
+                inner: None,
+                pending: Vec::new(),
+                ratio: 1.0,
+            });
+        }
+        let params = SincInterpolationParameters {
+            sinc_len: 256,
+            f_cutoff: 0.95,
+            interpolation: SincInterpolationType::Linear,
+            oversampling_factor: 256,
+            window: WindowFunction::BlackmanHarris2,
+        };
+        let ratio = WHISPER_SAMPLE_RATE as f64 / from_rate as f64;
+        let inner = SincFixedIn::<f32>::new(ratio, 2.0, params, RESAMPLE_CHUNK, 1)
+            .map_err(|e| IsperError::Resample(e.to_string()))?;
+        Ok(Self {
+            inner: Some(inner),
+            pending: Vec::with_capacity(RESAMPLE_CHUNK * 2),
+            ratio,
+        })
     }
 
-    let params = SincInterpolationParameters {
-        sinc_len: 256,
-        f_cutoff: 0.95,
-        interpolation: SincInterpolationType::Linear,
-        oversampling_factor: 256,
-        window: WindowFunction::BlackmanHarris2,
-    };
-    const CHUNK: usize = 1024;
-    let ratio = WHISPER_SAMPLE_RATE as f64 / from_rate as f64;
-    let mut resampler = SincFixedIn::<f32>::new(ratio, 2.0, params, CHUNK, 1)
-        .map_err(|e| IsperError::Resample(e.to_string()))?;
+    /// Quantas amostras de 16 kHz saem, mais ou menos, de `input_len`
+    /// amostras na taxa original — para reservar a memória de uma vez.
+    pub fn expected_len(&self, input_len: usize) -> usize {
+        (input_len as f64 * self.ratio) as usize + RESAMPLE_CHUNK
+    }
 
-    let mut out: Vec<f32> = Vec::with_capacity((mono.len() as f64 * ratio) as usize + CHUNK);
-    let mut pos = 0;
-    while pos + CHUNK <= mono.len() {
-        let chunk_out = resampler
-            .process(&[&mono[pos..pos + CHUNK]], None)
+    /// Entrega mais áudio mono na taxa original; o que já dá para converter
+    /// vai para o fim de `out`.
+    pub fn push(&mut self, mono: &[f32], out: &mut Vec<f32>) -> Result<()> {
+        let Some(filter) = self.inner.as_mut() else {
+            out.extend_from_slice(mono);
+            return Ok(());
+        };
+        self.pending.extend_from_slice(mono);
+        let mut pos = 0;
+        while pos + RESAMPLE_CHUNK <= self.pending.len() {
+            let chunk_out = filter
+                .process(&[&self.pending[pos..pos + RESAMPLE_CHUNK]], None)
+                .map_err(|e| IsperError::Resample(e.to_string()))?;
+            out.extend_from_slice(&chunk_out[0]);
+            pos += RESAMPLE_CHUNK;
+        }
+        self.pending.drain(..pos);
+        Ok(())
+    }
+
+    /// Fecha: converte o último pedaço (menor que um bloco) e drena o atraso
+    /// interno do filtro.
+    pub fn finish(mut self, out: &mut Vec<f32>) -> Result<()> {
+        let Some(mut filter) = self.inner.take() else {
+            return Ok(());
+        };
+        let tail = [self.pending.as_slice()];
+        let tail_in: Option<&[&[f32]]> = if self.pending.is_empty() {
+            None
+        } else {
+            Some(&tail[..])
+        };
+        let chunk_out = filter
+            .process_partial(tail_in, None)
             .map_err(|e| IsperError::Resample(e.to_string()))?;
         out.extend_from_slice(&chunk_out[0]);
-        pos += CHUNK;
+        Ok(())
     }
-    // Último pedaço (menor que um chunk) + drenagem do atraso interno do filtro.
-    let tail = &mono[pos..];
-    let tail_in: Option<&[&[f32]]> = if tail.is_empty() { None } else { Some(&[tail]) };
-    let chunk_out = resampler
-        .process_partial(tail_in, None)
-        .map_err(|e| IsperError::Resample(e.to_string()))?;
-    out.extend_from_slice(&chunk_out[0]);
-    Ok(out)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Um tom de `hz` em `rate` Hz, `secs` segundos.
+    fn tom(hz: f32, rate: u32, secs: f32) -> Vec<f32> {
+        (0..(rate as f32 * secs) as usize)
+            .map(|i| (i as f32 * hz * std::f32::consts::TAU / rate as f32).sin() * 0.5)
+            .collect()
+    }
+
+    #[test]
+    fn reamostrar_aos_pedacos_da_exatamente_o_mesmo_que_de_uma_vez() {
+        let entrada = tom(440.0, 44_100, 1.3);
+        let de_uma_vez = resample_to_16k(&entrada, 44_100).unwrap();
+        // Pedaços de tamanhos que não casam com o bloco do filtro.
+        let mut r = Resampler16k::new(44_100).unwrap();
+        let mut aos_pedacos = Vec::new();
+        let mut resto = entrada.as_slice();
+        for n in [1usize, 777, 5000, 3, 20_000] {
+            let (a, b) = resto.split_at(n.min(resto.len()));
+            r.push(a, &mut aos_pedacos).unwrap();
+            resto = b;
+        }
+        r.push(resto, &mut aos_pedacos).unwrap();
+        r.finish(&mut aos_pedacos).unwrap();
+        assert_eq!(de_uma_vez, aos_pedacos);
+        // 1,3 s em 16 kHz, com a folga do filtro.
+        let esperado = 1.3 * 16_000.0;
+        assert!(
+            (aos_pedacos.len() as f32 - esperado).abs() < 1500.0,
+            "{} amostras para ~{esperado}",
+            aos_pedacos.len()
+        );
+    }
+
+    #[test]
+    fn em_16k_o_reamostrador_so_repassa() {
+        let entrada = tom(300.0, 16_000, 0.2);
+        let mut r = Resampler16k::new(16_000).unwrap();
+        let mut out = Vec::new();
+        r.push(&entrada, &mut out).unwrap();
+        r.finish(&mut out).unwrap();
+        assert_eq!(out, entrada);
+        assert!(
+            Resampler16k::new(0).is_err(),
+            "taxa zero é erro, não divisão por zero"
+        );
+    }
 
     #[test]
     fn medidor_fecha_uma_janela_a_cada_n_amostras_mesmo_entre_pacotes() {

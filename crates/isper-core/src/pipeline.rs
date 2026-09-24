@@ -25,6 +25,7 @@
 //! passa um [`Diarizer`]. O app e a CLI ligam os dois em cinco linhas.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -184,6 +185,26 @@ pub fn run(
     diarizer: Option<&dyn Diarizer>,
     progress: Option<Progress<'_>>,
 ) -> Result<FinalTranscript> {
+    run_cancellable(engine, samples_16k, cfg, ctx, diarizer, progress, None)
+}
+
+/// O mesmo que [`run`], podendo ser interrompido: quando `cancel` vira
+/// `true`, a rodada para antes da próxima janela (ou da diarização) com
+/// [`crate::IsperError::Cancelled`]. É o que deixa cancelar a transcrição de
+/// um arquivo de horas importado (Fase 9.0) sem esperar o fim.
+///
+/// O `progress` recebe `(feita, total)` antes de cada janela e `(total,
+/// total)` quando a transcrição acaba — dali em diante, só a diarização.
+pub fn run_cancellable(
+    engine: &WhisperEngine,
+    samples_16k: &[f32],
+    cfg: &FinalConfig,
+    ctx: &MeetingContext,
+    diarizer: Option<&dyn Diarizer>,
+    progress: Option<Progress<'_>>,
+    cancel: Option<&AtomicBool>,
+) -> Result<FinalTranscript> {
+    let cancelled = || cancel.is_some_and(|c| c.load(Ordering::Relaxed));
     let started = Instant::now();
     let audio_secs = samples_16k.len() as f32 / WHISPER_SAMPLE_RATE as f32;
     let mut timings = StageTimings::default();
@@ -226,6 +247,9 @@ pub fn run(
     let mut previous_window_end = f32::MIN;
 
     for (i, w) in windows.iter().enumerate() {
+        if cancelled() {
+            return Err(crate::IsperError::Cancelled);
+        }
         if let Some(p) = progress {
             p(i, windows.len());
         }
@@ -316,6 +340,9 @@ pub fn run(
         p(windows.len(), windows.len());
     }
     timings.asr_secs = t.elapsed().as_secs_f32();
+    if let Some(p) = progress {
+        p(windows.len(), windows.len());
+    }
 
     segments.sort_by(|a, b| a.start_secs.total_cmp(&b.start_secs));
     asr.segments = segments.len();
@@ -335,6 +362,9 @@ pub fn run(
     );
 
     // ------------------------------------------------------- 3. diarização
+    if cancelled() {
+        return Err(crate::IsperError::Cancelled);
+    }
     let t = Instant::now();
     let diar = match diarizer {
         Some(d) => match d.diarize(samples_16k) {

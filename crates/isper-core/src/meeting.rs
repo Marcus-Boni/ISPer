@@ -1285,6 +1285,32 @@ pub fn render_markdown(
     out
 }
 
+/// Começo da linha do cabeçalho que diz de que arquivo de áudio a reunião
+/// veio (Fase 9.0). O [`crate::import`] a lê de volta: a origem sobrevive a
+/// uma reimportação da pasta.
+pub const SOURCE_LINE_PREFIX: &str = "> Importada do arquivo ";
+
+/// A linha do cabeçalho de uma reunião importada, com o nome do arquivo em
+/// código inline.
+pub fn source_line(source_name: &str) -> String {
+    // Crase no nome quebraria o código inline e a leitura de volta.
+    format!("{SOURCE_LINE_PREFIX}`{}`.", source_name.replace('`', "'"))
+}
+
+/// Põe a [`source_line`] logo abaixo da linha "> Transcrito…" do cabeçalho
+/// (ou no começo, num texto sem cabeçalho). Chamar de novo não duplica.
+pub fn insert_source_line(md: &mut String, source_name: &str) {
+    let linha = source_line(source_name);
+    if md.contains(&linha) {
+        return;
+    }
+    let pos = md
+        .find("> Transcrito")
+        .and_then(|i| md[i..].find('\n').map(|n| i + n + 1))
+        .unwrap_or(0);
+    md.insert_str(pos, &format!("{linha}\n"));
+}
+
 /// Título da seção com as decisões validadas no Copilot.
 ///
 /// Quem escreve a seção é o `isper-llm` (`render_decisions_markdown`), que não
@@ -1593,6 +1619,25 @@ mod tests {
         assert!(group_speech([seg("Eu", 0.0, 1.0, "   ")]).is_empty());
         assert_eq!(fmt_ts(65.0), "01:05");
         assert_eq!(fmt_ts(4587.0), "1:16:27");
+    }
+
+    #[test]
+    fn a_linha_de_origem_fica_no_cabecalho_uma_vez_so() {
+        let segs = [seg("Participante 1", 0.0, 3.0, "Oi.")];
+        let mut md = render_markdown("R", "22/09/2026 15:30", 3.0, &segs, None, &[]);
+        insert_source_line(&mut md, "Reunião `cliente`.mp3");
+        insert_source_line(&mut md, "Reunião `cliente`.mp3");
+        let linhas: Vec<&str> = md.lines().collect();
+        let i = linhas
+            .iter()
+            .position(|l| l.starts_with("> Transcrito"))
+            .unwrap();
+        assert_eq!(
+            linhas[i + 1],
+            "> Importada do arquivo `Reunião 'cliente'.mp3`.",
+            "logo abaixo do cabeçalho, sem crase dentro"
+        );
+        assert_eq!(md.matches(SOURCE_LINE_PREFIX).count(), 1);
     }
 
     #[test]

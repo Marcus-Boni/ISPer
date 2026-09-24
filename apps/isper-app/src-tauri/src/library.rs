@@ -89,7 +89,9 @@ pub(crate) fn segment_refs(detail: &MeetingDetail) -> Vec<SegmentRef<'_>> {
 static MARKDOWN_WRITE: Mutex<()> = Mutex::new(());
 
 /// A ata inteira a partir do banco: falas, momentos, resumo e, no fim, as
-/// seções do Copilot — decisões validadas e notas.
+/// seções do Copilot — decisões validadas e notas. Uma reunião importada de
+/// um arquivo de áudio (Fase 9.0) ganha, no cabeçalho, a linha que diz de
+/// qual arquivo ela veio.
 ///
 /// `summary` troca o resumo guardado: o fim da reunião usa para acrescentar
 /// a linha de qual provedor gerou o resumo, que não fica no banco.
@@ -102,6 +104,9 @@ pub(crate) fn meeting_markdown(detail: &MeetingDetail, summary: Option<&str>) ->
         summary.or(detail.summary.as_deref()),
         &detail.moments,
     );
+    if let Some(source) = detail.meeting.source_name.as_deref() {
+        meeting::insert_source_line(&mut md, source);
+    }
     meeting::append_copilot_sections(
         &mut md,
         decisions_markdown(&detail.decisions).as_deref(),
@@ -247,6 +252,7 @@ mod tests {
                 md_path: None,
                 moments: 0,
                 decisions: 1,
+                source_name: None,
             },
             summary: summary.map(Into::into),
             segments: vec![StoredSegment {
@@ -286,6 +292,19 @@ mod tests {
         let m = isper_core::import::parse_markdown("r.md", &md).expect("importa");
         assert_eq!(m.summary.as_deref(), Some("## Resumo\nFechado."));
         assert_eq!(m.notes.as_deref(), Some("- mandar contrato"));
+    }
+
+    #[test]
+    fn ata_regravada_de_um_audio_importado_mantem_a_origem() {
+        // A mesma armadilha das decisões: toda regravação passa por aqui, e a
+        // linha da origem precisa vir do banco para não sumir na primeira.
+        let mut d = detalhe(None, None);
+        d.meeting.source_name = Some("Com fornecedor.m4a".into());
+        let md = meeting_markdown(&d, None);
+        assert!(md.contains("> Importada do arquivo `Com fornecedor.m4a`."));
+        let m = isper_core::import::parse_markdown("r.md", &md).expect("importa");
+        assert_eq!(m.source_name.as_deref(), Some("Com fornecedor.m4a"));
+        assert!(!meeting_markdown(&detalhe(None, None), None).contains("Importada do arquivo"));
     }
 
     #[test]

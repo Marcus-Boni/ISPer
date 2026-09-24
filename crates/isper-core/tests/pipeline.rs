@@ -296,6 +296,69 @@ fn o_passe_final_transcreve_um_wav_inteiro_e_relata_o_que_fez() {
     assert_eq!(volta.config, r.config);
 }
 
+/// Fase 9.0: um arquivo que veio de fora (aqui, MP3 44,1 kHz estéreo) passa
+/// pelo mesmo passe final e dá praticamente o mesmo texto que o WAV original.
+#[test]
+#[ignore = "precisa dos modelos Whisper e Silero instalados"]
+fn um_mp3_importado_da_o_mesmo_texto_que_o_wav_original() {
+    let Some(modelo) = modelo() else {
+        eprintln!("sem modelo instalado — pulando");
+        return;
+    };
+    let Ok(vad_model) = isper_models::vad_path() else {
+        return;
+    };
+    if !vad_model.exists() {
+        eprintln!("sem modelo de VAD — pulando");
+        return;
+    }
+    let engine = WhisperEngine::new_with(&modelo, &isper_core::EngineOptions { dtw: true })
+        .expect("carrega o modelo");
+    let cfg = isper_core::pipeline::FinalConfig::meeting_final(vad_model);
+    let transcreve = |arquivo: &str| {
+        let d = isper_core::decode::decode_to_16k(std::path::Path::new(arquivo), None, None)
+            .expect("decodifica");
+        isper_core::pipeline::run(
+            &engine,
+            &d.samples_16k,
+            &cfg,
+            &MeetingContext::default(),
+            None,
+            None,
+        )
+        .expect("passe final")
+        .normalized_text
+    };
+    let do_wav = transcreve("../../fixtures/fala-16k.wav");
+    let do_mp3 = transcreve("../../fixtures/formatos/fala-44k-stereo.mp3");
+    eprintln!(
+        "WAV: {do_wav}
+MP3: {do_mp3}"
+    );
+    assert!(!do_mp3.trim().is_empty(), "o MP3 não virou texto");
+    let w = metrics::wer(&do_wav, &do_mp3, &Normalization::default());
+    assert!(w.rate <= 0.15, "o MP3 se afastou demais do WAV: {w:?}");
+
+    // Cancelar antes de começar não gasta nenhuma janela.
+    let d = isper_core::decode::decode_to_16k(
+        std::path::Path::new("../../fixtures/formatos/fala-48k.m4a"),
+        None,
+        None,
+    )
+    .expect("decodifica");
+    let cancelar = std::sync::atomic::AtomicBool::new(true);
+    let r = isper_core::pipeline::run_cancellable(
+        &engine,
+        &d.samples_16k,
+        &cfg,
+        &MeetingContext::default(),
+        None,
+        None,
+        Some(&cancelar),
+    );
+    assert!(matches!(r, Err(isper_core::IsperError::Cancelled)), "{r:?}");
+}
+
 #[test]
 #[ignore = "precisa dos modelos Whisper e Silero instalados"]
 fn o_passe_final_ganha_do_fatiamento_antigo_no_mesmo_audio() {

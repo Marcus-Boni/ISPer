@@ -56,6 +56,9 @@ pub struct ImportedMeeting {
     pub moments: Vec<f32>,
     /// As notas que o usuário escreveu no Copilot, se o arquivo tiver a seção.
     pub notes: Option<String>,
+    /// O arquivo de áudio de onde a reunião veio, se ela foi importada
+    /// (a linha `> Importada do arquivo …` do cabeçalho).
+    pub source_name: Option<String>,
 }
 
 /// Por que um `.md` não pôde ser lido como reunião do ISPer.
@@ -128,6 +131,11 @@ pub fn parse_markdown(name: &str, md: &str) -> Result<ImportedMeeting, ImportErr
     }
 
     let moments = parse_moments(corpo);
+    let source_name = corpo.lines().find_map(|l| {
+        let resto = l.strip_prefix(crate::meeting::SOURCE_LINE_PREFIX)?;
+        let nome = resto.trim().trim_end_matches('.').trim_matches('`').trim();
+        (!nome.is_empty()).then(|| nome.to_string())
+    });
     Ok(ImportedMeeting {
         title,
         started_at,
@@ -136,6 +144,7 @@ pub fn parse_markdown(name: &str, md: &str) -> Result<ImportedMeeting, ImportErr
         summary,
         moments,
         notes,
+        source_name,
     })
 }
 
@@ -319,6 +328,19 @@ mod tests {
                 .contains("Resumo gerado por IA")
         );
         assert_eq!(m.moments, vec![7.0]);
+    }
+
+    #[test]
+    fn a_origem_de_uma_reuniao_importada_volta_na_reimportacao() {
+        let segs = [seg("Participante 1", 0.0, 3.0, "Bom dia.")];
+        let mut md = render_markdown("Com fornecedor", "22/09/2026 15:30", 3.0, &segs, None, &[]);
+        crate::meeting::insert_source_line(&mut md, "Com fornecedor.m4a");
+        let m = parse_markdown("r.md", &md).expect("importa");
+        assert_eq!(m.source_name.as_deref(), Some("Com fornecedor.m4a"));
+        assert_eq!(m.segments.len(), 1, "a linha da origem não vira fala");
+
+        let gravada = render_markdown("R", "22/09/2026 15:30", 3.0, &segs, None, &[]);
+        assert_eq!(parse_markdown("g.md", &gravada).unwrap().source_name, None);
     }
 
     #[test]

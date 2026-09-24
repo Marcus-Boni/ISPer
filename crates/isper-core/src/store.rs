@@ -40,6 +40,29 @@ pub struct MeetingRow {
     pub moments: i64,
     /// Decisões validadas no Copilot (a Biblioteca marca a reunião).
     pub decisions: i64,
+    /// Nome do arquivo de áudio de onde a reunião veio, quando ela foi
+    /// importada (Fase 9.0) em vez de gravada.
+    pub source_name: Option<String>,
+}
+
+/// Uma reunião transcrita a partir de um arquivo de áudio (Fase 9.0), pronta
+/// para o banco — ver [`MeetingStore::save_imported`].
+#[derive(Debug, Clone)]
+pub struct NewImportedMeeting<'a> {
+    /// Título: o nome do arquivo, quando descritivo, ou o padrão com a data.
+    pub title: &'a str,
+    /// Quando a gravação aconteceu: `dd/mm/aaaa hh:mm`.
+    pub started_at: &'a str,
+    /// Duração do áudio, em segundos.
+    pub duration_secs: f32,
+    /// Caminho do `.md` da reunião.
+    pub md_path: &'a str,
+    /// As falas: falante, início, fim e texto.
+    pub segments: &'a [(String, f32, f32, String)],
+    /// Nome do arquivo de áudio, como o usuário o vê.
+    pub source_name: &'a str,
+    /// SHA-256 do arquivo, em hexadecimal — o mesmo áudio não entra duas vezes.
+    pub source_sha256: &'a str,
 }
 
 /// Uma fala da transcrição, como está no banco.
@@ -162,7 +185,8 @@ const MEETING_COLUMNS: &str = "m.id, m.title, m.started_at, m.duration_secs,
     (SELECT COUNT(*) FROM segments s WHERE s.meeting_id = m.id),
     (SELECT COUNT(DISTINCT s.speaker) FROM segments s WHERE s.meeting_id = m.id AND s.speaker != 'Eu'),
     (SELECT COUNT(*) FROM moments mo WHERE mo.meeting_id = m.id),
-    (SELECT COUNT(*) FROM decisions de WHERE de.meeting_id = m.id)";
+    (SELECT COUNT(*) FROM decisions de WHERE de.meeting_id = m.id),
+    m.source_name";
 
 fn row_to_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<MeetingRow> {
     Ok(MeetingRow {
@@ -176,6 +200,7 @@ fn row_to_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<MeetingRow> {
         participants: row.get(7)?,
         moments: row.get(8)?,
         decisions: row.get(9)?,
+        source_name: row.get(10)?,
     })
 }
 
@@ -199,7 +224,7 @@ fn like_pattern(q: &str) -> String {
 /// de versão maior (criado por um ISPer mais novo) é recusado em vez de
 /// alterado às cegas. Bancos anteriores a esta numeração chegam como 0 e
 /// passam pelo passo 1, que é idempotente sobre o que eles já têm.
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 
 /// Eventos de métrica mais antigos que isto (90 dias) saem do banco.
 pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
@@ -319,6 +344,7 @@ fn migrate(conn: &Connection) -> Result<()> {
             1 => migrate_to_v2(&tx)?,
             2 => migrate_to_v3(&tx)?,
             3 => migrate_to_v4(&tx)?,
+            4 => migrate_to_v5(&tx)?,
             other => {
                 return Err(IsperError::Schema(format!(
                     "sem migração a partir da versão {other}"
@@ -490,6 +516,20 @@ fn migrate_to_v3(conn: &Connection) -> Result<()> {
 /// Coluna nova e vazia: reuniões antigas simplesmente não têm notas.
 fn migrate_to_v4(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "meetings", "notes", "TEXT")
+}
+
+/// Passo 5 — a origem de uma reunião importada de um arquivo de áudio
+/// (Fase 9.0): o nome do arquivo, que o `.md` e a Biblioteca mostram, e o
+/// SHA-256, que impede importar o mesmo áudio duas vezes. Reuniões gravadas
+/// ficam com as duas colunas vazias.
+fn migrate_to_v5(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "meetings", "source_name", "TEXT")?;
+    add_column_if_missing(conn, "meetings", "source_sha256", "TEXT")?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_meetings_source_sha256 ON meetings(source_sha256)",
+        [],
+    )?;
+    Ok(())
 }
 
 /// Preenche `ts_col` a partir do texto de `text_col` onde ainda está vazio.
@@ -694,17 +734,73 @@ impl MeetingStore {
         Ok(changed)
     }
 
-    /// Já existe uma reunião vinda deste `.md` (ou começada neste instante)?
+    /// Já existe uma reunião vinda deste `.md` (ou começada neste instante,
+    /// com este título)?
     ///
-    /// O `md_path` é a chave natural: um arquivo, uma reunião. O `started_at`
-    /// cobre as reuniões antigas, gravadas antes de o caminho ser guardado.
-    pub fn has_meeting_from(&self, md_path: &str, started_at: &str) -> Result<bool> {
+    /// O `md_path` é a chave natural: um arquivo, uma reunião. Início e
+    /// título cobrem as reuniões antigas, gravadas antes de o caminho ser
+    /// guardado. Só o início não basta: ele tem precisão de minuto, e duas
+    /// gravações exportadas juntas do celular podem começar no mesmo minuto —
+    /// uma delas sumiria numa reimportação. Renomear na Biblioteca troca o
+    /// título no banco e no `.md` juntos, então continua casando.
+    pub fn has_meeting_from(&self, md_path: &str, started_at: &str, title: &str) -> Result<bool> {
         let n: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM meetings WHERE md_path = ?1 OR started_at = ?2",
-            params![md_path, started_at],
+            "SELECT COUNT(*) FROM meetings
+             WHERE md_path = ?1 OR (started_at = ?2 AND title = ?3)",
+            params![md_path, started_at, title],
             |r| r.get(0),
         )?;
         Ok(n > 0)
+    }
+
+    /// Salva uma reunião transcrita a partir de um arquivo de áudio
+    /// (Fase 9.0) e devolve o id. Tudo numa transação: a reunião entra com
+    /// as falas e a origem, ou não entra.
+    pub fn save_imported(&self, m: &NewImportedMeeting<'_>) -> Result<i64> {
+        if m.segments.is_empty() {
+            return Err(IsperError::Schema(
+                "a transcrição do áudio não tem nenhuma fala".into(),
+            ));
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "INSERT INTO meetings
+             (title, started_at, started_ts, duration_secs, md_path, source_name, source_sha256)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                m.title,
+                m.started_at,
+                parse_local_stamp(m.started_at),
+                m.duration_secs,
+                m.md_path,
+                m.source_name,
+                m.source_sha256
+            ],
+        )?;
+        let id = tx.last_insert_rowid();
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO segments (meeting_id, speaker, start_secs, end_secs, text)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+            )?;
+            for (speaker, start, end, text) in m.segments {
+                stmt.execute(params![id, speaker, start, end, text])?;
+            }
+        }
+        tx.commit()?;
+        Ok(id)
+    }
+
+    /// A reunião que veio de um áudio com este SHA-256, se já foi importado.
+    pub fn meeting_with_source(&self, sha256: &str) -> Result<Option<i64>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT id FROM meetings WHERE source_sha256 = ?1 ORDER BY id LIMIT 1",
+                params![sha256],
+                |r| r.get(0),
+            )
+            .optional()?)
     }
 
     /// Reinsere no índice uma reunião lida do Markdown
@@ -719,13 +815,14 @@ impl MeetingStore {
         m: &crate::import::ImportedMeeting,
         md_path: &str,
     ) -> Result<Option<i64>> {
-        if self.has_meeting_from(md_path, &m.started_at)? {
+        if self.has_meeting_from(md_path, &m.started_at, &m.title)? {
             return Ok(None);
         }
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
-            "INSERT INTO meetings (title, started_at, started_ts, duration_secs, md_path, summary, notes)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO meetings
+             (title, started_at, started_ts, duration_secs, md_path, summary, notes, source_name)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 m.title,
                 m.started_at,
@@ -733,7 +830,8 @@ impl MeetingStore {
                 m.duration_secs,
                 md_path,
                 m.summary,
-                m.notes
+                m.notes,
+                m.source_name
             ],
         )?;
         let id = tx.last_insert_rowid();
@@ -1619,6 +1717,104 @@ mod tests {
         );
     }
 
+    #[test]
+    fn banco_da_v4_ganha_a_origem_do_audio_sem_perder_nada() {
+        let path = temp_path("v4-para-v5");
+        let id = {
+            let store = MeetingStore::open(&path).unwrap();
+            let id = store
+                .save("Da 0.20", "23/09/2026 09:00", &sample_result(), None)
+                .unwrap();
+            store.set_notes(id, "anotado").unwrap();
+            // Recua para a v4: a mesma estrutura, menos as colunas da origem.
+            store
+                .conn
+                .execute_batch(
+                    "DROP INDEX idx_meetings_source_sha256;
+                     ALTER TABLE meetings DROP COLUMN source_name;
+                     ALTER TABLE meetings DROP COLUMN source_sha256;
+                     PRAGMA user_version = 4;",
+                )
+                .unwrap();
+            id
+        };
+
+        let store = MeetingStore::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+        assert!(
+            pre_migration_backup_path(&path, 4).exists(),
+            "cópia da v4 antes de migrar"
+        );
+        let detalhe = store
+            .get_meeting(id)
+            .unwrap()
+            .expect("a reunião continua lá");
+        assert_eq!(detalhe.meeting.title, "Da 0.20");
+        assert_eq!(
+            detalhe.notes.as_deref(),
+            Some("anotado"),
+            "as notas continuam"
+        );
+        assert_eq!(detalhe.meeting.source_name, None, "gravada, não importada");
+    }
+
+    #[test]
+    fn audio_importado_guarda_a_origem_e_e_achado_pelo_sha() {
+        let path = temp_path("importado");
+        let store = MeetingStore::open(&path).unwrap();
+        let falas = vec![
+            (
+                "Participante 1".to_string(),
+                0.0,
+                4.0,
+                "Bom dia.".to_string(),
+            ),
+            (
+                "Participante 2".to_string(),
+                4.0,
+                9.0,
+                "Vamos começar.".to_string(),
+            ),
+        ];
+        let id = store
+            .save_imported(&NewImportedMeeting {
+                title: "Reunião com fornecedor",
+                started_at: "22/09/2026 15:30",
+                duration_secs: 9.0,
+                md_path: "C:/ISPer/Reunioes/reuniao-20260922-153000.md",
+                segments: &falas,
+                source_name: "Reunião com fornecedor.mp3",
+                source_sha256: "ab12",
+            })
+            .unwrap();
+        let d = store.get_meeting(id).unwrap().unwrap();
+        assert_eq!(
+            d.meeting.source_name.as_deref(),
+            Some("Reunião com fornecedor.mp3")
+        );
+        assert_eq!(d.meeting.participants, 2);
+        assert_eq!(d.segments.len(), 2);
+        assert_eq!(store.meeting_with_source("ab12").unwrap(), Some(id));
+        assert_eq!(store.meeting_with_source("outro").unwrap(), None);
+        let lista = store.list_meetings().unwrap();
+        assert_eq!(
+            lista[0].source_name.as_deref(),
+            Some("Reunião com fornecedor.mp3")
+        );
+
+        let vazio = store.save_imported(&NewImportedMeeting {
+            title: "x",
+            started_at: "22/09/2026 15:30",
+            duration_secs: 1.0,
+            md_path: "y.md",
+            segments: &[],
+            source_name: "x.mp3",
+            source_sha256: "cd34",
+        });
+        assert!(vazio.is_err(), "sem fala não vira reunião");
+        assert_eq!(store.meeting_with_source("cd34").unwrap(), None);
+    }
+
     fn sample_result() -> MeetingResult {
         let seg = |speaker, start: f32, text: &str| MeetingSegment {
             speaker,
@@ -1925,6 +2121,32 @@ mod tests {
             vec!["Mais nova".to_string(), "Mais velha".to_string()],
             "a lista tem que sair pela data da reunião"
         );
+    }
+
+    #[test]
+    fn gravacoes_no_mesmo_minuto_com_titulos_diferentes_entram_as_duas() {
+        use crate::import::parse_markdown;
+        use crate::meeting::{SegmentRef, render_markdown};
+
+        let store = temp_store("mesmo-minuto");
+        let segs = [SegmentRef {
+            speaker: "Participante 1",
+            start_secs: 0.0,
+            end_secs: 2.0,
+            text: "Oi.",
+        }];
+        let md_a = render_markdown("Com fornecedor", "22/09/2026 15:30", 2.0, &segs, None, &[]);
+        let md_b = render_markdown("Com o time", "22/09/2026 15:30", 2.0, &segs, None, &[]);
+        let a = parse_markdown("a.md", &md_a).unwrap();
+        let b = parse_markdown("b.md", &md_b).unwrap();
+        assert!(store.import_meeting(&a, "C:/r/a.md").unwrap().is_some());
+        assert!(
+            store.import_meeting(&b, "C:/r/b.md").unwrap().is_some(),
+            "mesmo minuto, outra reunião: não pode sumir"
+        );
+        // A mesma reunião (início e título), vinda de outra cópia do `.md`.
+        assert!(store.import_meeting(&a, "D:/copia/a.md").unwrap().is_none());
+        assert_eq!(store.list_meetings().unwrap().len(), 2);
     }
 
     #[test]

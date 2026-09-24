@@ -30,7 +30,7 @@ bata com ela.
   reunião, ele lê em poucos segundos o que já foi dito. A fala ao vivo e a
   dinâmica da conversa continuam sendo registradas o tempo todo.
 - **O banco da Biblioteca ganha um formato novo — com cópia de segurança.**
-  Para guardar as notas, o ISPer atualiza o banco na primeira vez que abrir e,
+  Para guardar as notas (e de que arquivo veio uma reunião importada), o ISPer atualiza o banco na primeira vez que abrir e,
   antes, salva uma cópia dele como estava em `%APPDATA%\ISPer\isper.db.v3.bak`.
   A 0.20.0 e as anteriores não abrem o banco atualizado; para voltar a uma
   delas, feche o ISPer, instale a versão anterior e renomeie a cópia para
@@ -46,7 +46,16 @@ bata com ela.
   pnpm/action-setup v6. Os PRs do Dependabot correspondentes ficam
   supersedidos.
 
+- **O `isper-cli` lê os formatos de gravador e de celular**: `file`, `bench` e
+  `diarize` aceitam, além de WAV, MP3, M4A/MP4, AAC, FLAC e OGG, em qualquer
+  taxa e número de canais. O áudio é lido em fluxo, sem carregar o arquivo
+  inteiro descomprimido. Opus ainda não: a mensagem diz para converter.
+
 ### Corrigido
+- **Reimportar a pasta de reuniões podia pular uma reunião** que começou no
+  mesmo minuto de outra (o que acontece com gravações exportadas juntas do
+  celular): o ISPer considerava as duas a mesma. Agora a comparação é pelo
+  início e pelo título.
 - **As decisões validadas no Copilot sumiam da ata** depois do passe final da
   transcrição e ao renomear o título ou um falante na Biblioteca: essas
   regravações montavam o `.md` a partir do banco sem a seção de decisões. Elas
