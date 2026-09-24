@@ -55,6 +55,16 @@ enum Cmd {
         #[arg(long, default_value = "system")]
         source: String,
     },
+    /// Converte um áudio para Ogg/Opus mono, como o gravador do celular grava
+    Encode {
+        /// Áudio de entrada (qualquer formato que o ISPer lê)
+        audio: PathBuf,
+        /// Arquivo .opus de saída (não é sobrescrito)
+        saida: PathBuf,
+        /// Taxa de bits, em kbit/s
+        #[arg(long, default_value_t = 32)]
+        kbps: u32,
+    },
     /// Identifica os falantes de um arquivo de áudio (calibração da diarização)
     Diarize {
         path: PathBuf,
@@ -188,6 +198,7 @@ fn main() -> anyhow::Result<()> {
 
     match &cli.cmd {
         Cmd::Meeting { seconds, source } => run_meeting(&cli, *seconds, source),
+        Cmd::Encode { audio, saida, kbps } => run_encode(audio, saida, *kbps),
         Cmd::Diarize {
             path,
             speakers,
@@ -353,6 +364,31 @@ fn run_bench(cli: &Cli) -> anyhow::Result<()> {
 
 /// Roda só a diarização num arquivo de áudio — útil para calibrar o limiar
 /// do agrupamento.
+fn run_encode(audio: &Path, saida: &Path, kbps: u32) -> anyhow::Result<()> {
+    let decoded = isper_core::decode::decode_to_16k(audio, None, None)
+        .with_context(|| format!("falha ao ler {}", audio.display()))?;
+    let pcm: Vec<i16> = decoded
+        .samples_16k
+        .iter()
+        .map(|s| (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)
+        .collect();
+    let mut w = isper_core::ogg_opus::OggOpusWriter::create(saida, 16_000, kbps as i32 * 1000)
+        .with_context(|| format!("falha ao criar {}", saida.display()))?;
+    w.write(&pcm)?;
+    let secs = w.finish()?;
+    let bytes = std::fs::metadata(saida)?.len();
+    println!(
+        "{} → {}: {:.1} s, {:.1} KB ({:.1} kbit/s efetivos, {:.1} MB por hora)",
+        audio.display(),
+        saida.display(),
+        secs,
+        bytes as f64 / 1024.0,
+        bytes as f64 * 8.0 / secs / 1000.0,
+        bytes as f64 / secs * 3600.0 / 1_000_000.0
+    );
+    Ok(())
+}
+
 fn run_diarize(
     path: &Path,
     speakers: Option<u32>,

@@ -2,16 +2,16 @@
 //! gravação de uma reunião do Teams — viram o formato do Whisper: 16 kHz,
 //! mono, f32 (Fase 9.0).
 //!
-//! Tudo passa pelo [symphonia](https://github.com/pdeljanov/Symphonia), Rust
-//! puro: MP3, M4A e MP4 (AAC), WAV, FLAC e OGG Vorbis. A leitura é em fluxo:
+//! Quase tudo passa pelo [symphonia](https://github.com/pdeljanov/Symphonia),
+//! Rust puro: MP3, M4A e MP4 (AAC), WAV, FLAC e OGG Vorbis. O Opus — o `.opus`
+//! das mensagens de voz e das gravações do celular do ISPer — vai para o
+//! [`crate::ogg_opus`], com o libopus (o symphonia ainda não o decodifica).
+//! A leitura é em fluxo:
 //! cada pacote decodificado vira mono e segue direto para o
 //! [`Resampler16k`], então a memória é só a do resultado (≈ 230 MB por hora
 //! de áudio) — decodificar tudo primeiro e converter depois custaria 1,4 GB
 //! por hora num arquivo de celular em 48 kHz estéreo.
 //!
-//! Opus (o `.opus` das mensagens de voz) fica de fora por enquanto: o
-//! symphonia ainda não tem o decodificador, e o libopus traria uma biblioteca
-//! C para o build. O erro diz isso com todas as letras.
 
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -31,7 +31,9 @@ use crate::audio::{Resampler16k, to_mono};
 use crate::{IsperError, Result, WHISPER_SAMPLE_RATE};
 
 /// Extensões que o ISPer lê (minúsculas, sem o ponto).
-pub const AUDIO_EXTENSIONS: [&str; 8] = ["mp3", "m4a", "mp4", "aac", "wav", "flac", "ogg", "oga"];
+pub const AUDIO_EXTENSIONS: [&str; 9] = [
+    "mp3", "m4a", "mp4", "aac", "wav", "flac", "ogg", "oga", "opus",
+];
 
 /// O arquivo tem uma extensão que o ISPer sabe ler?
 pub fn is_supported(path: &Path) -> bool {
@@ -81,6 +83,9 @@ pub fn decode_to_16k(
     if !AUDIO_EXTENSIONS.contains(&ext.as_str()) {
         return Err(IsperError::Decode(unsupported_message(&ext)));
     }
+    if ext == "opus" {
+        return crate::ogg_opus::decode_to_16k(path, progress, cancel);
+    }
 
     let file = File::open(path)?;
     let len = file.metadata()?.len();
@@ -114,8 +119,10 @@ pub fn decode_to_16k(
         .and_then(|p| p.audio())
         .ok_or_else(|| IsperError::Decode("a trilha de áudio não diz qual é o codec".into()))?
         .clone();
+    // Um .ogg com Opus dentro (é o que o WhatsApp e muitos gravadores usam).
     if params.codec == CODEC_ID_OPUS {
-        return Err(IsperError::Decode(unsupported_message("opus")));
+        drop(format);
+        return crate::ogg_opus::decode_to_16k(path, progress, cancel);
     }
     let mut decoder = symphonia::default::get_codecs()
         .make_audio_decoder(&params, &AudioDecoderOptions::default())
@@ -235,11 +242,8 @@ fn expected_len(file_len: u64, _rate: u32) -> usize {
 }
 
 fn unsupported_message(ext: &str) -> String {
-    let lista = "MP3, M4A, MP4, AAC, WAV, FLAC e OGG";
+    let lista = "MP3, M4A, MP4, AAC, WAV, FLAC, OGG e Opus";
     match ext {
-        "opus" => format!(
-            "o áudio está em Opus, que o ISPer ainda não lê — converta para MP3 ou WAV (o ISPer lê {lista})"
-        ),
         "" => format!("o arquivo não tem extensão (o ISPer lê {lista})"),
         other => format!("formato .{other} não suportado (o ISPer lê {lista})"),
     }
@@ -401,13 +405,26 @@ mod tests {
     }
 
     #[test]
-    fn opus_e_extensoes_desconhecidas_dao_erro_que_explica() {
-        let e = decode_to_16k(&fixture("formatos/fala-2s.opus"), None, None).unwrap_err();
-        let msg = e.to_string();
-        assert!(msg.contains("Opus") && msg.contains("MP3"), "{msg}");
+    fn opus_e_lido_e_extensoes_desconhecidas_dao_erro_que_explica() {
+        // A mensagem de voz: .opus direto e o mesmo conteúdo com extensão .ogg.
+        let d = decode_to_16k(&fixture("formatos/fala-2s.opus"), None, None).unwrap();
+        assert!(
+            (d.duration_secs() - 2.0).abs() < 0.1,
+            "{}",
+            d.duration_secs()
+        );
+        let dir = std::env::temp_dir().join(format!("isper-decode-ogg-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let como_ogg = dir.join("voz.ogg");
+        std::fs::copy(fixture("formatos/fala-2s.opus"), &como_ogg).unwrap();
+        let d2 = decode_to_16k(&como_ogg, None, None).unwrap();
+        assert_eq!(d.samples_16k.len(), d2.samples_16k.len());
+        let _ = std::fs::remove_dir_all(&dir);
 
         let e = decode_to_16k(Path::new("reuniao.wma"), None, None).unwrap_err();
         assert!(e.to_string().contains(".wma não suportado"), "{e}");
+        assert!(e.to_string().contains("Opus"), "{e}");
+        assert!(is_supported(Path::new("PTT-20260924-WA0001.opus")));
 
         assert!(is_supported(Path::new("Gravação 01.M4A")));
         assert!(is_supported(Path::new("reuniao.mp4")));

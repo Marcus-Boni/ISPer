@@ -11,7 +11,8 @@
 //! | Etapa | Módulos |
 //! |---|---|
 //! | captura | [`audio`] (microfone, WAV, resample), [`loopback`] (o que sai na caixa de som), [`recorder`] (ditado), [`calls`] (chamada do Teams em andamento) |
-//! | arquivos de áudio | [`decode`] (MP3, M4A, WAV, FLAC, OGG → 16 kHz mono), [`recording`] (data e título pelo nome do arquivo) |
+//! | gravações do celular | [`capture`] (o Ogg/Opus e o manifesto ao lado; recuperação depois de uma queda) |
+//! | arquivos de áudio | [`decode`] (MP3, M4A, WAV, FLAC, OGG, Opus → 16 kHz mono), [`ogg_opus`] (gravar e ler Ogg/Opus, à prova de queda), [`recording`] (data e título pelo nome do arquivo) |
 //! | reunião ao vivo | [`meeting`] (os dois canais no relógio da reunião), [`chunk`] (corte em silêncio) |
 //! | transcrição | [`engine`] (whisper.cpp), [`profile`] (perfis e decodificação), [`context`] (glossário e contexto), [`text`] (alucinações, comandos de voz, dicionário) |
 //! | passe final | [`vad`] (Silero), [`pipeline`] (o passe inteiro), [`align`] (falante por palavra) |
@@ -28,6 +29,7 @@
 pub mod align;
 pub mod audio;
 pub mod calls;
+pub mod capture;
 pub mod chunk;
 pub mod context;
 pub mod decode;
@@ -38,6 +40,7 @@ pub mod import;
 pub mod loopback;
 pub mod meeting;
 pub mod metrics;
+pub mod ogg_opus;
 pub mod panics;
 pub mod pipeline;
 pub mod profile;
