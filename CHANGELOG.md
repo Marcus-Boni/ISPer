@@ -11,6 +11,11 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-24
+
+Uma versão de acabamento: o tema troca num clique, o tema e o idioma ficam
+no topo das Configurações, e o Tauri recebe uma correção de segurança.
+
 ### Adicionado
 - **Trocar o tema num clique.** Um botão de sol e lua no canto do Início e da
   Biblioteca troca entre o tema claro e o escuro na hora, em todas as janelas.
@@ -697,7 +702,11 @@ dia e de noite, em português ou em inglês, e utilizável só pelo teclado.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.21.0...v0.22.0
+[0.21.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.20.0...v0.21.0
+[0.20.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.19.0...v0.20.0
+[0.19.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/Marcus-Boni/ISPer/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.16.1...v0.17.0
