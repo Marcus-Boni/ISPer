@@ -6,7 +6,7 @@
 # artefatos de projetos OSS cujos jobs rodaram TODOS em runners do GitHub, e um runner
 # self-hosted num repositório público executaria código de qualquer PR. O CUDA compila aqui
 # porque o toolkit é instalado no runner (Jimver/cuda-toolkit) e o whisper.cpp é gerado com
-# Ninja no ambiente do MSVC; o sherpa-onnx vem do pré-compilado que o sherpa-rs baixa.
+# Ninja no ambiente do MSVC; o sherpa-onnx vem do pré-compilado que o crate sherpa-onnx baixa.
 #
 # Gatilhos:
 #   - push da tag v<versão>: valida tag × Cargo.toml × CHANGELOG, roda o CI, compila as duas
@@ -120,18 +120,25 @@ jobs:
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
 
-      # Ver o comentário equivalente em ci.yml: a pasta do sherpa-onnx pré-compilado precisa
-      # viajar no cache junto com o target/.
-      - name: Pasta do sherpa-onnx pré-compilado
-        shell: pwsh
-        run: Add-Content -Path $env:GITHUB_ENV -Value "SHERPA_CACHE=$env:LOCALAPPDATA\sherpa-rs"
-
       - uses: Swatinem/rust-cache@v2
         with:
           # A imagem entra na chave: objetos C/C++ compilados com um MSVC não servem para outro.
-          key: release-${{ matrix.variant }}-${{ matrix.os }}
-          cache-directories: ${{ env.SHERPA_CACHE }}
+          # v3: o pré-compilado do sherpa-onnx passou a morar dentro do target/.
+          key: release-${{ matrix.variant }}-${{ matrix.os }}-v3
+          cache-directories: target/sherpa-onnx-prebuilt
           cache-on-failure: true
+
+      # Ver o comentário equivalente em ci.yml.
+      - name: sherpa-onnx pré-compilado presente
+        shell: pwsh
+        run: |
+          $lib = @(Get-ChildItem target/sherpa-onnx-prebuilt -Recurse -File -Filter 'sherpa-onnx-c-api*' -ErrorAction SilentlyContinue)
+          if ($lib.Count -eq 0) {
+            "pré-compilado do sherpa-onnx ausente: o build script vai rodar e baixar de novo"
+            Remove-Item -Recurse -Force target/sherpa-onnx-prebuilt -ErrorAction SilentlyContinue
+            Get-ChildItem target -Recurse -Directory -Filter 'sherpa-onnx-sys-*' -ErrorAction SilentlyContinue |
+              Remove-Item -Recurse -Force
+          }
 
       - uses: actions/setup-node@v7
         with:
@@ -185,16 +192,16 @@ jobs:
           Get-ChildItem apps/isper-app/src-tauri/resources/cuda | Select-Object Name, Length | Format-Table -AutoSize | Out-String | Write-Output
 
       # As DLLs que o instalador embute (bundle.resources): sherpa-onnx, do pré-compilado que
-      # o build script do sherpa-rs baixa (um `cargo build` do isper-diarize faz o download
+      # o build script do sherpa-onnx baixa (um `cargo build` do isper-diarize faz o download
       # acontecer antes do tauri build), e o runtime do Visual C++, do Visual Studio do runner.
       - name: DLLs do sherpa-onnx e do runtime do VC para o instalador
         shell: pwsh
         run: |
           cargo build --release ${{ matrix.features }} -p isper-diarize
           if ($LASTEXITCODE -ne 0) { throw "cargo build isper-diarize falhou ($LASTEXITCODE)" }
-          $libs = @(Get-ChildItem "$env:LOCALAPPDATA\sherpa-rs" -Recurse -Filter *.dll -ErrorAction SilentlyContinue)
+          $libs = @(Get-ChildItem target/sherpa-onnx-prebuilt -Recurse -Filter *.dll -ErrorAction SilentlyContinue)
           New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/sherpa | Out-Null
-          foreach ($dll in 'sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll') {
+          foreach ($dll in 'sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll') {
             $src = $libs | Where-Object Name -eq $dll | Select-Object -First 1
             if (-not $src) { throw "DLL do sherpa-onnx ausente no pre-compilado: $dll" }
             Copy-Item $src.FullName "apps/isper-app/src-tauri/resources/sherpa/$dll" -Force

@@ -2,6 +2,8 @@
 
 - **Status:** aceita (revista em 18/09/2026)
 - **Data:** 01/09/2026
+- **Atualização (24/09/2026):** a lentidão de uma thread só acabou com a troca
+  do `sherpa-rs` pelo crate oficial do sherpa-onnx — ver [0015](0015-sherpa-onnx-oficial.md).
 
 ## Contexto
 

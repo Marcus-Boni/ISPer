@@ -25,10 +25,10 @@ Copy-Item (Join-Path $src 'isper-app.exe') $dir
 $dlls = @(Get-ChildItem $src -Filter *.dll)
 $dlls | Copy-Item -Destination $dir
 Copy-Item $marker $dir
-# As cinco do sherpa-onnx sao obrigatorias (sem elas o exe nem abre); as do
+# As quatro do sherpa-onnx sao obrigatorias (sem elas o exe nem abre); as do
 # runtime do VC++ podem estar no sistema, como no runner do CI.
-$sherpa = @($dlls | Where-Object { $_.Name -like 'sherpa-onnx*' -or $_.Name -like 'onnxruntime*' -or $_.Name -eq 'cargs.dll' })
-Check ($sherpa.Count -ge 5) "pasta portatil montada ($($dlls.Count) DLLs + exe + portable.txt)"
+$sherpa = @($dlls | Where-Object { $_.Name -like 'sherpa-onnx*' -or $_.Name -like 'onnxruntime*' })
+Check ($sherpa.Count -ge 4) "pasta portatil montada ($($dlls.Count) DLLs + exe + portable.txt)"
 $pexe = Join-Path $dir 'isper-app.exe'
 
 Check (Start-Isper -Exe $pexe) "a copia portatil abre (CDP)"

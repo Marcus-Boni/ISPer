@@ -100,11 +100,12 @@ if ($wantGpu) {
     if (-not (Test-Path $p)) { throw "DLL do CUDA ausente: $p (copie de <CUDA>\bin\x64; ver README)" }
   }
 }
-# sherpa-onnx: o exe importa a sherpa-onnx-c-api.dll, que puxa onnxruntime e cargs.
-# O build script do sherpa-rs as deixa em target\release; sem elas o app instalado nem abre.
+# sherpa-onnx: o exe importa a sherpa-onnx-c-api.dll, que puxa a onnxruntime.
+# O build script do crate sherpa-onnx as deixa em target\release; sem elas o app instalado
+# nem abre. (A cargs.dll saiu na 9.1: vinha do sherpa-rs e ninguém a importava.)
 $sherpaDir = Join-Path $tauriDir 'resources\sherpa'
 New-Item -ItemType Directory -Force $sherpaDir | Out-Null
-foreach ($dll in 'sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll') {
+foreach ($dll in 'sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll') {
   $src = Join-Path $root "target\release\$dll"
   if (-not (Test-Path $src)) { throw "DLL do sherpa-onnx ausente: $src (rode 'cargo build --release -p isper-app' antes)" }
   Copy-Item $src (Join-Path $sherpaDir $dll) -Force

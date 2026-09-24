@@ -434,15 +434,18 @@ cargo test --release -p isper-core --test pipeline -- --ignored   # com modelos
   (`--reference`, `--reference-turns`) já espera por ele.
 - **Memória e disco do passe final crescem com a duração.** Cada canal vai a
   disco em PCM 16 bits (115 MB/h, dois canais) e é lido de volta inteiro em
-  f32 (230 MB/h), e o `sherpa-rs` copia o buffer mais uma vez para diarizar.
+  f32 (230 MB/h). (O `sherpa-rs` copiava o buffer mais uma vez para diarizar;
+  o crate oficial do sherpa-onnx, desde a 9.1, lê o mesmo buffer.)
   Para 2 h: ~0,46 GB em `%TEMP%` e ~0,9 GB de pico de RAM. Rodou sem
   problema até 19 min (o maior corpus medido); as 2 h são extrapolação, não
   medição. Se um dia apertar, o caminho é processar a diarização em blocos
   longos com sobreposição, não carregar tudo.
-- **Diarização é o gargalo**: 55 s para 190 s de áudio (0,29× tempo real), mais
-  que o dobro do ASR. O `sherpa-rs` 0.6 fixa `num_threads: 1` na configuração
-  de diarização e não expõe o parâmetro; subir isso exige PR no crate ou
-  chamar o sherpa-onnx direto.
+- **Diarização era o gargalo**: 55 s para 190 s de áudio (0,29× tempo real),
+  mais que o dobro do ASR, porque o `sherpa-rs` 0.6 fixava `num_threads: 1`.
+  Desde a 9.1 o crate oficial do sherpa-onnx roda com metade dos núcleos (até
+  8): ~25 s nos mesmos 190 s, com o mesmo resultado
+  ([ADR 0015](adr/0015-sherpa-onnx-oficial.md)). O que sobra é o agrupamento,
+  que não usa threads.
 - **Modelo de embedding**: o atual (`3dspeaker_…_zh-cn_…`) foi treinado em
   chinês. Há alternativas multilíngues no catálogo do sherpa-onnx
   (`3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced`, 27 MB). Trocar sem

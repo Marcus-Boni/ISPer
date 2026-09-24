@@ -11,6 +11,18 @@ bata com ela.
 
 ## [Unreleased]
 
+### Alterado
+- **Identificar quem falou ficou ~2,4× mais rápido.** A diarização trocou o
+  `sherpa-rs`, descontinuado e preso a uma thread, pelo crate oficial do
+  sherpa-onnx, e passou a usar metade dos núcleos (até 8). No corpus de
+  190 s com 3 vozes, o tempo caiu de ~60 s para ~25 s, com exatamente o mesmo
+  resultado. Os nomes "Participante 1, 2…" aparecem bem antes no fim da
+  reunião. Para medir em outra máquina: `ISPER_DIARIZE_THREADS` e
+  `isper-cli diarize <áudio> --reference-turns <turnos.tsv>`, que agora
+  calcula o DER ([ADR 0015](docs/adr/0015-sherpa-onnx-oficial.md)).
+- O instalador leva uma DLL a menos (a `cargs.dll`, que nenhum binário
+  usava).
+
 ## [0.22.0] - 2026-09-24
 
 Uma versão de acabamento: o tema troca num clique, o tema e o idioma ficam

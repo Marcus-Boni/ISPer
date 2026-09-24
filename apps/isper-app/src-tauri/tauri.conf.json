@@ -46,7 +46,6 @@
       "resources/sherpa/sherpa-onnx-cxx-api.dll": "sherpa-onnx-cxx-api.dll",
       "resources/sherpa/onnxruntime.dll": "onnxruntime.dll",
       "resources/sherpa/onnxruntime_providers_shared.dll": "onnxruntime_providers_shared.dll",
-      "resources/sherpa/cargs.dll": "cargs.dll",
       "resources/vcredist/msvcp140.dll": "msvcp140.dll",
       "resources/vcredist/vcruntime140.dll": "vcruntime140.dll",
       "resources/vcredist/vcruntime140_1.dll": "vcruntime140_1.dll"
