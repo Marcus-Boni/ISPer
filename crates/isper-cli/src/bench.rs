@@ -24,7 +24,7 @@ use isper_core::metrics::{self, DiarizeStats, Normalization, PipelineReport};
 use isper_core::pipeline::{
     self, Diarizer, DiarizerOutput, FinalConfig, FinalTranscript, Segmentation,
 };
-use isper_core::{EngineOptions, WhisperEngine, audio};
+use isper_core::{EngineOptions, WhisperEngine};
 
 /// Liga o `isper-diarize` ao pipeline do core (que não conhece o sherpa).
 struct SherpaDiarizer {
@@ -84,15 +84,15 @@ pub struct BenchArgs {
 }
 
 pub fn run(args: &BenchArgs) -> anyhow::Result<PipelineReport> {
-    let raw = audio::load_wav(&args.audio)
+    let decoded = isper_core::decode::decode_to_16k(&args.audio, None, None)
         .with_context(|| format!("falha ao ler {}", args.audio.display()))?;
     println!(
         "áudio: {:.1}s @ {} Hz, {} canal(is)",
-        raw.duration_secs(),
-        raw.sample_rate,
-        raw.channels
+        decoded.duration_secs(),
+        decoded.source_rate,
+        decoded.source_channels
     );
-    let samples = raw.into_whisper_input()?;
+    let samples = decoded.samples_16k;
 
     let mut cfg = load_config(&args.config)?;
     cfg.lang = args.lang.clone();

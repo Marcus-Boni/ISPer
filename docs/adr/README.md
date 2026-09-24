@@ -19,6 +19,7 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0010](0010-criptografia-em-repouso-adiada.md) | Criptografia do banco em repouso adiada | aceita | 13/09/2026 |
 | [0011](0011-opcional-e-configuracao-nao-feature-flag.md) | O que é opcional vira configuração, não feature flag de compilação | aceita | 23/09/2026 |
 | [0012](0012-distribuicao-portatil-e-winget.md) | Distribuição além do instalador: zip portátil e um pacote no winget | aceita | 23/09/2026 |
+| [0013](0013-importar-audio-de-fora.md) | Importar áudio de fora: decodificação local, o mesmo passe final e a origem no banco | aceita | 23/09/2026 |
 
 ## Como escrever um ADR
 

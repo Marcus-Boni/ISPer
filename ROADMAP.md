@@ -20,8 +20,9 @@
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
 | F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (criptografia em repouso adiada com decisão registrada); 7.5 com 5 de 6 (v0.19.0 — falta a rodada com o NVDA); 7.6 com 4 de 5 (v0.20.0 — falta o winget, em revisão no winget-pkgs) |
 | F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; só com a janela aberta e notas salvas com a reunião (23/09); 3 itens em aberto — validar a memória, idioma do que a IA escreve e ver o sync do portal numa release |
+| F9 ISPer no Bolso | 🟡 | 9.0 começada (23/09): o núcleo lê MP3, M4A, WAV, FLAC e OGG e os transcreve com o mesmo passe final, e a reunião guarda de que arquivo veio; faltam a importação pela Biblioteca, a pasta vigiada e o guia. 9.1 a 9.7 (o celular) ainda são proposta |
 
-**109 itens entregues · 10 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**113 itens entregues · 13 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -311,6 +312,35 @@ ACL. Guia de uso em [isper.pages.dev/docs/copilot](https://isper.pages.dev/docs/
 - [ ] O que a IA escreve no idioma da interface: o resumo, os cards, as respostas e as notas do Copilot seguem o prompt em pt-BR mesmo com a interface em inglês (registrado na i18n da 7.5, 23/09)
 - [ ] O sync do portal falhava quando a branch do PR anterior ficou no remoto (v0.20.0, a run das 18:43): o repositório não apaga a branch no merge, o checkout raso não a conhece e o `git push --force-with-lease` sem valor recusava com *stale info*. Corrigido no #63 com a lease explícita, lida do `git ls-remote`, e simulado contra um remoto local; falta ver numa release em que a branch tenha sobrado — a segunda depois de 23/09
 - [x] Ver o disparo automático do portal (#41) funcionar numa release: "Portal avisado" no resumo da v0.19.0 (23/09), que abriu o #53 sozinha; na v0.20.0 o disparo também saiu
+
+## Fase 9 — ISPer no Bolso: as gravações de fora (a partir de 23/09/2026)
+
+O time grava reuniões presenciais no Plaud, e 90% do uso é baixar a
+transcrição (conversa com o líder, 22/09). Nada disso precisa de tempo real:
+grava-se no aparelho e processa-se depois. Por isso a fase começa pelo PC —
+transcrever os arquivos que o Plaud e o celular já exportam — e só depois vai
+para o celular. Decisões da 9.0 no [ADR 0013](docs/adr/0013-importar-audio-de-fora.md).
+
+### 9.0 Importar áudio no PC
+
+- [x] Ler MP3, M4A/MP4, AAC, WAV, FLAC e OGG no núcleo, em fluxo (`isper_core::decode`, symphonia; ~230 MB por hora em vez de 1,4 GB), com progresso e cancelamento (23/09). Opus fica de fora por enquanto, com uma mensagem que diz o que fazer
+- [x] O mesmo passe final numa trilha só, com diarização, e cancelável (`run_cancellable`): no teste com o modelo, um MP3 44,1 kHz estéreo deu exatamente o texto do WAV original (23/09)
+- [x] Origem no banco (schema v5: nome e SHA-256 do arquivo) e no cabeçalho do `.md`, lida de volta pelo `import`; data e título pelo nome do arquivo (`isper_core::recording`); a reimportação casa por início **e** título — só o início, com precisão de minuto, perdia uma de duas gravações exportadas juntas (23/09)
+- [x] `isper-cli file`, `bench` e `diarize` com qualquer desses formatos (23/09)
+- [ ] Importar pela Biblioteca: botão e arrastar e soltar, fila com progresso e cancelamento, resumo por IA, busca semântica e notificação ao terminar
+- [ ] Pasta vigiada `Documentos\ISPer\Importar`: o que entra vira reunião, e o arquivo vai para `Importados` (ou `Não importados`, com o motivo) — nada é apagado
+- [ ] Guia no portal: como levar as gravações do Plaud e do celular para o ISPer
+
+### Depois da 9.0 (proposto, a decidir)
+
+Do plano de 23/09; cada etapa ganha caixas quando for aprovada. A proposta é
+app nativo com o núcleo Rust via UniFFI — o Tauri mobile foi descartado por
+um bug aberto de tela branca com serviço em primeiro plano.
+
+- 9.1 núcleo portátil, compilando para Android, testado no celular do líder; troca do `sherpa-rs` (descontinuado) pela API Rust oficial do sherpa-onnx
+- 9.2 gravador Android (Compose, serviço em primeiro plano, Ogg/Opus a 32 kbit/s gravado com segurança)
+- 9.3 sincronização com o PC por pareamento (QR) → piloto interno
+- 9.4 transcrição no próprio aparelho · 9.5 IA · 9.6 Play Store · 9.7 iOS
 
 ## Boas práticas transversais
 

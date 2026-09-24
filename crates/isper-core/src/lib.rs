@@ -11,6 +11,7 @@
 //! | Etapa | Módulos |
 //! |---|---|
 //! | captura | [`audio`] (microfone, WAV, resample), [`loopback`] (o que sai na caixa de som), [`recorder`] (ditado), [`calls`] (chamada do Teams em andamento) |
+//! | arquivos de áudio | [`decode`] (MP3, M4A, WAV, FLAC, OGG → 16 kHz mono), [`recording`] (data e título pelo nome do arquivo) |
 //! | reunião ao vivo | [`meeting`] (os dois canais no relógio da reunião), [`chunk`] (corte em silêncio) |
 //! | transcrição | [`engine`] (whisper.cpp), [`profile`] (perfis e decodificação), [`context`] (glossário e contexto), [`text`] (alucinações, comandos de voz, dicionário) |
 //! | passe final | [`vad`] (Silero), [`pipeline`] (o passe inteiro), [`align`] (falante por palavra) |
@@ -29,6 +30,7 @@ pub mod audio;
 pub mod calls;
 pub mod chunk;
 pub mod context;
+pub mod decode;
 pub mod embed;
 pub mod engine;
 pub mod export;
@@ -40,6 +42,7 @@ pub mod panics;
 pub mod pipeline;
 pub mod profile;
 pub mod recorder;
+pub mod recording;
 pub mod store;
 pub mod text;
 pub mod vad;
@@ -80,6 +83,12 @@ pub enum IsperError {
     /// Erro de arquivo ou de sistema.
     #[error("erro de E/S: {0}")]
     Io(#[from] std::io::Error),
+    /// Arquivo de áudio que não pôde ser lido: formato, codec ou dados.
+    #[error("não consegui ler o áudio: {0}")]
+    Decode(String),
+    /// A operação foi cancelada por quem pediu.
+    #[error("cancelado")]
+    Cancelled,
 }
 
 /// `Result` com o erro do núcleo.

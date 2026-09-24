@@ -45,7 +45,7 @@ struct Cli {
 enum Cmd {
     /// Grava N segundos do microfone e transcreve
     Rec { seconds: u64 },
-    /// Transcreve um arquivo .wav
+    /// Transcreve um arquivo de áudio (MP3, M4A, WAV, FLAC, OGG…)
     File { path: PathBuf },
     /// Grava uma reunião (mic = "Eu" + áudio do sistema = "Participantes")
     /// por N segundos, transcreve em blocos e salva Markdown + SQLite
@@ -55,7 +55,7 @@ enum Cmd {
         #[arg(long, default_value = "system")]
         source: String,
     },
-    /// Identifica os falantes de um WAV (calibração da diarização)
+    /// Identifica os falantes de um arquivo de áudio (calibração da diarização)
     Diarize {
         path: PathBuf,
         /// Número de participantes, se conhecido (muda o agrupamento de
@@ -68,7 +68,7 @@ enum Cmd {
     },
     /// Roda o pipeline inteiro sobre um WAV e grava relatório + transcrições
     Bench {
-        /// Áudio da reunião (WAV, qualquer taxa/canais)
+        /// Áudio da reunião (MP3, M4A, WAV, FLAC, OGG; qualquer taxa e canais)
         audio: PathBuf,
         /// `baseline`, `final` ou o caminho de um JSON de configuração
         #[arg(long, default_value = "final")]
@@ -261,7 +261,7 @@ fn run_import(dir: Option<&Path>, db: Option<&Path>, apply: bool) -> anyhow::Res
             }
         };
         let caminho = path.to_string_lossy().to_string();
-        if store.has_meeting_from(&caminho, &parsed.started_at)? {
+        if store.has_meeting_from(&caminho, &parsed.started_at, &parsed.title)? {
             existentes += 1;
             continue;
         }
@@ -337,11 +337,13 @@ fn run_bench(cli: &Cli) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Roda só a diarização num WAV — útil para calibrar o limiar do agrupamento.
+/// Roda só a diarização num arquivo de áudio — útil para calibrar o limiar
+/// do agrupamento.
 fn run_diarize(path: &Path, speakers: Option<u32>, threshold: Option<f32>) -> anyhow::Result<()> {
-    let raw = audio::load_wav(path).with_context(|| format!("falha ao ler {}", path.display()))?;
-    let secs = raw.duration_secs();
-    let samples = raw.into_whisper_input()?;
+    let decoded = isper_core::decode::decode_to_16k(path, None, None)
+        .with_context(|| format!("falha ao ler {}", path.display()))?;
+    let secs = decoded.duration_secs();
+    let samples = decoded.samples_16k;
     let mut opts = isper_diarize::DiarizeOptions::from_env();
     if let Some(t) = threshold {
         opts.threshold = t;
@@ -407,7 +409,18 @@ fn run_dictation(cli: &Cli) -> anyhow::Result<()> {
             audio::record(Duration::from_secs(*seconds)).context("falha ao gravar do microfone")?
         }
         Cmd::File { path } => {
-            audio::load_wav(path).with_context(|| format!("falha ao ler {}", path.display()))?
+            // Qualquer formato: o arquivo já sai em 16 kHz mono.
+            let decoded = isper_core::decode::decode_to_16k(path, None, None)
+                .with_context(|| format!("falha ao ler {}", path.display()))?;
+            println!(
+                "arquivo: {} Hz, {} canal(is)",
+                decoded.source_rate, decoded.source_channels
+            );
+            audio::RawAudio {
+                samples: decoded.samples_16k,
+                sample_rate: isper_core::WHISPER_SAMPLE_RATE,
+                channels: 1,
+            }
         }
         outro => unreachable!(
             "run_dictation não trata {}",
