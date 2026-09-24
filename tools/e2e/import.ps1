@@ -1,10 +1,11 @@
 # E2E da importacao de gravacoes (fase 9.0) no app real, via CDP: um MP3
 # entregue a fila (como o botao "Importar audio" e o arrastar fazem) vira
 # reuniao com o mesmo passe final, a origem no banco e no .md; o mesmo audio
-# de novo aponta a reuniao que ja existe; um .opus e recusado na entrada; um
-# OGG deixado na pasta vigiada vira reuniao com data e titulo do nome e muda
-# para Importados; um "mp3" que nao e audio vai para "Nao importados" com o
-# motivo. Precisa de um modelo Whisper instalado.
+# de novo aponta a reuniao que ja existe; um .wma e recusado na entrada; uma
+# mensagem de voz (.opus, fase 9.2) vira reuniao; um OGG deixado na pasta
+# vigiada vira reuniao com data e titulo do nome e muda para Importados; um
+# "mp3" que nao e audio vai para "Nao importados" com o motivo. Precisa de um
+# modelo Whisper instalado.
 #
 #   .\tools\e2e\import.ps1 -Exe <caminho do exe>
 #
@@ -42,8 +43,13 @@ $before = @(Invoke-Isper 'list_meetings' '{ query: null }').Count
 # ---- escolhido/arrastado: MP3 44,1 kHz estereo
 $mp3 = (Join-Path $fixtures 'fala-44k-stereo.mp3') -replace '\\', '/'
 $opus = (Join-Path $fixtures 'fala-2s.opus') -replace '\\', '/'
-$q = Invoke-Isper 'import_audio_files' "{ paths: ['$mp3', '$opus'] }"
-Check ($q.queued -eq 1 -and @($q.rejected) -contains 'fala-2s.opus') "MP3 entra na fila e o .opus e recusado na entrada ($($q.queued) / $(@($q.rejected) -join ','))"
+# Um formato que o ISPer nao le (WMA): o arquivo existe, mas nao entra.
+$wmaPath = Join-Path $env:TEMP 'isper-e2e-voz.wma'
+[IO.File]::WriteAllBytes($wmaPath, [byte[]](1..64))
+$wma = $wmaPath -replace '\\', '/'
+$q = Invoke-Isper 'import_audio_files' "{ paths: ['$mp3', '$wma'] }"
+Remove-Item $wmaPath -ErrorAction SilentlyContinue
+Check ($q.queued -eq 1 -and @($q.rejected) -contains 'isper-e2e-voz.wma') "MP3 entra na fila e o .wma e recusado na entrada ($($q.queued) / $(@($q.rejected) -join ','))"
 $last = Wait-ImportOf 'fala-44k-stereo.mp3'
 Check ($null -ne $last -and $last.ok -and -not $last.duplicate -and $last.meeting_id) "MP3 virou reuniao (id $($last.meeting_id))"
 if ($last -and $last.meeting_id) {
@@ -61,6 +67,17 @@ if ($last -and $last.meeting_id) {
   $dup = Wait-ImportOf 'fala-44k-stereo.mp3' 60
   Check ($q2.queued -eq 1 -and $dup.duplicate -and $dup.meeting_id -eq $last.meeting_id) "o mesmo audio nao vira outra reuniao (aponta a $($dup.meeting_id))"
   Check (@(Invoke-Isper 'list_meetings' '{ query: null }').Count -eq $before + 1) "a Biblioteca tem uma reuniao a mais, nao duas"
+}
+
+# ---- mensagem de voz do WhatsApp: Ogg/Opus (fase 9.2, libopus)
+$q3 = Invoke-Isper 'import_audio_files' "{ paths: ['$opus'] }"
+$v = Wait-ImportOf 'fala-2s.opus' 120
+Check ($q3.queued -eq 1 -and $null -ne $v -and $v.ok -and $v.meeting_id) "a mensagem de voz (.opus) virou reuniao (id $($v.meeting_id))"
+if ($v -and $v.meeting_id) {
+  $created += $v.meeting_id
+  $vd = Invoke-Isper 'get_meeting' "{ id: $($v.meeting_id) }"
+  $vt = (@($vd.segments) | ForEach-Object { $_.text }) -join ' '
+  Check (@($vd.segments).Count -gt 0) "o passe final transcreveu o .opus ('$vt')"
 }
 
 # ---- pasta vigiada: OGG com data e titulo no nome

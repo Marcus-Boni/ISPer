@@ -1,6 +1,6 @@
 ---
 title: "Importar gravações"
-description: "Transcreva no ISPer gravações de fora — do Plaud, do celular, de uma reunião gravada — em MP3, M4A, WAV, FLAC ou OGG."
+description: "Transcreva no ISPer gravações de fora — do Plaud, do celular, de uma reunião gravada — em MP3, M4A, WAV, FLAC, OGG ou Opus."
 section: "Reuniões e Sistema"
 order: 46
 ---
@@ -20,8 +20,7 @@ O ISPer também transcreve áudio que **não** foi gravado por ele: o que o Plau
 | M4A, MP4, AAC | Gravador do iPhone e de muitos Androids; vídeos de reunião (vale a trilha de áudio) |
 | WAV | Plaud, gravadores profissionais |
 | FLAC, OGG | Gravadores e apps de áudio |
-
-Opus (o `.opus` das mensagens de voz) ainda não: converta para MP3 ou WAV antes. O ISPer avisa quando recebe um.
+| Opus | Mensagens de voz do WhatsApp (`.opus`, às vezes `.ogg`) e o gravador do ISPer no celular |
 
 ## Pela Biblioteca
 
