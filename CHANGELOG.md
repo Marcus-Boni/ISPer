@@ -11,6 +11,13 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-23
+
+A Fase 9 começa pelo PC: as gravações de fora — do Plaud, do celular, de
+uma reunião gravada — viram reunião na Biblioteca, com a mesma transcrição
+de uma reunião gravada pelo ISPer. E o Copilot passa a guardar as suas
+notas com a reunião e a só usar a IA com a janela aberta.
+
 ### Adicionado
 - **Importar gravações de fora** (Fase 9.0): o que o Plaud exporta, o
   gravador do celular, a gravação de uma reunião — MP3, M4A/MP4, AAC, WAV,
@@ -23,8 +30,8 @@ bata com ela.
   do nome, quando ele descreve a conversa. Um arquivo por vez, esperando a
   reunião em andamento terminar, com progresso e cancelamento. O mesmo áudio
   não entra duas vezes. Nada é apagado: da pasta vigiada, o arquivo vai para
-  `Importados` (ou `Não importados`, com o motivo num `.txt`). Opus ainda
-  não é lido. Guia em isper.pages.dev/docs/reunioes-e-sistema/importar-gravacoes.
+  `Importados` (ou `Não importados`, com o motivo num `.txt`); a pasta é
+  criada na primeira abertura. Opus ainda não é lido. Guia em isper.pages.dev/docs/reunioes-e-sistema/importar-gravacoes.
 - **As notas do Copilot são salvas com a reunião.** O que você escreve na aba
   Notas entra no fim da ata, na seção "Notas da reunião", e aparece na
   Biblioteca, em "Suas notas (Copilot)". Se você continuar escrevendo depois
@@ -43,8 +50,9 @@ bata com ela.
   reunião, ele lê em poucos segundos o que já foi dito. A fala ao vivo e a
   dinâmica da conversa continuam sendo registradas o tempo todo.
 - **O banco da Biblioteca ganha um formato novo — com cópia de segurança.**
-  Para guardar as notas (e de que arquivo veio uma reunião importada), o ISPer atualiza o banco na primeira vez que abrir e,
-  antes, salva uma cópia dele como estava em `%APPDATA%\ISPer\isper.db.v3.bak`.
+  Para guardar as notas e de que arquivo veio uma reunião importada, o ISPer
+  atualiza o banco na primeira vez que abrir e, antes, salva uma cópia dele
+  como estava em `%APPDATA%\ISPer\isper.db.v3.bak`.
   A 0.20.0 e as anteriores não abrem o banco atualizado; para voltar a uma
   delas, feche o ISPer, instale a versão anterior e renomeie a cópia para
   `isper.db` — as reuniões gravadas depois da atualização continuam nos
@@ -58,7 +66,6 @@ bata com ela.
   download-artifact v8 (hash divergente agora falha o download) e
   pnpm/action-setup v6. Os PRs do Dependabot correspondentes ficam
   supersedidos.
-
 - **O `isper-cli` lê os formatos de gravador e de celular**: `file`, `bench` e
   `diarize` aceitam, além de WAV, MP3, M4A/MP4, AAC, FLAC e OGG, em qualquer
   taxa e número de canais. O áudio é lido em fluxo, sem carregar o arquivo
