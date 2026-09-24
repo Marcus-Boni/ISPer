@@ -180,7 +180,7 @@ jobs:
           ISPER_E2E_CDP_REGISTRY: '1'
         run: .\tools\e2e\theme.ps1 -Exe .\target\release\isper-app.exe
 
-      # Desfazer pela Biblioteca (sem ditados no runner, só confere que a janela abre limpa).
+      # Desfazer pela Biblioteca, com ditados de exemplo no perfil de teste.
       - name: E2E desfazer (Biblioteca)
         shell: pwsh
         env:
