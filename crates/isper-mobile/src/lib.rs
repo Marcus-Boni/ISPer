@@ -17,8 +17,10 @@
 //! - devolver tempo por etapa, fator de tempo real, pico de memória e, quando
 //!   há referência, WER, CER e DER ([`SpikeReport`]).
 //!
-//! O gravador (9.2) e a sincronia com o PC (9.3) entram depois, em cima
-//! desta mesma fachada.
+//! Desde a 9.2, a fachada também grava ([`Recorder`], em [`recording`]): o
+//! `AudioRecord` do Android entrega PCM e o núcleo escreve o Ogg/Opus com o
+//! manifesto ao lado, à prova de queda. A sincronia com o PC (9.3) entra
+//! depois, em cima desta mesma fachada.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -32,6 +34,12 @@ use isper_core::pipeline::{self, Diarizer, DiarizerOutput, FinalConfig};
 use isper_core::{EngineOptions, WhisperEngine};
 
 uniffi::setup_scaffolding!();
+
+pub mod recording;
+pub use recording::{
+    GapKind, Recorder, RecordingGap, RecordingInfo, RecordingList, RecordingState,
+    delete_recording, import_recording, list_recordings,
+};
 
 /// Erro que chega ao app como exceção. A mensagem já vem em português e é
 /// para mostrar como está.
