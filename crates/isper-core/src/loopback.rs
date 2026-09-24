@@ -19,7 +19,9 @@
 //!    continuamente (silêncio incluído) — >1 s sem NENHUM byte novo significa
 //!    que estagnou: fechamos e reabrimos tudo, e a captura segue.
 
+#[cfg(windows)]
 use std::collections::VecDeque;
+#[cfg(windows)]
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender};
@@ -75,17 +77,23 @@ pub struct LoopbackReady {
 }
 
 /// Formato pedido ao WASAPI (com `autoconvert`, o mixer converte p/ nós).
+#[cfg(windows)]
 const RATE: usize = 48_000;
+#[cfg(windows)]
 const CH: usize = 2;
+#[cfg(windows)]
 const BYTES_PER_FRAME: usize = 4 * CH; // f32 intercalado
 /// Buffer dos clientes: 500 ms de folga (unidades de 100 ns).
+#[cfg(windows)]
 const BUFFER_HNS: i64 = 5_000_000;
 /// Sem nenhum byte novo por este tempo = stream estagnado → reabre.
+#[cfg(windows)]
 const STALL_TIMEOUT: Duration = Duration::from_millis(1000);
 
 /// Roda o loop de captura até chegar QUALQUER coisa em `stop_rx` (ou o canal
 /// fechar). Deve rodar numa thread própria (inicializa COM nela). Amostras
 /// f32 intercaladas (48 kHz, 2 canais) saem por `tx`.
+#[cfg(windows)]
 pub fn run(
     source: LoopbackSource,
     stop_rx: Receiver<()>,
@@ -126,9 +134,25 @@ pub fn run(
     }
 }
 
+/// Fora do Windows não há loopback: o Android e o iOS não deixam um app gravar
+/// o áudio de outro app de chamada. A reunião ao vivo com "Participantes" é
+/// coisa do desktop; aqui a captura falha na hora, dizendo o motivo.
+#[cfg(not(windows))]
+pub fn run(
+    _source: LoopbackSource,
+    _stop_rx: Receiver<()>,
+    _tx: Sender<Vec<f32>>,
+    ready_tx: Sender<Result<LoopbackReady>>,
+) {
+    let _ = ready_tx.send(Err(IsperError::Audio(
+        "o áudio do sistema (loopback) só é capturado no Windows".into(),
+    )));
+}
+
 /// PID do processo raiz entre os candidatos (o que não tem pai com o mesmo
 /// nome) — o process loopback com `include_tree` pega os filhos, onde o
 /// áudio do Teams novo de fato toca (WebView2).
+#[cfg(windows)]
 fn find_root_pid(names: &[String]) -> Option<u32> {
     let sys = sysinfo::System::new_all();
     let matches: Vec<(u32, Option<u32>)> = sys
@@ -151,6 +175,7 @@ fn find_root_pid(names: &[String]) -> Option<u32> {
         .or(Some(pids[0]))
 }
 
+#[cfg(windows)]
 struct Session {
     capture_client: wasapi::AudioClient,
     capture: wasapi::AudioCaptureClient,
@@ -161,6 +186,7 @@ struct Session {
     silence: Vec<u8>,
 }
 
+#[cfg(windows)]
 fn wa<T>(r: std::result::Result<T, wasapi::WasapiError>, what: &str) -> Result<T> {
     // Com a dica em português quando a causa é conhecida (dispositivo em uso
     // exclusivo por outro app, endpoint invalidado após suspensão…).
@@ -171,6 +197,7 @@ fn wa<T>(r: std::result::Result<T, wasapi::WasapiError>, what: &str) -> Result<T
     })
 }
 
+#[cfg(windows)]
 fn open(source: &LoopbackSource) -> Result<Session> {
     let enumerator = wa(wasapi::DeviceEnumerator::new(), "enumerator")?;
     let device = wa(
@@ -232,6 +259,7 @@ fn open(source: &LoopbackSource) -> Result<Session> {
     })
 }
 
+#[cfg(windows)]
 fn pump(
     mut session: Session,
     source: &LoopbackSource,
