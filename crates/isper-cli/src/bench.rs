@@ -358,7 +358,7 @@ fn score_against_reference(args: &BenchArgs, out: &FinalTranscript) -> anyhow::R
 }
 
 /// `início<TAB>fim<TAB>falante` por linha; `#` começa comentário.
-fn read_turns(path: &Path) -> anyhow::Result<Vec<SpeakerTurn>> {
+pub(crate) fn read_turns(path: &Path) -> anyhow::Result<Vec<SpeakerTurn>> {
     let texto = std::fs::read_to_string(path)
         .with_context(|| format!("falha ao ler {}", path.display()))?;
     let mut out = Vec::new();
