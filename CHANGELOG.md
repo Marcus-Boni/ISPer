@@ -20,6 +20,13 @@ bata com ela.
 - **Aparência e idioma no topo das Configurações.** O tema e o idioma da
   interface ficavam no fim da seção Sistema, depois de tudo, e eram difíceis
   de achar; agora têm um bloco próprio, o primeiro da janela.
+- **Dependências**: tauri 2.11.6, com uma correção de segurança
+  (GHSA-w28w-mhc8-qvjv: os dados de IPC de uma janela deixam de ser legíveis
+  por outra, e o ISPer tem seis); tauri-plugin-single-instance 2.4.5 — abrir o
+  ISPer de novo traz para a frente a janela já aberta, o que o Windows às
+  vezes recusava —; e tauri-plugin-updater 2.12, em que o `allowDowngrades`
+  sai do comando chamado pela página (o ISPer não o usava; uma página não
+  pode mais pedir a instalação de uma versão mais antiga).
 
 ### Corrigido
 - Os testes ponta a ponta (`tools/e2e`) rodam num perfil de dados próprio, em
