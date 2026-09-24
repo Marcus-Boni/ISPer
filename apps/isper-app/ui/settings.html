@@ -49,6 +49,24 @@
 <p class="sub reveal" data-i="0"><span data-i18n="settings.active.lead">Atalhos ativos agora: ditado</span> <b id="active">…</b> <span data-i18n="settings.active.meeting">· reunião</span> <b id="mactive">…</b> <span data-i18n="settings.active.mark">· marcar momento</span> <b id="kactive">…</b> <span data-i18n="settings.active.copilot">· Copilot</span> <b id="cactive">…</b></p>
 
 <div class="card reveal" data-i="1">
+  <h2 data-i18n="settings.aparencia.titulo">Aparência e idioma</h2>
+  <label class="lbl mt0" for="theme" data-i18n="settings.sistema.aparencia">Aparência</label>
+  <select id="theme" class="field">
+    <option value="system" data-i18n="settings.sistema.seguir-windows-padrao">Seguir o Windows (padrão)</option>
+    <option value="light" data-i18n="settings.sistema.clara">Clara</option>
+    <option value="dark" data-i18n="settings.sistema.escura">Escura</option>
+  </select>
+  <p class="hint" data-i18n="settings.sistema.vale-hora-inicio-biblioteca-configuracoes">Vale na hora para o Início, a Biblioteca e as Configurações — e o botão de sol e lua no topo do Início e da Biblioteca troca entre clara e escura num clique. O indicador flutuante e o Copilot ficam sempre escuros — flutuam sobre outros apps e precisam do contraste próprio.</p>
+  <label class="lbl" for="uilang" data-i18n="settings.sistema.ui-lang">Idioma da interface</label>
+  <select id="uilang" class="field">
+    <option value="auto" data-i18n="settings.sistema.ui-lang-auto">Seguir o Windows (padrão)</option>
+    <option value="pt-BR" lang="pt-BR">Português (Brasil)</option>
+    <option value="en" lang="en">English</option>
+  </select>
+  <p class="hint" data-i18n="settings.sistema.ui-lang-hint">Muda os textos do ISPer na hora: janelas, bandeja e notificações. O idioma da fala (o que o Whisper transcreve) fica em Ditado.</p>
+</div>
+
+<div class="card reveal" data-i="1">
   <h2 data-i18n="settings.ditado.ditado">Ditado</h2>
   <label class="lbl mt0" for="shortcut" data-i18n="settings.ditado.atalho-global-ditado">Atalho global do ditado</label>
   <div class="row">
@@ -273,20 +291,6 @@
     <label class="switch"><input type="checkbox" id="autoupdate"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.sistema.avisar-quando-houver-versao-nova">Avisar quando houver versão nova (ao abrir e uma vez por dia)</span></label>
   </div>
   <p class="hint" data-i18n="settings.sistema.inicio-windows-isper-nasce-quieto">No início com o Windows o ISPer nasce quieto na bandeja; a tela Início também abre com um clique no ícone da bandeja.</p>
-  <label class="lbl" for="theme" data-i18n="settings.sistema.aparencia">Aparência</label>
-  <select id="theme" class="field">
-    <option value="system" data-i18n="settings.sistema.seguir-windows-padrao">Seguir o Windows (padrão)</option>
-    <option value="light" data-i18n="settings.sistema.clara">Clara</option>
-    <option value="dark" data-i18n="settings.sistema.escura">Escura</option>
-  </select>
-  <p class="hint" data-i18n="settings.sistema.vale-hora-inicio-biblioteca-configuracoes">Vale na hora para o Início, a Biblioteca e as Configurações. O indicador flutuante e o Copilot ficam sempre escuros — flutuam sobre outros apps e precisam do contraste próprio.</p>
-  <label class="lbl" for="uilang" data-i18n="settings.sistema.ui-lang">Idioma da interface</label>
-  <select id="uilang" class="field">
-    <option value="auto" data-i18n="settings.sistema.ui-lang-auto">Seguir o Windows (padrão)</option>
-    <option value="pt-BR" lang="pt-BR">Português (Brasil)</option>
-    <option value="en" lang="en">English</option>
-  </select>
-  <p class="hint" data-i18n="settings.sistema.ui-lang-hint">Muda os textos do ISPer na hora: janelas, bandeja e notificações. O idioma da fala (o que o Whisper transcreve) fica em Ditado.</p>
   <button class="btn" id="onboarding" data-i18n="settings.sistema.onboarding">Refazer a primeira configuração</button>
   <p class="hint" data-i18n="settings.sistema.onboarding-hint">Microfone, modelo, atalho e IA, passo a passo — como na primeira vez.</p>
   <label class="lbl" for="retention" data-i18n="settings.sistema.guardar-reunioes-ditados-por">Guardar reuniões e ditados por</label>
