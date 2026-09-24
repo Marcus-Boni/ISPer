@@ -24,19 +24,79 @@ function Get-IsperExe {
   return Join-Path $script:E2ERoot 'target\release\isper-app.exe'
 }
 
-function Get-IsperWebViews {
+# O ISPer que o usuario usa no dia a dia. Os e2e NUNCA o derrubam: processos
+# nao ficam isolados (nem no sandbox do agente), e matar o app no meio de uma
+# reuniao perderia a gravacao. So encerram o que eles mesmos abriram - uma
+# copia de teste, ou o instalado quando foi o e2e que o abriu, com a porta CDP.
+$script:InstalledDir = Join-Path $env:LOCALAPPDATA 'Programs\ISPer'
+
+function Get-AllIsperWebViews {
   # Processos msedgewebview2 do ISPer: os que usam a pasta de dados com.isper.desktop.
-  Get-CimInstance Win32_Process -Filter "name='msedgewebview2.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -like '*com.isper.desktop*' }
+  @(Get-CimInstance Win32_Process -Filter "name='msedgewebview2.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like '*com.isper.desktop*' })
+}
+
+function Test-OpenedByE2E {
+  # O processo isper-app foi aberto por um e2e? Copia fora da pasta instalada:
+  # sim (build de desenvolvimento, zip portatil de teste). Na pasta instalada,
+  # so se o WebView2 dele tiver a porta de depuracao que o Start-Isper liga.
+  # Sem caminho legivel, nao da para saber: fica em paz (o pior caso e um
+  # teste falhar, nunca derrubar o app de alguem).
+  param([Parameter(Mandatory)]$Process, $WebViews)
+  $path = $Process.Path
+  if (-not $path) { return $false }
+  if (-not $path.StartsWith($script:InstalledDir, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+  if ($null -eq $WebViews) { $WebViews = Get-AllIsperWebViews }
+  $filhos = @($WebViews | Where-Object { [int]$_.ParentProcessId -eq $Process.Id })
+  return [bool](@($filhos | Where-Object { $_.CommandLine -like '*--remote-debugging-port*' }).Count)
+}
+
+function Get-E2EIsper {
+  # As instancias do ISPer que os e2e podem encerrar.
+  $webviews = Get-AllIsperWebViews
+  @(Get-Process -Name isper-app -ErrorAction SilentlyContinue | Where-Object { Test-OpenedByE2E -Process $_ -WebViews $webviews })
+}
+
+function Get-UserIsper {
+  # O ISPer instalado aberto pelo usuario (sem porta CDP): intocavel.
+  $webviews = Get-AllIsperWebViews
+  @(Get-Process -Name isper-app -ErrorAction SilentlyContinue | Where-Object { -not (Test-OpenedByE2E -Process $_ -WebViews $webviews) })
+}
+
+function Get-IsperWebViews {
+  # WebView2 que podem ser encerrados: os que NAO descendem do ISPer do usuario.
+  $all = Get-AllIsperWebViews
+  $user = @(Get-UserIsper | ForEach-Object { $_.Id })
+  if ($user.Count -eq 0) { return $all }
+  $byPid = @{}
+  foreach ($w in $all) { $byPid[[int]$w.ProcessId] = $w }
+  @($all | Where-Object {
+    $cur = $_
+    for ($n = 0; $cur -and $n -lt 8; $n++) {
+      if ($user -contains [int]$cur.ParentProcessId) { return $false }
+      $cur = $byPid[[int]$cur.ParentProcessId]
+    }
+    $true
+  })
+}
+
+function Assert-NoUserIsper {
+  # O Windows so deixa uma instancia do ISPer rodar: com a do usuario aberta,
+  # a de teste nem sobe. Em vez de derruba-la, para e explica.
+  $user = @(Get-UserIsper)
+  if ($user.Count -gt 0) {
+    throw "O ISPer instalado esta aberto (PID $($user.Id -join ', ')). Feche-o pela bandeja (Sair) antes de rodar os e2e - eles nunca o encerram por conta propria, para nao cortar uma reuniao em andamento."
+  }
 }
 
 function Stop-Isper {
-  # Fecha o app E os processos do WebView2 dele. Sem isso, os msedgewebview2 da
-  # instância anterior sobrevivem alguns segundos e a instância nova se acopla a
-  # eles — SEM a porta CDP (ECONNREFUSED em 9223, e o teste falha à toa).
-  Stop-Process -Name isper-app -Force -ErrorAction SilentlyContinue
+  # Fecha o app de teste E os processos do WebView2 dele. Sem isso, os
+  # msedgewebview2 da instância anterior sobrevivem alguns segundos e a
+  # instância nova se acopla a eles — SEM a porta CDP (ECONNREFUSED em 9223, e o
+  # teste falha à toa). O ISPer do usuário (instalado, sem CDP) fica de fora.
+  Get-E2EIsper | Stop-Process -Force -ErrorAction SilentlyContinue
   for ($i = 0; $i -lt 20; $i++) {
-    $alive = @(Get-Process -Name isper-app -ErrorAction SilentlyContinue).Count
+    $alive = @(Get-E2EIsper).Count
     $webviews = @(Get-IsperWebViews)
     if ($alive -eq 0 -and $webviews.Count -eq 0) { break }
     if ($alive -eq 0 -and $i -ge 3) {
@@ -68,6 +128,7 @@ function Start-Isper {
   # configuração: ela é concluída pelo caminho do usuário (onboarding_finish)
   # e o Início abre em seguida. Com -KeepOnboarding, para nela.
   param([Parameter(Mandatory)][string]$Exe, [hashtable]$Env = @{}, [switch]$NoCdp, [switch]$KeepOnboarding)
+  Assert-NoUserIsper
   $exeName = Split-Path $Exe -Leaf
   $viaRegistry = (-not $NoCdp) -and [bool]$env:ISPER_E2E_CDP_REGISTRY
   if (-not $NoCdp) { $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$script:CdpPort" }
@@ -219,12 +280,20 @@ function Remove-CdpRegistry {
 }
 
 function Restart-IsperClean {
-  # Relança o exe sem porta CDP (estado normal de uso).
+  # Fecha a instância de teste e relança o exe sem porta CDP (estado normal de
+  # uso). Uma cópia de desenvolvimento só é relançada no CI (ou com
+  # ISPER_E2E_RELAUNCH=1): na máquina de quem usa o ISPer, ela ficaria na
+  # bandeja no lugar do app instalado, com outra pasta de dados.
   param([Parameter(Mandatory)][string]$Exe)
   Stop-Isper
   Remove-CdpRegistry -Exe $Exe
-  Start-Process $Exe -WorkingDirectory (Split-Path $Exe)
-  Start-Sleep -Seconds 3
+  $installed = $Exe.StartsWith($script:InstalledDir, [StringComparison]::OrdinalIgnoreCase)
+  if ($installed -or $env:CI -or $env:ISPER_E2E_RELAUNCH) {
+    Start-Process $Exe -WorkingDirectory (Split-Path $Exe)
+    Start-Sleep -Seconds 3
+  } else {
+    Write-Host "  (a copia de teste foi fechada; o ISPer instalado pode ser aberto de novo)"
+  }
 }
 
 function Finish-E2E {

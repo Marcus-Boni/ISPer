@@ -158,8 +158,12 @@ function Build-Variant([string]$name, [string]$configFile, [string]$targetDir, [
 }
 
 if (-not $SkipBuild) {
-  "ISPer $version - parando o app (o bundler reescreve o exe e as DLLs ficam travadas)"
-  Stop-Process -Name isper-app -Force -ErrorAction SilentlyContinue
+  "ISPer $version - parando copias de desenvolvimento (o bundler reescreve o exe de target\ e as DLLs ficam travadas)"
+  # So as que rodam de target\: o ISPer instalado, em uso (talvez gravando
+  # uma reuniao), nao trava nada do build e nao e encerrado.
+  Get-Process -Name isper-app -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -and $_.Path.StartsWith((Join-Path $root 'target'), [StringComparison]::OrdinalIgnoreCase) } |
+    Stop-Process -Force -ErrorAction SilentlyContinue
   Start-Sleep -Seconds 1
   if ($wantGpu) { Build-Variant 'GPU (CUDA)' 'tauri.gpu.conf.json' (Join-Path $root 'target') @() $gpuSetup }
   if ($wantCpu) { Build-Variant 'CPU' 'tauri.cpu.conf.json' (Join-Path $root 'target-cpu') @('--no-default-features') $cpuSetup }
