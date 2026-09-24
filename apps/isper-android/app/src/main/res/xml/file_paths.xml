@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- O que o ISPer pode entregar a outro app ao compartilhar: só as gravações. -->
+<paths>
+    <external-files-path name="gravacoes" path="Gravacoes/" />
+    <files-path name="gravacoes-internas" path="Gravacoes/" />
+</paths>

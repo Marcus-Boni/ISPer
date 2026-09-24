@@ -42,3 +42,6 @@ apps/isper-app/src-tauri/resources/
 /fixtures/reuniao-sintetica-16k.wav
 # Saída do `isper-cli bench`.
 /bench/
+# Chave que assina os APKs do Android (ADR 0016): mora fora do Git.
+*.jks
+*.keystore

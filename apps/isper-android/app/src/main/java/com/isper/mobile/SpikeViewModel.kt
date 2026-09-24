@@ -135,6 +135,10 @@ class SpikeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun useSample() = _state.update { it.copy(audio = AudioChoice.Sample) }
 
+    /** Uma gravação da Biblioteca, para medir o passe final sobre ela. */
+    fun useRecording(path: String, name: String) =
+        _state.update { it.copy(audio = AudioChoice.Picked(File(path), name), message = null, result = null) }
+
     fun pickAudio(uri: Uri) {
         viewModelScope.launch {
             val picked = withContext(Dispatchers.IO) { runCatching { copyToCache(uri) } }

@@ -1,9 +1,12 @@
-# App Android (Fase 9.1): compila o isper-mobile para arm64 (celulares) e
+# App Android (Fase 9): compila o isper-mobile para arm64 (celulares) e
 # x86_64 (emulador) com o cargo-ndk, gera os bindings Kotlin do UniFFI e monta
-# o APK do laboratório — o mesmo `./gradlew assembleDebug` de quem desenvolve.
+# o APK do gravador e do laboratório — o mesmo `./gradlew assembleDebug` de quem desenvolve.
 #
 # Roda quando o núcleo ou o app Android mudam. O APK sai como artefato do run,
-# assinado com a chave de debug do runner: serve para testar, não para loja.
+# assinado com a chave do ISPer (segredos ANDROID_KEYSTORE_B64 e
+# ANDROID_KEYSTORE_PASSWORD; ver apps/isper-android/README.md): a mesma em todo
+# run, para o app atualizar por cima sem apagar as gravações. Sem os segredos
+# (forks), vale a chave de debug do runner. Serve para testar, não para loja.
 # A amostra do laboratório no CI é a fala curta versionada (o corpus de 190 s
 # não entra no Git); o APK montado na máquina de quem tem o corpus leva ele.
 name: Android
@@ -85,12 +88,25 @@ jobs:
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358" "platforms;android-37.0" > /dev/null
 
+      - name: Chave de assinatura
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/isper.jks"
+            echo "ISPER_ANDROID_KEYSTORE=$RUNNER_TEMP/isper.jks" >> "$GITHUB_ENV"
+          else
+            echo "::notice::sem o segredo ANDROID_KEYSTORE_B64: o APK sai com a chave de debug do runner, e atualizar exige desinstalar"
+          fi
+
       - name: APK (arm64 + x86_64)
         working-directory: apps/isper-android
+        env:
+          ISPER_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: ./gradlew assembleDebug --stacktrace
 
       - uses: actions/upload-artifact@v7
         with:
-          name: isper-android-laboratorio
+          name: isper-android
           path: apps/isper-android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
