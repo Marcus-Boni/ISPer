@@ -33,7 +33,7 @@ isper-core · isper-diarize · isper-models   (o mesmo Rust do desktop)
   usar outros apps. Numa ligação, o Android silencia o microfone: a gravação
   continua, e o trecho fica marcado.
 - **Onde fica:** `Android/data/com.isper.mobile/files/Gravacoes`, um `.opus`
-  e um `.json` (o manifesto) por gravação, com ~10,5 MB por hora. Se o app
+  e um `.json` (o manifesto) por gravação, com ~15 MB por hora. Se o app
   morrer no meio, o áudio até a queda fica, e a gravação aparece como
   recuperada na próxima abertura.
 - **Levar para o PC** (até a 9.3 chegar): **Compartilhar** na Biblioteca

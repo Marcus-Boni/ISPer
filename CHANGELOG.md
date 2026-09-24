@@ -24,8 +24,8 @@ bata com ela.
   inteira, com a tela apagada e o app fechado, num serviço em primeiro plano
   com cronômetro, Marcar, Pausar e Parar na notificação. Começa em um toque:
   pela tela Gravar, pelo widget ou pelo bloco nas Configurações rápidas. O
-  áudio vai em Ogg/Opus a 32 kbit/s: ~10,5 MB por hora, com a transcrição
-  idêntica à do WAV no corpus. Se o app morrer no meio, o que foi gravado
+  áudio vai em Ogg/Opus a 32 kbit/s: ~15 MB por hora, com a transcrição
+  igual à do WAV no corpus, mesmo com ruído de sala. Se o app morrer no meio, o que foi gravado
   fica, e a gravação volta como recuperada na próxima abertura. Uma ligação
   vira um trecho marcado, sem parar a gravação. A Biblioteca do celular
   ouve, compartilha, manda ao laboratório, apaga com Desfazer e recebe áudio

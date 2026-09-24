@@ -33,8 +33,10 @@ use crate::{IsperError, Result};
 /// A posição (granule) do Ogg/Opus conta amostras a 48 kHz, qualquer que seja
 /// a taxa de entrada.
 pub const GRANULE_RATE: u32 = 48_000;
-/// 32 kbit/s mono: 14,4 MB por hora, e voz com folga para o Whisper (que
-/// trabalha em 16 kHz). O corpus mede o efeito no WER (ver o ADR 0016).
+/// 32 kbit/s mono: até 14,4 MB por hora (~15 MB no celular, com o Ogg), e voz
+/// com folga para o Whisper. A 24 kbit/s o arquivo encolhe, mas a transcrição
+/// piora numa sala barulhenta; limitar a banda à faixa da voz não encolhe
+/// nada (o VBR gasta a mesma taxa). Medições no ADR 0016.
 pub const DEFAULT_BITRATE: i32 = 32_000;
 /// Taxas que o Opus aceita na entrada.
 pub const INPUT_RATES: [u32; 5] = [8_000, 12_000, 16_000, 24_000, 48_000];
