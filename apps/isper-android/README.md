@@ -1,9 +1,15 @@
 # ISPer para Android
 
-App Android do ISPer (Fase 9, "ISPer no Bolso"). Por enquanto é o
-**laboratório da 9.1**: mede no próprio celular o mesmo passe final que o
-ISPer roda no PC — decodificação, VAD Silero, Whisper com busca em feixe,
-falante por palavra — antes de o gravador (9.2) ser construído em cima dele.
+App Android do ISPer (Fase 9, "ISPer no Bolso"). Três abas:
+
+- **Gravar** (9.2): grava a reunião inteira, com a tela apagada, em Ogg/Opus
+  a 32 kbit/s ([ADR 0016](../../docs/adr/0016-gravacao-no-celular-ogg-opus.md));
+- **Biblioteca**: as gravações, para ouvir, compartilhar, medir e apagar (com
+  Desfazer), e o que chega de outros apps pelo "Compartilhar";
+- **Laboratório** (9.1): mede no próprio celular o mesmo passe final que o
+  ISPer roda no PC — decodificação, VAD Silero, Whisper com busca em feixe,
+  falante por palavra.
+
 A decisão de arquitetura está no [ADR 0014](../../docs/adr/0014-celular-nativo-com-nucleo-rust.md).
 
 ```text
@@ -15,6 +21,32 @@ isper-mobile  (crates/isper-mobile: a fachada do núcleo)
         ▼
 isper-core · isper-diarize · isper-models   (o mesmo Rust do desktop)
 ```
+
+## O gravador
+
+- **Começar:** o botão da aba Gravar, o widget "Gravar reunião" na tela
+  inicial ou o bloco "Gravar" nas Configurações rápidas (puxe a barra de
+  notificações e edite os blocos). Na primeira vez, o Android pede o
+  microfone e as notificações.
+- **Durante:** a notificação mostra o cronômetro e tem **Marcar** (um
+  momento para achar depois), **Pausar** e **Parar**. Pode apagar a tela e
+  usar outros apps. Numa ligação, o Android silencia o microfone: a gravação
+  continua, e o trecho fica marcado.
+- **Onde fica:** `Android/data/com.isper.mobile/files/Gravacoes`, um `.opus`
+  e um `.json` (o manifesto) por gravação, com ~10,5 MB por hora. Se o app
+  morrer no meio, o áudio até a queda fica, e a gravação aparece como
+  recuperada na próxima abertura.
+- **Levar para o PC** (até a 9.3 chegar): **Compartilhar** na Biblioteca
+  manda o `.opus` por WhatsApp, e-mail ou Drive. O ISPer do PC importa o
+  arquivo como qualquer outro.
+
+> Alguns fabricantes (Xiaomi, Samsung, Motorola) matam apps em segundo plano
+> mesmo com a notificação. Se uma gravação longa parar sozinha, libere o
+> ISPer em Bateria → Sem restrições.
+
+`tools/e2e/android-recorder.ps1` testa o gravador num emulador pela
+interface (21 verificações): gravar, marcar e parar; matar o app no meio e
+recuperar; gravar com a tela apagada.
 
 ## O que o laboratório mede
 
@@ -82,10 +114,45 @@ roda com o modelo tiny e confere o relatório (12 verificações).
 | Onde | Modelo | Áudio | Total | Falantes | WER · DER | Pico de memória |
 |---|---|---|---|---|---|---|
 | Emulador x86_64, 4 núcleos (24/09) | tiny q5 | corpus, 190 s | 81 s (0,43×) | 3 de 3 | 18,0% · 21,4% | 576 MB |
+| Xiaomi, Snapdragon 855/860 (SM8150) (24/09) | small q5 | corpus, 190 s | ~272 s (1,43×) | 3 de 3 | 10,9% · 22,1% | — |
 
 O emulador prova que o pipeline do PC funciona no Android. A velocidade de
-verdade só se mede num celular: a próxima linha desta tabela é a do aparelho
-do líder.
+verdade só se mede num celular: o Xiaomi foi o primeiro. Falta o aparelho do
+líder.
+
+## Assinatura
+
+O Android só atualiza um app por cima se a versão nova vier assinada com a
+**mesma chave**. Com a chave de debug de cada run do CI, instalar o APK novo
+exigia desinstalar o antigo, e isso apagava as gravações. O workflow assina
+com a chave do ISPer quando os segredos do repositório existem:
+
+| Segredo | Conteúdo |
+|---|---|
+| `ANDROID_KEYSTORE_B64` | o `.jks` em base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | a senha do `.jks` (a mesma da chave, alias `isper`) |
+
+Criar a chave é à mão, uma vez, por quem mantém o repositório. O `keytool`
+vem com o JDK e com o Android Studio (`jbr\bin`):
+
+```bash
+keytool -genkeypair -keystore isper-android.jks -alias isper -keyalg RSA -keysize 4096 -validity 36500 -dname "CN=ISPer" -storetype PKCS12
+```
+
+Depois, em GitHub → Settings → Secrets and variables → Actions, crie os dois
+segredos. Guarde o `.jks` e a senha num gerenciador de senhas: sem eles, a
+próxima versão não atualiza por cima. O `.gitignore` recusa `*.jks`.
+
+Num build local, as variáveis `ISPER_ANDROID_KEYSTORE` (caminho do `.jks`) e
+`ISPER_ANDROID_KEYSTORE_PASSWORD` fazem o mesmo. Sem elas, vale a chave de
+debug da máquina.
+
+**Trocar de chave apaga as gravações do aparelho.** O Android recusa a
+instalação nova (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) mesmo que a antiga
+tenha sido desinstalada com "manter os dados": é preciso apagar os dados.
+Antes de trocar, compartilhe as gravações para o PC. O `hasFragileUserData`
+só protege quem desinstala por engano e reinstala com a mesma chave:
+aí o Android oferece manter os dados, e as gravações voltam.
 
 ## Versões
 

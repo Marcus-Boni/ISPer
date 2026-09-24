@@ -22,6 +22,7 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0013](0013-importar-audio-de-fora.md) | Importar áudio de fora: decodificação local, o mesmo passe final e a origem no banco | aceita | 23/09/2026 |
 | [0014](0014-celular-nativo-com-nucleo-rust.md) | Celular: app nativo, com o núcleo Rust exposto pelo UniFFI | aceita | 24/09/2026 |
 | [0015](0015-sherpa-onnx-oficial.md) | O crate oficial do sherpa-onnx no lugar do sherpa-rs, com threads | aceita | 24/09/2026 |
+| [0016](0016-gravacao-no-celular-ogg-opus.md) | Gravação no celular: Ogg/Opus a 32 kbit/s, em páginas de 1 s, com um manifesto ao lado | aceita | 24/09/2026 |
 
 ## Como escrever um ADR
 

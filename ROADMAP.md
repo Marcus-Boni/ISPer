@@ -20,9 +20,9 @@
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
 | F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (criptografia em repouso adiada com decisão registrada); 7.5 com 5 de 6 (v0.19.0 — falta a rodada com o NVDA); 7.6 com 4 de 5 (v0.20.0 — falta o winget, em revisão no winget-pkgs) |
 | F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; só com a janela aberta e notas salvas com a reunião (23/09); 3 itens em aberto — validar a memória, idioma do que a IA escreve e ver o sync do portal numa release |
-| F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; falta rodá-lo no celular do líder. 9.2 a 9.7 ainda são proposta |
+| F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (10,5 MB/h, a mesma transcrição do WAV), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. Falta o teste de 2 h em aparelhos de verdade. 9.3 a 9.7 ainda são proposta |
 
-**122 itens entregues · 11 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**130 itens entregues · 13 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -323,7 +323,7 @@ para o celular. Decisões da 9.0 no [ADR 0013](docs/adr/0013-importar-audio-de-f
 
 ### 9.0 Importar áudio no PC
 
-- [x] Ler MP3, M4A/MP4, AAC, WAV, FLAC e OGG no núcleo, em fluxo (`isper_core::decode`, symphonia; ~230 MB por hora em vez de 1,4 GB), com progresso e cancelamento (23/09). Opus fica de fora por enquanto, com uma mensagem que diz o que fazer
+- [x] Ler MP3, M4A/MP4, AAC, WAV, FLAC e OGG no núcleo, em fluxo (`isper_core::decode`, symphonia; ~230 MB por hora em vez de 1,4 GB), com progresso e cancelamento (23/09). Opus fica de fora por enquanto, com uma mensagem que diz o que fazer (entrou na 9.2, com o libopus, em 24/09)
 - [x] O mesmo passe final numa trilha só, com diarização, e cancelável (`run_cancellable`): no teste com o modelo, um MP3 44,1 kHz estéreo deu exatamente o texto do WAV original (23/09)
 - [x] Origem no banco (schema v5: nome e SHA-256 do arquivo) e no cabeçalho do `.md`, lida de volta pelo `import`; data e título pelo nome do arquivo (`isper_core::recording`); a reimportação casa por início **e** título — só o início, com precisão de minuto, perdia uma de duas gravações exportadas juntas (23/09)
 - [x] `isper-cli file`, `bench` e `diarize` com qualquer desses formatos (23/09)
@@ -345,13 +345,30 @@ dele. Decisões no [ADR 0014](docs/adr/0014-celular-nativo-com-nucleo-rust.md)
 - [x] App Android de laboratório (24/09, `apps/isper-android`): Kotlin + Compose nas cores do ISPer, AGP 9.4 / Gradle 9.8 / Kotlin 2.4, `minSdk` 29; arm64 em ARMv8.2 com dotprod e fp16, com checagem do `/proc/cpuinfo`; bateria, temperatura e estado térmico antes e depois; relatório em JSON para compartilhar e `autorun` por intent. A compilação cruzada do whisper.cpp pelo `whisper-rs-sys` num PC Windows precisou de um contorno (ADR 0014)
 - [x] APK no CI (`android.yml`, runner Linux) e laboratório de ponta a ponta no emulador (`tools/e2e/android-lab.ps1`, 12 verificações): no emulador x86_64 com 4 núcleos, o modelo tiny transcreveu e separou os 3 falantes dos 190 s do corpus em 81 s (0,43× a duração), com WER 18,0% e DER 21,4% (o do PC é 20,6%) e 576 MB de pico. É prova de funcionamento, não de velocidade de celular
 - [x] VAD numa thread só (24/09): com 4 threads, a sincronização a cada quadro de 32 ms custava mais que a conta — 2,1 s → 0,4 s no PC nos 190 s do corpus, e 135 s (com o PC ocupado) → 1,1 s no emulador, com as mesmas regiões e o mesmo texto
-- [ ] Rodar o laboratório no celular do líder e em dois intermediários populares (Samsung da linha A, Motorola) e fixar, com os números, os níveis de aparelho e a meta de tempo da 9.4 — é à mão, com o aparelho na mão
+- [ ] Rodar o laboratório no celular do líder e em dois intermediários populares (Samsung da linha A, Motorola) e fixar, com os números, os níveis de aparelho e a meta de tempo da 9.4 — é à mão, com o aparelho na mão. Primeiro aparelho de verdade em 24/09: um Xiaomi com Snapdragon 855/860 (SM8150), modelo small q5, 1,43× a duração do áudio, WER 10,9%, DER 22,1% e os 3 falantes
 
-### Depois da 9.1 (proposto, a decidir)
+### 9.2 Gravador no celular
+
+O gravador mora no mesmo app da 9.1: grava a reunião inteira com a tela
+apagada, sobrevive a uma queda do processo e guarda cada gravação como um
+`.opus` com um manifesto ao lado. Decisões no
+[ADR 0016](docs/adr/0016-gravacao-no-celular-ogg-opus.md).
+
+- [x] Ogg/Opus no núcleo (`isper_core::ogg_opus`, 24/09): libopus oficial, mono, 32 kbit/s VBR, uma página por segundo e `sync_data` a cada 5 s, leitura que aceita o arquivo truncado. No corpus, a transcrição sai idêntica à do WAV (WER 9,86%, CER 7,17%) com 10,5 MB por hora, 11× menos que o WAV de 16 kHz; `isper-cli encode` converte para medir
+- [x] O desktop lê Opus (24/09): as mensagens de voz do WhatsApp (`.opus`, ou `.ogg` com Opus dentro) entram pela Biblioteca, pela pasta vigiada e pelo `isper-cli`
+- [x] Manifesto ao lado de cada gravação (`isper_core::capture`, 24/09): escrito antes do áudio e trocado de forma atômica, com estado, duração, momentos marcados e trechos sem áudio (ligação, pausa, microfone reaberto); ao abrir o app, o que uma queda deixou aberto volta como recuperado, com a duração lida do próprio Ogg
+- [x] Serviço em primeiro plano do tipo microfone (24/09): `AudioRecord` a 48 kHz (16 kHz se o aparelho não abrir), notificação com cronômetro, Marcar, Pausar e Parar, e *wake lock* parcial; uma ligação vira trecho marcado sem parar a gravação, e o microfone que cai é reaberto
+- [x] Gravar em um toque (24/09): tela Gravar com a onda ao vivo e as horas que ainda cabem, widget na tela inicial e bloco nas Configurações rápidas, por uma activity não exportada — só o próprio ISPer liga o microfone dele
+- [x] Biblioteca no celular (24/09): ouvir, compartilhar, mandar ao laboratório, apagar com Desfazer e receber áudio de outros apps pelo "Compartilhar"
+- [x] APK que atualiza por cima (24/09): o CI assina com uma chave fixa, se os segredos existirem, e `hasFragileUserData` oferece manter as gravações ao desinstalar. Antes, cada run assinava com uma chave nova, e atualizar exigia desinstalar, o que apagava as gravações
+- [x] Gravador de ponta a ponta no emulador (`tools/e2e/android-recorder.ps1`, 21 verificações, 24/09): gravar, marcar e parar; matar o app no meio e recuperar (13,0 s de 13,5 s); gravar com a tela apagada. O `.opus` sai legível pelo ffprobe
+- [ ] Criar a chave de assinatura e os segredos `ANDROID_KEYSTORE_B64` e `ANDROID_KEYSTORE_PASSWORD` — à mão, por quem mantém o repositório ([como](apps/isper-android/README.md#assinatura))
+- [ ] Pronto quando, num aparelho de verdade: 2 h com a tela apagada, uma ligação no meio e o app morto aos 90 min, num Samsung e num Motorola ou Xiaomi — é à mão
+
+### Depois da 9.2 (proposto, a decidir)
 
 Do plano de 23/09; cada etapa ganha caixas quando for aprovada.
 
-- 9.2 gravador Android dentro do mesmo app (serviço em primeiro plano, Ogg/Opus a 32 kbit/s gravado com segurança, widget e bloco nas Configurações rápidas)
 - 9.3 sincronização com o PC por pareamento (QR) → piloto interno
 - 9.4 transcrição no próprio aparelho · 9.5 IA · 9.6 Play Store · 9.7 iOS
 
