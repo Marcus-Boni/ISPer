@@ -18,9 +18,27 @@ bata com ela.
   próprio aparelho o mesmo passe final do PC: tempo de cada etapa, fator de
   tempo real, memória, bateria, temperatura e, na amostra embutida, WER e
   DER. É o spike que decide o que o celular faz sozinho e o que manda para o
-  PC; o gravador vem em seguida, dentro do mesmo app. O APK sai do CI a cada
-  mudança, e `tools/e2e/android-lab.ps1` roda o laboratório num emulador
-  ([ADR 0014](docs/adr/0014-celular-nativo-com-nucleo-rust.md)).
+  PC. O APK sai do CI a cada mudança, e `tools/e2e/android-lab.ps1` roda o
+  laboratório num emulador ([ADR 0014](docs/adr/0014-celular-nativo-com-nucleo-rust.md)).
+- **O gravador no celular (Fase 9.2).** O app Android grava a reunião
+  inteira, com a tela apagada e o app fechado, num serviço em primeiro plano
+  com cronômetro, Marcar, Pausar e Parar na notificação. Começa em um toque:
+  pela tela Gravar, pelo widget ou pelo bloco nas Configurações rápidas. O
+  áudio vai em Ogg/Opus a 32 kbit/s: ~10,5 MB por hora, com a transcrição
+  idêntica à do WAV no corpus. Se o app morrer no meio, o que foi gravado
+  fica, e a gravação volta como recuperada na próxima abertura. Uma ligação
+  vira um trecho marcado, sem parar a gravação. A Biblioteca do celular
+  ouve, compartilha, manda ao laboratório, apaga com Desfazer e recebe áudio
+  de outros apps pelo "Compartilhar". `tools/e2e/android-recorder.ps1`
+  cobre gravar, cair e recuperar, e a tela apagada, num emulador
+  ([ADR 0016](docs/adr/0016-gravacao-no-celular-ogg-opus.md)). Com a chave
+  de assinatura configurada no repositório, o APK do CI instala por cima do
+  anterior, sem desinstalar e sem apagar as gravações.
+- **O ISPer lê Opus.** As mensagens de voz do WhatsApp (`.opus`, ou `.ogg`
+  com Opus dentro) entram pela Biblioteca, pela pasta vigiada e pelo
+  `isper-cli`, como os outros formatos.
+- `isper-cli encode <áudio> <saída.opus> [--kbps 32]` converte para o formato
+  do gravador do celular e mostra o tamanho por hora.
 
 ### Alterado
 - **Identificar quem falou ficou ~2,4× mais rápido.** A diarização trocou o

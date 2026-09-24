@@ -77,7 +77,9 @@ só lia WAV. O que existia e servia:
 - **Opus via libopus agora:** o `.opus` das mensagens de voz ficou de fora.
   O symphonia ainda não tem o decodificador, e o libopus traria uma
   biblioteca C para o build. O erro diz isso ao usuário, com a saída
-  (converter para MP3 ou WAV).
+  (converter para MP3 ou WAV). *Revisto na 9.2 (24/09): o gravador do
+  celular grava em Opus, e o libopus entrou para os dois lados
+  ([ADR 0016](0016-gravacao-no-celular-ogg-opus.md)).*
 - **Decodificar tudo e converter depois:** mais simples, mas a memória de
   uma reunião longa (item 2) inviabiliza.
 
