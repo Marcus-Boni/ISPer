@@ -10,7 +10,8 @@
 #
 # O `isper-diarize` não tem testes próprios e não entra sozinho no `cargo
 # test`; ele é compilado e ligado pelo binário de teste do app, com as import
-# libs do sherpa-onnx pré-compilado que o `sherpa-rs` baixa durante o build.
+# libs do sherpa-onnx pré-compilado que o crate `sherpa-onnx` baixa durante o
+# build.
 name: CI
 
 on:
@@ -54,23 +55,30 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.channel }}
           components: rustfmt, clippy
 
-      # O sherpa-rs-sys baixa o sherpa-onnx pré-compilado (DLLs e import libs)
-      # para %LOCALAPPDATA%\sherpa-rs e grava esse caminho na saída do build
-      # script, que mora no target/. Um cache que traz o target/ sem essa pasta
-      # faz o link do binário de teste falhar (LNK1181: cargs.lib) — por isso
-      # ela entra no cache junto. O contexto `env` do Actions não enxerga
-      # LOCALAPPDATA: o caminho é exportado pelo shell.
-      - name: Pasta do sherpa-onnx pré-compilado
-        shell: pwsh
-        run: Add-Content -Path $env:GITHUB_ENV -Value "SHERPA_CACHE=$env:LOCALAPPDATA\sherpa-rs"
-
       - uses: Swatinem/rust-cache@v2
         with:
-          # Chave nova: os caches antigos não têm a pasta do sherpa.
-          key: v2
-          cache-directories: ${{ env.SHERPA_CACHE }}
+          # v3: o pré-compilado do sherpa-onnx passou a morar dentro do target/.
+          key: v3
+          cache-directories: target/sherpa-onnx-prebuilt
           # O whisper.cpp compilado (whisper-rs-sys) é o que mais pesa.
           cache-on-failure: true
+
+      # O crate sherpa-onnx baixa o pré-compilado (DLLs e import libs) para
+      # target/sherpa-onnx-prebuilt e grava esse caminho na saída do build
+      # script. Se o cache trouxer a saída do build script mas não as
+      # bibliotecas (a pasta pode voltar vazia), o link falha com LNK1181: sem
+      # a biblioteca, a saída antiga sai e o build script roda de novo,
+      # baixando tudo. A conferência é pelo arquivo, não pela pasta.
+      - name: sherpa-onnx pré-compilado presente
+        shell: pwsh
+        run: |
+          $lib = @(Get-ChildItem target/sherpa-onnx-prebuilt -Recurse -File -Filter 'sherpa-onnx-c-api*' -ErrorAction SilentlyContinue)
+          if ($lib.Count -eq 0) {
+            "pré-compilado do sherpa-onnx ausente: o build script vai rodar e baixar de novo"
+            Remove-Item -Recurse -Force target/sherpa-onnx-prebuilt -ErrorAction SilentlyContinue
+            Get-ChildItem target -Recurse -Directory -Filter 'sherpa-onnx-sys-*' -ErrorAction SilentlyContinue |
+              Remove-Item -Recurse -Force
+          }
 
       - name: Formatação
         run: cargo fmt --all -- --check
@@ -81,7 +89,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/sherpa | Out-Null
-          foreach ($dll in @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll')) {
+          foreach ($dll in @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll')) {
             New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/sherpa/$dll" | Out-Null
           }
           New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/vcredist | Out-Null

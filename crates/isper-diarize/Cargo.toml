@@ -6,9 +6,12 @@ license = "MIT"
 publish = false
 
 [dependencies]
-# Binários pré-compilados do sherpa-onnx (feature download-binaries) — sem
-# compilar C++; `tts` desligado (não usamos).
-sherpa-rs = { version = "0.6", default-features = false, features = ["download-binaries"] }
+# O crate oficial do sherpa-onnx (k2-fsa) — o `sherpa-rs` foi descontinuado
+# em favor dele. O build script baixa as bibliotecas pré-compiladas da versão
+# (sem compilar C++). `shared` = DLLs no Windows: o pacote estático do Windows
+# é compilado com /MT e não se mistura com o resto do app (whisper.cpp e Rust
+# usam /MD). No Android e no iOS o crate só oferece o modo compartilhado.
+sherpa-onnx = { version = "=1.13.8", default-features = false, features = ["shared"] }
 isper-models = { path = "../isper-models" }
 thiserror = "2"
 tracing = "0.1"

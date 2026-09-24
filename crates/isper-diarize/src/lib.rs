@@ -6,8 +6,12 @@
 //!   trecho, que é agrupada por similaridade → cada grupo é um falante.
 //!
 //! Os modelos (~45 MB) são baixados uma vez pelo gerenciador de modelos. O
-//! crate pesado (`sherpa-rs`) fica isolado aqui — o `isper-core` não depende
-//! dele.
+//! crate pesado (`sherpa-onnx`, o oficial da k2-fsa) fica isolado aqui — o
+//! `isper-core` não depende dele.
+//!
+//! O mesmo código roda no desktop e no celular (Fase 9.1): quem não usa as
+//! pastas padrão do PC passa os caminhos dos modelos
+//! ([`diarize_with_models`], [`download_models_to`]).
 //!
 //! ## O que o agrupamento faz de verdade
 //!
@@ -30,7 +34,7 @@
 //!   aviso e `reliable = false`, para quem chamou decidir (ver
 //!   [`DiarizeOutcome`]).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 mod postprocess;
@@ -106,6 +110,10 @@ pub struct DiarizeOptions {
     pub min_speaker_turns: usize,
     /// Acima desta contagem de grupos, o resultado é marcado como duvidoso.
     pub max_plausible_speakers: usize,
+    /// Threads do ONNX Runtime na segmentação e nos embeddings. 0 = escolha
+    /// automática ([`auto_threads`]). O `sherpa-rs` fixava 1, e era por isso
+    /// que 30 min de reunião levavam 12,8 min para separar os falantes.
+    pub threads: usize,
 }
 
 impl Default for DiarizeOptions {
@@ -121,13 +129,33 @@ impl Default for DiarizeOptions {
             min_speaker_share: 0.02,
             min_speaker_turns: 2,
             max_plausible_speakers: 12,
+            threads: 0,
         }
     }
 }
 
+/// Threads quando [`DiarizeOptions::threads`] é 0: metade dos núcleos lógicos
+/// que o sistema oferece, entre 1 e [`MAX_AUTO_THREADS`].
+///
+/// Medido no corpus de 190 s num Ryzen 7 7735HS (8 núcleos, 16 threads):
+/// 1 thread 63,6 s · 4 → 30,8 s · 8 → 22,7 s · 16 → 31,3 s. Passar dos núcleos
+/// físicos piora (o SMT disputa as mesmas unidades de ponto flutuante), e a
+/// metade dos lógicos é a melhor aproximação portátil dos físicos. Num
+/// celular de 8 núcleos sem SMT, dá 4, que são em geral os núcleos rápidos.
+pub fn auto_threads() -> usize {
+    let logical = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+    (logical / 2).clamp(1, MAX_AUTO_THREADS)
+}
+
+/// Teto da escolha automática de threads.
+pub const MAX_AUTO_THREADS: usize = 8;
+
 impl DiarizeOptions {
-    /// Lê `ISPER_DIARIZE_THRESHOLD` e `ISPER_DIARIZE_SPEAKERS` — calibrar numa
-    /// reunião real sem recompilar continua possível.
+    /// Lê `ISPER_DIARIZE_THRESHOLD`, `ISPER_DIARIZE_SPEAKERS` e
+    /// `ISPER_DIARIZE_THREADS` — calibrar e medir numa reunião real sem
+    /// recompilar continua possível.
     pub fn from_env() -> Self {
         let mut o = Self::default();
         if let Some(t) = std::env::var("ISPER_DIARIZE_THRESHOLD")
@@ -142,6 +170,12 @@ impl DiarizeOptions {
             .filter(|n| *n > 0)
         {
             o.num_speakers = Some(n);
+        }
+        if let Some(n) = std::env::var("ISPER_DIARIZE_THREADS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+        {
+            o.threads = n;
         }
         o
     }
@@ -172,8 +206,13 @@ pub fn models_dir() -> Result<PathBuf> {
 }
 
 fn model_paths() -> Result<(PathBuf, PathBuf)> {
-    let dir = models_dir()?;
-    Ok((dir.join(SEGMENTATION_FILE), dir.join(EMBEDDING_FILE)))
+    Ok(model_paths_in(&models_dir()?))
+}
+
+/// Os caminhos dos dois modelos (segmentação, embedding) dentro de `dir`,
+/// existam eles ou não.
+pub fn model_paths_in(dir: &Path) -> (PathBuf, PathBuf) {
+    (dir.join(SEGMENTATION_FILE), dir.join(EMBEDDING_FILE))
 }
 
 pub fn models_installed() -> bool {
@@ -184,7 +223,13 @@ pub fn models_installed() -> bool {
 
 /// Baixa os dois modelos (pula os já presentes). `on_progress(nome, feito, total)`.
 pub fn download_models(on_progress: &mut dyn FnMut(&str, u64, u64)) -> Result<()> {
-    let (seg, emb) = model_paths()?;
+    download_models_to(&models_dir()?, on_progress)
+}
+
+/// Como [`download_models`], para uma pasta escolhida por quem chama (o
+/// celular guarda os modelos na pasta do próprio app).
+pub fn download_models_to(dir: &Path, on_progress: &mut dyn FnMut(&str, u64, u64)) -> Result<()> {
+    let (seg, emb) = model_paths_in(dir);
     for (path, url, name) in [
         (seg, SEGMENTATION_URL, SEGMENTATION_FILE),
         (emb, EMBEDDING_URL, EMBEDDING_FILE),
@@ -213,25 +258,60 @@ pub fn diarize(samples_16k: &[f32]) -> Result<Vec<SpeakerTurn>> {
 /// Como [`diarize`], devolvendo também as métricas e os avisos.
 pub fn diarize_with(samples_16k: &[f32], opts: &DiarizeOptions) -> Result<DiarizeOutcome> {
     let (seg, emb) = model_paths()?;
-    if !seg.exists() || !emb.exists() {
+    diarize_with_models(&seg, &emb, samples_16k, opts)
+}
+
+/// Como [`diarize_with`], com os modelos em caminhos escolhidos por quem
+/// chama — o celular não tem as pastas do PC.
+pub fn diarize_with_models(
+    segmentation: &Path,
+    embedding: &Path,
+    samples_16k: &[f32],
+    opts: &DiarizeOptions,
+) -> Result<DiarizeOutcome> {
+    if !segmentation.exists() || !embedding.exists() {
         return Err(DiarizeError::ModelsMissing);
     }
     let started = Instant::now();
-    let config = sherpa_rs::diarize::DiarizeConfig {
-        // -1 = número de falantes desconhecido → agrupa por similaridade.
-        num_clusters: Some(opts.num_speakers.map(|n| n as i32).unwrap_or(-1)),
-        threshold: Some(opts.threshold),
-        min_duration_on: Some(opts.min_duration_on),
-        min_duration_off: Some(opts.min_duration_off),
-        provider: None,
-        debug: false,
+    let threads = if opts.threads == 0 {
+        auto_threads()
+    } else {
+        opts.threads
     };
-    let mut engine = sherpa_rs::diarize::Diarize::new(&seg, &emb, config)
-        .map_err(|e| DiarizeError::Engine(e.to_string()))?;
-    let segments = engine
-        .compute(samples_16k.to_vec(), None)
-        .map_err(|e| DiarizeError::Engine(e.to_string()))?;
-    let raw: Vec<SpeakerTurn> = segments
+    let path = |p: &Path| Some(p.to_string_lossy().into_owned());
+    let config = sherpa_onnx::OfflineSpeakerDiarizationConfig {
+        segmentation: sherpa_onnx::OfflineSpeakerSegmentationModelConfig {
+            pyannote: sherpa_onnx::OfflineSpeakerSegmentationPyannoteModelConfig {
+                model: path(segmentation),
+                ..Default::default()
+            },
+            num_threads: threads as i32,
+            ..Default::default()
+        },
+        embedding: sherpa_onnx::SpeakerEmbeddingExtractorConfig {
+            model: path(embedding),
+            num_threads: threads as i32,
+            ..Default::default()
+        },
+        clustering: sherpa_onnx::FastClusteringConfig {
+            // -1 = número de falantes desconhecido → agrupa por similaridade.
+            num_clusters: opts.num_speakers.map(|n| n as i32).unwrap_or(-1),
+            threshold: opts.threshold,
+            ..Default::default()
+        },
+        min_duration_on: opts.min_duration_on,
+        min_duration_off: opts.min_duration_off,
+    };
+    // `create` devolve None quando um modelo não carrega (arquivo corrompido,
+    // formato errado); o sherpa-onnx escreve o motivo no stderr.
+    let engine = sherpa_onnx::OfflineSpeakerDiarization::create(&config).ok_or_else(|| {
+        DiarizeError::Engine("o sherpa-onnx não carregou os modelos de diarização".into())
+    })?;
+    let result = engine.process(samples_16k).ok_or_else(|| {
+        DiarizeError::Engine("o sherpa-onnx não conseguiu processar o áudio".into())
+    })?;
+    let raw: Vec<SpeakerTurn> = result
+        .sort_by_start_time()
         .into_iter()
         .map(|s| SpeakerTurn {
             start: s.start,
@@ -270,6 +350,7 @@ pub fn diarize_with(samples_16k: &[f32], opts: &DiarizeOptions) -> Result<Diariz
         absorbed = metrics.absorbed_clusters,
         median_turn_secs = metrics.median_turn_secs,
         very_short_turns = metrics.very_short_turns,
+        threads,
         secs = metrics.elapsed_secs,
         "diarização concluída"
     );

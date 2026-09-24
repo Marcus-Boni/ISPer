@@ -21,7 +21,7 @@
 //! que é como se compara uma mudança com a anterior.
 //!
 //! Uma decisão de arquitetura: a diarização NÃO é chamada daqui. O
-//! `isper-core` não depende do `sherpa-rs` (30 MB de C++), então quem chama
+//! `isper-core` não depende do `sherpa-onnx` (30 MB de C++), então quem chama
 //! passa um [`Diarizer`]. O app e a CLI ligam os dois em cinco linhas.
 
 use std::path::PathBuf;

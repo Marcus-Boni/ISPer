@@ -48,24 +48,30 @@ jobs:
 
       - uses: taiki-e/install-action@cargo-llvm-cov
 
-      # Ver o comentário equivalente em ci.yml: a pasta do sherpa-onnx
-      # pré-compilado precisa viajar no cache junto com o target/.
-      - name: Pasta do sherpa-onnx pré-compilado
-        shell: pwsh
-        run: Add-Content -Path $env:GITHUB_ENV -Value "SHERPA_CACHE=$env:LOCALAPPDATA\sherpa-rs"
-
       - uses: Swatinem/rust-cache@v2
         with:
           # A instrumentação muda os artefatos: cache próprio, separado do CI.
-          key: coverage-v2
-          cache-directories: ${{ env.SHERPA_CACHE }}
+          key: coverage-v3
+          cache-directories: target/sherpa-onnx-prebuilt
           cache-on-failure: true
+
+      # Ver o comentário equivalente em ci.yml.
+      - name: sherpa-onnx pré-compilado presente
+        shell: pwsh
+        run: |
+          $lib = @(Get-ChildItem target/sherpa-onnx-prebuilt -Recurse -File -Filter 'sherpa-onnx-c-api*' -ErrorAction SilentlyContinue)
+          if ($lib.Count -eq 0) {
+            "pré-compilado do sherpa-onnx ausente: o build script vai rodar e baixar de novo"
+            Remove-Item -Recurse -Force target/sherpa-onnx-prebuilt -ErrorAction SilentlyContinue
+            Get-ChildItem target -Recurse -Directory -Filter 'sherpa-onnx-sys-*' -ErrorAction SilentlyContinue |
+              Remove-Item -Recurse -Force
+          }
 
       - name: Recursos de mentira (o bundler exige que os bundle.resources existam)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/sherpa | Out-Null
-          foreach ($dll in @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll')) {
+          foreach ($dll in @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll')) {
             New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/sherpa/$dll" | Out-Null
           }
           New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/vcredist | Out-Null

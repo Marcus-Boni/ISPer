@@ -46,17 +46,23 @@ jobs:
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
 
-      # Ver o comentário equivalente em ci.yml: a pasta do sherpa-onnx
-      # pré-compilado precisa viajar no cache junto com o target/.
-      - name: Pasta do sherpa-onnx pré-compilado
-        shell: pwsh
-        run: Add-Content -Path $env:GITHUB_ENV -Value "SHERPA_CACHE=$env:LOCALAPPDATA\sherpa-rs"
-
       - uses: Swatinem/rust-cache@v2
         with:
-          key: e2e-nightly-v2
-          cache-directories: ${{ env.SHERPA_CACHE }}
+          key: e2e-nightly-v3 # gitleaks:allow — nome do cache, não é segredo
+          cache-directories: target/sherpa-onnx-prebuilt
           cache-on-failure: true
+
+      # Ver o comentário equivalente em ci.yml.
+      - name: sherpa-onnx pré-compilado presente
+        shell: pwsh
+        run: |
+          $lib = @(Get-ChildItem target/sherpa-onnx-prebuilt -Recurse -File -Filter 'sherpa-onnx-c-api*' -ErrorAction SilentlyContinue)
+          if ($lib.Count -eq 0) {
+            "pré-compilado do sherpa-onnx ausente: o build script vai rodar e baixar de novo"
+            Remove-Item -Recurse -Force target/sherpa-onnx-prebuilt -ErrorAction SilentlyContinue
+            Get-ChildItem target -Recurse -Directory -Filter 'sherpa-onnx-sys-*' -ErrorAction SilentlyContinue |
+              Remove-Item -Recurse -Force
+          }
 
       # O cdp.mjs usa o WebSocket global do Node 22.
       - uses: actions/setup-node@v7
@@ -64,13 +70,13 @@ jobs:
           node-version: 22
 
       # O build script do Tauri exige os bundle.resources; as DLLs reais do
-      # sherpa-onnx que o exe carrega vêm do pré-compilado que o sherpa-rs
-      # baixa e copia para target/release durante o build.
+      # sherpa-onnx que o exe carrega vêm do pré-compilado que o crate
+      # sherpa-onnx baixa e copia para target/release durante o build.
       - name: Recursos de mentira (bundle.resources)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/sherpa | Out-Null
-          foreach ($dll in @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'cargs.dll')) {
+          foreach ($dll in @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll')) {
             New-Item -ItemType File -Force "apps/isper-app/src-tauri/resources/sherpa/$dll" | Out-Null
           }
           New-Item -ItemType Directory -Force apps/isper-app/src-tauri/resources/vcredist | Out-Null
@@ -82,8 +88,8 @@ jobs:
         run: cargo build --release --no-default-features -p isper-app
 
       # O tauri-build copia os bundle.resources — aqui, DLLs VAZIAS — para
-      # target/release, por cima das DLLs reais que o sherpa-rs-sys tinha posto
-      # lá. Um exe ao lado de uma sherpa-onnx-c-api.dll de 0 bytes nem abre
+      # target/release, por cima das DLLs reais que o sherpa-onnx-sys tinha
+      # posto lá. Um exe ao lado de uma sherpa-onnx-c-api.dll de 0 bytes nem abre
       # (foi assim que a primeira execução deste workflow falhou). As vazias
       # saem; as do sherpa-onnx voltam do pré-compilado baixado; o runtime do
       # VC vem do próprio Windows do runner.
@@ -94,8 +100,8 @@ jobs:
             "removendo DLL vazia: $($_.Name)"
             Remove-Item $_.FullName -Force
           }
-          $libs = @(Get-ChildItem "$env:LOCALAPPDATA\sherpa-rs" -Recurse -Filter *.dll -ErrorAction SilentlyContinue)
-          if ($libs.Count -eq 0) { throw "DLLs do sherpa-onnx nao encontradas em $env:LOCALAPPDATA\sherpa-rs" }
+          $libs = @(Get-ChildItem target/sherpa-onnx-prebuilt -Recurse -Filter *.dll -ErrorAction SilentlyContinue)
+          if ($libs.Count -eq 0) { throw "DLLs do sherpa-onnx nao encontradas em target/sherpa-onnx-prebuilt" }
           $libs | Copy-Item -Destination target\release -Force
           Get-ChildItem target\release\*.dll | Select-Object Name, Length | Format-Table -AutoSize | Out-String | Write-Output
 
