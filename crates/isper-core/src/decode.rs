@@ -248,13 +248,18 @@ fn unsupported_message(ext: &str) -> String {
 fn symphonia_err(e: SymphoniaError, ext: &str) -> IsperError {
     match e {
         SymphoniaError::IoError(io) => IsperError::Io(io),
-        SymphoniaError::Unsupported(what) => IsperError::Decode(format!(
-            "{} ({what})",
-            unsupported_message(ext)
-                .split(" (o ISPer")
-                .next()
-                .unwrap_or("formato não suportado")
-        )),
+        // Extensão conhecida e o leitor não reconhece o conteúdo: o arquivo
+        // é que está errado (corrompido, ou outra coisa com a extensão
+        // trocada) — dizer "formato não suportado" mandaria procurar outro
+        // formato à toa.
+        SymphoniaError::Unsupported(what) if AUDIO_EXTENSIONS.contains(&ext) => {
+            IsperError::Decode(format!(
+                "o arquivo não é um .{ext} válido — está corrompido ou tem a extensão errada ({what})"
+            ))
+        }
+        SymphoniaError::Unsupported(what) => {
+            IsperError::Decode(format!("{} ({what})", unsupported_message(ext)))
+        }
         other => IsperError::Decode(other.to_string()),
     }
 }
@@ -420,11 +425,10 @@ mod tests {
             b"isto nao e um mp3, e texto puro repetido ".repeat(200),
         )
         .unwrap();
-        let r = decode_to_16k(&falso, None, None);
-        assert!(
-            r.is_err(),
-            "texto com extensão .mp3 não pode virar áudio: {r:?}"
-        );
+        let msg = decode_to_16k(&falso, None, None)
+            .expect_err("texto com extensão .mp3 não pode virar áudio")
+            .to_string();
+        assert!(msg.contains("não é um .mp3 válido"), "{msg}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

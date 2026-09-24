@@ -45,6 +45,10 @@ pub(crate) struct SettingsDto {
     retention_days: u32,
     /// Passe final ligado (refaz a transcrição ao encerrar a reunião).
     final_pass: bool,
+    /// Transcrever o que cair na pasta Importar (Fase 9.0).
+    import_watch: bool,
+    /// A pasta Importar, para a tela mostrar o caminho.
+    import_dir: String,
     /// Participantes conhecidos da reunião (0 = descobrir pelo agrupamento).
     meeting_speakers: u32,
     /// Limiar do agrupamento de falantes (0 = o padrão do projeto).
@@ -102,6 +106,9 @@ pub(crate) struct SettingsPatch {
     /// Avançado — passe final ligado (padrão) ou não.
     #[serde(default)]
     final_pass: Option<bool>,
+    /// Vigiar a pasta Importar (ausente = mantém).
+    #[serde(default)]
+    import_watch: Option<bool>,
     /// Avançado — quantos participantes a reunião tem (0 = descobrir).
     #[serde(default)]
     meeting_speakers: Option<u32>,
@@ -357,6 +364,10 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         emb_key_present,
         retention_days: cfg.retention_days,
         final_pass: cfg.final_pass,
+        import_watch: cfg.import_watch,
+        import_dir: crate::audio_import::import_dir()
+            .map(|d| d.display().to_string())
+            .unwrap_or_default(),
         meeting_speakers: cfg.meeting_speakers,
         diarize_threshold: cfg.diarize_threshold,
         theme: cfg.theme,
@@ -403,6 +414,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         retention_days: patch.retention_days.unwrap_or_default(),
         // Avançado: o que a tela não mandar mantém o valor atual.
         final_pass: patch.final_pass.unwrap_or(previous.final_pass),
+        import_watch: patch.import_watch.unwrap_or(previous.import_watch),
         meeting_speakers: patch.meeting_speakers.unwrap_or(previous.meeting_speakers),
         diarize_threshold: patch
             .diarize_threshold

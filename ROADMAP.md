@@ -20,9 +20,9 @@
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
 | F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (criptografia em repouso adiada com decisão registrada); 7.5 com 5 de 6 (v0.19.0 — falta a rodada com o NVDA); 7.6 com 4 de 5 (v0.20.0 — falta o winget, em revisão no winget-pkgs) |
 | F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; só com a janela aberta e notas salvas com a reunião (23/09); 3 itens em aberto — validar a memória, idioma do que a IA escreve e ver o sync do portal numa release |
-| F9 ISPer no Bolso | 🟡 | 9.0 começada (23/09): o núcleo lê MP3, M4A, WAV, FLAC e OGG e os transcreve com o mesmo passe final, e a reunião guarda de que arquivo veio; faltam a importação pela Biblioteca, a pasta vigiada e o guia. 9.1 a 9.7 (o celular) ainda são proposta |
+| F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca (botão ou arrastar) ou pela pasta vigiada `Documentos\ISPer\Importar`, com o mesmo passe final, falantes, resumo e a origem guardada. 9.1 a 9.7 (o celular) ainda são proposta |
 
-**113 itens entregues · 13 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**116 itens entregues · 10 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -327,9 +327,9 @@ para o celular. Decisões da 9.0 no [ADR 0013](docs/adr/0013-importar-audio-de-f
 - [x] O mesmo passe final numa trilha só, com diarização, e cancelável (`run_cancellable`): no teste com o modelo, um MP3 44,1 kHz estéreo deu exatamente o texto do WAV original (23/09)
 - [x] Origem no banco (schema v5: nome e SHA-256 do arquivo) e no cabeçalho do `.md`, lida de volta pelo `import`; data e título pelo nome do arquivo (`isper_core::recording`); a reimportação casa por início **e** título — só o início, com precisão de minuto, perdia uma de duas gravações exportadas juntas (23/09)
 - [x] `isper-cli file`, `bench` e `diarize` com qualquer desses formatos (23/09)
-- [ ] Importar pela Biblioteca: botão e arrastar e soltar, fila com progresso e cancelamento, resumo por IA, busca semântica e notificação ao terminar
-- [ ] Pasta vigiada `Documentos\ISPer\Importar`: o que entra vira reunião, e o arquivo vai para `Importados` (ou `Não importados`, com o motivo) — nada é apagado
-- [ ] Guia no portal: como levar as gravações do Plaud e do celular para o ISPer
+- [x] Importar pela Biblioteca: botão e arrastar e soltar, fila com progresso e cancelamento, resumo por IA, busca semântica e notificação ao terminar (23/09): um arquivo por vez, esperando a reunião em andamento e o passe final dela; o mesmo áudio (SHA-256) aponta a reunião que já existe; selo "importada" na lista; seletor nativo pelo `tauri-plugin-dialog`, só do lado do Rust
+- [x] Pasta vigiada `Documentos\ISPer\Importar`: o que entra vira reunião, e o arquivo vai para `Importados` (ou `Não importados`, com o motivo) — nada é apagado (23/09): só entra o que parou de crescer e já abre em modo exclusivo (terminou de ser copiado); liga e desliga em Configurações → Reuniões; `tools/e2e/import.ps1` cobre os três caminhos (22 verificações)
+- [x] Guia no portal: como levar as gravações do Plaud e do celular para o ISPer (23/09): [Importar gravações](https://isper.pages.dev/docs/reunioes-e-sistema/importar-gravacoes/)
 
 ### Depois da 9.0 (proposto, a decidir)
 

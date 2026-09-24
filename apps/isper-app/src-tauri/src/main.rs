@@ -12,6 +12,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod audio_import;
 mod calls;
 mod config;
 mod copilot;
@@ -152,6 +153,7 @@ fn main() {
             Some(vec![AUTOSTART_FLAG]),
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -264,7 +266,12 @@ fn main() {
             onboarding::onboarding_set_model,
             onboarding::onboarding_set_provider,
             onboarding::onboarding_finish,
-            onboarding::open_onboarding_window
+            onboarding::open_onboarding_window,
+            audio_import::import_pick_files,
+            audio_import::import_audio_files,
+            audio_import::import_status,
+            audio_import::import_cancel,
+            audio_import::open_import_folder
         ])
         .setup(|app| {
             let cfg = config::load();
@@ -301,7 +308,11 @@ fn main() {
                 copilot: Mutex::new(CopilotAppState::default()),
                 indexing: Mutex::new(None),
                 indicator_item: Mutex::new(None),
+                imports: audio_import::ImportQueue::default(),
             });
+            // Fase 9.0: a fila de importação e a pasta vigiada.
+            audio_import::spawn_worker(app.handle().clone());
+            audio_import::spawn_watcher(app.handle().clone());
             app.state::<AppState>()
                 .audio
                 .set_device(cfg.input_device.clone());

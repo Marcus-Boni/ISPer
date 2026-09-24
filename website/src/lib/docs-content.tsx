@@ -14,6 +14,7 @@ import PrimeiroDitado from "../../content/docs/primeiros-passos/primeiro-ditado.
 import Reunioes from "../../content/docs/reunioes-e-sistema/captura-audio-lgpd.md";
 import Teams from "../../content/docs/reunioes-e-sistema/teams.md";
 import Privacidade from "../../content/docs/reunioes-e-sistema/privacidade.md";
+import ImportarGravacoes from "../../content/docs/reunioes-e-sistema/importar-gravacoes.md";
 import Benchmarks from "../../content/docs/referencia/benchmarks.md";
 import Hardware from "../../content/docs/referencia/hardware.md";
 import Releases from "../../content/docs/referencia/releases.md";
@@ -41,6 +42,7 @@ export const docComponents: Record<string, ComponentType> = {
   "reunioes-e-sistema/captura-audio-lgpd": Reunioes,
   "reunioes-e-sistema/teams": Teams,
   "reunioes-e-sistema/privacidade": Privacidade,
+  "reunioes-e-sistema/importar-gravacoes": ImportarGravacoes,
   "referencia/benchmarks": Benchmarks,
   "referencia/hardware": Hardware,
   "referencia/releases": Releases,

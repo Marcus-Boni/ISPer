@@ -336,6 +336,23 @@ pub fn download_asset(
     Ok(())
 }
 
+/// SHA-256 de um arquivo, em hexadecimal minúsculo, lido aos pedaços (um
+/// áudio de duas horas não passa pela memória de uma vez). É a identidade de
+/// um arquivo importado (Fase 9.0): o mesmo áudio não vira duas reuniões.
+pub fn sha256_file(path: &Path) -> std::io::Result<String> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buf = vec![0u8; 256 * 1024];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hex(&hasher.finalize()))
+}
+
 /// Hexadecimal minúsculo, como o `sha256sum` e o `lfs.oid` do Hugging Face.
 ///
 /// Na sha2 0.10 bastava `format!("{:x}", …)`; desde a 0.11 o digest é um
@@ -424,6 +441,18 @@ mod checksum_tests {
             hex(&Sha256::digest(b"abc")),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
+    }
+
+    #[test]
+    fn sha256_de_arquivo_bate_com_o_do_texto() {
+        let path = std::env::temp_dir().join(format!("isper-sha-{}.bin", std::process::id()));
+        std::fs::write(&path, b"abc").unwrap();
+        assert_eq!(
+            super::sha256_file(&path).unwrap(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        let _ = std::fs::remove_file(&path);
+        assert!(super::sha256_file(std::path::Path::new("nao-existe.bin")).is_err());
     }
 
     #[test]

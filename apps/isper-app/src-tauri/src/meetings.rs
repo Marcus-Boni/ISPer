@@ -254,44 +254,11 @@ pub(crate) fn finish_meeting(
     attach_saved_meeting(app, &copilot, &store, meeting_id);
 
     // Fase 5: título + resumo por IA de nuvem, numa chamada — só o TEXTO do
-    // transcript (com as decisões validadas) sai da máquina. Com resposta, o
-    // Markdown é regravado inteiro a partir do banco, a fonte que a Biblioteca
-    // usa.
-    let settings = isper_llm::load_settings();
-    match isper_llm::provider_from_settings(&settings) {
-        Ok(provider) => {
-            let _ = app.emit("isper-state", json!({"state": "meeting-summary"}));
-            match isper_llm::summarize_meeting_titled(provider.as_ref(), &para_resumo) {
-                Ok(summary) => {
-                    if let Some(t) = summary
-                        .title
-                        .as_deref()
-                        .map(str::trim)
-                        .filter(|t| !t.is_empty())
-                    {
-                        title = t.to_string();
-                        let _ = store.rename_meeting(meeting_id, &title);
-                    }
-                    let _ = store.set_summary(meeting_id, summary.body.trim());
-                    // Pelo banco, e não montado aqui: enquanto o resumo saía, o
-                    // usuário pode ter mexido nas notas. A linha do provedor
-                    // não fica guardada, então vai junto só nesta gravação.
-                    let assinado = format!(
-                        "{}\n\n_Resumo gerado via {} ({})._",
-                        summary.body.trim(),
-                        provider.name(),
-                        provider.model()
-                    );
-                    rewrite_markdown_with_summary(&store, meeting_id, Some(&assinado));
-                    tracing::info!("resumo e título gerados via {}", provider.name());
-                }
-                Err(e) => tracing::warn!("resumo falhou (transcript preservado): {e}"),
-            }
-        }
-        Err(isper_llm::LlmError::NotConfigured) => {
-            tracing::info!("sem provider de IA configurado — reunião salva sem resumo");
-        }
-        Err(e) => tracing::warn!("resumo indisponível: {e}"),
+    // transcript (com as decisões validadas) sai da máquina.
+    if let Some(t) = summarize_saved(&store, meeting_id, &para_resumo, true, || {
+        let _ = app.emit("isper-state", json!({"state": "meeting-summary"}));
+    }) {
+        title = t;
     }
 
     // Busca semântica: transcript + resumo viram vetores em segundo plano
@@ -330,6 +297,68 @@ pub(crate) fn finish_meeting(
     final_pass::run_in_background(app.clone(), meeting_id, result);
 
     Ok(md_path.display().to_string())
+}
+
+/// Título + resumo por IA de uma reunião já salva (Fase 5): só o texto sai
+/// da máquina. Sem provedor configurado, ou se ele falhar, nada muda — a
+/// transcrição já está salva.
+///
+/// Com resposta, o resumo vai para o banco e o Markdown é regravado inteiro
+/// a partir dele — a fonte que a Biblioteca usa. Com `rename`, o título
+/// também passa a ser o da IA; `on_start` roda quando há provedor, antes da
+/// chamada (a tela avisa que o resumo está saindo). Devolve o título novo,
+/// quando ele mudou.
+pub(crate) fn summarize_saved(
+    store: &isper_core::store::MeetingStore,
+    meeting_id: i64,
+    text: &str,
+    rename: bool,
+    on_start: impl FnOnce(),
+) -> Option<String> {
+    let settings = isper_llm::load_settings();
+    let provider = match isper_llm::provider_from_settings(&settings) {
+        Ok(p) => p,
+        Err(isper_llm::LlmError::NotConfigured) => {
+            tracing::info!("sem provider de IA configurado — reunião salva sem resumo");
+            return None;
+        }
+        Err(e) => {
+            tracing::warn!("resumo indisponível: {e}");
+            return None;
+        }
+    };
+    on_start();
+    let summary = match isper_llm::summarize_meeting_titled(provider.as_ref(), text) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!("resumo falhou (transcript preservado): {e}");
+            return None;
+        }
+    };
+    let mut renamed = None;
+    if rename
+        && let Some(t) = summary
+            .title
+            .as_deref()
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+    {
+        let _ = store.rename_meeting(meeting_id, t);
+        renamed = Some(t.to_string());
+    }
+    let _ = store.set_summary(meeting_id, summary.body.trim());
+    // Pelo banco, e não montado aqui: enquanto o resumo saía, o usuário pode
+    // ter mexido nas notas. A linha do provedor não fica guardada, então vai
+    // junto só nesta gravação.
+    let assinado = format!(
+        "{}\n\n_Resumo gerado via {} ({})._",
+        summary.body.trim(),
+        provider.name(),
+        provider.model()
+    );
+    rewrite_markdown_with_summary(store, meeting_id, Some(&assinado));
+    tracing::info!("resumo e título gerados via {}", provider.name());
+    renamed
 }
 
 /// Abre um arquivo no programa padrão do Windows.

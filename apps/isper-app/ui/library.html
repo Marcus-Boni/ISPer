@@ -7,11 +7,18 @@
 <script src="assets/i18n.js"></script>
 <link rel="stylesheet" href="assets/base.css">
 <style>
-  body { display: grid; grid-template-rows: auto 1fr; height: 100vh; overflow: hidden; }
+  body { display: grid; grid-template-rows: auto auto 1fr; height: 100vh; overflow: hidden; }
   .crumb { color: var(--muted); font-size: 13px; margin-left: -4px; }
   .crumb::before { content: "/"; margin-right: 8px; color: var(--muted-2); }
   .tabs { margin-left: 8px; }
-  .search { position: relative; margin-left: auto; width: 320px; }
+  /* A busca cede espaço antes dos botões: com "Importar áudio" no cabeçalho,
+     a largura fixa empurrava "Abrir pasta" para fora da janela. */
+  .search { position: relative; margin-left: auto; flex: 0 1 320px; min-width: 150px; }
+  #importbtn { display: inline-flex; align-items: center; gap: 6px; }
+  #importbtn svg { width: 15px; height: 15px; flex: none; }
+  @media (max-width: 900px) { #importbtn .txt { display: none; } }
+  /* No mínimo da janela (720 px), o "/ Biblioteca" já está no título dela. */
+  @media (max-width: 780px) { .crumb { display: none; } .count { min-width: 0; } }
   .search .field { padding-right: 30px; }
   .search .clear {
     position: absolute; right: 6px; top: 50%; transform: translateY(-50%) scale(.8); opacity: 0; pointer-events: none;
@@ -26,7 +33,28 @@
   #semantic[aria-pressed="true"] { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
   #semantic svg { width: 14px; height: 14px; }
 
-  main { display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
+  main { display: grid; grid-template-columns: 340px 1fr; min-height: 0; grid-row: 3; }
+  /* Importar gravações (Fase 9.0): a faixa da fila e a área de soltar. A
+     faixa tem linha própria na grade, então escondida ela não empurra nada. */
+  .imports { grid-row: 2; display: flex; align-items: center; gap: 12px; padding: 8px 16px;
+    border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); font-size: 13px; }
+  .imports[hidden] { display: none; }
+  .imports.ok { background: color-mix(in srgb, var(--good) 10%, var(--panel)); }
+  .imports .what { flex: 1; min-width: 0; display: grid; gap: 6px; }
+  .imports .line { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+  .imports .file { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .imports .stage { color: var(--ink-2); white-space: nowrap; }
+  .imports .queue { color: var(--muted); white-space: nowrap; }
+  .imports.err .stage { color: var(--accent); white-space: normal; }
+  .imports .progress[hidden] { display: none; }
+  .dropzone { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; pointer-events: none;
+    background: color-mix(in srgb, var(--bg) 72%, transparent); }
+  .dropzone[hidden] { display: none; }
+  .dropzone .box { border: 2px dashed var(--accent); border-radius: var(--r-lg); padding: 28px 44px;
+    background: var(--panel); text-align: center; box-shadow: var(--shadow-3); animation: pop var(--dur-2) var(--ease-out); }
+  .dropzone .big { font: 600 20px var(--font-display); }
+  .dropzone .small { color: var(--muted); margin-top: 6px; }
+  @media (prefers-reduced-motion: reduce) { .dropzone .box { animation: none; } }
   #list { border-right: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; background: color-mix(in srgb, var(--panel) 50%, transparent); }
   /* Ditados: lista de largura inteira — o painel de detalhe não tem o que
      mostrar, e a coluna de 340 px espremia o texto com barra horizontal. */
@@ -170,8 +198,26 @@
     <span data-i18n="library.semantic">Semântica</span>
   </button>
   <span class="count num" id="count"></span>
+  <button class="btn btn-ghost" id="importbtn" data-i18n-attr="title:library.import.button-title,aria-label:library.import.button">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10.5V2.5M5 5.5l3-3 3 3"/><path d="M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10"/></svg>
+    <span class="txt" data-i18n="library.import.button">Importar áudio</span>
+  </button>
   <button class="btn btn-ghost" id="openfolder" data-i18n="library.top.openfolder">Abrir pasta</button>
 </header>
+<section class="imports" id="imports" hidden aria-live="polite">
+  <div class="what">
+    <div class="line"><span class="file" id="impfile"></span><span class="stage" id="impstage"></span><span class="queue" id="impqueue"></span></div>
+    <div class="progress" id="impprog" role="progressbar" aria-valuemin="0" aria-valuemax="100" data-i18n-attr="aria-label:library.import.progress.aria"><i></i></div>
+  </div>
+  <button class="btn btn-ghost btn-sm" id="impopen" hidden data-i18n="library.import.open">Abrir</button>
+  <button class="btn btn-ghost btn-sm" id="impcancel" hidden data-i18n="library.import.cancel">Cancelar</button>
+</section>
+<div class="dropzone" id="dropzone" hidden>
+  <div class="box">
+    <div class="big" data-i18n="library.import.drop">Solte para transcrever</div>
+    <div class="small" data-i18n="library.import.drop-hint">MP3, M4A, WAV, FLAC ou OGG</div>
+  </div>
+</div>
 <main id="main">
   <div id="list"></div>
   <div id="detail"></div>
@@ -297,6 +343,7 @@
     if (r.has_summary) m.appendChild(el('span', 'badge ok', t('library.ai-summary')));
     if (r.moments) { const b = el('span', 'badge warn'); b.append(mkGlyph('star'), document.createTextNode(String(r.moments))); b.title = t('library.moments-title', { n: r.moments }); m.appendChild(b); }
     if (r.decisions) { const b = el('span', 'chip chip-ok', String(r.decisions)); b.title = t('library.decisions-title', { n: r.decisions }); m.appendChild(b); }
+    if (r.source_name) { const b = el('span', 'badge', t('library.source.chip')); b.title = t('library.source.title', { name: r.source_name }); m.appendChild(b); }
     it.appendChild(m);
     if (extra && extra.snippet) {
       const snip = el('div', 'snip');
@@ -389,6 +436,7 @@
       head.appendChild(h2);
       d.appendChild(head);
       d.appendChild(el('div', 'meta', t('library.meta', { at: m.started_at, dur: fmtClock(m.duration_secs), segs: t('library.segments', { n: m.segments }), people: t('library.participants', { n: m.participants }) })));
+      if (m.source_name) d.appendChild(el('div', 'meta', t('library.source.title', { name: m.source_name })));
 
       const actions = el('div', 'actions');
       const bOpen = el('button', 'btn', t('library.open-md')); bOpen.disabled = !m.md_path;
@@ -769,6 +817,97 @@
     showMeeting(id);
   }
   listen('isper-library-select', selectPending);
+
+  // ------------------------------------------ importar gravações (Fase 9.0)
+  // A fila roda no app, um arquivo por vez; aqui só se mostra o que ela diz
+  // (evento isper-import) e se entrega arquivo a ela: o botão abre o
+  // seletor nativo, e soltar arquivos na janela manda os caminhos.
+  async function openMeetingId(id) {
+    if (tab !== 'meetings') tabsCtl.select('meetings');
+    selected = id;
+    $('list').dataset.sig = '';
+    await loadMeetings(true);
+    showMeeting(id);
+  }
+  function importStageText(stage) {
+    switch (stage) {
+      case 'waiting': return t('library.import.stage.waiting');
+      case 'reading': return t('library.import.stage.reading');
+      case 'transcribing': return t('library.import.stage.transcribing');
+      case 'speakers': return t('library.import.stage.speakers');
+      case 'saving': return t('library.import.stage.saving');
+      case 'summary': return t('library.import.stage.summary');
+      default: return '';
+    }
+  }
+  const outcomeKey = (o) => (o ? [o.file, o.ok, o.meeting_id, o.duplicate, o.cancelled, o.message].join('|') : '');
+  let lastOutcomeSeen = '';
+  let importHideTimer = 0;
+  let importOpenId = null;
+  function renderImports(s) {
+    const box = $('imports');
+    const prog = $('impprog');
+    clearTimeout(importHideTimer);
+    box.classList.remove('ok', 'err');
+    $('impopen').hidden = true;
+    importOpenId = null;
+    if (s.current) {
+      const withPct = s.stage === 'reading' || s.stage === 'transcribing';
+      const pct = Math.round((s.progress || 0) * 100);
+      box.hidden = false;
+      $('impfile').textContent = s.current;
+      $('impstage').textContent = importStageText(s.stage) + (withPct ? ' · ' + pct + '%' : '');
+      $('impqueue').textContent = s.queued.length ? t('library.import.queued', { n: s.queued.length }) : '';
+      prog.hidden = false;
+      prog.querySelector('i').style.width = (withPct ? pct : s.stage === 'waiting' ? 0 : 100) + '%';
+      prog.setAttribute('aria-valuenow', String(withPct ? pct : 0));
+      $('impcancel').hidden = false;
+      $('impcancel').textContent = s.queued.length ? t('library.import.cancel-all') : t('library.import.cancel');
+      return;
+    }
+    // Nada rodando: o último resultado aparece uma vez, por alguns segundos.
+    const o = s.last;
+    const key = outcomeKey(o);
+    if (!o || key === lastOutcomeSeen) { box.hidden = true; return; }
+    lastOutcomeSeen = key;
+    box.hidden = false;
+    prog.hidden = true;
+    $('impcancel').hidden = true;
+    $('impfile').textContent = '';
+    $('impqueue').textContent = '';
+    let msg;
+    if (o.ok && o.duplicate) msg = t('library.import.duplicate', { file: o.file });
+    else if (o.ok) msg = t('library.import.done', { file: o.file });
+    else if (o.cancelled) msg = t('library.import.cancelled', { file: o.file });
+    else msg = t('library.import.failed', { file: o.file, e: o.message || '' });
+    $('impstage').textContent = msg;
+    if (o.ok) box.classList.add('ok'); else if (!o.cancelled) box.classList.add('err');
+    if (o.ok && o.meeting_id != null) { importOpenId = o.meeting_id; $('impopen').hidden = false; }
+    importHideTimer = setTimeout(() => { box.hidden = true; }, o.ok ? 10000 : 20000);
+  }
+  function reportRejected(r) {
+    if (r && r.rejected && r.rejected.length) toast(t('library.import.rejected', { files: r.rejected.join(', ') }), 'err', 6000);
+  }
+  $('importbtn').addEventListener('click', async () => {
+    try { reportRejected(await invoke('import_pick_files')); }
+    catch (e) { toast(t('common.error', { e }), 'err'); }
+  });
+  $('impcancel').addEventListener('click', () => invoke('import_cancel', { all: true }).catch(e => toast(t('common.error', { e }), 'err')));
+  $('impopen').addEventListener('click', () => { if (importOpenId != null) openMeetingId(importOpenId); });
+  listen('isper-import', (e) => renderImports(e.payload || {}));
+  // Arrastar arquivos para a janela: o WebView não vê o arrasto (o Tauri o
+  // intercepta para dar os caminhos), então a área de soltar segue os
+  // eventos da janela.
+  listen('tauri://drag-enter', () => { $('dropzone').hidden = false; });
+  listen('tauri://drag-leave', () => { $('dropzone').hidden = true; });
+  listen('tauri://drag-drop', async (e) => {
+    $('dropzone').hidden = true;
+    const paths = (e.payload && e.payload.paths) || [];
+    if (!paths.length) return;
+    try { reportRejected(await invoke('import_audio_files', { paths })); }
+    catch (err) { toast(t('common.error', { e: err }), 'err'); }
+  });
+  invoke('import_status').then((s) => { lastOutcomeSeen = outcomeKey(s.last); renderImports(s); }).catch(() => {});
   // Reunião nova salva, ditado colado, índice atualizado etc. — a lista se mantém atual.
   listen('isper-status', () => { checkSemantic(); refresh(true); });
   listen('isper-state', (e) => { if (e.payload.state === 'done' && tab === 'dictations') setTimeout(() => refresh(true), 300); });
