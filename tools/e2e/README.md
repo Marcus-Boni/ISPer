@@ -14,8 +14,16 @@ atalhos globais, áudio e o atualizador.
 - Node 22+ (o `cdp.mjs` usa o `WebSocket` global) e Python 3 (servidor local do
   teste do atualizador).
 - Um modelo Whisper instalado (Início → Baixar) para o teste de reunião.
-- Os testes **fecham qualquer ISPer aberto** e relançam, no fim, o exe testado
-  sem a porta de depuração.
+- **Feche o ISPer instalado antes** (bandeja → Sair). Os testes só encerram o que
+  eles mesmos abriram: a cópia de teste, ou o app instalado quando foi o e2e que
+  o abriu (reconhecido pela porta de depuração no WebView2). Com o seu ISPer
+  aberto, eles param com uma mensagem em vez de derrubá-lo — ele pode estar
+  gravando uma reunião. O Windows só deixa uma instância rodar, então não dá
+  para testar com ele aberto.
+- No fim, o exe testado é relançado sem a porta de depuração quando é o
+  instalado. Uma cópia de desenvolvimento só é relançada no CI (ou com
+  `ISPER_E2E_RELAUNCH=1`), para não ficar na bandeja no lugar do app de
+  verdade.
 
 ## Scripts
 
