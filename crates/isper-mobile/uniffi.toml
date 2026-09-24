@@ -1,0 +1,6 @@
+# Configuração dos bindings gerados pelo UniFFI.
+[bindings.kotlin]
+# O código gerado entra no app Android neste pacote.
+package_name = "com.isper.mobile.core"
+# Nome da biblioteca que o JNA carrega (libisper_mobile.so).
+cdylib_name = "isper_mobile"

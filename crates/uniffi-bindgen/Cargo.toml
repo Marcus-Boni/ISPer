@@ -1,0 +1,18 @@
+[package]
+name = "uniffi-bindgen"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Gera os bindings Kotlin (e, depois, Swift) do isper-mobile"
+
+# Um crate à parte, sem depender do núcleo: gerar os bindings não precisa
+# compilar o whisper.cpp nem o sherpa-onnx de novo — ele só lê os metadados
+# de uma libisper_mobile já compilada (modo "library" do UniFFI).
+
+[dependencies]
+# Mesma versão do isper-mobile: o formato dos metadados muda entre versões.
+uniffi = { version = "=0.32.2", features = ["cli"] }
+
+[lints]
+workspace = true

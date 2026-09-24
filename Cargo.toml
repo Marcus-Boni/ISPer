@@ -6,6 +6,8 @@ members = [
     "crates/isper-models",
     "crates/isper-diarize",
     "crates/isper-cli",
+    "crates/isper-mobile",
+    "crates/uniffi-bindgen",
     "apps/isper-app/src-tauri",
 ]
 
