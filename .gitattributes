@@ -15,6 +15,12 @@
 crates/isper-core/tests/golden/** -text
 *.docx binary
 *.woff2 binary
+*.jar binary
+
+# Wrapper do Gradle do app Android: o script Unix roda no runner Linux (LF), o
+# .bat no Windows (CRLF).
+apps/isper-android/gradlew text eol=lf
+*.bat text eol=crlf
 
 # GitHub Linguist — Metadados e estatísticas de linguagens do repositório
 # Skills e ferramentas de IA são dependências externas (vendored):

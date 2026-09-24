@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ondas de fala com o ponto de gravação: o mesmo gesto do indicador do desktop. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#ECE7E1"
+        android:pathData="M34,46h4v16h-4z M42,40h4v28h-4z M50,34h4v40h-4z M58,42h4v24h-4z M66,48h4v12h-4z" />
+    <path
+        android:fillColor="#F07E72"
+        android:pathData="M76,54m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+</vector>
