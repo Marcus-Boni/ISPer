@@ -22,7 +22,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,7 +44,7 @@ private val ptBR: Locale = Locale.forLanguageTag("pt-BR")
 private fun Float.fmt(digits: Int = 1) = String.format(ptBR, "%.${digits}f", this)
 
 @Composable
-fun SpikeScreen(state: SpikeUiState, actions: SpikeViewModel) {
+fun SpikeScreen(state: SpikeUiState, actions: SpikeViewModel, modifier: Modifier = Modifier) {
     // A tela não apaga no meio de uma medição (o Android pode derrubar o
     // processo em segundo plano; o gravador da 9.2 é que roda num serviço).
     val view = LocalView.current
@@ -57,9 +56,9 @@ fun SpikeScreen(state: SpikeUiState, actions: SpikeViewModel) {
         uri?.let(actions::pickAudio)
     }
 
-    Scaffold { padding ->
+    run {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

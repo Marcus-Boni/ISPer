@@ -7,6 +7,8 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+    <!-- O atalho de gravar abre por um instante sem mostrar nada. -->
+    <style name="Theme.ISPer.Translucent" parent="android:Theme.Translucent.NoTitleBar" />
     <color name="isper_bg">#161311</color>
     <color name="isper_accent">#F07E72</color>
 </resources>

@@ -15,6 +15,13 @@ val rustAbis: List<String> = providers.gradleProperty("isper.abis")
     .filter { it.isNotEmpty() }
 val minSdkVersion = 29
 
+// A chave que assina os APKs distribuídos (ADR 0016). Sem uma chave fixa, cada
+// run do CI assina com uma chave de debug nova, e o Android só atualiza um app
+// assinado pela mesma chave: instalar a versão nova exigiria desinstalar, e
+// desinstalar apaga as gravações. Sem as variáveis (forks, a máquina de quem
+// desenvolve), vale a chave de debug local de sempre.
+val signingKeystore: String? = providers.environmentVariable("ISPER_ANDROID_KEYSTORE").orNull
+
 android {
     namespace = "com.isper.mobile"
     // Compila contra o SDK mais novo (as bibliotecas androidx de set/2026
@@ -28,9 +35,21 @@ android {
         applicationId = "com.isper.mobile"
         minSdk = minSdkVersion
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0-spike"
+        versionCode = 2
+        versionName = "0.2.0-gravador"
         ndk { abiFilters += rustAbis }
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            if (signingKeystore != null) {
+                val password = providers.environmentVariable("ISPER_ANDROID_KEYSTORE_PASSWORD").get()
+                storeFile = file(signingKeystore)
+                storePassword = password
+                keyAlias = providers.environmentVariable("ISPER_ANDROID_KEY_ALIAS").getOrElse("isper")
+                keyPassword = password
+            }
+        }
     }
 
     compileOptions {
