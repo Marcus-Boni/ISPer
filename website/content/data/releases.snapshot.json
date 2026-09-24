@@ -1,26 +1,28 @@
 {
   "repository": "Marcus-Boni/ISPer",
-  "tag": "v0.20.0",
-  "version": "0.20.0",
+  "tag": "v0.21.0",
+  "version": "0.21.0",
   "channel": "stable",
-  "publishedAt": "2026-09-23T18:43:15Z",
-  "fetchedAt": "2026-09-23T18:45:20.238Z",
-  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.20.0",
+  "publishedAt": "2026-09-24T01:43:15Z",
+  "fetchedAt": "2026-09-24T01:43:25.726Z",
+  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.21.0",
   "notes": [
-    "Adicionado — Versão portátil (zip), ao lado dos instaladores: a pasta do ISPer inteira, para usar sem instalar.",
-    "Corrigido — Os seletores de *Aparência* e de *Idioma da interface* acompanham a troca feita em outra janela."
+    "Adicionado — Importar gravações de fora (Fase 9.0): o que o Plaud exporta, o gravador do celular, a gravação de uma reunião — MP3, M4A/MP4, AAC, WAV, FLAC ou OGG — vira reunião na Biblioteca, com o mesmo passe final de uma reunião gravada, a identificação de quem falou (\"Participante 1, 2…\") e o resumo por IA, se configurado.",
+    "Adicionado — As notas do Copilot são salvas com a reunião. O que você escreve na aba Notas entra no fim da ata, na seção \"Notas da reunião\", e aparece na Biblioteca, em \"Suas notas (Copilot)\".",
+    "Alterado — O Copilot só consome o provedor de IA com a janela aberta. Até aqui ele analisava toda reunião gravada com provedor configurado, com a janela aberta ou não — perto de 80 chamadas por hora que ninguém estava vendo.",
+    "Alterado — O banco da Biblioteca ganha um formato novo — com cópia de segurança."
   ],
   "assets": [
     {
-      "name": "ISPer_0.20.0_x64-cpu-setup.exe",
+      "name": "ISPer_0.21.0_x64-cpu-setup.exe",
       "platform": "windows",
       "arch": "x64",
       "variant": "cpu",
       "kind": "installer",
-      "sizeBytes": 10069769,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/ISPer_0.20.0_x64-cpu-setup.exe",
-      "sha256": "b388a6e60a564a8ee38f2b0420a888101e0f68d4ab0c517bc2459aa06018a2f9",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/SHA256SUMS.txt",
+      "sizeBytes": 10610656,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.21.0/ISPer_0.21.0_x64-cpu-setup.exe",
+      "sha256": "d5fc944d8195afc134750d9a110576f33d17d3ce5d336ed3bd8731958f57b99d",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.21.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
@@ -29,15 +31,15 @@
       ]
     },
     {
-      "name": "ISPer_0.20.0_x64-setup.exe",
+      "name": "ISPer_0.21.0_x64-setup.exe",
       "platform": "windows",
       "arch": "x64",
       "variant": "cuda",
       "kind": "installer",
-      "sizeBytes": 423051440,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/ISPer_0.20.0_x64-setup.exe",
-      "sha256": "d9895d1a7cfee0db69f1fdcabcb85ed03961d824575b01dca64ccb8f87bfcd0b",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/SHA256SUMS.txt",
+      "sizeBytes": 423584957,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.21.0/ISPer_0.21.0_x64-setup.exe",
+      "sha256": "dd53b48bb334ba1a698e39537e6e6171b3139f5fe3852e079dcef6c52a50a747",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.21.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
@@ -46,15 +48,15 @@
       ]
     },
     {
-      "name": "ISPer_0.20.0_x64-cpu-portable.zip",
+      "name": "ISPer_0.21.0_x64-cpu-portable.zip",
       "platform": "windows",
       "arch": "x64",
       "variant": "cpu",
       "kind": "portable",
-      "sizeBytes": 14322889,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/ISPer_0.20.0_x64-cpu-portable.zip",
-      "sha256": "9a5777127c4fdde627b97c803333f97ca28fff29a166b9b51eed201442e3fd76",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/SHA256SUMS.txt",
+      "sizeBytes": 15090391,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.21.0/ISPer_0.21.0_x64-cpu-portable.zip",
+      "sha256": "ef878d3ffe06bd397d5a71bbed73c7fcf65cd9e94765785527c1183986c7c7f7",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.21.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
@@ -63,15 +65,15 @@
       ]
     },
     {
-      "name": "ISPer_0.20.0_x64-portable.zip",
+      "name": "ISPer_0.21.0_x64-portable.zip",
       "platform": "windows",
       "arch": "x64",
       "variant": "cuda",
       "kind": "portable",
-      "sizeBytes": 446352935,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/ISPer_0.20.0_x64-portable.zip",
-      "sha256": "0c1f49f5bdc8748a2603e99f3e68b0bc4fe961c7d20f705f7937ce1eec350d0c",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.20.0/SHA256SUMS.txt",
+      "sizeBytes": 447120664,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.21.0/ISPer_0.21.0_x64-portable.zip",
+      "sha256": "ce9fdd0dced3e2e5d0a177bc0c80db923fd34d1367494fd55f1a34c4ccd335cf",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.21.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
