@@ -2,6 +2,10 @@
 
 - **Status:** aceita
 - **Data:** 24/09/2026
+- **Atualização (24/09/2026, à noite):** no celular, o tamanho real é ~15 MB
+  por hora, não 10,5. Limitar a banda à faixa da voz não diminui o arquivo, e
+  24 kbit/s piora numa sala barulhenta. Os 32 kbit/s ficam — ver
+  [Medido no celular](#medido-no-celular).
 
 ## Contexto
 
@@ -89,10 +93,47 @@ onda na tela.
    WhatsApp (`.opus`, ou `.ogg` com Opus dentro), que a 9.0 recusava
    ([ADR 0013](0013-importar-audio-de-fora.md)).
 
+## Medido no celular
+
+A primeira gravação num aparelho de verdade (Samsung Galaxy Tab A9, SM-X115)
+deu 198 KB em 48 s: **~15 MB por hora**, e não os 10,5 do corpus. O corpus
+entra a 16 kHz, e o Opus fica na banda da voz (até 8 kHz) por construção. O
+microfone do celular entra a 48 kHz, e o VBR usa a banda cheia e chega perto
+dos 32 kbit/s.
+
+Para decidir se valia limitar a banda (`OPUS_SET_MAX_BANDWIDTH` em
+*wideband*, a faixa que o Whisper usa) ou baixar a taxa, o corpus foi
+passado a 48 kHz com ruído rosa por baixo, que tem os agudos de um microfone
+de verdade. O libopus é o mesmo, pelo `ffmpeg -c:a libopus -application voip`,
+com `-cutoff 8000` para limitar a banda:
+
+| ruído | variante | kbit/s | WER | CER | DER |
+|---|---|---|---|---|---|
+| leve (−48 dBFS) | WAV | — | 7,75% | 5,50% | 24,70% |
+| leve | **32k, banda cheia (o gravador)** | 30,7 | 8,10% | 5,63% | 18,94% |
+| leve | 32k, só a voz | 31,6 | 7,39% | 5,37% | 19,00% |
+| leve | 24k, banda cheia | 22,7 | 7,39% | 5,37% | 18,94% |
+| leve | 24k, só a voz | 23,5 | 7,39% | 5,37% | 28,02% |
+| leve | 20k, só a voz | 19,0 | 7,39% | 5,37% | 20,93% |
+| forte (−30 dBFS) | WAV | — | 7,04% | 4,99% | 23,49% |
+| forte | **32k, banda cheia (o gravador)** | 30,9 | 7,04% | 5,18% | 23,14% |
+| forte | 32k, só a voz | 31,5 | 7,39% | 5,37% | 18,80% |
+| forte | 24k, banda cheia | 22,5 | 8,80% | 5,69% | 30,23% |
+
+- **Limitar a banda não diminui o arquivo:** o VBR gasta a mesma taxa na
+  faixa da voz. Na qualidade, a diferença é de uma palavra para um lado ou
+  para o outro.
+- **Baixar para 24 kbit/s** encolhe ~26% e empata com ruído leve, mas com
+  ruído forte erra 5 palavras a mais e o DER sobe 7 pontos. É a margem que o
+  item 1 previu.
+- Os 32 kbit/s em banda cheia ficam. O que muda é a conta de espaço da tela
+  Gravar, que passa a usar 15 MB por hora.
+
 ## Consequências
 
-- **Fica melhor:** uma hora de reunião ocupa ~10,5 MB, 11× menos que o WAV
-  de 16 kHz, com a mesma transcrição. Mandar para o PC (9.3) fica barato, e
+- **Fica melhor:** uma hora de reunião ocupa ~15 MB no celular, 8× menos que
+  o WAV de 16 kHz (10,5 MB com o áudio de 16 kHz do corpus), com a mesma
+  transcrição. Mandar para o PC (9.3) fica barato, e
   64 GB livres cabem milhares de horas.
 - **Fica melhor:** o que foi gravado sobrevive a uma queda do processo. Isso
   está provado no emulador (`am force-stop`) e nos testes do núcleo (arquivo
@@ -125,9 +166,10 @@ onda na tela.
   só no Android.
 - **WAV ou FLAC:** sem perda e fáceis de recuperar, mas 115 MB/h (WAV
   16 kHz) e ~50 MB/h (FLAC), para uma transcrição que o Opus já deixa igual.
-- **Opus a 24 kbit/s ou menos:** a 24 a transcrição é a mesma, mas sobra
-  pouca margem para uma sala ruim, e a economia não compensa. Abaixo disso,
-  não foi medido.
+- **Opus a 24 kbit/s ou menos:** com ruído leve, a transcrição é a mesma;
+  com ruído forte, piora (ver [Medido no celular](#medido-no-celular)).
+- **Limitar a banda à faixa da voz (8 kHz):** não diminui o arquivo, e a
+  qualidade fica igual dentro do ruído da medição.
 - **Codificar no Kotlin (`MediaCodec`) e só mandar o arquivo para o Rust:**
   duplicaria o empacotamento Ogg, que o iOS e o desktop também precisam, e
   tiraria do núcleo o controle da durabilidade.

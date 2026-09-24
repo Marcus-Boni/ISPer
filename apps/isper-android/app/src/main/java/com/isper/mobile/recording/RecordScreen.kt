@@ -57,8 +57,12 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.isper.mobile.R
 
-/** Bytes por hora do Ogg/Opus a 32 kbit/s com VBR, medido no corpus (10,5 MB/h). */
-private const val BYTES_PER_HOUR = 10_500_000.0
+/**
+ * Bytes por hora do Ogg/Opus a 32 kbit/s no celular: o microfone entra a
+ * 48 kHz e o VBR fica perto da meta (198 KB em 48 s num Galaxy Tab A9). O
+ * corpus de 16 kHz dá 10,5 MB/h, mas não é o caso do aparelho (ADR 0016).
+ */
+private const val BYTES_PER_HOUR = 15_000_000.0
 
 @Composable
 fun RecordScreen(state: RecState, modifier: Modifier = Modifier) {
