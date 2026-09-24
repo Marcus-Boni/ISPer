@@ -262,5 +262,40 @@
   })[m.file] || m.note;
   const keyLabel = (label) => String(label || '').replace(/Espaço/g, window.I18N ? window.I18N.t('keys.space', null, 'Espaço') : 'Espaço');
 
-  window.UI = { el, toast, undoable, keyLabel, speaker, modelNote, countUp, stagger, busy, flash, tabs, swap, skeleton, fmtClock, fmtDur, plural, reduce, uiLang };
+  // Tema claro/escuro num clique, fora das Configurações. O botão troca o
+  // tema que está NA TELA pelo oposto — com "seguir o Windows", o que o
+  // Windows está mostrando agora. Voltar a seguir o Windows é nas
+  // Configurações. A troca vale para todas as janelas (set_ui_theme avisa
+  // cada uma), e o botão acompanha o que vier de fora: outra janela, as
+  // Configurações ou o próprio Windows mudando de tema.
+  function themeToggle(btn) {
+    if (!btn) return;
+    const root = document.documentElement;
+    const dark = matchMedia('(prefers-color-scheme: dark)');
+    const t = (k) => tt(k, null, k);
+    const shown = () => {
+      const th = root.dataset.theme;
+      if (th === 'light' || th === 'dark') return th;
+      return dark.matches ? 'dark' : 'light';
+    };
+    const paint = () => {
+      const next = shown() === 'dark' ? 'light' : 'dark';
+      btn.dataset.next = next;
+      const label = next === 'light' ? t('common.theme.to-light') : t('common.theme.to-dark');
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+    };
+    btn.addEventListener('click', async () => {
+      const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+      if (!invoke) return;
+      try { await invoke('set_ui_theme', { theme: btn.dataset.next }); }
+      catch (e) { toast(String(e), 'err'); }
+    });
+    new MutationObserver(paint).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    dark.addEventListener('change', paint);
+    document.addEventListener('isper-i18n', paint);
+    paint();
+  }
+
+  window.UI = { el, toast, themeToggle, undoable, keyLabel, speaker, modelNote, countUp, stagger, busy, flash, tabs, swap, skeleton, fmtClock, fmtDur, plural, reduce, uiLang };
 })();

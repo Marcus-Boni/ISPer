@@ -8,6 +8,7 @@ recompilar o app inteiro (o build com CUDA leva minutos).
 
     python tools/e2e/copilot-harness.py          # http://127.0.0.1:3112/copilot.html
                                                 # http://127.0.0.1:3112/library.html
+                                                # http://127.0.0.1:3112/home.html (só a barra)
 
 No console da página:
 
@@ -330,6 +331,10 @@ LIB_MOCK = r"""
           case 'take_pending_meeting': return Promise.resolve(null);
           case 'embeddings_status': return Promise.resolve({ configured: false, key_present: false });
           case 'semantic_search': return Promise.resolve([]);
+          // Como o app: grava a escolha e avisa as janelas (evento isper-ui).
+          case 'set_ui_theme':
+            (listeners['isper-ui'] || []).forEach((cb) => cb({ payload: { theme: args.theme } }));
+            return Promise.resolve(args.theme);
           case 'get_meeting': {
             const meeting = args.id === 2 ? SEM_DECISOES : ROW;
             return Promise.resolve({
@@ -346,7 +351,11 @@ LIB_MOCK = r"""
       },
     },
   };
-  window.__lib = { decisions: () => DECISIONS };
+  window.__lib = {
+    decisions: () => DECISIONS,
+    // O tema mudou em outra janela (ou nas Configurações).
+    theme(name) { (listeners['isper-ui'] || []).forEach((cb) => cb({ payload: { theme: name } })); return name; },
+  };
 })();
 </script>
 """
@@ -380,12 +389,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         rota = self.path.split("?")[0]
         alvo = {"/": "copilot.html", "/copilot.html": "copilot.html",
-                "/library.html": "library.html"}.get(rota)
+                "/library.html": "library.html", "/home.html": "home.html"}.get(rota)
         if alvo:
             path = os.path.join(ROOT, alvo)
             with open(path, encoding="utf-8") as fh:
                 html = fh.read()
-            mock = LIB_MOCK if alvo == "library.html" else MOCK
+            # O Início usa o mock da Biblioteca: o que ele pede e o mock não
+            # conhece volta vazio, o bastante para exercitar a barra do topo.
+            mock = LIB_MOCK if alvo in ("library.html", "home.html") else MOCK
             # O app injeta o dicionário no nascimento da janela (ui.rs,
             # boot_script); aqui, o mesmo: ?lang=en abre em inglês.
             html = html.replace("<head>", "<head>\n" + ui_prefs_script(self.path) + mock, 1)
