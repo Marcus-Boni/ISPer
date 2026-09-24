@@ -11,6 +11,16 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **Trocar o tema num clique.** Um botão de sol e lua no canto do Início e da
+  Biblioteca troca entre o tema claro e o escuro na hora, em todas as janelas.
+  "Seguir o Windows" continua nas Configurações.
+
+### Alterado
+- **Aparência e idioma no topo das Configurações.** O tema e o idioma da
+  interface ficavam no fim da seção Sistema, depois de tudo, e eram difíceis
+  de achar; agora têm um bloco próprio, o primeiro da janela.
+
 ## [0.21.0] - 2026-09-23
 
 A Fase 9 começa pelo PC: as gravações de fora — do Plaud, do celular, de

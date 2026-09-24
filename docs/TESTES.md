@@ -101,7 +101,7 @@ da janela.
 | N4 | Biblioteca | Tab até a lista; Enter numa reunião; Tab até o título e até o nome de um falante; Enter; Esc | Cada reunião como botão (a aberta como "atual"); o título como "renomear a reunião …, botão"; o falante como "renomear o falante Participante 1, botão"; Enter abre "novo nome do falante, editar" e Esc desiste |
 | N5 | Abas | Na Biblioteca, Tab até as abas; seta para a direita e para a esquerda | "Reuniões, guia, selecionado, 1 de 2"; a seta leva a "Ditados, guia, selecionado, 2 de 2" e a lista troca |
 | N6 | Configurações | Tab por todas as seções; em Reuniões, Enter em *Avançado* | Todo campo e toda lista com o rótulo ("intervalo entre as rodadas de insights, caixa de combinação"); *Avançado* como "recolhido" e, depois do Enter, "expandido", com os controles dele na sequência |
-| N7 | Em inglês | Configurações → Sistema → Idioma da interface = English; repetir N1 e N5 | Tudo em inglês ("Library, button", "Meetings, tab, selected"). Com a troca automática de idioma do NVDA ligada, a voz passa a ler em inglês |
+| N7 | Em inglês | Configurações → Aparência e idioma → Idioma da interface = English; repetir N1 e N5 | Tudo em inglês ("Library, button", "Meetings, tab, selected"). Com a troca automática de idioma do NVDA ligada, a voz passa a ler em inglês |
 | N8 | Temas de contraste do Windows | Configurações do Windows → Acessibilidade → Temas de contraste (ou Alt+Shift esquerdo+Print Screen); Tab pelo Início e pelas Configurações | O texto segue legível nas cores do tema, e o foco aparece como um contorno ao redor de cada controle (o anel normal do ISPer não sobrevive nesse modo; o contorno o substitui) |
 
 Anote ✅/❌, a versão do NVDA e a do ISPer. Uma falha aqui vira issue com o

@@ -7,7 +7,7 @@ order: 35
 
 # Tema, idioma e acessibilidade
 
-As duas preferências de interface ficam em Configurações → Sistema e valem na hora, em todas as janelas abertas, sem reiniciar.
+As duas preferências de interface ficam no topo das Configurações, em **Aparência e idioma**, e valem na hora, em todas as janelas abertas, sem reiniciar. O tema também troca num clique pelo botão de sol e lua no canto do Início e da Biblioteca.
 
 ## Aparência
 
@@ -18,6 +18,8 @@ As duas preferências de interface ficam em Configurações → Sistema e valem 
 | Escura | Sempre escuro |
 
 O tema vale para o Início, a Biblioteca, as Configurações e a primeira configuração, com a barra de título junto. Cada janela já abre no tema certo, sem piscar. A paleta clara passa no contraste WCAG AA em todos os textos.
+
+O botão de sol e lua, no canto direito do topo do Início e da Biblioteca, troca o tema que está na tela pelo oposto: no escuro ele mostra um sol e leva ao claro; no claro, uma lua. Com **Seguir o Windows**, ele parte do que o Windows está mostrando naquele momento. Para voltar a seguir o Windows depois de usar o botão, escolha a opção de novo nas Configurações.
 
 O indicador flutuante e o Copilot continuam escuros de propósito: eles ficam por cima de outros apps e precisam de contraste próprio.
 
