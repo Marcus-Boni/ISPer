@@ -11,6 +11,17 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **O ISPer no celular, primeiro passo (Fase 9.1).** O núcleo Rust compila
+  para Android e ganhou uma fachada para o celular (`crates/isper-mobile`, via
+  UniFFI). Um app Android de laboratório (`apps/isper-android`) mede no
+  próprio aparelho o mesmo passe final do PC: tempo de cada etapa, fator de
+  tempo real, memória, bateria, temperatura e, na amostra embutida, WER e
+  DER. É o spike que decide o que o celular faz sozinho e o que manda para o
+  PC; o gravador vem em seguida, dentro do mesmo app. O APK sai do CI a cada
+  mudança, e `tools/e2e/android-lab.ps1` roda o laboratório num emulador
+  ([ADR 0014](docs/adr/0014-celular-nativo-com-nucleo-rust.md)).
+
 ### Alterado
 - **Identificar quem falou ficou ~2,4× mais rápido.** A diarização trocou o
   `sherpa-rs`, descontinuado e preso a uma thread, pelo crate oficial do
@@ -22,6 +33,12 @@ bata com ela.
   calcula o DER ([ADR 0015](docs/adr/0015-sherpa-onnx-oficial.md)).
 - O instalador leva uma DLL a menos (a `cargs.dll`, que nenhum binário
   usava).
+- **O passe final acha as falas 5× mais rápido.** O VAD (Silero) roda num
+  grafo minúsculo a cada 32 ms de áudio, e dividi-lo em até 4 threads custava
+  mais do que ajudava: nos 190 s do corpus, 0,4 s com uma thread contra 2,1 s
+  com quatro, com as mesmas regiões e o mesmo texto. No emulador Android, com
+  o PC ocupado, as quatro threads chegaram a 135 s; com uma, 1,1 s.
+  `ISPER_VAD_THREADS` continua valendo para medir.
 
 ## [0.22.0] - 2026-09-24
 

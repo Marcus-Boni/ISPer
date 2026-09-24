@@ -20,9 +20,9 @@
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
 | F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (criptografia em repouso adiada com decisão registrada); 7.5 com 5 de 6 (v0.19.0 — falta a rodada com o NVDA); 7.6 com 4 de 5 (v0.20.0 — falta o winget, em revisão no winget-pkgs) |
 | F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; só com a janela aberta e notas salvas com a reunião (23/09); 3 itens em aberto — validar a memória, idioma do que a IA escreve e ver o sync do portal numa release |
-| F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca (botão ou arrastar) ou pela pasta vigiada `Documentos\ISPer\Importar`, com o mesmo passe final, falantes, resumo e a origem guardada. 9.1 a 9.7 (o celular) ainda são proposta |
+| F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; falta rodá-lo no celular do líder. 9.2 a 9.7 ainda são proposta |
 
-**116 itens entregues · 10 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**122 itens entregues · 11 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -331,14 +331,27 @@ para o celular. Decisões da 9.0 no [ADR 0013](docs/adr/0013-importar-audio-de-f
 - [x] Pasta vigiada `Documentos\ISPer\Importar`: o que entra vira reunião, e o arquivo vai para `Importados` (ou `Não importados`, com o motivo) — nada é apagado (23/09): só entra o que parou de crescer e já abre em modo exclusivo (terminou de ser copiado); liga e desliga em Configurações → Reuniões; `tools/e2e/import.ps1` cobre os três caminhos (22 verificações)
 - [x] Guia no portal: como levar as gravações do Plaud e do celular para o ISPer (23/09): [Importar gravações](https://isper.pages.dev/docs/reunioes-e-sistema/importar-gravacoes/)
 
-### Depois da 9.0 (proposto, a decidir)
+### 9.1 Núcleo portátil e laboratório no celular
 
-Do plano de 23/09; cada etapa ganha caixas quando for aprovada. A proposta é
-app nativo com o núcleo Rust via UniFFI — o Tauri mobile foi descartado por
-um bug aberto de tela branca com serviço em primeiro plano.
+O núcleo Rust compila para Android, e um app de laboratório mede no próprio
+aparelho o mesmo passe final do PC, antes de o gravador ser construído em cima
+dele. Decisões no [ADR 0014](docs/adr/0014-celular-nativo-com-nucleo-rust.md)
+(app nativo com o núcleo via UniFFI) e no
+[ADR 0015](docs/adr/0015-sherpa-onnx-oficial.md) (sherpa-onnx oficial).
 
-- 9.1 núcleo portátil, compilando para Android, testado no celular do líder; troca do `sherpa-rs` (descontinuado) pela API Rust oficial do sherpa-onnx
-- 9.2 gravador Android (Compose, serviço em primeiro plano, Ogg/Opus a 32 kbit/s gravado com segurança)
+- [x] Troca do `sherpa-rs` (descontinuado, uma thread) pelo crate oficial do sherpa-onnx (24/09, #79). A diarização usa metade dos núcleos, até 8: no corpus de 190 s caiu de ~60 s para ~25 s (2,4×), com o mesmo resultado. A estimativa de 5–8× não se confirmou, porque o agrupamento não usa threads. `isper-cli diarize --reference-turns` passou a medir o DER sozinho
+- [x] Núcleo portátil (24/09): a captura do Windows (`wasapi`, loopback) fica atrás de `cfg(windows)`, com um `run` que explica a falta fora dele; `keyring` com o cofre do Windows só no Windows; modelos Whisper, VAD e diarização baixam para uma pasta escolhida (`download_whisper_to`, `download_vad_to`, `download_models_to`), e há um catálogo de modelos para o celular (tiny, base e small q5, e o turbo do PC); turnos de referência lidos no núcleo (`metrics::parse_turns`)
+- [x] Fachada `crates/isper-mobile` pelo UniFFI 0.32 (24/09): baixar modelos com SHA-256, transcrever um arquivo com o passe final do PC (cancelável, com progresso por etapa) e medir tempo, fator de tempo real, pico de memória e WER/CER/DER; bindings Kotlin gerados pela biblioteca compilada (`crates/uniffi-bindgen`)
+- [x] App Android de laboratório (24/09, `apps/isper-android`): Kotlin + Compose nas cores do ISPer, AGP 9.4 / Gradle 9.8 / Kotlin 2.4, `minSdk` 29; arm64 em ARMv8.2 com dotprod e fp16, com checagem do `/proc/cpuinfo`; bateria, temperatura e estado térmico antes e depois; relatório em JSON para compartilhar e `autorun` por intent. A compilação cruzada do whisper.cpp pelo `whisper-rs-sys` num PC Windows precisou de um contorno (ADR 0014)
+- [x] APK no CI (`android.yml`, runner Linux) e laboratório de ponta a ponta no emulador (`tools/e2e/android-lab.ps1`, 12 verificações): no emulador x86_64 com 4 núcleos, o modelo tiny transcreveu e separou os 3 falantes dos 190 s do corpus em 81 s (0,43× a duração), com WER 18,0% e DER 21,4% (o do PC é 20,6%) e 576 MB de pico. É prova de funcionamento, não de velocidade de celular
+- [x] VAD numa thread só (24/09): com 4 threads, a sincronização a cada quadro de 32 ms custava mais que a conta — 2,1 s → 0,4 s no PC nos 190 s do corpus, e 135 s (com o PC ocupado) → 1,1 s no emulador, com as mesmas regiões e o mesmo texto
+- [ ] Rodar o laboratório no celular do líder e em dois intermediários populares (Samsung da linha A, Motorola) e fixar, com os números, os níveis de aparelho e a meta de tempo da 9.4 — é à mão, com o aparelho na mão
+
+### Depois da 9.1 (proposto, a decidir)
+
+Do plano de 23/09; cada etapa ganha caixas quando for aprovada.
+
+- 9.2 gravador Android dentro do mesmo app (serviço em primeiro plano, Ogg/Opus a 32 kbit/s gravado com segurança, widget e bloco nas Configurações rápidas)
 - 9.3 sincronização com o PC por pareamento (QR) → piloto interno
 - 9.4 transcrição no próprio aparelho · 9.5 IA · 9.6 Play Store · 9.7 iOS
 
