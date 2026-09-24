@@ -1,0 +1,96 @@
+# App Android (Fase 9.1): compila o isper-mobile para arm64 (celulares) e
+# x86_64 (emulador) com o cargo-ndk, gera os bindings Kotlin do UniFFI e monta
+# o APK do laboratório — o mesmo `./gradlew assembleDebug` de quem desenvolve.
+#
+# Roda quando o núcleo ou o app Android mudam. O APK sai como artefato do run,
+# assinado com a chave de debug do runner: serve para testar, não para loja.
+# A amostra do laboratório no CI é a fala curta versionada (o corpus de 190 s
+# não entra no Git); o APK montado na máquina de quem tem o corpus leva ele.
+name: Android
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - "apps/isper-android/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "crates/**"
+      - "apps/isper-android/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: APK do laboratório
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Canal do Rust (rust-toolchain.toml)
+        id: toolchain
+        run: |
+          channel=$(sed -n 's/^channel *= *"\([^"]*\)".*/\1/p' rust-toolchain.toml)
+          test -n "$channel" || { echo "rust-toolchain.toml sem 'channel'"; exit 1; }
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.channel }}
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android-v1
+          cache-directories: target/sherpa-onnx-prebuilt
+          cache-on-failure: true
+
+      # Ver o comentário equivalente em ci.yml.
+      - name: sherpa-onnx pré-compilado presente
+        run: |
+          if [ -z "$(find target/sherpa-onnx-prebuilt -type f -name 'libsherpa-onnx-c-api*' -print -quit 2>/dev/null)" ]; then
+            echo "pré-compilado do sherpa-onnx ausente: o build script vai rodar e baixar de novo"
+            rm -rf target/sherpa-onnx-prebuilt
+            find target -type d -name 'sherpa-onnx-sys-*' -prune -exec rm -rf {} + 2>/dev/null || true
+          fi
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk@4.1.2
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # O NDK e a plataforma fixados no app/build.gradle.kts; o SDK do runner
+      # já aceita as licenças.
+      - name: NDK e plataforma do SDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358" "platforms;android-37.0" > /dev/null
+
+      - name: APK (arm64 + x86_64)
+        working-directory: apps/isper-android
+        run: ./gradlew assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: isper-android-laboratorio
+          path: apps/isper-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

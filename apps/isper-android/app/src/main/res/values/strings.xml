@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ISPer</string>
+    <string name="lab_title">Laboratório do celular</string>
+    <string name="lab_subtitle">Mede neste aparelho o mesmo passe final que o ISPer roda no PC. Nada sai daqui: só os modelos são baixados.</string>
+
+    <string name="section_device">Aparelho</string>
+    <string name="device_soc">Processador</string>
+    <string name="device_cores">Núcleos</string>
+    <string name="device_ram">Memória</string>
+    <string name="device_system">Sistema</string>
+    <string name="device_battery">Bateria</string>
+    <string name="device_unsupported">Este aparelho não tem as instruções ARMv8.2 que esta versão usa (%1$s). O laboratório não roda aqui.</string>
+    <string name="device_load_failed">Não consegui carregar o motor: %1$s</string>
+
+    <string name="section_model">Modelo</string>
+    <string name="model_installed">baixado</string>
+    <string name="model_size">~%1$d MB</string>
+    <string name="model_download">Baixar</string>
+
+    <string name="section_audio">Áudio</string>
+    <string name="audio_sample">Reunião de exemplo</string>
+    <string name="audio_sample_reference">3 vozes, 3 min, com referência para WER e DER</string>
+    <string name="audio_sample_plain">fala curta, sem referência</string>
+    <string name="audio_pick">Escolher um arquivo…</string>
+    <string name="audio_picked">Arquivo: %1$s</string>
+
+    <string name="diarize">Separar os falantes</string>
+    <string name="diarize_note">Baixa mais ~45 MB na primeira vez</string>
+
+    <string name="run">Medir</string>
+    <string name="cancel">Cancelar</string>
+    <string name="stage_download">Baixando</string>
+    <string name="stage_decode">Lendo o áudio</string>
+    <string name="stage_transcribe">Transcrevendo</string>
+    <string name="stage_diarize">Separando os falantes</string>
+    <string name="need_model">Escolha e baixe um modelo primeiro.</string>
+
+    <string name="section_result">Resultado</string>
+    <string name="result_rtf">%1$s× a duração do áudio</string>
+    <string name="result_faster">mais rápido que a reunião</string>
+    <string name="result_slower">mais lento que a reunião</string>
+    <string name="result_total">Total</string>
+    <string name="result_transcribe">Transcrição</string>
+    <string name="result_diarize">Falantes</string>
+    <string name="result_load">Carga do modelo</string>
+    <string name="result_memory">Pico de memória</string>
+    <string name="result_battery">Bateria</string>
+    <string name="result_temperature">Temperatura</string>
+    <string name="result_quality">Qualidade (WER · CER · DER)</string>
+    <string name="result_speakers">Falantes encontrados</string>
+    <string name="result_transcript">Transcrição</string>
+    <string name="result_share">Compartilhar o relatório</string>
+    <string name="result_share_title">Relatório do laboratório do ISPer</string>
+    <string name="speaker_label">Participante %1$d</string>
+    <string name="speaker_unknown">—</string>
+</resources>

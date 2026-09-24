@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A interface é toda em Compose; este tema só pinta a janela antes do
+         primeiro quadro, na cor de fundo do ISPer (sem clarão branco). -->
+    <style name="Theme.ISPer" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/isper_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+    <color name="isper_bg">#161311</color>
+    <color name="isper_accent">#F07E72</color>
+</resources>
