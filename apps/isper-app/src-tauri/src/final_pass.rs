@@ -34,7 +34,7 @@ use isper_core::meeting::MeetingResult;
 use isper_core::pipeline::{self, Diarizer, DiarizerOutput, FinalConfig, FinalTranscript};
 
 /// Uma fala pronta para o banco: falante, início, fim, texto.
-type Row = (String, f32, f32, String);
+pub(crate) type Row = (String, f32, f32, String);
 
 /// Liga o `isper-diarize` ao pipeline do core (que não conhece o sherpa).
 struct SherpaDiarizer {
@@ -125,76 +125,113 @@ pub(crate) fn run_in_background(app: AppHandle, meeting_id: i64, result: Meeting
     });
 }
 
-fn run(app: &AppHandle, meeting_id: i64, result: &MeetingResult) -> anyhow::Result<Option<usize>> {
-    let opts = options(app);
-    if !app.state::<AppState>().config.lock_or_recover().final_pass {
-        return Ok(None);
-    }
-    let engine = app
-        .state::<AppState>()
+/// O motor Whisper carregado, ou um erro que diz por quê.
+pub(crate) fn loaded_engine(app: &AppHandle) -> anyhow::Result<Arc<isper_core::WhisperEngine>> {
+    app.state::<AppState>()
         .engine
         .lock_or_recover()
         .clone()
-        .ok_or_else(|| anyhow::anyhow!("o modelo Whisper não está carregado"))?;
+        .ok_or_else(|| anyhow::anyhow!("o modelo Whisper não está carregado"))
+}
 
-    // O modelo de VAD tem 0,9 MB e é baixado na primeira reunião.
-    let vad_model = isper_models::vad_path()?;
-    if !vad_model.exists() {
+/// O modelo de VAD (0,9 MB), baixado na primeira vez que for preciso.
+pub(crate) fn vad_model() -> anyhow::Result<PathBuf> {
+    let path = isper_models::vad_path()?;
+    if !path.exists() {
         tracing::info!(
             "baixando o modelo de VAD ({} MB)",
             isper_models::VAD_APPROX_MB
         );
         isper_models::download_vad(&mut |_, _| {})?;
     }
+    Ok(path)
+}
+
+/// Transcreve uma trilha onde várias pessoas falam — o canal dos
+/// participantes de uma reunião, ou uma gravação importada (Fase 9.0) —
+/// com o passe final e diarização, se os modelos existirem. Cada fala sai
+/// como "Participante N", ou "Participantes" quando o agrupamento é
+/// implausível.
+///
+/// `meeting_id` só entra no log (0 numa gravação importada, que ainda não tem
+/// id); `progress` e `cancel` vão direto para o [`pipeline::run_cancellable`].
+pub(crate) fn transcribe_mixed(
+    app: &AppHandle,
+    engine: &isper_core::WhisperEngine,
+    vad_model: &Path,
+    samples: &[f32],
+    meeting_id: i64,
+    progress: Option<pipeline::Progress<'_>>,
+    cancel: Option<&std::sync::atomic::AtomicBool>,
+) -> anyhow::Result<Vec<Row>> {
+    let opts = options(app);
+    let diarizer = isper_diarize::models_installed().then(|| SherpaDiarizer {
+        opts: isper_diarize::DiarizeOptions {
+            num_speakers: opts.speakers,
+            threshold: opts
+                .diarize_threshold
+                .unwrap_or(isper_diarize::DEFAULT_THRESHOLD),
+            ..isper_diarize::DiarizeOptions::default()
+        },
+    });
+    let cfg = FinalConfig {
+        name: "participantes".into(),
+        lang: opts.lang.clone(),
+        ..FinalConfig::meeting_final(vad_model.to_path_buf())
+    };
+    let out = pipeline::run_cancellable(
+        engine,
+        samples,
+        &cfg,
+        &opts.context,
+        diarizer.as_ref().map(|d| d as &dyn Diarizer),
+        progress,
+        cancel,
+    )?;
+    log_report(meeting_id, "participantes", &out);
+    // Agrupamento implausível: publicamos o texto, não os falantes. Um
+    // rótulo genérico é menos errado que dezenas de pessoas inventadas.
+    let confiavel = out
+        .report
+        .diarization
+        .as_ref()
+        .is_none_or(|d| d.warnings.is_empty());
+    if !confiavel {
+        tracing::warn!(
+            meeting_id,
+            "diarização implausível — as falas ficam como \"Participantes\""
+        );
+    }
+    Ok(out
+        .utterances
+        .iter()
+        .map(|u| {
+            let speaker = match u.speaker.filter(|_| confiavel) {
+                Some(n) => meeting::Speaker::Participant(n + 1).label(),
+                None => meeting::Speaker::Others.label(),
+            };
+            (speaker, u.start_secs, u.end_secs, u.text.clone())
+        })
+        .collect())
+}
+
+fn run(app: &AppHandle, meeting_id: i64, result: &MeetingResult) -> anyhow::Result<Option<usize>> {
+    let opts = options(app);
+    if !app.state::<AppState>().config.lock_or_recover().final_pass {
+        return Ok(None);
+    }
+    let engine = loaded_engine(app)?;
+    // O modelo de VAD tem 0,9 MB e é baixado na primeira reunião.
+    let vad_model = vad_model()?;
 
     let mut rows: Vec<Row> = Vec::new();
 
     // Canal dos participantes: com diarização, se os modelos existirem.
     let others = result.others_audio_f32()?;
     if !others.is_empty() {
-        let diarizer = isper_diarize::models_installed().then(|| SherpaDiarizer {
-            opts: isper_diarize::DiarizeOptions {
-                num_speakers: opts.speakers,
-                threshold: opts
-                    .diarize_threshold
-                    .unwrap_or(isper_diarize::DEFAULT_THRESHOLD),
-                ..isper_diarize::DiarizeOptions::default()
-            },
-        });
-        let cfg = FinalConfig {
-            name: "participantes".into(),
-            lang: opts.lang.clone(),
-            ..FinalConfig::meeting_final(vad_model.clone())
-        };
-        let out = pipeline::run(
-            &engine,
-            &others,
-            &cfg,
-            &opts.context,
-            diarizer.as_ref().map(|d| d as &dyn Diarizer),
-            None,
-        )?;
-        log_report(meeting_id, "participantes", &out);
-        // Agrupamento implausível: publicamos o texto, não os falantes. Um
-        // rótulo genérico é menos errado que dezenas de pessoas inventadas.
-        let confiavel = out
-            .report
-            .diarization
-            .as_ref()
-            .is_none_or(|d| d.warnings.is_empty());
-        if !confiavel {
-            tracing::warn!(
-                meeting_id,
-                "diarização implausível — as falas ficam como \"Participantes\""
-            );
-        }
-        rows.extend(out.utterances.iter().map(|u| {
-            let speaker = match u.speaker.filter(|_| confiavel) {
-                Some(n) => meeting::Speaker::Participant(n + 1).label(),
-                None => meeting::Speaker::Others.label(),
-            };
-            (speaker, u.start_secs, u.end_secs, u.text.clone())
-        }));
+        rows.extend(transcribe_mixed(
+            app, &engine, &vad_model, &others, meeting_id, None, None,
+        )?);
     }
 
     // Canal do microfone: quem falou já se sabe, então nada de diarizar.

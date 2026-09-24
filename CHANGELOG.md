@@ -12,6 +12,19 @@ bata com ela.
 ## [Unreleased]
 
 ### Adicionado
+- **Importar gravações de fora** (Fase 9.0): o que o Plaud exporta, o
+  gravador do celular, a gravação de uma reunião — MP3, M4A/MP4, AAC, WAV,
+  FLAC ou OGG — vira reunião na Biblioteca, com o mesmo passe final de uma
+  reunião gravada, a identificação de quem falou ("Participante 1, 2…") e o
+  resumo por IA, se configurado. Três caminhos: **Importar áudio** na
+  Biblioteca, arrastar o arquivo para a janela, ou deixá-lo na pasta
+  `Documentos\ISPer\Importar`, vigiada com o ISPer aberto (Configurações →
+  Reuniões). A data vem do nome do arquivo, quando ele traz uma; o título,
+  do nome, quando ele descreve a conversa. Um arquivo por vez, esperando a
+  reunião em andamento terminar, com progresso e cancelamento. O mesmo áudio
+  não entra duas vezes. Nada é apagado: da pasta vigiada, o arquivo vai para
+  `Importados` (ou `Não importados`, com o motivo num `.txt`). Opus ainda
+  não é lido. Guia em isper.pages.dev/docs/reunioes-e-sistema/importar-gravacoes.
 - **As notas do Copilot são salvas com a reunião.** O que você escreve na aba
   Notas entra no fim da ata, na seção "Notas da reunião", e aparece na
   Biblioteca, em "Suas notas (Copilot)". Se você continuar escrevendo depois

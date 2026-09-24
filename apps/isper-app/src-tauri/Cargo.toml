@@ -20,6 +20,9 @@ tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 # Atualização automática: latest.json assinado (minisign) nas releases do GitHub.
 tauri-plugin-updater = "2"
+# Seletor de arquivos nativo (importar gravações, Fase 9.0). Só pelo Rust: a
+# página não chama o plugin, então nenhuma permissão nova na ACL.
+tauri-plugin-dialog = "2"
 # Pastas conhecidas do Windows (ver paths.rs).
 dirs = "6"
 toml = "1"

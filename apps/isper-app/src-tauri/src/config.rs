@@ -104,6 +104,12 @@ pub struct AppConfig {
     /// que dá a transcrição boa o bastante para virar ata.
     #[serde(default = "default_true")]
     pub final_pass: bool,
+    /// Transcrever o que for deixado na pasta `Documentos\ISPer\Importar`
+    /// (Fase 9.0). Ligado por padrão: a pasta só existe para isso, e o
+    /// arquivo nunca é apagado — muda para `Importados` depois de virar
+    /// reunião.
+    #[serde(default = "default_true")]
+    pub import_watch: bool,
     /// Quantos participantes a reunião tem, quando se sabe.
     ///
     /// Zero = descobrir pelo agrupamento. Informado, o agrupamento corta o
@@ -159,6 +165,7 @@ impl Default for AppConfig {
             overlay_pinned: false,
             retention_days: 0,
             final_pass: true,
+            import_watch: true,
             meeting_speakers: 0,
             diarize_threshold: 0.0,
             theme: default_theme(),
