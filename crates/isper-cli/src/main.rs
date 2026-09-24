@@ -65,6 +65,9 @@ enum Cmd {
         /// Limiar do agrupamento (padrão: 0.5, o do sherpa-onnx)
         #[arg(long)]
         threshold: Option<f32>,
+        /// Turnos de referência (início<TAB>fim<TAB>falante), para calcular DER
+        #[arg(long)]
+        reference_turns: Option<PathBuf>,
     },
     /// Roda o pipeline inteiro sobre um WAV e grava relatório + transcrições
     Bench {
@@ -189,7 +192,8 @@ fn main() -> anyhow::Result<()> {
             path,
             speakers,
             threshold,
-        } => run_diarize(path, *speakers, *threshold),
+            reference_turns,
+        } => run_diarize(path, *speakers, *threshold, reference_turns.as_deref()),
         Cmd::Bench { .. } => run_bench(&cli),
         Cmd::Compare { before, after } => bench::compare(before, after),
         Cmd::Import { dir, db, apply } => run_import(dir.as_deref(), db.as_deref(), *apply),
@@ -349,7 +353,12 @@ fn run_bench(cli: &Cli) -> anyhow::Result<()> {
 
 /// Roda só a diarização num arquivo de áudio — útil para calibrar o limiar
 /// do agrupamento.
-fn run_diarize(path: &Path, speakers: Option<u32>, threshold: Option<f32>) -> anyhow::Result<()> {
+fn run_diarize(
+    path: &Path,
+    speakers: Option<u32>,
+    threshold: Option<f32>,
+    reference_turns: Option<&Path>,
+) -> anyhow::Result<()> {
     let decoded = isper_core::decode::decode_to_16k(path, None, None)
         .with_context(|| format!("falha ao ler {}", path.display()))?;
     let secs = decoded.duration_secs();
@@ -387,6 +396,27 @@ fn run_diarize(path: &Path, speakers: Option<u32>, threshold: Option<f32>) -> an
     );
     for w in &out.warnings {
         println!("AVISO: {w}");
+    }
+    if let Some(reference) = reference_turns {
+        let turnos = bench::read_turns(reference)?;
+        let hipotese: Vec<isper_core::align::SpeakerTurn> = out
+            .turns
+            .iter()
+            .map(|t| isper_core::align::SpeakerTurn {
+                start_secs: t.start,
+                end_secs: t.end,
+                speaker: t.speaker,
+            })
+            .collect();
+        let d = isper_core::metrics::der(&turnos, &hipotese);
+        println!(
+            "DER {:.2}% (omissão {:.1}s · falso alarme {:.1}s · confusão {:.1}s de {:.1}s)",
+            d.rate * 100.0,
+            d.missed_secs,
+            d.false_alarm_secs,
+            d.confusion_secs,
+            d.reference_secs
+        );
     }
     Ok(())
 }
