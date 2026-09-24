@@ -9,7 +9,7 @@
       com -Publish: gh autenticado, tag inexistente e CI verde no commit atual (salvo -SkipCiCheck).
   Recursos que vão dentro do instalador:
     - DLLs do CUDA em apps/isper-app/src-tauri/resources/cuda (só a variante GPU; copie do toolkit);
-    - DLLs do sherpa-onnx (identificação de falantes), copiadas de target\release;
+    - DLLs do sherpa-onnx (identificação de falantes), do pré-compilado em target\sherpa-onnx-prebuilt;
     - runtime do Visual C++ (msvcp140/vcruntime140), copiado do VS Build Tools.
   Build (salvo -SkipBuild): para o ISPer e roda `tauri build` por variante, assinando as
   atualizações com a chave privada (padrão %USERPROFILE%\.tauri\isper.key — NUNCA no repositório):
@@ -100,15 +100,23 @@ if ($wantGpu) {
     if (-not (Test-Path $p)) { throw "DLL do CUDA ausente: $p (copie de <CUDA>\bin\x64; ver README)" }
   }
 }
-# sherpa-onnx: o exe importa a sherpa-onnx-c-api.dll, que puxa a onnxruntime.
-# O build script do crate sherpa-onnx as deixa em target\release; sem elas o app instalado
-# nem abre. (A cargs.dll saiu na 9.1: vinha do sherpa-rs e ninguém a importava.)
+# sherpa-onnx: o exe importa a sherpa-onnx-c-api.dll, que puxa a onnxruntime; sem elas o
+# app instalado nem abre. Vêm do pré-compilado que o build script do crate sherpa-onnx
+# baixa em target\sherpa-onnx-prebuilt, como no release.yml. NÃO de target\release: o
+# tauri-build copia para lá o que estiver em resources\sherpa, e uma DLL velha (a do
+# sherpa-rs) ficaria se copiando de volta a cada build — com ela, o app morre ao
+# identificar os falantes. (A cargs.dll saiu na 9.1: vinha do sherpa-rs e ninguém a importava.)
+& cargo build --release -p isper-diarize
+if ($LASTEXITCODE -ne 0) { throw "cargo build isper-diarize falhou ($LASTEXITCODE)" }
+$prebuilt = @(Get-ChildItem (Join-Path $root 'target\sherpa-onnx-prebuilt') -Recurse -Filter *.dll -ErrorAction SilentlyContinue |
+  Where-Object { $_.FullName -match 'win-x64' })
 $sherpaDir = Join-Path $tauriDir 'resources\sherpa'
 New-Item -ItemType Directory -Force $sherpaDir | Out-Null
+Get-ChildItem $sherpaDir -Filter cargs.dll -ErrorAction SilentlyContinue | Remove-Item -Force
 foreach ($dll in 'sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll') {
-  $src = Join-Path $root "target\release\$dll"
-  if (-not (Test-Path $src)) { throw "DLL do sherpa-onnx ausente: $src (rode 'cargo build --release -p isper-app' antes)" }
-  Copy-Item $src (Join-Path $sherpaDir $dll) -Force
+  $src = $prebuilt | Where-Object Name -eq $dll | Select-Object -First 1
+  if (-not $src) { throw "DLL do sherpa-onnx ausente no pre-compilado: $dll (target\sherpa-onnx-prebuilt)" }
+  Copy-Item $src.FullName (Join-Path $sherpaDir $dll) -Force
 }
 # Runtime do Visual C++ ao lado do exe (deploy "app-local", suportado pela Microsoft):
 # o exe e a onnxruntime.dll importam msvcp140/vcruntime140, que uma maquina limpa nao tem.
