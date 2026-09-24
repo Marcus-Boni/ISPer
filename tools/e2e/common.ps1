@@ -8,6 +8,46 @@ $script:CdpPort = 9223
 $script:Checks = 0
 $script:Failures = 0
 
+# Perfil de dados proprio (ISPER_PROFILE_DIR): o app testado le e grava banco,
+# configuracoes, llm.toml, atas, backups e logs numa pasta em %TEMP%, nunca nos
+# de quem roda - um e2e ja deixou atas de teste em Documentos\ISPer\Reunioes.
+# Um perfil por execucao de roteiro, que vale para todos os Start-Isper dele;
+# apagado no fim quando tudo passa, mantido para investigar quando algo falha.
+# Os modelos continuam os da maquina (o app so os le).
+$script:E2EProfile = Join-Path ([IO.Path]::GetTempPath()) ('isper-e2e-{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $PID)
+
+function Get-E2EDataPath {
+  # Arquivo na pasta de dados do perfil de teste (o %APPDATA%\ISPer dele).
+  param([string]$Name = '')
+  $dir = Join-Path $script:E2EProfile 'AppData\Roaming\ISPer'
+  if ($Name) { return Join-Path $dir $Name }
+  $dir
+}
+
+function Get-E2EDocsPath {
+  # Pasta em Documentos\ISPer do perfil de teste (Reunioes, Backups, Importar).
+  param([string]$Name = '')
+  $dir = Join-Path $script:E2EProfile 'Documents\ISPer'
+  if ($Name) { return Join-Path $dir $Name }
+  $dir
+}
+
+function Get-E2ELogsDir {
+  Join-Path $script:E2EProfile 'AppData\Local\com.isper.desktop\logs'
+}
+
+function Assert-E2EProfile {
+  # O app aberto esta mesmo no perfil de teste? O primeiro que ele faz e abrir
+  # o log, e no perfil. Um exe anterior a ISPER_PROFILE_DIR ignora a variavel
+  # e usaria os dados de quem roda: fecha e para, em vez de seguir o roteiro.
+  for ($i = 0; $i -lt 10; $i++) {
+    if (@(Get-ChildItem (Get-E2ELogsDir) -Filter 'isper.log*' -ErrorAction SilentlyContinue).Count) { return }
+    Start-Sleep -Milliseconds 500
+  }
+  Stop-Isper
+  throw "O ISPer testado nao usou o perfil de teste ($script:E2EProfile): esse exe e anterior ao ISPER_PROFILE_DIR e mexeria nos seus dados. Teste um build atual (-Exe target\release\isper-app.exe)."
+}
+
 # Os scripts sao feitos de verificacoes (Check) e seguem em frente quando uma
 # falha; um erro nao-terminante ou um exe saindo com codigo != 0 (o cdp.mjs
 # quando a janela ainda nao existe) NAO pode abortar o roteiro. O GitHub
@@ -129,6 +169,9 @@ function Start-Isper {
   # e o Início abre em seguida. Com -KeepOnboarding, para nela.
   param([Parameter(Mandatory)][string]$Exe, [hashtable]$Env = @{}, [switch]$NoCdp, [switch]$KeepOnboarding)
   Assert-NoUserIsper
+  New-Item -ItemType Directory -Force $script:E2EProfile | Out-Null
+  $vars = @{ ISPER_PROFILE_DIR = $script:E2EProfile }
+  foreach ($k in $Env.Keys) { $vars[$k] = $Env[$k] }
   $exeName = Split-Path $Exe -Leaf
   $viaRegistry = (-not $NoCdp) -and [bool]$env:ISPER_E2E_CDP_REGISTRY
   if (-not $NoCdp) { $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$script:CdpPort" }
@@ -140,11 +183,11 @@ function Start-Isper {
       } catch { Write-Host "  (aviso) nao consegui gravar $key`: $($_.Exception.Message)" }
     }
   }
-  foreach ($k in $Env.Keys) { [Environment]::SetEnvironmentVariable($k, [string]$Env[$k], 'Process') }
+  foreach ($k in $vars.Keys) { [Environment]::SetEnvironmentVariable($k, [string]$vars[$k], 'Process') }
   Start-Process $Exe -WorkingDirectory (Split-Path $Exe)
   [Environment]::SetEnvironmentVariable('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS', $null, 'Process')
-  foreach ($k in $Env.Keys) { [Environment]::SetEnvironmentVariable($k, $null, 'Process') }
-  if ($NoCdp) { Start-Sleep -Seconds 4; return $true }
+  foreach ($k in $vars.Keys) { [Environment]::SetEnvironmentVariable($k, $null, 'Process') }
+  if ($NoCdp) { Start-Sleep -Seconds 4; Assert-E2EProfile; return $true }
   $ok = $false
   $lastError = ''
   $finished = $false
@@ -177,7 +220,7 @@ function Start-Isper {
   # aberto — sem a chave, Biblioteca e Configuracoes falhavam com
   # ERROR_INVALID_STATE (0x8007139F). Restart-IsperClean a remove antes do
   # relancamento limpo.
-  if ($ok) { return $true }
+  if ($ok) { Assert-E2EProfile; return $true }
   # Nao abriu: diz por que, em vez de so "FALHA" (processos, porta, log).
   # Write-Host: saida de diagnostico NAO pode virar valor de retorno da funcao.
   Write-Host "  (diagnostico) ultimo erro ao consultar a porta CDP $script:CdpPort`: $lastError"
@@ -265,11 +308,13 @@ function Check {
 }
 
 function Get-TodayLog {
-  # A partir da 0.12.2 os logs ficam na pasta do identificador do app; a antiga e reserva.
-  $name = "isper.log.$(Get-Date -Format yyyy-MM-dd)"
-  $new = Join-Path $env:LOCALAPPDATA "com.isper.desktop\logs\$name"
-  if (Test-Path $new) { return $new }
-  Join-Path $env:LOCALAPPDATA "ISPer\logs\$name"
+  # O log atual do app testado: o mais recente do perfil de teste. Pelo nome
+  # do dia nao serve - o arquivo gira pela data em UTC, e perto da meia-noite
+  # UTC o "de hoje" local nao e o que esta sendo escrito.
+  $dir = Get-E2ELogsDir
+  $f = Get-ChildItem $dir -Filter 'isper.log*' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if ($f) { return $f.FullName }
+  Join-Path $dir "isper.log.$((Get-Date).ToUniversalTime().ToString('yyyy-MM-dd'))"
 }
 
 function Remove-CdpRegistry {
@@ -284,12 +329,19 @@ function Restart-IsperClean {
   # uso). Uma cópia de desenvolvimento só é relançada no CI (ou com
   # ISPER_E2E_RELAUNCH=1): na máquina de quem usa o ISPer, ela ficaria na
   # bandeja no lugar do app instalado, com outra pasta de dados.
+  # O instalado volta como o app do usuario, com os dados dele; a copia de
+  # desenvolvimento continua no perfil de teste.
   param([Parameter(Mandatory)][string]$Exe)
   Stop-Isper
   Remove-CdpRegistry -Exe $Exe
   $installed = $Exe.StartsWith($script:InstalledDir, [StringComparison]::OrdinalIgnoreCase)
-  if ($installed -or $env:CI -or $env:ISPER_E2E_RELAUNCH) {
+  if ($installed) {
     Start-Process $Exe -WorkingDirectory (Split-Path $Exe)
+    Start-Sleep -Seconds 3
+  } elseif ($env:CI -or $env:ISPER_E2E_RELAUNCH) {
+    [Environment]::SetEnvironmentVariable('ISPER_PROFILE_DIR', $script:E2EProfile, 'Process')
+    Start-Process $Exe -WorkingDirectory (Split-Path $Exe)
+    [Environment]::SetEnvironmentVariable('ISPER_PROFILE_DIR', $null, 'Process')
     Start-Sleep -Seconds 3
   } else {
     Write-Host "  (a copia de teste foi fechada; o ISPer instalado pode ser aberto de novo)"
@@ -300,9 +352,12 @@ function Finish-E2E {
   param([Parameter(Mandatory)][string]$Name)
   ""
   if ($script:Failures -eq 0) {
+    # Um app relancado no perfil (CI) segura arquivos dele: o que der, sai.
+    Remove-Item -Recurse -Force $script:E2EProfile -ErrorAction SilentlyContinue
     "$Name`: $($script:Checks) verificacoes, todas OK"
   } else {
     "$Name`: $($script:Failures) de $($script:Checks) verificacoes FALHARAM"
+    if (Test-Path $script:E2EProfile) { "perfil de teste mantido para investigar: $script:E2EProfile" }
     exit 1
   }
 }

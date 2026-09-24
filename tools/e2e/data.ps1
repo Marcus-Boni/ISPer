@@ -5,10 +5,9 @@
 #   .\tools\e2e\data.ps1                       # usa target\release\isper-app.exe
 #   .\tools\e2e\data.ps1 -Exe <caminho do exe>
 #
-# O que ele muda na maquina: grava um backup em Documentos\ISPer\Backups e um
-# zip em Documentos\ISPer, e apaga os dois no fim. A retencao e testada com o
-# prazo mais longo (1 ano) e volta ao valor anterior - nada do usuario e
-# apagado por este roteiro.
+# O backup (Documentos\ISPer\Backups) e o zip (Documentos\ISPer) saem no
+# perfil de teste (common.ps1) e sao apagados no fim. A retencao e testada com
+# o prazo mais longo (1 ano) e volta ao valor anterior.
 #
 # Este arquivo e ASCII puro de proposito: o PowerShell 5.1 le um .ps1 sem BOM
 # como ANSI, e um acento no script viraria comparacao errada.

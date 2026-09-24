@@ -579,17 +579,13 @@ pub(crate) fn spawn_worker(app: AppHandle) {
 
 // --------------------------------------------------------- pasta vigiada
 
-/// `Documentos\ISPer\Importar`. `ISPER_IMPORT_DIR` troca a pasta — é o que os
-/// testes usam, para não mexer na pasta de verdade de quem roda.
+/// `Documentos\ISPer\Importar` (nos e2e, a do perfil de teste).
 pub(crate) fn import_dir() -> anyhow::Result<PathBuf> {
-    let dir = match std::env::var_os("ISPER_IMPORT_DIR") {
-        Some(d) if !d.is_empty() => PathBuf::from(d),
-        _ => crate::paths::home_dir()
-            .ok_or_else(|| anyhow::anyhow!("pasta do usuário indisponível"))?
-            .join("Documents")
-            .join("ISPer")
-            .join("Importar"),
-    };
+    let dir = crate::paths::home_dir()
+        .ok_or_else(|| anyhow::anyhow!("pasta do usuário indisponível"))?
+        .join("Documents")
+        .join("ISPer")
+        .join("Importar");
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
 }

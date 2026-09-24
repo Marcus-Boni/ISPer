@@ -130,6 +130,13 @@ fn main() {
         );
     }
     tracing::info!("ISPer {} iniciando", env!("CARGO_PKG_VERSION"));
+    if let Some(profile) = paths::profile_dir() {
+        tracing::warn!(
+            pasta = %profile.display(),
+            "perfil de dados de teste ({}): banco, configurações, atas e logs ficam nele",
+            paths::PROFILE_ENV
+        );
+    }
     if let Err(e) = notify::ensure_registered() {
         tracing::warn!("não consegui registrar o ISPer para notificações: {e}");
     }
@@ -407,7 +414,7 @@ fn main() {
             // Autostart ligado numa versão anterior não passava a flag — reaplica
             // o registro para que o próximo login também nasça quieto na bandeja.
             let autostarted = std::env::args().skip(1).any(|a| a == AUTOSTART_FLAG);
-            if app.autolaunch().is_enabled().unwrap_or(false) {
+            if paths::manages_autostart() && app.autolaunch().is_enabled().unwrap_or(false) {
                 let _ = app.autolaunch().enable();
             }
 

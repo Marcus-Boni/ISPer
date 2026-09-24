@@ -8,11 +8,41 @@
 //! app, como a pasta do WebView2). Até a 0.12.1 ficavam em `%LOCALAPPDATA%\ISPer`,
 //! que é a pasta padrão de INSTALAÇÃO por usuário do Tauri: um instalador rodado
 //! à mão misturou programa e dados. `migrate_legacy_local` move o que houver.
+//!
+//! Com [`PROFILE_ENV`] definida, os dados do usuário (banco, configurações,
+//! atas e logs) saem todos de uma pasta só: é o perfil dos testes ponta a ponta.
 
 use std::path::{Path, PathBuf};
 
 /// Variáveis que um processo Windows normal sempre tem — e que já faltaram.
 const REQUIRED_ENV: [&str; 3] = ["LOCALAPPDATA", "APPDATA", "USERPROFILE"];
+
+/// Troca as pastas de dados do usuário por uma pasta só: a dos testes ponta a
+/// ponta (`tools/e2e`), que assim nunca leem nem gravam o banco, as
+/// configurações, as atas, os backups e os logs de quem os roda. Dentro dela,
+/// o mesmo desenho do Windows: `AppData\Roaming\ISPer`,
+/// `AppData\Local\com.isper.desktop\logs` e `Documents\ISPer`. Os modelos
+/// continuam na pasta de verdade, porque são grandes e só lidos. Com o perfil,
+/// o app também não mexe no registro de iniciar com o Windows
+/// ([`manages_autostart`]), e o `isper-llm` guarda chaves num cofre à parte.
+pub(crate) const PROFILE_ENV: &str = "ISPER_PROFILE_DIR";
+
+/// A pasta de [`PROFILE_ENV`], quando definida (vazia não conta).
+pub(crate) fn profile_dir() -> Option<PathBuf> {
+    profile_from(std::env::var_os(PROFILE_ENV))
+}
+
+fn profile_from(value: Option<std::ffi::OsString>) -> Option<PathBuf> {
+    value.filter(|v| !v.is_empty()).map(PathBuf::from)
+}
+
+/// O registro de iniciar com o Windows é de quem usa o ISPer: um app de teste
+/// (com perfil próprio) não o grava nem o apaga. Sem isso, um build de
+/// desenvolvimento aberto pelos e2e regravava a entrada com o caminho DELE, e
+/// o próximo login abria a cópia de teste no lugar da instalada.
+pub(crate) fn manages_autostart() -> bool {
+    profile_dir().is_none()
+}
 
 /// Arquivo que marca a versão portátil (o zip da release): fica ao lado do exe.
 /// Explícito de propósito — "não tem desinstalador ao lado" também valeria
@@ -46,6 +76,9 @@ pub(crate) fn local_dir() -> Option<PathBuf> {
 
 /// `%APPDATA%\ISPer` — `config.toml`, `llm.toml` e o banco.
 pub(crate) fn roaming_dir() -> Option<PathBuf> {
+    if let Some(profile) = profile_dir() {
+        return Some(profile_roaming(&profile));
+    }
     dirs::config_dir()
         .or_else(|| std::env::var_os("APPDATA").map(PathBuf::from))
         .map(|p| p.join("ISPer"))
@@ -53,7 +86,29 @@ pub(crate) fn roaming_dir() -> Option<PathBuf> {
 
 /// Perfil do usuário — `Documentos\ISPer\Reunioes` parte daqui.
 pub(crate) fn home_dir() -> Option<PathBuf> {
-    dirs::home_dir().or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
+    profile_dir()
+        .or_else(dirs::home_dir)
+        .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
+}
+
+/// `%LOCALAPPDATA%\com.isper.desktop\logs` (no perfil de teste, a dele).
+pub(crate) fn logs_dir() -> Option<PathBuf> {
+    match profile_dir() {
+        Some(profile) => Some(profile_logs(&profile)),
+        None => local_dir().map(|d| d.join("logs")),
+    }
+}
+
+fn profile_roaming(profile: &Path) -> PathBuf {
+    profile.join("AppData").join("Roaming").join("ISPer")
+}
+
+fn profile_logs(profile: &Path) -> PathBuf {
+    profile
+        .join("AppData")
+        .join("Local")
+        .join(isper_models::APP_ID)
+        .join("logs")
 }
 
 /// Move `logs` e `models` de `%LOCALAPPDATA%\ISPer` para a pasta nova (se a
@@ -174,6 +229,31 @@ mod tests {
         assert!(migrate_legacy_local_in(&base).is_empty());
         assert!(!base.join(isper_models::APP_ID).exists());
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn perfil_de_teste_vale_so_com_uma_pasta_de_verdade() {
+        assert_eq!(profile_from(None), None);
+        assert_eq!(profile_from(Some("".into())), None, "vazia não conta");
+        assert_eq!(
+            profile_from(Some(r"C:	\perfil".into())),
+            Some(PathBuf::from(r"C:	\perfil"))
+        );
+    }
+
+    #[test]
+    fn perfil_de_teste_imita_as_pastas_do_windows() {
+        let p = Path::new(r"C:	\perfil");
+        assert_eq!(
+            profile_roaming(p),
+            PathBuf::from(r"C:	\perfil\AppData\Roaming\ISPer")
+        );
+        assert_eq!(
+            profile_logs(p),
+            PathBuf::from(r"C:	\perfil\AppData\Local")
+                .join(isper_models::APP_ID)
+                .join("logs")
+        );
     }
 
     #[test]

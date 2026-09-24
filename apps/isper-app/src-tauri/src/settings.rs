@@ -479,12 +479,14 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
     })
     .map_err(|e| e.to_string())?;
 
-    let autolaunch = app.autolaunch();
-    let _ = if patch.autostart {
-        autolaunch.enable()
-    } else {
-        autolaunch.disable()
-    };
+    if crate::paths::manages_autostart() {
+        let autolaunch = app.autolaunch();
+        let _ = if patch.autostart {
+            autolaunch.enable()
+        } else {
+            autolaunch.disable()
+        };
+    }
 
     notify_status(&app);
     Ok(label)

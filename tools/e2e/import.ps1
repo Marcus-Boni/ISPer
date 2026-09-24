@@ -8,8 +8,9 @@
 #
 #   .\tools\e2e\import.ps1 -Exe <caminho do exe>
 #
-# A pasta vigiada do teste fica em %TEMP% (ISPER_IMPORT_DIR) e e apagada no
-# fim; as reunioes de teste saem da Biblioteca pelo Desfazer e somem com os .md.
+# Tudo acontece no perfil de teste (common.ps1): a pasta vigiada e a dele
+# (Documentos\ISPer\Importar), e as atas .md ficam na Reunioes dele - excluir
+# uma reuniao tira do banco, mas o .md fica, e o perfil inteiro sai no fim.
 # ASCII puro de proposito: o PowerShell 5.1 le .ps1 sem BOM como ANSI.
 param([string]$Exe)
 . "$PSScriptRoot\common.ps1"
@@ -17,8 +18,7 @@ param([string]$Exe)
 $exe = Get-IsperExe $Exe
 "import: $exe"
 $fixtures = (Resolve-Path (Join-Path $PSScriptRoot '..\..\fixtures\formatos')).Path
-$dir = Join-Path $env:TEMP 'isper-import-e2e'
-if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+$dir = Get-E2EDocsPath 'Importar'
 New-Item -ItemType Directory -Force $dir | Out-Null
 $created = @()
 
@@ -33,7 +33,7 @@ function Wait-ImportOf([string]$file, [int]$secs = 240) {
 }
 
 Stop-Isper
-Check (Start-Isper -Exe $exe -Env @{ ISPER_IMPORT_DIR = $dir }) "app abriu (CDP) com a pasta vigiada de teste"
+Check (Start-Isper -Exe $exe) "app abriu (CDP) no perfil de teste"
 $st0 = Invoke-Isper 'home_status'
 Check ($st0.engine.kind -eq 'ready') "motor pronto ($($st0.engine.kind))"
 if ($st0.engine.kind -ne 'ready') { "sem motor carregado: abortando"; Finish-E2E 'import' }
@@ -101,15 +101,14 @@ Check ($set.watch -and $set.dir -eq $dir) "Configuracoes mostram a pasta vigiada
 $errs = Get-JsErrors 'settings.html'
 Check (@($errs).Count -eq 0) "settings.html sem erros de JS$(Format-JsErrors $errs)"
 
-# ---- limpeza: pelo Desfazer, como o usuario faria; os .md vao junto
+# ---- limpeza: excluir pela Biblioteca, como o usuario faria (o .md fica)
 $undoMs = 0
 foreach ($id in $created) {
   $sched = Invoke-Isper 'delete_meeting' "{ id: $id }"
   if ($sched.undo_ms -gt $undoMs) { $undoMs = [int]$sched.undo_ms }
 }
 if ($undoMs -gt 0) { Start-Sleep -Milliseconds ($undoMs + 1500) }
-Check (@(Invoke-Isper 'list_meetings' '{ query: null }').Count -eq $before) "reunioes de teste e .md apagados"
-Remove-Item -Recurse -Force $dir -ErrorAction SilentlyContinue
+Check (@(Invoke-Isper 'list_meetings' '{ query: null }').Count -eq $before) "reunioes de teste excluidas da Biblioteca"
 Restart-IsperClean -Exe $exe
 Check (-not (Test-Cdp)) "relancado sem porta CDP"
 Finish-E2E 'import'
