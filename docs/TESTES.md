@@ -21,6 +21,13 @@ com `clippy::unwrap_used` (o `unwrap()` só existe dentro de testes),
 `cargo fmt --check`, `cargo deny` e gitleaks — e o `main` protegido só aceita PR
 com os três checks verdes.
 
+No Windows, o binário de teste do `isper-mobile` carrega o
+`sherpa-onnx-c-api.dll` ao abrir, e o sistema procura a DLL primeiro na pasta
+do executável. Se o teste morrer antes de começar (`0xc0000020` quando acha
+uma DLL vazia, `0xc0000135` quando não acha nenhuma), copie as DLLs de
+`target/sherpa-onnx-prebuilt/*/lib` para `target/release/deps`, por cima de
+alguma antiga que esteja lá. O CI faz isso antes de rodar os testes.
+
 ## Cobertura
 
 [`coverage.yml`](../.github/workflows/coverage.yml) roda `cargo llvm-cov` a

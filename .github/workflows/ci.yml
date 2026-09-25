@@ -37,6 +37,10 @@ jobs:
     name: fmt · test · check (Windows, CPU)
     runs-on: windows-latest
     timeout-minutes: 60
+    env:
+      # Os crates com testes: os mesmos nos dois passos de teste e no modelo
+      # de PR (.github/pull_request_template.md).
+      PACOTES_COM_TESTE: -p isper-core -p isper-llm -p isper-models -p isper-sync -p isper-mobile -p isper-cli -p isper-app
     steps:
       - uses: actions/checkout@v7
 
@@ -102,9 +106,28 @@ jobs:
       # indicador, definição da CLI — roda aqui, além dos testes golden e de
       # propriedade do núcleo. O `isper-sync` sobe o protocolo de ponta a
       # ponta pelo loopback (iroh de verdade), e o `isper-mobile` testa o
-      # gravador e a rodada de sincronia do celular.
+      # gravador e a rodada de sincronia do celular. Primeiro só compila:
+      # as DLLs do passo seguinte vêm do build.
+      - name: Testes — compilar (núcleo, IA, modelos, sincronia, celular, app e CLI)
+        run: cargo test --release --no-default-features ${{ env.PACOTES_COM_TESTE }} --no-run
+
+      # O binário de teste do `isper-mobile` carrega o sherpa-onnx ao abrir (os
+      # do app e da CLI não: o linker descarta o que os testes não usam). O
+      # Windows procura a DLL primeiro na pasta do executável; sem ela ali,
+      # achava no PATH que o cargo monta a cópia VAZIA que o build script do
+      # Tauri pôs em target/release (os recursos de mentira acima), e o teste
+      # morria antes de começar (0xc0000020). As DLLs de verdade vão para
+      # target/release/deps, ao lado dos binários de teste.
+      - name: DLLs do sherpa-onnx ao lado dos binários de teste
+        shell: pwsh
+        run: |
+          $dlls = @(Get-ChildItem target/sherpa-onnx-prebuilt -Recurse -File -Filter '*.dll' | Where-Object { $_.Directory.Name -eq 'lib' })
+          if ($dlls.Count -eq 0) { throw "sem as DLLs do sherpa-onnx em target/sherpa-onnx-prebuilt" }
+          $dlls | Copy-Item -Destination target/release/deps -Force
+          $dlls | ForEach-Object { "  $($_.Name) ($([math]::Round($_.Length / 1MB, 1)) MB)" }
+
       - name: Testes (núcleo, IA, modelos, sincronia, celular, app e CLI)
-        run: cargo test --release --no-default-features -p isper-core -p isper-llm -p isper-models -p isper-sync -p isper-mobile -p isper-cli -p isper-app
+        run: cargo test --release --no-default-features ${{ env.PACOTES_COM_TESTE }}
 
       # Clippy é `cargo check` + lints em TODOS os alvos (testes e o loopdump
       # inclusive); `--release` reaproveita o whisper.cpp que o `cargo test`
