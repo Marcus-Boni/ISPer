@@ -321,9 +321,13 @@ async fn aparelho_estranho_esquecido_ou_com_arquivo_corrompido_nao_entra() {
     let (have, _) = session.offer(&offer).await.unwrap();
     assert_eq!(have, 0, "a parcial corrompida foi descartada");
 
-    // Pedido fora de ordem e id perigoso são recusados.
+    // Pedido fora de ordem e id perigoso são recusados. A gravação é grande
+    // para o PC recusar no meio da escrita: ele manda o motivo e para de ler,
+    // e o motivo tem de chegar (e não um "a conexão caiu").
+    let (big_path, big) = recording(tmp.path(), "rec-2", 8_000_000);
+    session.offer(&big).await.unwrap();
     let e = session
-        .upload(&path, &offer, 999, &no_progress, &AtomicBool::new(false))
+        .upload(&big_path, &big, 999, &no_progress, &AtomicBool::new(false))
         .await
         .unwrap_err();
     assert!(e.to_string().contains("o PC tem 0 bytes"), "{e}");
