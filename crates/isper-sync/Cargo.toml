@@ -1,0 +1,28 @@
+[package]
+name = "isper-sync"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Sincronia do ISPer entre o celular e o PC (Fase 9.3): pareamento por QR e envio retomável sobre iroh"
+publish = false
+
+[dependencies]
+# QUIC em que cada lado é uma chave Ed25519: a conexão já prova com quem se
+# fala (ADR 0017). Sem os padrões: nada de relay nem de DNS da n0 a menos que
+# a configuração peça, e nada de UPnP no roteador.
+iroh = { version = "1.2", default-features = false, features = ["tls-ring"] }
+# Acha o PC na rede local quando o IP dele muda (DHCP).
+iroh-mdns-address-lookup = "0.5"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "fs", "io-util", "sync"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+getrandom = "0.3"
+thiserror = "2"
+tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3.27"
+
+[lints]
+workspace = true

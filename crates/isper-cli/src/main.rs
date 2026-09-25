@@ -9,6 +9,8 @@
 //!   isper-cli meeting 30 --source teams # reunião: mic + só o áudio do Teams
 //!   isper-cli models list|download|remove
 //!   isper-cli llm use|set-key|status|test|models
+//!   isper-cli receber pasta --aprovar  # faz de PC para o celular (sincronia)
+//!   isper-cli enviar gravacao.opus --codigo 'isper://parear?…'  # faz de celular
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -19,6 +21,7 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 
 mod bench;
+mod sync;
 use isper_core::loopback::LoopbackSource;
 use isper_core::meeting::{self, MeetingOptions};
 use isper_core::{WhisperEngine, audio, store::MeetingStore};
@@ -64,6 +67,52 @@ enum Cmd {
         /// Taxa de bits, em kbit/s
         #[arg(long, default_value_t = 32)]
         kbps: u32,
+    },
+    /// Faz de PC para o celular: mostra o QR de pareamento e guarda as
+    /// gravações recebidas numa pasta (uma fica "pronta" quando aparece um
+    /// `<id>.ata.md` ao lado dela)
+    Receber {
+        /// Pasta das gravações, dos aparelhos pareados e da chave deste "PC"
+        pasta: PathBuf,
+        /// Porta UDP
+        #[arg(long, default_value_t = isper_sync::DEFAULT_PORT)]
+        porta: u16,
+        /// Endereço para pôr no código no lugar dos da rede (o emulador
+        /// Android chega ao PC por 10.0.2.2); pode repetir
+        #[arg(long)]
+        anunciar: Vec<std::net::SocketAddr>,
+        /// Aprova o pareamento sem perguntar
+        #[arg(long)]
+        aprovar: bool,
+        /// Relay (URL) para quando o celular estiver fora da rede
+        #[arg(long)]
+        relay: Option<String>,
+        /// Quanto o código de pareamento vale, em segundos
+        #[arg(long, default_value_t = 120)]
+        validade: u64,
+    },
+    /// Faz de celular: pareia com um PC (pelo código do QR) e manda um áudio
+    Enviar {
+        /// O áudio a mandar
+        arquivo: PathBuf,
+        /// O código de pareamento (o texto do QR); sem ele, usa o PC já pareado
+        #[arg(long)]
+        codigo: Option<String>,
+        /// Pasta com a chave e o PC pareado deste "celular"
+        #[arg(long)]
+        estado: Option<PathBuf>,
+        /// Espera a ata por até N segundos e a salva ao lado do áudio
+        #[arg(long, default_value_t = 0)]
+        esperar: u64,
+        /// Nome do aparelho, como o PC mostra
+        #[arg(long, default_value = "isper-cli")]
+        nome: String,
+        /// Id da gravação (padrão: o nome do arquivo)
+        #[arg(long)]
+        id: Option<String>,
+        /// Momentos marcados, em segundos (ex.: 1.5,3)
+        #[arg(long, value_delimiter = ',')]
+        momentos: Vec<f64>,
     },
     /// Identifica os falantes de um arquivo de áudio (calibração da diarização)
     Diarize {
@@ -199,6 +248,41 @@ fn main() -> anyhow::Result<()> {
     match &cli.cmd {
         Cmd::Meeting { seconds, source } => run_meeting(&cli, *seconds, source),
         Cmd::Encode { audio, saida, kbps } => run_encode(audio, saida, *kbps),
+        Cmd::Receber {
+            pasta,
+            porta,
+            anunciar,
+            aprovar,
+            relay,
+            validade,
+        } => sync::receive(
+            pasta,
+            *porta,
+            anunciar,
+            *aprovar,
+            relay.as_deref(),
+            *validade,
+        ),
+        Cmd::Enviar {
+            arquivo,
+            codigo,
+            estado,
+            esperar,
+            nome,
+            id,
+            momentos,
+        } => {
+            let default_state = std::env::temp_dir().join("isper-cli-celular");
+            sync::send(sync::SendArgs {
+                file: arquivo,
+                code: codigo.as_deref(),
+                state_dir: estado.as_deref().unwrap_or(&default_state),
+                wait_secs: *esperar,
+                name: nome,
+                id: id.as_deref(),
+                moments: momentos.clone(),
+            })
+        }
         Cmd::Diarize {
             path,
             speakers,

@@ -5,6 +5,7 @@ members = [
     "crates/isper-llm",
     "crates/isper-models",
     "crates/isper-diarize",
+    "crates/isper-sync",
     "crates/isper-cli",
     "crates/isper-mobile",
     "crates/uniffi-bindgen",
