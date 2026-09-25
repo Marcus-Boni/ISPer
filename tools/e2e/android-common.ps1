@@ -32,6 +32,12 @@ function Check {
   if ($Ok) { "  OK     $What" } else { $script:Failures++; "  FALHA  $What" }
 }
 
+function Start-Detached([string]$CommandLine) {
+  # Um processo que nao e filho deste script (criado pelo servico do WMI).
+  $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $CommandLine }
+  if ($r.ReturnValue -ne 0) { throw "nao consegui iniciar: $CommandLine (Win32_Process.Create = $($r.ReturnValue))" }
+}
+
 function Start-IsperEmulator {
   param(
     [string]$Avd = 'isper-lab',
@@ -42,9 +48,18 @@ function Start-IsperEmulator {
     "criando o AVD ($Image)"
     'no' | & $script:AvdManager create avd -n $Avd -k $Image -d pixel_7 --force | Out-Null
   }
+  # O servidor do adb e o emulador continuam rodando depois do script. Como
+  # filhos dele, herdariam os handles e segurariam aberto o pipe de quem
+  # chamou: um `android-recorder.ps1 | tail` nunca terminava. Pelo WMI, eles
+  # nascem sem herdar nada.
+  if (-not (Get-Process adb -ErrorAction SilentlyContinue)) {
+    Start-Detached "`"$($script:AdbExe)`" start-server"
+    Start-Sleep -Seconds 2
+  }
   if (-not ((Adb devices) -match 'emulator-\d+\s+device')) {
     "subindo o emulador (sem janela)"
-    Start-Process $script:EmulatorExe -ArgumentList @('-avd', $Avd, '-no-window', '-no-audio', '-no-boot-anim', '-no-snapshot-save', '-gpu', 'swiftshader_indirect', '-memory', '4096', '-cores', '4') -WindowStyle Hidden | Out-Null
+    $argLine = @('-avd', $Avd, '-no-window', '-no-audio', '-no-boot-anim', '-no-snapshot-save', '-gpu', 'swiftshader_indirect', '-memory', '4096', '-cores', '4') -join ' '
+    Start-Detached "`"$($script:EmulatorExe)`" $argLine"
     $script:StartedEmulator = $true
   }
   Adb wait-for-device | Out-Null

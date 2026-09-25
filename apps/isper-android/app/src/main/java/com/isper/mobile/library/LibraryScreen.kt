@@ -22,6 +22,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -29,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -36,6 +38,8 @@ import com.isper.mobile.R
 import com.isper.mobile.core.GapKind
 import com.isper.mobile.core.RecordingInfo
 import com.isper.mobile.core.RecordingState
+import com.isper.mobile.core.RemoteStage
+import com.isper.mobile.sync.PcSync
 import com.isper.mobile.recording.formatDuration
 import java.io.File
 import java.time.OffsetDateTime
@@ -60,10 +64,19 @@ fun LibraryScreen(
     state: LibraryState,
     actions: LibraryViewModel,
     onMeasure: (RecordingInfo) -> Unit,
+    onOpenMinutes: (RecordingInfo) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val visible = state.recordings.filterNot { it.id in state.pendingDelete }
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
+    val pc by actions.pc.collectAsState()
+    val sending by actions.sending.collectAsState()
+    val lastError by actions.lastError.collectAsState()
+    val finished = visible.filter { it.state != RecordingState.RECORDING }
+    val waiting = finished.count { it.remote == RemoteStage.QUEUED || it.remote == RemoteStage.PROCESSING }
+    val unsent = finished.count { it.remote == RemoteStage.NOT_SENT || it.remote == RemoteStage.SENDING }
+
+    PairDialogs(state.pair, actions)
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -79,6 +92,16 @@ fun LibraryScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+        item {
+            PcCard(
+                pc = pc,
+                sending = sending,
+                waiting = waiting,
+                unsent = unsent,
+                lastError = lastError,
+                actions = actions,
+            )
         }
         if (!state.loading && visible.isEmpty()) {
             item {
@@ -104,6 +127,9 @@ fun LibraryScreen(
                 onToggle = { expanded = if (expanded == info.id) null else info.id },
                 actions = actions,
                 onMeasure = { onMeasure(info) },
+                paired = pc != null,
+                sendingFraction = sending?.takeIf { it.id == info.id }?.fraction,
+                onOpenMinutes = { onOpenMinutes(info) },
             )
         }
     }
@@ -119,6 +145,9 @@ private fun RecordingCard(
     onToggle: () -> Unit,
     actions: LibraryViewModel,
     onMeasure: () -> Unit,
+    paired: Boolean,
+    sendingFraction: Float?,
+    onOpenMinutes: () -> Unit,
 ) {
     val context = LocalContext.current
     Card(
@@ -150,6 +179,26 @@ private fun RecordingCard(
                 if (silenced > 0) {
                     Chip(stringResource(R.string.lib_chip_silenced, silenced), MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                if (info.state != RecordingState.RECORDING) RemoteChip(info, paired, sendingFraction)
+            }
+            if (info.remote == RemoteStage.FAILED && !info.remoteError.isNullOrBlank()) {
+                Text(
+                    info.remoteError.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (info.minutesPath != null || info.remote == RemoteStage.FAILED) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (info.minutesPath != null) {
+                        TextButton(onClick = onOpenMinutes, modifier = Modifier.testTag("ver-ata-${info.id}")) {
+                            Text(stringResource(R.string.lib_open_minutes))
+                        }
+                    }
+                    if (info.remote == RemoteStage.FAILED) {
+                        TextButton(onClick = { actions.retry(info) }) { Text(stringResource(R.string.lib_retry)) }
+                    }
+                }
             }
             if (playing) {
                 val total = ((info.durationSecs ?: 1.0) * 1000).coerceAtLeast(1.0)
@@ -174,14 +223,33 @@ private fun RecordingCard(
     }
 }
 
+/** Em que pé a gravação está no PC. */
 @Composable
-private fun Chip(text: String, color: Color) {
+private fun RemoteChip(info: RecordingInfo, paired: Boolean, sendingFraction: Float?) {
+    val (text, color) = when (info.remote) {
+        RemoteStage.NOT_SENT ->
+            if (paired) stringResource(R.string.lib_remote_not_sent) to MaterialTheme.colorScheme.onSurfaceVariant
+            else return
+        RemoteStage.SENDING ->
+            (sendingFraction?.let { stringResource(R.string.lib_remote_sending, (it * 100).toInt()) }
+                ?: stringResource(R.string.lib_remote_partial)) to MaterialTheme.colorScheme.primary
+        RemoteStage.QUEUED -> stringResource(R.string.lib_remote_queued) to MaterialTheme.colorScheme.primary
+        RemoteStage.PROCESSING -> stringResource(R.string.lib_remote_processing) to MaterialTheme.colorScheme.primary
+        RemoteStage.READY -> stringResource(R.string.lib_remote_ready) to MaterialTheme.colorScheme.tertiary
+        RemoteStage.FAILED -> stringResource(R.string.lib_remote_failed) to MaterialTheme.colorScheme.error
+    }
+    Chip(text, color, textModifier = Modifier.testTag("remoto-${info.id}"))
+}
+
+@Composable
+private fun Chip(text: String, color: Color, textModifier: Modifier = Modifier) {
     Surface(color = color.copy(alpha = 0.12f), shape = RoundedCornerShape(50)) {
         Text(
             text,
             color = color,
             style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            // A etiqueta de teste vai no texto: é ele que o uiautomator lê.
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp).then(textModifier),
         )
     }
 }
