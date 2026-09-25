@@ -45,6 +45,40 @@ pub struct MeetingRow {
     pub source_name: Option<String>,
 }
 
+/// Um celular pareado com este PC (Fase 9.3).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SyncDevice {
+    /// A chave pública do aparelho, em hexadecimal: é a identidade dele.
+    pub id: String,
+    /// O nome que o aparelho mandou ("Galaxy Tab A9").
+    pub name: String,
+    /// Quando pareou (`dd/mm/aaaa HH:MM`).
+    pub paired_at: String,
+    /// A última vez que o aparelho apareceu.
+    pub last_seen: Option<String>,
+}
+
+/// Uma gravação que chegou de um celular pareado (Fase 9.3).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SyncItem {
+    /// A chave do aparelho que mandou.
+    pub device_id: String,
+    /// O id da gravação no celular.
+    pub recording_id: String,
+    /// SHA-256 do arquivo, conferido na chegada.
+    pub sha256: String,
+    /// Onde o arquivo ficou no PC.
+    pub path: String,
+    /// `queued` (na fila de importação) · `done` (virou reunião) · `failed`.
+    pub state: String,
+    /// A reunião em que a gravação virou (em `done`).
+    pub meeting_id: Option<i64>,
+    /// Por que não virou reunião (em `failed`).
+    pub error: Option<String>,
+    /// Quando chegou (`dd/mm/aaaa HH:MM`).
+    pub received_at: String,
+}
+
 /// Uma reunião transcrita a partir de um arquivo de áudio (Fase 9.0), pronta
 /// para o banco — ver [`MeetingStore::save_imported`].
 #[derive(Debug, Clone)]
@@ -224,7 +258,7 @@ fn like_pattern(q: &str) -> String {
 /// de versão maior (criado por um ISPer mais novo) é recusado em vez de
 /// alterado às cegas. Bancos anteriores a esta numeração chegam como 0 e
 /// passam pelo passo 1, que é idempotente sobre o que eles já têm.
-pub const SCHEMA_VERSION: i64 = 5;
+pub const SCHEMA_VERSION: i64 = 6;
 
 /// Eventos de métrica mais antigos que isto (90 dias) saem do banco.
 pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
@@ -345,6 +379,7 @@ fn migrate(conn: &Connection) -> Result<()> {
             2 => migrate_to_v3(&tx)?,
             3 => migrate_to_v4(&tx)?,
             4 => migrate_to_v5(&tx)?,
+            5 => migrate_to_v6(&tx)?,
             other => {
                 return Err(IsperError::Schema(format!(
                     "sem migração a partir da versão {other}"
@@ -530,6 +565,45 @@ fn migrate_to_v5(conn: &Connection) -> Result<()> {
         [],
     )?;
     Ok(())
+}
+
+/// Passo 6 (Fase 9.3) — os celulares pareados e as gravações que chegaram
+/// deles. A chave de cada lado mora fora do banco; aqui fica só quem pode
+/// mandar e o que já chegou.
+fn migrate_to_v6(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS sync_devices (
+             id         TEXT PRIMARY KEY,
+             name       TEXT NOT NULL,
+             paired_at  TEXT NOT NULL,
+             last_seen  TEXT
+         );
+         CREATE TABLE IF NOT EXISTS sync_items (
+             device_id    TEXT NOT NULL,
+             recording_id TEXT NOT NULL,
+             sha256       TEXT NOT NULL,
+             path         TEXT NOT NULL,
+             state        TEXT NOT NULL,
+             meeting_id   INTEGER,
+             error        TEXT,
+             received_at  TEXT NOT NULL,
+             PRIMARY KEY (device_id, recording_id)
+         );",
+    )?;
+    Ok(())
+}
+
+fn sync_item_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<SyncItem> {
+    Ok(SyncItem {
+        device_id: r.get(0)?,
+        recording_id: r.get(1)?,
+        sha256: r.get(2)?,
+        path: r.get(3)?,
+        state: r.get(4)?,
+        meeting_id: r.get(5)?,
+        error: r.get(6)?,
+        received_at: r.get(7)?,
+    })
 }
 
 /// Preenche `ts_col` a partir do texto de `text_col` onde ainda está vazio.
@@ -789,6 +863,139 @@ impl MeetingStore {
         }
         tx.commit()?;
         Ok(id)
+    }
+
+    // ------------------------------------------------ celulares (Fase 9.3)
+
+    /// Os celulares pareados, pelo nome.
+    pub fn sync_devices(&self) -> Result<Vec<SyncDevice>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, paired_at, last_seen FROM sync_devices ORDER BY name, paired_at",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(SyncDevice {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                paired_at: r.get(2)?,
+                last_seen: r.get(3)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// O celular pareado com esta chave, se houver.
+    pub fn sync_device(&self, id: &str) -> Result<Option<SyncDevice>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT id, name, paired_at, last_seen FROM sync_devices WHERE id = ?1",
+                params![id],
+                |r| {
+                    Ok(SyncDevice {
+                        id: r.get(0)?,
+                        name: r.get(1)?,
+                        paired_at: r.get(2)?,
+                        last_seen: r.get(3)?,
+                    })
+                },
+            )
+            .optional()?)
+    }
+
+    /// Guarda um celular aprovado (parear de novo atualiza o nome e a data).
+    pub fn add_sync_device(&self, id: &str, name: &str, now: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO sync_devices (id, name, paired_at, last_seen) VALUES (?1, ?2, ?3, ?3)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, paired_at = excluded.paired_at,
+                                           last_seen = excluded.last_seen",
+            params![id, name, now],
+        )?;
+        Ok(())
+    }
+
+    /// O celular apareceu: anota quando, e o nome atual dele.
+    pub fn touch_sync_device(&self, id: &str, name: &str, now: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE sync_devices SET last_seen = ?3, name = CASE WHEN ?2 = '' THEN name ELSE ?2 END
+             WHERE id = ?1",
+            params![id, name, now],
+        )?;
+        Ok(())
+    }
+
+    /// Esquece o celular: ele não manda mais nada. As reuniões que vieram
+    /// dele ficam; some só o registro das gravações recebidas.
+    pub fn forget_sync_device(&self, id: &str) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM sync_items WHERE device_id = ?1", params![id])?;
+        tx.execute("DELETE FROM sync_devices WHERE id = ?1", params![id])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Registra (ou substitui) uma gravação recebida.
+    pub fn put_sync_item(&self, item: &SyncItem) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO sync_items
+             (device_id, recording_id, sha256, path, state, meeting_id, error, received_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                item.device_id,
+                item.recording_id,
+                item.sha256,
+                item.path,
+                item.state,
+                item.meeting_id,
+                item.error,
+                item.received_at
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Uma gravação recebida, pelo aparelho e pelo id dela no aparelho.
+    pub fn sync_item(&self, device_id: &str, recording_id: &str) -> Result<Option<SyncItem>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT device_id, recording_id, sha256, path, state, meeting_id, error, received_at
+                 FROM sync_items WHERE device_id = ?1 AND recording_id = ?2",
+                params![device_id, recording_id],
+                sync_item_from_row,
+            )
+            .optional()?)
+    }
+
+    /// Fecha uma gravação recebida: `done` com a reunião, ou `failed` com o motivo.
+    pub fn finish_sync_item(
+        &self,
+        device_id: &str,
+        recording_id: &str,
+        meeting_id: Option<i64>,
+        error: Option<&str>,
+    ) -> Result<()> {
+        let state = if meeting_id.is_some() {
+            "done"
+        } else {
+            "failed"
+        };
+        self.conn.execute(
+            "UPDATE sync_items SET state = ?3, meeting_id = ?4, error = ?5
+             WHERE device_id = ?1 AND recording_id = ?2",
+            params![device_id, recording_id, state, meeting_id, error],
+        )?;
+        Ok(())
+    }
+
+    /// As gravações que chegaram e ainda não viraram reunião — o app as põe
+    /// na fila de novo ao abrir (ele pode ter fechado no meio).
+    pub fn queued_sync_items(&self) -> Result<Vec<SyncItem>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT device_id, recording_id, sha256, path, state, meeting_id, error, received_at
+             FROM sync_items WHERE state = 'queued' ORDER BY received_at",
+        )?;
+        let rows = stmt.query_map([], sync_item_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     /// A reunião que veio de um áudio com este SHA-256, se já foi importado.
@@ -1539,6 +1746,71 @@ mod tests {
                 "banco recém-criado não tem o que guardar"
             );
         }
+    }
+
+    #[test]
+    fn celulares_pareados_e_gravacoes_recebidas() {
+        let store = temp_store("sync");
+        assert!(store.sync_devices().unwrap().is_empty());
+        store
+            .add_sync_device("ab12", "Galaxy Tab A9", "24/09/2026 20:10")
+            .unwrap();
+        store
+            .touch_sync_device("ab12", "", "24/09/2026 20:15")
+            .unwrap();
+        let d = store.sync_device("ab12").unwrap().unwrap();
+        assert_eq!(d.name, "Galaxy Tab A9", "nome vazio não apaga o que havia");
+        assert_eq!(d.last_seen.as_deref(), Some("24/09/2026 20:15"));
+        assert!(store.sync_device("outro").unwrap().is_none());
+
+        let item = SyncItem {
+            device_id: "ab12".into(),
+            recording_id: "20260924-201224".into(),
+            sha256: "ff".repeat(32),
+            path: "C:/Recebidos/20260924-201224.opus".into(),
+            state: "queued".into(),
+            meeting_id: None,
+            error: None,
+            received_at: "24/09/2026 20:16".into(),
+        };
+        store.put_sync_item(&item).unwrap();
+        assert_eq!(store.queued_sync_items().unwrap(), vec![item.clone()]);
+
+        let id = store
+            .save_imported(&NewImportedMeeting {
+                title: "Visita",
+                started_at: "24/09/2026 20:12",
+                duration_secs: 48.0,
+                md_path: "C:/x.md",
+                segments: &[("Participante 1".into(), 0.0, 2.0, "oi".into())],
+                source_name: "Galaxy Tab A9 · 20260924-201224.opus",
+                source_sha256: &item.sha256,
+            })
+            .unwrap();
+        store
+            .finish_sync_item("ab12", "20260924-201224", Some(id), None)
+            .unwrap();
+        let done = store.sync_item("ab12", "20260924-201224").unwrap().unwrap();
+        assert_eq!((done.state.as_str(), done.meeting_id), ("done", Some(id)));
+        assert!(store.queued_sync_items().unwrap().is_empty());
+
+        store
+            .finish_sync_item("ab12", "20260924-201224", None, Some("sem fala"))
+            .unwrap();
+        let failed = store.sync_item("ab12", "20260924-201224").unwrap().unwrap();
+        assert_eq!(failed.state, "failed");
+        assert_eq!(failed.error.as_deref(), Some("sem fala"));
+
+        // Esquecer o aparelho leva o registro das gravações, não a reunião.
+        store.forget_sync_device("ab12").unwrap();
+        assert!(store.sync_device("ab12").unwrap().is_none());
+        assert!(
+            store
+                .sync_item("ab12", "20260924-201224")
+                .unwrap()
+                .is_none()
+        );
+        assert!(store.get_meeting(id).unwrap().is_some());
     }
 
     #[test]
