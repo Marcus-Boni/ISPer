@@ -275,6 +275,15 @@ pub fn list(dir: &Path) -> Result<Vec<CaptureManifest>> {
         if path.extension().and_then(|e| e.to_str()) != Some(MANIFEST_EXT) {
             continue;
         }
+        // Só `<id>.json` é manifesto: um id nunca tem ponto, e os arquivos de
+        // outros módulos ao lado (`<id>.sync.json`, da sincronia) ficam de fora.
+        let is_manifest = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .is_some_and(|stem| !stem.contains('.'));
+        if !is_manifest {
+            continue;
+        }
         match CaptureManifest::load(&path) {
             Ok(m) => out.push(m),
             Err(e) => tracing::warn!("{e}"),
@@ -427,6 +436,14 @@ mod tests {
             (m.gaps[0].start_secs - 1.0).abs() < 1e-9 && (m.gaps[0].end_secs - 2.0).abs() < 1e-9
         );
         assert_eq!(m.gaps[1].reason, GapReason::Paused);
+        // Os arquivos da sincronia (9.3) ao lado não são manifestos.
+        std::fs::write(d.join("20260924-150000.sync.json"), r#"{"stage":"queued"}"#).unwrap();
+        std::fs::write(
+            d.join("20260924-150000.ata.md"),
+            "# Ata
+",
+        )
+        .unwrap();
         assert_eq!(list(&d).unwrap(), vec![m.clone()]);
         assert!(recover(&d, None).unwrap().is_empty(), "nada a recuperar");
         let decoded = crate::decode::decode_to_16k(&m.audio_path(&d), None, None).unwrap();
