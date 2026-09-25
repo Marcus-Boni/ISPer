@@ -42,6 +42,18 @@
   .footer #status { flex: 1; }
   /* Caminhos longos (%LOCALAPPDATA%\\…) quebram em vez de abrir rolagem horizontal. */
   code { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+  /* Pareamento com o celular: o QR fica sempre preto no branco (o leitor do
+     celular não lê o inverso), em qualquer tema. */
+  .pairbox { margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel-2); }
+  #phoneqrwrap { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .qr { background: #fff; border-radius: 10px; padding: 8px; line-height: 0; flex: 0 0 auto; }
+  .qr img { width: 200px; height: 200px; display: block; }
+  .pairside { flex: 1 1 200px; display: grid; gap: 10px; }
+  .pairask { font-size: 13px; margin: 0 0 10px; }
+  .dev { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+  .dev:first-child { border-top: none; }
+  .dev .dname { font-size: 13px; }
+  .dev .dnote { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 </style>
 </head>
 <body class="atmos">
@@ -204,6 +216,50 @@
       <option value="0.8" data-i18n="settings.reunioes.0-8-junta-bastante">0,8 — junta bastante</option>
     </select>
     <p class="hint" data-i18n="settings.reunioes.distancia-maxima-entre-duas-vozes">Distância máxima entre duas vozes para serem a mesma pessoa. Mexer aqui sem comparar o resultado costuma piorar — prefira informar o número de participantes acima.</p>
+  </details>
+</div>
+
+<div class="card reveal" data-i="4">
+  <h2 data-i18n="settings.celular.titulo">Celular</h2>
+  <label class="switch"><input type="checkbox" id="phonesync" aria-describedby="phonehint"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.celular.receber">Receber as gravações do ISPer no celular</span></label>
+  <p class="hint" id="phonestate" role="status" aria-live="polite"></p>
+  <p class="hint" id="phonehint" data-i18n="settings.celular.hint">O celular grava; o PC transcreve com o mesmo passe final e devolve a ata. A conexão é direta pela rede local e cifrada de ponta a ponta, e o celular só fala com este PC. Na primeira vez, o Windows pergunta se o ISPer pode usar a rede: marque "Redes privadas".</p>
+  <div class="row mt8">
+    <button class="btn btn-primary" id="phonepair" data-i18n="settings.celular.parear">Parear um celular</button>
+    <button class="btn" id="openphone" data-i18n="settings.celular.pasta">Abrir a pasta das gravações</button>
+  </div>
+
+  <div id="phonepairbox" class="pairbox" hidden>
+    <div id="phoneqrwrap">
+      <div class="qr"><img id="phoneqr" width="200" height="200" alt="QR de pareamento" data-i18n-attr="alt:settings.celular.qr-alt"></div>
+      <div class="pairside">
+        <p class="hint mt0" id="phoneqrhint"></p>
+        <div class="row">
+          <button class="btn btn-sm" id="phonecopy" data-i18n="settings.celular.copiar">Copiar o código</button>
+          <button class="btn btn-sm" id="phonecancel" data-i18n="settings.celular.cancelar">Cancelar</button>
+        </div>
+      </div>
+    </div>
+    <div id="phoneask" hidden>
+      <p class="pairask" id="phoneasktext"></p>
+      <div class="row">
+        <button class="btn btn-primary" id="phoneallow" data-i18n="settings.celular.permitir">Permitir</button>
+        <button class="btn" id="phonedeny" data-i18n="settings.celular.recusar">Recusar</button>
+      </div>
+    </div>
+  </div>
+
+  <span class="lbl mt8" id="lbl-phonedevices" data-i18n="settings.celular.aparelhos">Aparelhos pareados</span>
+  <div id="phonedevices" class="stack mt0" role="group" aria-labelledby="lbl-phonedevices"></div>
+
+  <details class="mt8">
+    <summary class="lbl" data-i18n="settings.celular.avancado">Avançado</summary>
+    <label class="lbl mt8" for="phonerelay" data-i18n="settings.celular.relay">Relay, para quando o celular estiver fora da rede</label>
+    <div class="row">
+      <input class="field" id="phonerelay" type="url" spellcheck="false" placeholder="https://relay.exemplo.com.br" data-i18n-attr="placeholder:settings.celular.relay-placeholder" aria-describedby="phonerelayhint">
+      <button class="btn" id="phonerelaysave" data-i18n="settings.celular.relay-salvar">Salvar</button>
+    </div>
+    <p class="hint" id="phonerelayhint" data-i18n="settings.celular.relay-hint">Vazio: só a rede local, sem falar com nenhum servidor de fora. Com um relay iroh (de preferência próprio), o celular também manda de fora da rede; o relay só repassa dados cifrados, que ele não consegue ler. Os celulares já pareados aprendem o relay na próxima conversa.</p>
   </details>
 </div>
 
@@ -759,6 +815,93 @@
     try { await navigator.clipboard.writeText(diagText); UI.flash($('copydiag'), t('common.copied')); }
     catch (_) { status(t('settings.msg.copy-failed'), 'err'); }
   });
+  // ------------------------------------------------ celular (Fase 9.3)
+  let phoneCode = null;
+  let phoneTick = null;
+  function phoneCountdown(until) {
+    clearInterval(phoneTick);
+    const paint = () => {
+      const left = Math.max(0, Math.round((until - Date.now()) / 1000));
+      $('phoneqrhint').textContent = t('settings.celular.qr-hint', { secs: left });
+      if (left <= 0) { clearInterval(phoneTick); renderPhone(); }
+    };
+    paint();
+    phoneTick = setInterval(paint, 1000);
+  }
+  async function renderPhone() {
+    let s;
+    try { s = await invoke('phone_sync_status'); } catch (e) { $('phonestate').textContent = t('common.unavailable', { e }); return; }
+    $('phonesync').checked = !!s.enabled;
+    const st = $('phonestate');
+    if (s.error) { st.textContent = t('settings.celular.estado-erro', { e: s.error }); st.className = 'hint text-warn'; }
+    else if (s.running) { /* a porta não é quantidade: sem separador de milhar */ st.textContent = t('settings.celular.estado-ligado', { pc: s.pc_name, port: s.port == null ? '?' : String(s.port) }); st.className = 'hint text-good'; }
+    else { st.textContent = t('settings.celular.estado-desligado'); st.className = 'hint'; }
+    $('phonepair').disabled = !s.running;
+    if (document.activeElement !== $('phonerelay')) $('phonerelay').value = s.relay || '';
+
+    const box = $('phonepairbox');
+    if (s.pending) {
+      box.hidden = false; $('phoneqrwrap').hidden = true; $('phoneask').hidden = false;
+      $('phoneasktext').textContent = t('settings.celular.pedido', { name: s.pending.name });
+      clearInterval(phoneTick);
+      $('phoneallow').focus();
+    } else if (s.pairing) {
+      box.hidden = false; $('phoneask').hidden = true; $('phoneqrwrap').hidden = false;
+      phoneCode = s.pairing.code;
+      // O SVG vem do próprio app (o QR desenhado em Rust); como <img>, não roda nada.
+      $('phoneqr').src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s.pairing.svg);
+      phoneCountdown(Date.now() + s.pairing.remaining_secs * 1000);
+    } else {
+      box.hidden = true; phoneCode = null; clearInterval(phoneTick);
+    }
+
+    const list = $('phonedevices');
+    if (!s.devices.length) {
+      list.replaceChildren(el('p', 'hint mt0', t('settings.celular.nenhum')));
+    } else {
+      list.replaceChildren(...s.devices.map((d) => {
+        const row = el('div', 'dev');
+        const info = el('div');
+        info.append(el('div', 'dname', d.name));
+        const seen = d.last_seen && d.last_seen !== d.paired_at ? ' · ' + t('settings.celular.visto', { date: d.last_seen }) : '';
+        info.append(el('div', 'dnote', t('settings.celular.pareado-em', { date: d.paired_at }) + seen));
+        const forget = el('button', 'btn btn-sm', t('settings.celular.esquecer'));
+        forget.setAttribute('aria-label', t('settings.celular.esquecer-aria', { name: d.name }));
+        forget.addEventListener('click', async () => {
+          try { await invoke('phone_sync_forget', { id: d.id }); status(t('settings.celular.esquecido', { name: d.name }), 'ok'); }
+          catch (e) { status(t('common.error', { e }), 'err'); }
+        });
+        row.append(info, forget);
+        return row;
+      }));
+    }
+  }
+  listen('isper-phone', () => renderPhone());
+  $('phonesync').addEventListener('change', async (ev) => {
+    try { await invoke('phone_sync_set_enabled', { enabled: ev.target.checked }); }
+    catch (e) { status(t('common.error', { e }), 'err'); renderPhone(); }
+  });
+  $('phonepair').addEventListener('click', async () => {
+    try { await invoke('phone_sync_start_pairing'); }
+    catch (e) { status(t('common.error', { e }), 'err'); }
+  });
+  $('phonecancel').addEventListener('click', () => invoke('phone_sync_cancel_pairing').catch(() => {}));
+  $('phoneallow').addEventListener('click', () => invoke('phone_sync_answer', { allow: true }).catch(() => {}));
+  $('phonedeny').addEventListener('click', () => invoke('phone_sync_answer', { allow: false }).catch(() => {}));
+  $('phonecopy').addEventListener('click', async () => {
+    if (!phoneCode) return;
+    try { await navigator.clipboard.writeText(phoneCode); UI.flash($('phonecopy'), t('common.copied')); }
+    catch (e) { status(t('common.error', { e }), 'err'); }
+  });
+  $('phonerelaysave').addEventListener('click', async () => {
+    try { await invoke('phone_sync_set_relay', { relay: $('phonerelay').value }); status(t('settings.celular.relay-ok'), 'ok'); }
+    catch (e) { status(t('common.error', { e }), 'err'); }
+  });
+  $('openphone').addEventListener('click', () => invoke('open_phone_folder').catch(e => status(t('common.error', { e }), 'err')));
+  // Fechar a janela fecha o pareamento aberto: o QR não fica valendo sem ninguém olhando.
+  window.addEventListener('beforeunload', () => { if (phoneCode) invoke('phone_sync_cancel_pairing').catch(() => {}); });
+  renderPhone();
+
   $('openlogs').addEventListener('click', () => invoke('open_logs_folder').catch(e => status(t('common.error', { e }), 'err')));
   $('openimport').addEventListener('click', () => invoke('open_import_folder').catch(e => status(t('common.error', { e }), 'err')));
   $('exportdiag').addEventListener('click', async () => {

@@ -5,8 +5,8 @@
 //!
 //! ```text
 //!  Biblioteca (escolher/arrastar) ─┐
-//!                                  ├─► fila ─► espera a reunião e o motor
-//!  pasta Importar (vigiada) ───────┘            │
+//!  pasta Importar (vigiada) ───────┼─► fila ─► espera a reunião e o motor
+//!  celular pareado (9.3) ──────────┘            │
 //!                          SHA-256 já importado? ├─► aponta a reunião que existe
 //!                                               ▼
 //!                  ler (16 kHz) → transcrever → falantes → salvar → resumo
@@ -43,12 +43,33 @@ pub(crate) enum Origin {
     Picked,
     /// Deixado na pasta vigiada: muda de pasta ao terminar.
     Watched,
+    /// Mandado por um celular pareado (Fase 9.3): fica na pasta do aparelho,
+    /// e o resultado volta para o celular.
+    Phone,
+}
+
+/// O que o celular contou da gravação (o manifesto dele).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct PhoneMeta {
+    /// A chave do aparelho (hexadecimal) e o id da gravação nele.
+    pub(crate) device_id: String,
+    pub(crate) recording_id: String,
+    /// Quando a gravação começou, já em `dd/mm/aaaa hh:mm`.
+    pub(crate) started_at: Option<String>,
+    /// Momentos marcados no celular, em segundos.
+    pub(crate) moments: Vec<f32>,
+    /// Como a origem aparece na ata e na Biblioteca ("Galaxy Tab A9 · …").
+    pub(crate) source_name: String,
+    /// O nome do áudio que chegou ao celular por "Compartilhar", se veio
+    /// assim — o título sai dele quando descreve a conversa.
+    pub(crate) original_name: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 struct Job {
     path: PathBuf,
     origin: Origin,
+    phone: Option<PhoneMeta>,
 }
 
 /// A etapa do arquivo em processamento, para a Biblioteca.
@@ -292,15 +313,25 @@ fn process(app: &AppHandle, job: &Job) -> Result<Done, Failure> {
     }
 
     set_stage(app, Stage::Saving, 0.0);
-    let source_name = file_name(&job.path);
-    let stem = job
-        .path
+    let phone = job.phone.as_ref();
+    let source_name = phone
+        .map(|m| m.source_name.clone())
+        .unwrap_or_else(|| file_name(&job.path));
+    // A data e o título saem do nome do arquivo; o do celular traz a data no
+    // manifesto, e o nome original, se o áudio veio de outro app.
+    let stem = phone
+        .and_then(|m| m.original_name.as_deref())
+        .map(Path::new)
+        .unwrap_or(&job.path)
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let started_at =
-        recording::started_at_from_name(&stem).unwrap_or_else(|| modified_stamp(&job.path));
+    let started_at = phone
+        .and_then(|m| m.started_at.clone())
+        .or_else(|| recording::started_at_from_name(&stem))
+        .unwrap_or_else(|| modified_stamp(&job.path));
     let named = recording::title_from_name(&stem);
+    let moments: &[f32] = phone.map_or(&[], |m| m.moments.as_slice());
     let mut title = named.clone().unwrap_or_else(|| {
         crate::i18n::trv(
             app,
@@ -322,7 +353,7 @@ fn process(app: &AppHandle, job: &Job) -> Result<Done, Failure> {
         })
         .collect();
     let secs = decoded.duration_secs();
-    let mut md = meeting::render_markdown(&title, &started_at, secs, &refs, None, &[]);
+    let mut md = meeting::render_markdown(&title, &started_at, secs, &refs, None, moments);
     meeting::insert_source_line(&mut md, &source_name);
     std::fs::write(&md_path, &md).map_err(fail)?;
     let id = store
@@ -336,6 +367,14 @@ fn process(app: &AppHandle, job: &Job) -> Result<Done, Failure> {
             source_sha256: &sha,
         })
         .map_err(fail)?;
+    if !moments.is_empty()
+        && let Err(e) = store.save_moments(id, moments)
+    {
+        tracing::warn!(
+            meeting_id = id,
+            "não consegui guardar os momentos do celular: {e}"
+        );
+    }
     tracing::info!(
         meeting_id = id,
         arquivo = %source_name,
@@ -458,6 +497,14 @@ fn finish(app: &AppHandle, job: &Job, result: Result<Done, Failure>) {
         },
     };
 
+    if let Some(meta) = &job.phone {
+        let (meeting_id, error) = match &result {
+            Ok(Done::Imported { id, .. } | Done::Duplicate { id }) => (Some(*id), None),
+            Err(f) => (None, Some(f.message.as_str())),
+        };
+        crate::phone_sync::import_finished(meta, meeting_id, error);
+    }
+
     if job.origin == Origin::Watched {
         let moved = match &result {
             Ok(_) => move_aside(&job.path, DONE_DIR),
@@ -484,9 +531,9 @@ fn finish(app: &AppHandle, job: &Job, result: Result<Done, Failure>) {
             }),
             _,
         ) => notify_done(app, *id, title, *secs, *has_summary, md_path),
-        // Da pasta vigiada ninguém está olhando: o erro vira aviso. Da
-        // Biblioteca, ele aparece ali mesmo.
-        (Err(f), Origin::Watched) if !f.cancelled => {
+        // Da pasta vigiada e do celular ninguém está olhando: o erro vira
+        // aviso. Da Biblioteca, ele aparece ali mesmo.
+        (Err(f), Origin::Watched | Origin::Phone) if !f.cancelled => {
             let heading = crate::i18n::tr(app, "notify.import-failed");
             let _ = notify::show(
                 notify::Toast {
@@ -550,6 +597,30 @@ fn notify_done(app: &AppHandle, id: i64, title: &str, secs: f32, has_summary: bo
             );
         }
     }
+}
+
+/// Põe na fila uma gravação que chegou do celular (Fase 9.3). `false` se ela
+/// já estava na fila.
+pub(crate) fn enqueue_phone(app: &AppHandle, path: PathBuf, meta: PhoneMeta) -> bool {
+    let q = &app.state::<AppState>().imports;
+    let pushed = q.push(Job {
+        path,
+        origin: Origin::Phone,
+        phone: Some(meta),
+    });
+    publish(app);
+    pushed
+}
+
+/// A gravação deste caminho está na fila (`Some(false)`) ou sendo processada
+/// agora (`Some(true)`)?
+pub(crate) fn queue_position(app: &AppHandle, path: &Path) -> Option<bool> {
+    let q = &app.state::<AppState>().imports;
+    if !q.busy.lock_or_recover().contains(path) {
+        return None;
+    }
+    let current = q.status.lock_or_recover().current.clone();
+    Some(current.as_deref() == Some(file_name(path).as_str()))
 }
 
 /// A thread que processa a fila, um arquivo por vez.
@@ -665,6 +736,7 @@ pub(crate) fn spawn_watcher(app: AppHandle) {
                     if q.push(Job {
                         path: path.clone(),
                         origin: Origin::Watched,
+                        phone: None,
                     }) {
                         tracing::info!(arquivo = %file_name(&path), "gravação na pasta Importar");
                         added = true;
@@ -700,6 +772,7 @@ fn enqueue_picked(app: &AppHandle, paths: Vec<PathBuf>) -> Queued {
             if q.push(Job {
                 path,
                 origin: Origin::Picked,
+                phone: None,
             }) {
                 out.queued += 1;
             }
@@ -763,6 +836,9 @@ pub(crate) fn import_cancel(app: AppHandle, all: bool) {
         let motivo = crate::i18n::tr(&app, "import.cancelled");
         for job in dropped {
             q.busy.lock_or_recover().remove(&job.path);
+            if let Some(meta) = &job.phone {
+                crate::phone_sync::import_finished(meta, None, Some(&motivo));
+            }
             if job.origin == Origin::Watched
                 && let Ok(dest) = move_aside(&job.path, FAILED_DIR)
             {
@@ -856,6 +932,7 @@ mod tests {
         let job = || Job {
             path: PathBuf::from("C:/x/a.mp3"),
             origin: Origin::Watched,
+            phone: None,
         };
         assert!(q.push(job()));
         assert!(!q.push(job()), "já está na fila");

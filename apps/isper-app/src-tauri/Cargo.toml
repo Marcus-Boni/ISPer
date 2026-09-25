@@ -30,6 +30,11 @@ isper-core = { path = "../../../crates/isper-core" }
 isper-llm = { path = "../../../crates/isper-llm" }
 isper-models = { path = "../../../crates/isper-models" }
 isper-diarize = { path = "../../../crates/isper-diarize" }
+# Fase 9.3: receber as gravações do celular (ADR 0017).
+isper-sync = { path = "../../../crates/isper-sync" }
+# O QR do pareamento, desenhado em SVG para a tela de Configurações.
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
+tokio = { version = "1", features = ["sync"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
