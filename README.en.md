@@ -530,11 +530,15 @@ The script reads the version from the app's `Cargo.toml` (single source —
 `tauri.conf.json` doesn't repeat it; Tauri reads it from there), requires the
 `## [version]` section in [`CHANGELOG.md`](CHANGELOG.md) (which becomes the
 release notes), a clean git tree and, with `-Publish`, green CI on the
-commit. Then it stops the app, copies the sherpa-onnx DLLs (from
-`target/release`) and the Visual C++ ones (from VS Build Tools) into
-`resources/`, runs `tauri build` per variant (`--config tauri.gpu.conf.json`
-with the CUDA DLLs; `--config tauri.cpu.conf.json --no-default-features` in
-`target-cpu/`), signs and leaves everything in `dist\v<version>\`. With
+commit. Then it copies the sherpa-onnx and Visual C++ DLLs into
+`resources/`. The sherpa-onnx ones come from the prebuilt that the
+`sherpa-onnx` crate's build script downloads into
+`target/sherpa-onnx-prebuilt`, not from `target/release`, where tauri-build
+may have left an old copy. The Visual C++ ones come from VS Build Tools. Then
+it stops the copies of the app running from `target/`, runs `tauri build` per
+variant (`--config tauri.gpu.conf.json` with the CUDA DLLs; `--config
+tauri.cpu.conf.json --no-default-features` in `target-cpu/`), signs and leaves
+everything in `dist\v<version>\`. With
 `-Publish`, `gh release create v<version>` uploads the six files; the tag
 triggers [`release.yml`](.github/workflows/release.yml), which checks tag ×
 manifests × CHANGELOG and runs CI again. The CUDA DLLs (`cudart64_13`,
