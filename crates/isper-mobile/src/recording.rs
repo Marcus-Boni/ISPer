@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use isper_core::capture::{self, CaptureManifest, CaptureRecorder, CaptureState, GapReason};
 
 use crate::MobileError;
+use crate::sync::RemoteStage;
 
 /// Em que pé está uma gravação.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -86,10 +87,19 @@ pub struct RecordingInfo {
     pub gaps: Vec<RecordingGap>,
     /// Nome original, se veio de outro app.
     pub source_name: Option<String>,
+    /// Em que pé ela está no PC pareado (Fase 9.3).
+    pub remote: RemoteStage,
+    /// O título que o PC deu à reunião.
+    pub remote_title: Option<String>,
+    /// Por que o envio ou o PC falhou, quando falhou.
+    pub remote_error: Option<String>,
+    /// A ata que voltou do PC (Markdown), quando voltou.
+    pub minutes_path: Option<String>,
 }
 
 fn info(dir: &Path, m: &CaptureManifest) -> RecordingInfo {
     let audio = m.audio_path(dir);
+    let remote = crate::sync::remote_view(dir, &m.id);
     RecordingInfo {
         id: m.id.clone(),
         started_at: m.started_at.clone(),
@@ -108,6 +118,10 @@ fn info(dir: &Path, m: &CaptureManifest) -> RecordingInfo {
             })
             .collect(),
         source_name: m.source_name.clone(),
+        remote: remote.stage,
+        remote_title: remote.title,
+        remote_error: remote.error,
+        minutes_path: remote.minutes,
     }
 }
 
@@ -247,10 +261,12 @@ pub fn import_recording(
     Ok(info(&dir, &m))
 }
 
-/// Apaga uma gravação (áudio e manifesto). O app oferece "Desfazer" antes.
+/// Apaga uma gravação (áudio, manifesto e o que a sincronia guardou dela,
+/// inclusive a ata). O app oferece "Desfazer" antes.
 #[uniffi::export]
 pub fn delete_recording(dir: String, id: String) -> Result<(), MobileError> {
     capture::delete(Path::new(&dir), &id)?;
+    crate::sync::forget_recording(Path::new(&dir), &id);
     Ok(())
 }
 
