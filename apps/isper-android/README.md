@@ -5,7 +5,9 @@ App Android do ISPer (Fase 9, "ISPer no Bolso"). Três abas:
 - **Gravar** (9.2): grava a reunião inteira, com a tela apagada, em Ogg/Opus
   a 32 kbit/s ([ADR 0016](../../docs/adr/0016-gravacao-no-celular-ogg-opus.md));
 - **Biblioteca**: as gravações, para ouvir, compartilhar, medir e apagar (com
-  Desfazer), e o que chega de outros apps pelo "Compartilhar";
+  Desfazer), e o que chega de outros apps pelo "Compartilhar". No topo, o PC
+  pareado (9.3): as gravações vão para ele, e a ata volta
+  ([ADR 0017](../../docs/adr/0017-sincronia-celular-pc.md));
 - **Laboratório** (9.1): mede no próprio celular o mesmo passe final que o
   ISPer roda no PC — decodificação, VAD Silero, Whisper com busca em feixe,
   falante por palavra.
@@ -36,9 +38,10 @@ isper-core · isper-diarize · isper-models   (o mesmo Rust do desktop)
   e um `.json` (o manifesto) por gravação, com ~15 MB por hora. Se o app
   morrer no meio, o áudio até a queda fica, e a gravação aparece como
   recuperada na próxima abertura.
-- **Levar para o PC** (até a 9.3 chegar): **Compartilhar** na Biblioteca
-  manda o `.opus` por WhatsApp, e-mail ou Drive. O ISPer do PC importa o
-  arquivo como qualquer outro.
+- **Levar para o PC:** pareado com um PC (a seção abaixo), a gravação vai
+  sozinha. Sem pareamento, **Compartilhar** na Biblioteca manda o `.opus` por
+  WhatsApp, e-mail ou Drive, e o ISPer do PC importa o arquivo como qualquer
+  outro.
 
 > Alguns fabricantes (Xiaomi, Samsung, Motorola) matam apps em segundo plano
 > mesmo com a notificação. Se uma gravação longa parar sozinha, libere o
@@ -47,6 +50,26 @@ isper-core · isper-diarize · isper-models   (o mesmo Rust do desktop)
 `tools/e2e/android-recorder.ps1` testa o gravador num emulador pela
 interface (21 verificações): gravar, marcar e parar; matar o app no meio e
 recuperar; gravar com a tela apagada.
+
+## O PC pareado (Fase 9.3)
+
+- **Parear:** no PC, Configurações → Celular → *Parear um celular*; no app,
+  Biblioteca → **Ler o QR do PC** (o leitor do Google, sem a permissão da
+  câmera) ou **Colar o código** (o PC tem "Copiar o código"). O PC pergunta
+  "Permitir?".
+- **Mandar:** o WorkManager roda uma rodada ao parar uma gravação, ao abrir o
+  app, em **Enviar agora** e a cada 15 min, sempre com rede. O PC fora de
+  alcance faz o Android tentar de novo mais tarde; enquanto o PC transcreve,
+  há outra rodada em 90 s. O mDNS acha o PC se o IP dele mudar.
+- **Onde fica:** a chave do celular e o PC pareado ficam na pasta interna do
+  app (`files/sync`); ao lado de cada gravação, `<id>.sync.json` diz em que pé
+  ela está no PC, e `<id>.ata.md` é a ata que voltou.
+- **Ata pronta:** notificação e a tela da ata, com **Compartilhar** (o texto
+  vai para o WhatsApp, o e-mail ou o Teams).
+
+`tools/e2e/android-sync.ps1` testa isso num emulador, com o `isper-cli
+receber` fazendo o papel do PC: colar o código, parear, gravar, a gravação
+chegar ao PC, a ata voltar e abrir, desconectar.
 
 ## O que o laboratório mede
 

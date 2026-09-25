@@ -39,6 +39,23 @@ bata com ela.
   `isper-cli`, como os outros formatos.
 - `isper-cli encode <áudio> <saída.opus> [--kbps 32]` converte para o formato
   do gravador do celular e mostra o tamanho por hora.
+- **O celular manda as gravações para o PC, e a ata volta (Fase 9.3).** Em
+  Configurações → Celular, o PC mostra um QR; no app Android, "Ler o QR do PC"
+  (ou "Colar o código") pareia, depois de um "Permitir?" no PC. A partir daí,
+  cada gravação vai sozinha para o PC: ao parar, ao abrir o app ou quando o
+  celular volta para a mesma rede. O PC a transcreve pela fila da
+  importação, com a data, os momentos marcados (★) e o nome do aparelho, e
+  devolve a ata. O celular avisa "Ata pronta" e a mostra com "Compartilhar".
+  A conexão é direta pela rede local (iroh: QUIC com a chave de cada lado
+  fixada no pareamento) e não passa por nenhum servidor. O envio continua de
+  onde parou se a conexão cair, e o arquivo é conferido pelo SHA-256. Um
+  relay, opcional, cobre o celular fora da rede. A opção vem desligada; ao
+  ligá-la, o Windows pergunta se o ISPer pode usar a rede
+  ([ADR 0017](docs/adr/0017-sincronia-celular-pc.md), guia em
+  isper.pages.dev/docs/reunioes-e-sistema/celular).
+- `isper-cli receber` faz o papel do PC (mostra o QR no terminal e guarda as
+  gravações numa pasta), e `isper-cli enviar` faz o do celular: servem para
+  testar um lado sem o outro.
 
 ### Alterado
 - **Identificar quem falou ficou ~2,4× mais rápido.** A diarização trocou o
