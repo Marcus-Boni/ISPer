@@ -475,12 +475,15 @@ prefira o modelo Small ou Medium; o Large é lento sem GPU.
 O script lê a versão do `Cargo.toml` do app (fonte única — o `tauri.conf.json`
 não a repete; o Tauri lê de lá), exige a seção
 `## [versão]` no [`CHANGELOG.md`](CHANGELOG.md) (que vira as notas da release),
-árvore do git limpa e, com `-Publish`, CI verde no commit. Depois para o app,
-copia para `resources/` as DLLs do sherpa-onnx (de `target/release`) e do
-Visual C++ (do VS Build Tools), roda `tauri build` por variante (`--config
-tauri.gpu.conf.json` com as DLLs do CUDA; `--config tauri.cpu.conf.json
---no-default-features` em `target-cpu/`), assina e deixa tudo em
-`dist\v<versão>\`. Com `-Publish`, `gh release create v<versão>` sobe os seis
+árvore do git limpa e, com `-Publish`, CI verde no commit. Depois copia para
+`resources/` as DLLs do sherpa-onnx e do Visual C++. As do sherpa-onnx vêm do
+pré-compilado que o build script do crate `sherpa-onnx` baixa em
+`target/sherpa-onnx-prebuilt`, e não de `target/release`, onde o tauri-build
+pode ter deixado uma cópia antiga. As do Visual C++ vêm do VS Build Tools.
+Então encerra as cópias do app que rodam de `target/`, roda `tauri build` por
+variante (`--config tauri.gpu.conf.json` com as DLLs do CUDA; `--config
+tauri.cpu.conf.json --no-default-features` em `target-cpu/`), assina e deixa
+tudo em `dist\v<versão>\`. Com `-Publish`, `gh release create v<versão>` sobe os seis
 arquivos; a tag dispara o workflow
 [`release.yml`](.github/workflows/release.yml), que valida tag × manifests ×
 CHANGELOG e roda o CI de novo. As DLLs do CUDA (`cudart64_13`, `cublas64_13`,
