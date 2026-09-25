@@ -11,6 +11,13 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-25
+
+A versão que conversa com o celular: o app Android grava a reunião e manda
+para o PC, que transcreve e devolve a ata. E o fim da reunião ficou mais
+rápido: identificar quem falou leva ~2,4× menos tempo, e achar as falas, 5×
+menos.
+
 ### Adicionado
 - **O ISPer no celular, primeiro passo (Fase 9.1).** O núcleo Rust compila
   para Android e ganhou uma fachada para o celular (`crates/isper-mobile`, via
@@ -52,12 +59,20 @@ bata com ela.
   relay, opcional, cobre o celular fora da rede. A opção vem desligada; ao
   ligá-la, o Windows pergunta se o ISPer pode usar a rede
   ([ADR 0017](docs/adr/0017-sincronia-celular-pc.md), guia em
-  isper.pages.dev/docs/reunioes-e-sistema/celular).
+  isper.pages.dev/docs/reunioes-e-sistema/celular). O app Android desta
+  etapa é o 0.3.0-sincronia.
 - `isper-cli receber` faz o papel do PC (mostra o QR no terminal e guarda as
   gravações numa pasta), e `isper-cli enviar` faz o do celular: servem para
   testar um lado sem o outro.
 
 ### Alterado
+- **O banco da Biblioteca ganha um formato novo, com cópia de segurança.**
+  Para guardar os celulares pareados e as gravações que chegaram deles, o
+  ISPer atualiza o banco na primeira vez que abrir e, antes, salva uma cópia
+  dele como estava em `%APPDATA%\ISPer\isper.db.v5.bak`. A 0.22.0 e as anteriores
+  não abrem o banco atualizado. Para voltar a uma delas, feche o ISPer,
+  instale a versão anterior e renomeie a cópia para `isper.db`. As reuniões
+  gravadas depois da atualização continuam nos arquivos `.md` em Documentos.
 - **Identificar quem falou ficou ~2,4× mais rápido.** A diarização trocou o
   `sherpa-rs`, descontinuado e preso a uma thread, pelo crate oficial do
   sherpa-onnx, e passou a usar metade dos núcleos (até 8). No corpus de
@@ -766,7 +781,8 @@ dia e de noite, em português ou em inglês, e utilizável só pelo teclado.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.19.0...v0.20.0
