@@ -20,9 +20,9 @@
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
 | F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (criptografia em repouso adiada com decisão registrada); 7.5 com 5 de 6 (v0.19.0 — falta a rodada com o NVDA); 7.6 com 4 de 5 (v0.20.0 — falta o winget, em revisão no winget-pkgs) |
 | F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; só com a janela aberta e notas salvas com a reunião (23/09); 3 itens em aberto — validar a memória, idioma do que a IA escreve e ver o sync do portal numa release |
-| F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (~15 MB/h no celular, a mesma transcrição do WAV; já gravou num Galaxy Tab A9), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. Falta o teste de 2 h em aparelhos de verdade. 9.3 a 9.7 ainda são proposta |
+| F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (~15 MB/h no celular, a mesma transcrição do WAV; já gravou num Galaxy Tab A9), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. O teste de 2 h e o do Motorola/Xiaomi ficaram para depois. **9.3 em 25/09**: o celular manda as gravações para o PC, pareado por QR (iroh, com a chave de cada lado e sem servidor de fora), e a ata volta com "Ata pronta". Falta a volta completa num aparelho de verdade. 9.4 a 9.7 ainda são proposta |
 
-**130 itens entregues · 13 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**138 itens entregues · 15 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -362,14 +362,30 @@ apagada, sobrevive a uma queda do processo e guarda cada gravação como um
 - [x] Biblioteca no celular (24/09): ouvir, compartilhar, mandar ao laboratório, apagar com Desfazer e receber áudio de outros apps pelo "Compartilhar"
 - [x] APK que atualiza por cima (24/09): o CI assina com uma chave fixa, se os segredos existirem, e `hasFragileUserData` oferece manter as gravações ao desinstalar. Antes, cada run assinava com uma chave nova, e atualizar exigia desinstalar, o que apagava as gravações
 - [x] Gravador de ponta a ponta no emulador (`tools/e2e/android-recorder.ps1`, 21 verificações, 24/09): gravar, marcar e parar; matar o app no meio e recuperar (13,0 s de 13,5 s); gravar com a tela apagada. O `.opus` sai legível pelo ffprobe
-- [ ] Criar a chave de assinatura e os segredos `ANDROID_KEYSTORE_B64` e `ANDROID_KEYSTORE_PASSWORD` — à mão, por quem mantém o repositório ([como](apps/isper-android/README.md#assinatura))
-- [ ] Pronto quando, num aparelho de verdade: 2 h com a tela apagada, uma ligação no meio e o app morto aos 90 min, num Samsung e num Motorola ou Xiaomi — é à mão
+- [x] Criar a chave de assinatura e os segredos `ANDROID_KEYSTORE_B64` e `ANDROID_KEYSTORE_PASSWORD` (24/09, à mão, por quem mantém o repositório — [como](apps/isper-android/README.md#assinatura)): o build do CI confirmou a assinatura com a chave nova
+- [ ] Pronto quando, num aparelho de verdade: 2 h com a tela apagada, uma ligação no meio e o app morto aos 90 min, num Samsung e num Motorola ou Xiaomi — é à mão. Em 24/09, um Galaxy Tab A9 gravou e listou; o teste de 2 h e o do Motorola/Xiaomi ficaram para depois (decisão de 25/09)
 
-### Depois da 9.2 (proposto, a decidir)
+### 9.3 Sincronia com o PC
+
+O celular manda as gravações para o PC, que transcreve pela fila da 9.0 e
+devolve a ata. É o que fecha o circuito que substitui o Plaud. Decisões no
+[ADR 0017](docs/adr/0017-sincronia-celular-pc.md).
+
+- [x] `isper-sync` sobre o iroh 1.2 (25/09): QUIC em que cada lado é uma chave Ed25519, sem relay nem DNS de fora no padrão. O spike antes de decidir: 30 MB em 0,34 s na mesma máquina, e a biblioteca compilou para Windows e Android arm64 sem contorno
+- [x] Pareamento por QR (25/09): a chave do PC e um segredo de uso único (2 min, 5 tentativas), mais o "Permitir?" no PC. Depois disso, a autorização é a chave do celular: não há senha nem token. "Esquecer" no PC e "Desconectar" no celular desfazem
+- [x] Envio retomável (25/09): o PC guarda um `.part`, o `Offer` diz quanto chegou, e o SHA-256 é conferido no fim (o que chega diferente é descartado)
+- [x] No PC (25/09): Configurações → Celular (ligar, QR, "Copiar o código", aparelhos pareados, relay). A gravação vai para `Documentos\ISPer\Do celular` e entra na fila da importação com a data, os momentos (★) e a origem do manifesto; schema v6 (`sync_devices`, `sync_items`); o que chegou e não virou reunião volta à fila na abertura. Desligado por padrão
+- [x] No celular (25/09): "Ler o QR do PC" (Google Code Scanner, sem a permissão da câmera) ou "Colar o código"; o WorkManager manda ao parar a gravação, ao abrir o app, em "Enviar agora" e a cada 15 min; o mDNS acha o PC se o IP mudar; estados na Biblioteca, notificação "Ata pronta" e a tela da ata com "Compartilhar"
+- [x] `isper-cli receber` (faz de PC, com o QR no terminal) e `isper-cli enviar` (faz de celular) (25/09)
+- [x] Testes (25/09): o protocolo de ponta a ponta com iroh de verdade (`crates/isper-sync/tests`: retomar, hash errado, aparelho estranho, esquecido, código vencido, recusa); a rodada do celular (`isper-mobile`); `tools/e2e/sync.ps1` no app real (25 verificações); `tools/e2e/android-sync.ps1` no emulador (24 verificações)
+- [ ] Relay próprio para "só tem internet": a opção existe; falta subir um relay iroh e medir
+- [ ] Pronto quando você grava no celular longe do PC, chega perto dele e a ata aparece no celular sem tocar em nada — num aparelho de verdade, com o PC do dia a dia (é à mão)
+- [ ] Piloto interno: o APK do CI para o líder e o time
+
+### Depois da 9.3 (proposto, a decidir)
 
 Do plano de 23/09; cada etapa ganha caixas quando for aprovada.
 
-- 9.3 sincronização com o PC por pareamento (QR) → piloto interno
 - 9.4 transcrição no próprio aparelho · 9.5 IA · 9.6 Play Store · 9.7 iOS
 
 ## Boas práticas transversais
