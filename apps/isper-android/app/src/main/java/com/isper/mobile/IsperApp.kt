@@ -13,7 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
@@ -23,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.isper.mobile.library.LibraryScreen
 import com.isper.mobile.library.LibraryViewModel
+import com.isper.mobile.library.MinutesScreen
 import com.isper.mobile.recording.RecordScreen
 import com.isper.mobile.recording.RecorderBus
 
@@ -42,6 +46,8 @@ fun IsperApp(
     onTab: (Int) -> Unit,
     library: LibraryViewModel,
     lab: SpikeViewModel,
+    minutesId: String?,
+    onMinutes: (String?) -> Unit,
 ) {
     val snackbars = remember { SnackbarHostState() }
     val undoLabel = stringResource(R.string.undo)
@@ -82,15 +88,22 @@ fun IsperApp(
             }
             MainActivity.TAB_LIBRARY -> {
                 val state by library.state.collectAsStateWithLifecycle()
-                LibraryScreen(
-                    state = state,
-                    actions = library,
-                    onMeasure = { info ->
-                        lab.useRecording(info.audioPath, info.sourceName ?: info.id)
-                        onTab(MainActivity.TAB_LAB)
-                    },
-                    modifier = modifier,
-                )
+                // A ata aberta (pela Biblioteca ou pela notificação "Ata pronta").
+                val open = minutesId?.let { id -> state.recordings.firstOrNull { it.id == id && it.minutesPath != null } }
+                if (open != null) {
+                    MinutesScreen(info = open, onBack = { onMinutes(null) }, modifier = modifier)
+                } else {
+                    LibraryScreen(
+                        state = state,
+                        actions = library,
+                        onMeasure = { info ->
+                            lab.useRecording(info.audioPath, info.sourceName ?: info.id)
+                            onTab(MainActivity.TAB_LAB)
+                        },
+                        onOpenMinutes = { info -> onMinutes(info.id) },
+                        modifier = modifier,
+                    )
+                }
             }
             else -> {
                 val state by lab.state.collectAsStateWithLifecycle()

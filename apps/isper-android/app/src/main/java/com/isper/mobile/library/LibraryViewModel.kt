@@ -8,14 +8,17 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.isper.mobile.R
+import com.isper.mobile.core.MobileException
 import com.isper.mobile.core.RecordingInfo
 import com.isper.mobile.core.deleteRecording
 import com.isper.mobile.core.importRecording
 import com.isper.mobile.core.listRecordings
+import com.isper.mobile.core.retryRecording
 import com.isper.mobile.recording.RecEvent
 import com.isper.mobile.recording.RecorderBus
 import com.isper.mobile.recording.Storage
 import com.isper.mobile.recording.formatDuration
+import com.isper.mobile.sync.PcSync
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -37,6 +40,8 @@ data class LibraryState(
     val playingPosition: Int = 0,
     /** Apagadas há pouco e ainda desfazíveis: somem da lista na hora. */
     val pendingDelete: Set<String> = emptySet(),
+    /** O pareamento com o PC em andamento (Fase 9.3). */
+    val pair: PairUi = PairUi.Idle,
 )
 
 /** Um aviso de rodapé, com "Desfazer" quando é uma exclusão. */
@@ -60,8 +65,16 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     private var ticker: Job? = null
     private val deleteJobs = mutableMapOf<String, Job>()
 
+    /** O PC pareado, o envio em andamento e o último erro (Fase 9.3). */
+    val pc = PcSync.pc
+    val sending = PcSync.sending
+    val lastError = PcSync.lastError
+
     init {
+        PcSync.link(context)
         refresh()
+        // Uma rodada de sincronia terminou: os estados "no PC" mudaram.
+        viewModelScope.launch { PcSync.changed.collect { refresh() } }
         viewModelScope.launch {
             RecorderBus.events.collect { event ->
                 when (event) {
@@ -115,6 +128,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             result.onSuccess { info ->
                 refresh()
                 notice(context.getString(R.string.lib_imported, info.sourceName ?: info.id))
+                PcSync.syncSoon(context)
             }.onFailure { e -> notice(e.message ?: e.javaClass.simpleName) }
         }
     }
@@ -185,8 +199,61 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(pendingDelete = it.pendingDelete - id) }
     }
 
-    private fun notice(text: String, undoId: String? = null) {
+    fun notice(text: String) = notice(text, null)
+
+    private fun notice(text: String, undoId: String?) {
         _notices.tryEmit(LibraryNotice(text, undoId))
+    }
+
+    // ------------------------------------------------ PC (Fase 9.3)
+
+    /** Um código lido (QR) ou colado: pergunta "Parear com …?". */
+    fun startPair(code: String) {
+        viewModelScope.launch {
+            runCatching { PcSync.readCode(context, code.trim()) }
+                .onSuccess { name -> _state.update { it.copy(pair = PairUi.Confirm(code.trim(), name)) } }
+                .onFailure { e -> notice(e.message ?: e.javaClass.simpleName) }
+        }
+    }
+
+    fun cancelPair() = _state.update { it.copy(pair = PairUi.Idle) }
+
+    /** "Parear": espera o "Permitir" no PC. */
+    fun confirmPair() {
+        val confirm = _state.value.pair as? PairUi.Confirm ?: return
+        _state.update { it.copy(pair = PairUi.Waiting(confirm.pcName)) }
+        viewModelScope.launch {
+            runCatching { PcSync.pair(context, confirm.code) }
+                .onSuccess { pc -> notice(context.getString(R.string.sync_paired, pc.name)) }
+                .onFailure { e -> notice(pairError(e)) }
+            _state.update { it.copy(pair = PairUi.Idle) }
+        }
+    }
+
+    private fun pairError(e: Throwable): String = when (e) {
+        is MobileException.Sync -> context.getString(R.string.sync_pair_failed, e.message ?: "")
+        else -> e.message ?: e.javaClass.simpleName
+    }
+
+    fun unpair() {
+        viewModelScope.launch {
+            val name = pc.value?.name.orEmpty()
+            runCatching { PcSync.unpair(context) }
+            notice(context.getString(R.string.sync_unpaired, name))
+            refresh()
+        }
+    }
+
+    fun sendNow() {
+        PcSync.syncSoon(context)
+        notice(context.getString(R.string.sync_sending_now))
+    }
+
+    /** A gravação que falhou volta para a fila do envio. */
+    fun retry(info: RecordingInfo) {
+        retryRecording(dir.path, info.id)
+        refresh()
+        PcSync.syncSoon(context)
     }
 
     override fun onCleared() {

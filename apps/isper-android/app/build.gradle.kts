@@ -74,6 +74,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.play.services.code.scanner)
     // Os bindings do UniFFI carregam a libisper_mobile.so pelo JNA (a versão
     // AAR traz a libjnidispatch.so de cada ABI).
     implementation(variantOf(libs.jna) { artifactType("aar") })

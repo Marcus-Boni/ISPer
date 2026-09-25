@@ -26,7 +26,8 @@ param(
 $dir = "/sdcard/Android/data/$script:Pkg/files/Gravacoes"
 
 function Get-Manifests {
-  $names = @(Adb shell ls $dir 2>$null | Where-Object { $_ -match '\.json$' })
+  # So os manifestos: o .sync.json (Fase 9.3) e outra coisa.
+  $names = @(Adb shell ls $dir 2>$null | Where-Object { $_ -match '\.json$' -and $_ -notmatch '\.sync\.json$' })
   $out = @()
   foreach ($n in $names) {
     $txt = (Adb shell cat "$dir/$($n.Trim())" 2>$null) -join "`n"

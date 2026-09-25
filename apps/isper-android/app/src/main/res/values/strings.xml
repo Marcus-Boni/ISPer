@@ -118,4 +118,54 @@
     <string name="lib_imported">Importada: %1$s</string>
     <string name="lib_import_unreadable">Não consegui abrir %1$s</string>
     <string name="lib_play_failed">Não consegui tocar esta gravação</string>
+    <!-- Sincronia com o PC (Fase 9.3) -->
+    <string name="channel_minutes">Atas prontas</string>
+    <string name="sync_minutes_ready">Ata pronta</string>
+    <string name="sync_card_title">Mandar as gravações para o PC</string>
+    <string name="sync_card_pitch">O PC transcreve com o mesmo capricho de uma reunião gravada nele e devolve a ata para cá. A conexão é direta, pela rede, e cifrada.</string>
+    <string name="sync_scan">Ler o QR do PC</string>
+    <string name="sync_paste">Colar o código</string>
+    <string name="sync_scan_failed">Não consegui ler o QR (%1$s). Use \"Colar o código\".</string>
+    <string name="sync_paste_title">Código do PC</string>
+    <string name="sync_paste_hint">No PC, abra Configurações → Celular → Parear um celular e toque em \"Copiar o código\". Cole aqui o que você mandou para este celular.</string>
+    <string name="sync_use_code">Usar o código</string>
+    <string name="sync_confirm_title">Parear com %1$s?</string>
+    <string name="sync_confirm_text">As gravações deste celular vão para esse PC, que as transcreve e devolve a ata. Só ele recebe.</string>
+    <string name="sync_pair">Parear</string>
+    <string name="sync_waiting_title">Confirme no PC</string>
+    <string name="sync_waiting_text">Toque em \"Permitir\" no ISPer do %1$s.</string>
+    <string name="sync_paired">Pareado com %1$s</string>
+    <string name="sync_pair_failed">Não deu para parear: %1$s</string>
+    <string name="sync_connected">Conectado a %1$s</string>
+    <string name="sync_sending">Enviando… %1$d%%</string>
+    <string name="sync_unreachable">O PC não está ao alcance; %1$d gravação(ões) vão quando ele estiver.</string>
+    <string name="sync_all_sent">Tudo enviado.</string>
+    <string name="sync_send_now">Enviar agora</string>
+    <string name="sync_sending_now">Procurando o PC…</string>
+    <string name="sync_unpair">Desconectar</string>
+    <string name="sync_unpair_title">Desconectar de %1$s?</string>
+    <string name="sync_unpair_text">As próximas gravações ficam só neste celular. As atas que já voltaram continuam aqui.</string>
+    <string name="sync_unpaired">Desconectado de %1$s</string>
+    <plurals name="sync_waiting">
+        <item quantity="one">%1$d gravação no PC, esperando a ata.</item>
+        <item quantity="other">%1$d gravações no PC, esperando a ata.</item>
+    </plurals>
+    <plurals name="sync_unsent">
+        <item quantity="one">%1$d gravação ainda não foi.</item>
+        <item quantity="other">%1$d gravações ainda não foram.</item>
+    </plurals>
+    <string name="lib_remote_not_sent">Vai para o PC</string>
+    <string name="lib_remote_sending">Enviando %1$d%%</string>
+    <string name="lib_remote_partial">Envio pela metade</string>
+    <string name="lib_remote_queued">Na fila do PC</string>
+    <string name="lib_remote_processing">Transcrevendo no PC</string>
+    <string name="lib_remote_ready">Ata pronta</string>
+    <string name="lib_remote_failed">Falhou no PC</string>
+    <string name="lib_open_minutes">Ver a ata</string>
+    <string name="lib_retry">Tentar de novo</string>
+    <string name="minutes_back">Biblioteca</string>
+    <string name="minutes_share">Compartilhar</string>
+    <string name="minutes_share_title">Compartilhar a ata</string>
+    <string name="minutes_copy">Copiar</string>
+    <string name="minutes_copied">Ata copiada</string>
 </resources>

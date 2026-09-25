@@ -10,7 +10,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import com.isper.mobile.library.LibraryViewModel
+import com.isper.mobile.sync.PcSync
 
 /**
  * A casa do app: três destinos (Gravar, Biblioteca, Laboratório).
@@ -25,14 +27,30 @@ class MainActivity : ComponentActivity() {
     private val lab: SpikeViewModel by viewModels()
     private val library: LibraryViewModel by viewModels()
     private val tab = mutableIntStateOf(TAB_RECORD)
+    /** A ata aberta na Biblioteca (id da gravação). */
+    private val minutes = mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) handle(intent) else tab.intValue = savedInstanceState.getInt(STATE_TAB)
+        if (savedInstanceState == null) {
+            handle(intent)
+        } else {
+            tab.intValue = savedInstanceState.getInt(STATE_TAB)
+            minutes.value = savedInstanceState.getString(STATE_MINUTES)
+        }
+        // Pareado com um PC: a rodada periódica fica agendada (Fase 9.3).
+        PcSync.ensurePeriodic(this)
         setContent {
             IsperTheme {
-                IsperApp(tab = tab.intValue, onTab = { tab.intValue = it }, library = library, lab = lab)
+                IsperApp(
+                    tab = tab.intValue,
+                    onTab = { tab.intValue = it; minutes.value = null },
+                    library = library,
+                    lab = lab,
+                    minutesId = minutes.value,
+                    onMinutes = { minutes.value = it },
+                )
             }
         }
     }
@@ -41,11 +59,14 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Uma gravação que caiu enquanto o app estava fechado aparece aqui.
         library.refresh()
+        // Abrir o app é uma boa hora para mandar o que falta ao PC.
+        PcSync.syncSoon(this)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putInt(STATE_TAB, tab.intValue)
+        outState.putString(STATE_MINUTES, minutes.value)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -56,6 +77,12 @@ class MainActivity : ComponentActivity() {
     private fun handle(intent: Intent?) {
         intent ?: return
         intent.getIntExtra(EXTRA_TAB, -1).takeIf { it in TAB_RECORD..TAB_LAB }?.let { tab.intValue = it }
+        // Da notificação "Ata pronta": abre a ata (o id só serve para achar a
+        // gravação na Biblioteca; nada é lido de fora).
+        intent.getStringExtra(EXTRA_MINUTES)?.let {
+            tab.intValue = TAB_LIBRARY
+            minutes.value = it
+        }
         if (intent.action == Intent.ACTION_SEND) {
             // Só content://: um file:// de outro app poderia apontar para os
             // arquivos privados do próprio ISPer.
@@ -83,9 +110,11 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_TAB = "com.isper.mobile.ABA"
+        const val EXTRA_MINUTES = "com.isper.mobile.ATA"
         const val TAB_RECORD = 0
         const val TAB_LIBRARY = 1
         const val TAB_LAB = 2
         private const val STATE_TAB = "aba"
+        private const val STATE_MINUTES = "ata"
     }
 }

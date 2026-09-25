@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat
 import com.isper.mobile.MainActivity
 import com.isper.mobile.R
 import com.isper.mobile.core.Recorder
+import com.isper.mobile.sync.PcSync
 import java.util.concurrent.Executors
 import kotlin.math.sqrt
 
@@ -271,16 +272,22 @@ class RecordingService : Service() {
             it.release()
         }
         record = null
+        var saved = false
         try {
             recorder?.finish()?.let { info ->
                 RecorderBus.emit(RecEvent.Saved(info))
                 notifySaved(info.durationSecs ?: elapsedSecs())
+                saved = true
             }
         } catch (e: Exception) {
             Log.e(TAG, "falha ao fechar a gravação", e)
             RecorderBus.emit(RecEvent.Failed(e.message ?: e.javaClass.simpleName))
         }
         cleanup()
+        // Pareado com um PC, a gravação vai para ele (Fase 9.3). Só depois do
+        // cleanup: enquanto o RecorderBus diz "gravando", a rodada deixa esta
+        // gravação de fora (e era isso que acontecia quando ela começava rápido).
+        if (saved) PcSync.syncSoon(this)
     }
 
     private fun cleanup() {
