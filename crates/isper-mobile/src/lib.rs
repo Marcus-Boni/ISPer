@@ -40,6 +40,10 @@ pub use recording::{
     GapKind, Recorder, RecordingGap, RecordingInfo, RecordingList, RecordingState,
     delete_recording, import_recording, list_recordings,
 };
+pub mod sync;
+pub use sync::{
+    PcInfo, PcLink, ReadyMinutes, RemoteStage, SyncListener, SyncSummary, retry_recording,
+};
 
 /// Erro que chega ao app como exceção. A mensagem já vem em português e é
 /// para mostrar como está.
@@ -58,6 +62,19 @@ pub enum MobileError {
     /// Quem chamou pediu para parar.
     #[error("cancelado")]
     Cancelled,
+    /// A sincronia com o PC: ele não respondeu, o código não vale, a conexão caiu.
+    #[error("{0}")]
+    Sync(String),
+    /// O PC não reconhece mais este celular (foi esquecido lá): é preciso
+    /// parear de novo.
+    #[error("este celular não está mais pareado com o PC")]
+    NotPaired,
+}
+
+impl From<std::io::Error> for MobileError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Sync(e.to_string())
+    }
 }
 
 impl From<isper_models::ModelsError> for MobileError {
@@ -119,6 +136,35 @@ pub struct EngineInfo {
     pub target: String,
     /// Núcleos que o sistema oferece a este processo.
     pub cpu_threads: u32,
+}
+
+/// Liga o log do núcleo num arquivo (a pasta interna do app): o logcat não
+/// vê o `tracing` do Rust, e é ali que a sincronia conta por que não falou
+/// com o PC. Só a primeira chamada vale. Passando de 2 MB, o arquivo vira
+/// `.1` e recomeça.
+#[uniffi::export]
+pub fn init_logging(path: String) {
+    static ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    ONCE.get_or_init(|| {
+        let path = PathBuf::from(path);
+        if std::fs::metadata(&path).is_ok_and(|m| m.len() > 2_000_000) {
+            let _ = std::fs::rename(&path, path.with_extension("log.1"));
+        }
+        let Ok(file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        else {
+            return;
+        };
+        let filter = tracing_subscriber::EnvFilter::new("info,iroh=debug");
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_ansi(false)
+            .with_writer(std::sync::Mutex::new(file))
+            .try_init();
+        tracing::info!(versao = env!("CARGO_PKG_VERSION"), "isper-mobile carregado");
+    });
 }
 
 /// Versão e alvo da biblioteca carregada.
