@@ -10,7 +10,7 @@
 
 ## Checklist
 
-- [ ] `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --release --no-default-features -- -D warnings` e `cargo test --release --no-default-features -p isper-core -p isper-llm -p isper-models -p isper-cli -p isper-app` passam localmente
+- [ ] `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --release --no-default-features -- -D warnings` e `cargo test --release --no-default-features -p isper-core -p isper-llm -p isper-models -p isper-sync -p isper-mobile -p isper-cli -p isper-app` passam localmente
 - [ ] Comportamento novo ou corrigido vem com teste (unitário, `proptest`, golden ou e2e — ver `docs/TESTES.md`)
 - [ ] Nenhum `unwrap()` fora de testes; nenhum segredo, modelo ou binário grande no diff
 - [ ] Mudança visível para quem usa está no `CHANGELOG.md`, em `[Unreleased]`

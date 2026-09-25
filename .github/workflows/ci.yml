@@ -100,9 +100,11 @@ jobs:
       # Todos os crates com testes, inclusive o app e a CLI (sem CUDA): a
       # lógica pura extraída deles — config, pastas, atalhos, posição do
       # indicador, definição da CLI — roda aqui, além dos testes golden e de
-      # propriedade do núcleo.
-      - name: Testes (núcleo, IA, modelos, app e CLI)
-        run: cargo test --release --no-default-features -p isper-core -p isper-llm -p isper-models -p isper-cli -p isper-app
+      # propriedade do núcleo. O `isper-sync` sobe o protocolo de ponta a
+      # ponta pelo loopback (iroh de verdade), e o `isper-mobile` testa o
+      # gravador e a rodada de sincronia do celular.
+      - name: Testes (núcleo, IA, modelos, sincronia, celular, app e CLI)
+        run: cargo test --release --no-default-features -p isper-core -p isper-llm -p isper-models -p isper-sync -p isper-mobile -p isper-cli -p isper-app
 
       # Clippy é `cargo check` + lints em TODOS os alvos (testes e o loopdump
       # inclusive); `--release` reaproveita o whisper.cpp que o `cargo test`
