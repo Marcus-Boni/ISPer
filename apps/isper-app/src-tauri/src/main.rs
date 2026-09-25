@@ -28,6 +28,7 @@ mod notify;
 mod onboarding;
 mod overlay;
 mod paths;
+mod phone_sync;
 mod prelude;
 mod search;
 mod settings;
@@ -199,6 +200,14 @@ fn main() {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
+            phone_sync::phone_sync_status,
+            phone_sync::phone_sync_set_enabled,
+            phone_sync::phone_sync_set_relay,
+            phone_sync::phone_sync_start_pairing,
+            phone_sync::phone_sync_cancel_pairing,
+            phone_sync::phone_sync_answer,
+            phone_sync::phone_sync_forget,
+            phone_sync::open_phone_folder,
             get_settings,
             apply_settings,
             set_llm_key,
@@ -316,10 +325,14 @@ fn main() {
                 indexing: Mutex::new(None),
                 indicator_item: Mutex::new(None),
                 imports: audio_import::ImportQueue::default(),
+                phone: phone_sync::PhoneSync::default(),
             });
             // Fase 9.0: a fila de importação e a pasta vigiada.
             audio_import::spawn_worker(app.handle().clone());
             audio_import::spawn_watcher(app.handle().clone());
+            // Fase 9.3: o que chegou do celular e não virou reunião volta
+            // para a fila; a sincronia liga se estiver ligada.
+            phone_sync::startup(app.handle());
             app.state::<AppState>()
                 .audio
                 .set_device(cfg.input_device.clone());

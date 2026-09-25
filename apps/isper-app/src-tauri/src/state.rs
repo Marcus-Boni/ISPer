@@ -139,6 +139,8 @@ pub(crate) struct AppState {
     pub(crate) indicator_item: Mutex<Option<MenuItem<tauri::Wry>>>,
     /// Gravações de fora esperando para virar reunião (Fase 9.0).
     pub(crate) imports: crate::audio_import::ImportQueue,
+    /// Sincronia com o celular (Fase 9.3).
+    pub(crate) phone: crate::phone_sync::PhoneSync,
 }
 
 /// Uma fala transcrita durante a reunião (evento `isper-live`).

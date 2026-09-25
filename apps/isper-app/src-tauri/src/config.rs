@@ -110,6 +110,14 @@ pub struct AppConfig {
     /// reunião.
     #[serde(default = "default_true")]
     pub import_watch: bool,
+    /// Receber as gravações do app Android (Fase 9.3). Desligado por padrão:
+    /// ligado, o PC abre uma porta UDP na rede local (ADR 0017).
+    #[serde(default)]
+    pub phone_sync: bool,
+    /// Relay para quando o celular está fora da rede local. `None`: só a
+    /// rede local, sem falar com nenhum servidor de fora.
+    #[serde(default)]
+    pub phone_relay: Option<String>,
     /// Quantos participantes a reunião tem, quando se sabe.
     ///
     /// Zero = descobrir pelo agrupamento. Informado, o agrupamento corta o
@@ -166,6 +174,8 @@ impl Default for AppConfig {
             retention_days: 0,
             final_pass: true,
             import_watch: true,
+            phone_sync: false,
+            phone_relay: None,
             meeting_speakers: 0,
             diarize_threshold: 0.0,
             theme: default_theme(),
@@ -297,6 +307,7 @@ impl AppConfig {
         clean(&mut self.copilot_shortcut);
         clean(&mut self.model);
         clean(&mut self.input_device);
+        clean(&mut self.phone_relay);
         lowered_or(&mut self.lang, default_lang());
         lowered_or(&mut self.meeting_source, default_source());
         let mut dictionary: Vec<String> = Vec::with_capacity(self.dictionary.len());

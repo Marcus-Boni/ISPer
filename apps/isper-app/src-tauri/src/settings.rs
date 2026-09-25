@@ -415,6 +415,9 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         // Avançado: o que a tela não mandar mantém o valor atual.
         final_pass: patch.final_pass.unwrap_or(previous.final_pass),
         import_watch: patch.import_watch.unwrap_or(previous.import_watch),
+        // A sincronia com o celular muda na hora pelos comandos dela.
+        phone_sync: previous.phone_sync,
+        phone_relay: previous.phone_relay.clone(),
         meeting_speakers: patch.meeting_speakers.unwrap_or(previous.meeting_speakers),
         diarize_threshold: patch
             .diarize_threshold
