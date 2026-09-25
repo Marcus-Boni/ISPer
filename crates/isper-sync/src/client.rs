@@ -35,6 +35,9 @@ use crate::{ALPN, Result, SyncError};
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(12);
 /// Quanto espera uma resposta (o PC pode estar perguntando "Permitir?").
 const RESPONSE_TIMEOUT: Duration = Duration::from_secs(120);
+/// Quanto espera o motivo de um envio que o PC parou de ler: ele o manda
+/// antes de parar, então já está a caminho.
+const REFUSAL_TIMEOUT: Duration = Duration::from_secs(10);
 const CHUNK: usize = 256 * 1024;
 /// Nome do serviço mDNS: só PCs do ISPer aparecem.
 pub(crate) const MDNS_SERVICE: &str = "isper-sync";
@@ -256,6 +259,11 @@ impl Session {
         let mut sent = offset;
         let mut buf = vec![0u8; CHUNK];
         let mut cancelled = false;
+        // O PC pode recusar o envio no meio (o offset não bate, o pareamento
+        // foi desfeito): ele responde com o motivo e para de ler, e a escrita
+        // daqui falha com "stopped by peer". O motivo chega pela outra metade
+        // do stream, e é ele que o celular tem de mostrar.
+        let mut refused: Option<String> = None;
         while sent < offer.size {
             if cancel.load(Ordering::Relaxed) {
                 cancelled = true;
@@ -271,17 +279,35 @@ impl Session {
                     sent, offer.size
                 )));
             }
-            send.write_all(&buf[..n])
-                .await
-                .map_err(|e| SyncError::Connection(e.to_string()))?;
+            if let Err(e) = send.write_all(&buf[..n]).await {
+                refused = Some(e.to_string());
+                break;
+            }
             sent += n as u64;
             progress(sent, offer.size);
         }
-        send.finish()
-            .map_err(|e| SyncError::Connection(e.to_string()))?;
-        let resp: Response = tokio::time::timeout(RESPONSE_TIMEOUT, read_frame(&mut recv))
-            .await
-            .map_err(|_| SyncError::Connection("o PC não respondeu ao envio".into()))??;
+        // Num stream que o PC parou de ler, o finish também falha; quem diz
+        // o que houve é a resposta, lida abaixo.
+        if refused.is_none()
+            && let Err(e) = send.finish()
+        {
+            refused = Some(e.to_string());
+        }
+        let wait = if refused.is_some() {
+            REFUSAL_TIMEOUT
+        } else {
+            RESPONSE_TIMEOUT
+        };
+        let resp: Response = match tokio::time::timeout(wait, read_frame(&mut recv)).await {
+            Ok(Ok(resp)) => resp,
+            // Sem resposta, vale o erro da escrita, se ela falhou.
+            Ok(Err(e)) => return Err(refused.map_or(e, SyncError::Connection)),
+            Err(_) => {
+                return Err(SyncError::Connection(
+                    refused.unwrap_or_else(|| "o PC não respondeu ao envio".into()),
+                ));
+            }
+        };
         if cancelled {
             return Err(SyncError::Cancelled);
         }
