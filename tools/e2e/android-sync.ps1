@@ -81,8 +81,17 @@ Adb shell rm -rf $dir 2>$null | Out-Null
 Adb shell run-as $script:Pkg rm -rf files/sync 2>$null | Out-Null
 
 # ---------------------------------------------------------------- o "PC"
+# Uma porta livre, e nao a 47823 padrao: o ISPer de verdade, aberto com a
+# sincronia ligada, ja ouve nela. O receber cairia para uma porta qualquer, e o
+# celular do teste, discando a 47823, falaria com o ISPer de quem roda o teste
+# (que recusa, porque a chave e outra).
+function Get-FreeUdpPort {
+  $udp = New-Object System.Net.Sockets.UdpClient 0
+  try { return $udp.Client.LocalEndPoint.Port } finally { $udp.Close() }
+}
+$port = Get-FreeUdpPort
 $receiverLog = Join-Path $work 'receber.log'
-$receiver = Start-Process -FilePath $cli -ArgumentList "receber `"$pcDir`" --aprovar --anunciar 10.0.2.2:47823 --validade 600" `
+$receiver = Start-Process -FilePath $cli -ArgumentList "receber `"$pcDir`" --porta $port --aprovar --anunciar 10.0.2.2:$port --validade 600" `
   -RedirectStandardOutput $receiverLog -RedirectStandardError "$receiverLog.err" -PassThru -WindowStyle Hidden
 $null = $receiver.Handle
 $codeFile = Join-Path $pcDir 'codigo.txt'
