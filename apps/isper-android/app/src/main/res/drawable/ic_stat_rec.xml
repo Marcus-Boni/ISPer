@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ícone da notificação e do bloco rápido: o microfone, em branco (o sistema pinta). -->
+<!-- Ícone da gravação em andamento (a notificação que fica enquanto grava) e do
+     bloco rápido "Gravar": o microfone, em branco (o sistema pinta). Só a
+     gravação usa o microfone; as notificações de depois têm ícones próprios
+     (ic_stat_saved, ic_stat_minutes), para a barra de status não parecer
+     dizer que ele continua ligado. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp"
     android:viewportWidth="24" android:viewportHeight="24">

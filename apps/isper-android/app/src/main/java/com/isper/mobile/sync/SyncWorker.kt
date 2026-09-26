@@ -108,7 +108,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val n = NotificationCompat.Builder(ctx, CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_rec)
+            .setSmallIcon(R.drawable.ic_stat_minutes)
             .setContentTitle(ctx.getString(R.string.sync_minutes_ready))
             .setContentText(ready.title)
             .setContentIntent(open)
