@@ -35,12 +35,12 @@ android {
         applicationId = "com.isper.mobile"
         minSdk = minSdkVersion
         targetSdk = 36
-        // Sobe a cada entrega do app (1 = laboratório da 9.1, 2 = gravador da
-        // 9.2, 3 = sincronia da 9.3). O versionName é o que o PC mostra do
-        // celular pareado, e o Android nunca instala um versionCode menor por
-        // cima de um maior.
-        versionCode = 3
-        versionName = "0.3.0-sincronia"
+        // O versionCode sobe a cada APK distribuído, e o Android nunca instala
+        // um menor por cima de um maior. O versionName é o que o PC mostra do
+        // celular pareado: o minor diz a etapa (0.1 laboratório da 9.1, 0.2
+        // gravador da 9.2, 0.3 sincronia da 9.3), e o patch, as correções.
+        versionCode = 4
+        versionName = "0.3.1-sincronia"
         ndk { abiFilters += rustAbis }
     }
 

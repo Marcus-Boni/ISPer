@@ -11,6 +11,14 @@ bata com ela.
 
 ## [Unreleased]
 
+### Corrigido
+- **No celular, o microfone na barra de status fica só para a gravação em
+  andamento.** As notificações "Gravação salva" e "Ata pronta" usavam o mesmo
+  ícone de microfone da gravação, e, depois de parar, a barra de status
+  parecia dizer que ele continuava ligado. Agora cada uma tem o seu: um ✓
+  para a gravação salva e uma folha para a ata. O app Android vai para o
+  0.3.1-sincronia.
+
 ## [0.23.0] - 2026-09-25
 
 A versão que conversa com o celular: o app Android grava a reunião e manda

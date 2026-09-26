@@ -370,7 +370,7 @@ class RecordingService : Service() {
 
     private fun notifySaved(secs: Double) {
         val n = NotificationCompat.Builder(this, CHANNEL_DONE)
-            .setSmallIcon(R.drawable.ic_stat_rec)
+            .setSmallIcon(R.drawable.ic_stat_saved)
             .setContentTitle(getString(R.string.rec_saved_title))
             .setContentText(getString(R.string.rec_saved_text, formatDuration(secs)))
             .setContentIntent(openApp())
