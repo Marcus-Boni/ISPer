@@ -16,6 +16,7 @@ mod audio_import;
 mod calls;
 mod config;
 mod copilot;
+mod copilot_filter;
 mod data;
 mod dictation;
 mod final_pass;
@@ -212,6 +213,7 @@ fn main() {
             apply_settings,
             set_llm_key,
             test_llm,
+            test_typesafe,
             list_llm_models,
             models_status,
             download_model,

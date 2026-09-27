@@ -18,7 +18,10 @@
 //! 2. **O gatilho barato vem antes do caro.** [`detect_trigger`] roda local,
 //!    em cima do texto recém-transcrito, e só então a rodada de LLM é
 //!    antecipada. É o que faz a decisão aparecer em segundos em vez de
-//!    esperar o pulso periódico.
+//!    esperar o pulso periódico. Só que as frases fixas pegam 5% dos momentos
+//!    medidos numa amostra de reuniões reais; com a chave da TypeSafe, o
+//!    filtro do Jev ([`filter_questions`], [`read_filter`]) lê cada parágrafo
+//!    e pega 92% — e o LLM passa a olhar só os trechos marcados.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -151,6 +154,16 @@ pub struct CopilotInput<'a> {
     pub elapsed: &'a str,
     pub elapsed_secs: u32,
     pub previous_cards: &'a [CopilotCard],
+    /// Trechos que o filtro ([`read_filter`]) marcou nesta janela. Vazio na
+    /// rodada comum; na rodada focada, diz à IA onde olhar primeiro.
+    pub focus: &'a [FocusHint],
+}
+
+/// Um parágrafo marcado pelo filtro: quando começou e o tipo provável.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FocusHint {
+    pub at_secs: f32,
+    pub kind: CardKind,
 }
 
 // ---------------------------------------------------------------- Normalização
@@ -344,6 +357,88 @@ pub fn detect_trigger(text: &str) -> Option<TriggerKind> {
     }
 }
 
+// ---------------------------------------------------------------- Filtro (Jev)
+
+/// A partir desta probabilidade de "merece card", o parágrafo vai para o LLM.
+///
+/// Medido nos 450 parágrafos reais (estudo, §12.5): a 0,5, o filtro pega 92%
+/// dos momentos que viram card e manda só 45% dos parágrafos adiante. A
+/// precisão ali é 0,49 — por isso ele filtra e o LLM decide, nunca o
+/// contrário.
+pub const FILTER_THRESHOLD: f32 = 0.5;
+
+/// Parágrafo com menos palavras que isto nem vai ao filtro: "uhum", "perfeito,
+/// beleza" nunca viram card (o corpus da medição usou o mesmo corte).
+pub const FILTER_MIN_WORDS: usize = 8;
+
+const FILTER_KIND: &str = "kind";
+
+/// A pergunta do filtro, exatamente como foi medida (pt-BR, a ordem das
+/// opções incluída). Mudar o texto é mudar o modelo: meça de novo.
+pub fn filter_questions() -> Vec<(&'static str, crate::systemone::Question)> {
+    let opt = |k: &str, v: &str| (k.to_string(), v.to_string());
+    vec![(
+        FILTER_KIND,
+        crate::systemone::Question::Choice {
+            instructions: "Este é um parágrafo da transcrição automática de uma reunião de trabalho (pode ter erros de transcrição). 'anterior' é o parágrafo antes dele, só para contexto. Classifique o que o parágrafo 'atual' faz.".into(),
+            options: vec![
+                opt("decision", "uma decisão ou acordo é firmado aqui: concluem como algo vai ficar (ex.: 'então a gente deixa assim', 'a estrutura já está certa')"),
+                opt("action", "uma tarefa para depois deste momento: alguém se compromete a fazer algo ou pede que alguém faça ou mude algo (ex.: 'vou te mandar', 'você consegue ver', 'mostra o ano aqui')"),
+                opt("risk", "um problema, defeito, bloqueio, objeção ou dúvida sem resposta sobre o plano"),
+                opt("none", "explicação, demonstração narrada, confirmação, conversa social ou fragmento sem decisão, tarefa ou problema"),
+            ],
+        },
+    )]
+}
+
+/// O `state` do filtro: o parágrafo e o anterior, cada um como
+/// `"Falante: texto"`. O anterior é só contexto — a pergunta diz isso.
+pub fn filter_state(previous: &str, current: &str) -> Value {
+    serde_json::json!({ "anterior": previous, "atual": current })
+}
+
+/// O que o filtro achou de um parágrafo.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FilterVerdict {
+    /// 1 − p(nada): a chance de o parágrafo merecer um card.
+    pub p_card: f32,
+    /// O tipo mais provável entre decisão, ação e risco.
+    pub kind: CardKind,
+    /// `p_card` passou do [`FILTER_THRESHOLD`].
+    pub flagged: bool,
+}
+
+/// Lê a resposta do filtro. `None` se ela não tiver a pergunta do filtro.
+pub fn read_filter(decision: &crate::systemone::Decision) -> Option<FilterVerdict> {
+    let answer = decision.answer(FILTER_KIND)?;
+    let p = |k: &str| answer.probability(k).unwrap_or(0.0);
+    let p_card = (1.0 - p("none")).clamp(0.0, 1.0);
+    let kind = [
+        (CardKind::Decision, p("decision")),
+        (CardKind::Action, p("action")),
+        (CardKind::Risk, p("risk")),
+    ]
+    .into_iter()
+    .max_by(|a, b| a.1.total_cmp(&b.1))
+    .map_or(CardKind::Action, |(k, _)| k);
+    Some(FilterVerdict {
+        p_card,
+        kind,
+        flagged: p_card >= FILTER_THRESHOLD,
+    })
+}
+
+/// `mm:ss` (ou `h:mm:ss`) para o prompt — o mesmo formato da janela.
+fn clock(secs: f32) -> String {
+    let s = secs.max(0.0) as u32;
+    let (h, m, s) = (s / 3600, (s / 60) % 60, s % 60);
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m:02}:{s:02}")
+    }
+}
+
 // ---------------------------------------------------------------- Análise
 
 const SYSTEM_COPILOT: &str = r#"Você é o ISPer Copilot, um assistente executivo e estrategista de reuniões de alto nível.
@@ -378,6 +473,20 @@ pub(crate) fn build_analysis_prompt(input: &CopilotInput<'_>) -> String {
         )
     };
 
+    let focus_block = if input.focus.is_empty() {
+        String::new()
+    } else {
+        let lines: Vec<String> = input
+            .focus
+            .iter()
+            .map(|f| format!("- [{}] provável {}", clock(f.at_secs), f.kind.label_pt()))
+            .collect();
+        format!(
+            "\n\nUm filtro rápido marcou estes pontos do trecho como prováveis momentos importantes. Confira cada um na conversa: se não houver nada concreto, não crie card.\n{}",
+            lines.join("\n")
+        )
+    };
+
     format!(
         r#"A reunião está em {elapsed}. "Eu" é quem opera o assistente; "Participantes" são os demais interlocutores.
 
@@ -386,7 +495,7 @@ pub(crate) fn build_analysis_prompt(input: &CopilotInput<'_>) -> String {
 Trecho recente da conversa:
 ---
 {window}
----
+---{focus_block}
 
 Retorne um objeto JSON com a seguinte estrutura:
 {{
@@ -921,10 +1030,102 @@ mod tests {
             elapsed: "00:10",
             elapsed_secs: 10,
             previous_cards: &anteriores,
+            focus: &[],
         });
         assert!(p.contains("Lançar dia 30"));
         assert!(p.contains("NÃO repita"));
         assert!(p.contains("00:10"));
+        assert!(
+            !p.contains("filtro rápido"),
+            "sem foco, sem o bloco do filtro"
+        );
+    }
+
+    #[test]
+    fn rodada_focada_diz_onde_o_filtro_marcou() {
+        let focus = [
+            FocusHint {
+                at_secs: 75.0,
+                kind: CardKind::Action,
+            },
+            FocusHint {
+                at_secs: 3725.0,
+                kind: CardKind::Risk,
+            },
+        ];
+        let p = build_analysis_prompt(&CopilotInput {
+            window: "[01:15] Eu: eu te mando amanhã",
+            elapsed: "1:02:10",
+            elapsed_secs: 3730,
+            previous_cards: &[],
+            focus: &focus,
+        });
+        assert!(p.contains("filtro rápido"));
+        assert!(p.contains("- [01:15] provável Ação"));
+        assert!(p.contains("- [1:02:05] provável Alerta de Risco"));
+        assert!(p.contains("não crie card"), "o filtro sugere, o LLM decide");
+    }
+
+    fn filter_decision(probs: [f32; 4]) -> crate::systemone::Decision {
+        let labels = ["decision", "action", "risk", "none"];
+        crate::systemone::Decision {
+            model: "jev-1.13.0".into(),
+            answers: vec![(
+                FILTER_KIND.into(),
+                crate::systemone::Answer::Choice {
+                    chosen: String::new(),
+                    probabilities: labels
+                        .iter()
+                        .zip(probs)
+                        .map(|(l, p)| ((*l).to_string(), p))
+                        .collect(),
+                    confidence: 0.5,
+                },
+            )],
+            input_tokens: 600,
+        }
+    }
+
+    #[test]
+    fn filtro_marca_pelo_complemento_de_nada_e_escolhe_o_tipo() {
+        let v = read_filter(&filter_decision([0.1, 0.4, 0.2, 0.3])).unwrap();
+        assert!((v.p_card - 0.7).abs() < 1e-6);
+        assert_eq!(v.kind, CardKind::Action);
+        assert!(v.flagged);
+
+        let calmo = read_filter(&filter_decision([0.05, 0.05, 0.1, 0.8])).unwrap();
+        assert!(!calmo.flagged, "p(card) 0,2 fica abaixo do limiar");
+        assert_eq!(calmo.kind, CardKind::Risk);
+
+        let limite = read_filter(&filter_decision([0.5, 0.0, 0.0, 0.5])).unwrap();
+        assert!(limite.flagged, "o limiar é inclusivo");
+    }
+
+    #[test]
+    fn filtro_sem_a_pergunta_nao_decide_nada() {
+        let mut d = filter_decision([0.0, 0.0, 0.0, 1.0]);
+        d.answers.clear();
+        assert!(read_filter(&d).is_none());
+    }
+
+    #[test]
+    fn pergunta_do_filtro_e_a_medida() {
+        // A ordem e os rótulos foram os da medição (estudo, §12.5); a leitura
+        // do veredito depende exatamente destes rótulos.
+        let qs = filter_questions();
+        assert_eq!(qs.len(), 1);
+        let (id, q) = &qs[0];
+        assert_eq!(*id, FILTER_KIND);
+        match q {
+            crate::systemone::Question::Choice { options, .. } => {
+                let labels: Vec<&str> = options.iter().map(|(l, _)| l.as_str()).collect();
+                assert_eq!(labels, ["decision", "action", "risk", "none"]);
+            }
+            other => panic!("esperava choice, veio {other:?}"),
+        }
+        let s = filter_state("Eu: oi", "Participantes: fica combinado");
+        assert_eq!(s["atual"], "Participantes: fica combinado");
+        assert_eq!(s["anterior"], "Eu: oi");
     }
 
     #[test]
@@ -936,6 +1137,7 @@ mod tests {
             elapsed: "00:10",
             elapsed_secs: 10,
             previous_cards: &anteriores,
+            focus: &[],
         });
         assert!(!p.contains("Ruído da sala"));
     }
@@ -965,6 +1167,7 @@ mod tests {
                 elapsed: "00:10",
                 elapsed_secs: 10,
                 previous_cards: &[],
+                focus: &[],
             },
         )
         .unwrap_err();

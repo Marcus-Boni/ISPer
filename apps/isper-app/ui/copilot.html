@@ -729,6 +729,16 @@
       action.onclick = () => $('btn-analyze').click();
       return;
     }
+    // O filtro do Jev caiu nesta reunião (chave, crédito): o Copilot segue
+    // pelo pulso, mas quem paga precisa saber — e onde consertar.
+    if (d.filter && d.filter.disabled && !d.running) {
+      strip.classList.add('warn');
+      text.textContent = t('copilot.status.filter-off', { e: d.filter.disabled });
+      action.hidden = false;
+      action.textContent = t('copilot.status.open-settings');
+      action.onclick = () => invoke('open_settings_window').catch((e) => UI.toast(String(e), 'err'));
+      return;
+    }
     if (d.running) {
       spin.hidden = false;
       text.textContent = d.last_trigger
@@ -746,7 +756,9 @@
       return;
     }
     if (d.last_updated) {
-      text.textContent = t('copilot.status.following', { at: d.last_updated });
+      text.textContent = d.filter && !d.filter.disabled
+        ? t('copilot.status.following-filter', { at: d.last_updated, flagged: d.filter.flagged, n: d.filter.paragraphs })
+        : t('copilot.status.following', { at: d.last_updated });
       return;
     }
     strip.hidden = true;
