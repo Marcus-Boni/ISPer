@@ -11,6 +11,27 @@ bata com ela.
 
 ## [Unreleased]
 
+### Corrigido
+- **Uma pessoa falando sozinha não vira mais dois participantes.** Numa
+  gravação curta de uma pessoa só (33 s no celular), a identificação de
+  falantes partia a mesma voz em "Participante 1" e "Participante 2". Agora,
+  depois do agrupamento, cada falante ganha uma impressão de voz tirada da
+  fala dele, e falantes com a mesma voz viram um, no PC e no celular. É o
+  mesmo passo que o 3D-Speaker, de onde vem o modelo de voz, usa depois do
+  agrupamento, com o limiar medido em gravação real e nas fixtures: vozes
+  parecidas continuam separadas, e as reuniões de teste dão os mesmos
+  falantes de antes. `isper-cli diarize` passou a mostrar a semelhança entre
+  as vozes (`--same-voice` muda o limiar; `ISPER_DIARIZE_SAME_VOICE` também)
+  ([ADR 0005](docs/adr/0005-diarizacao-pos-hoc.md)).
+- **No celular, os botões da gravação não espremem mais.** Com a gravação
+  aberta, "Apagar" quebrava letra por letra quando os quatro botões não
+  cabiam na largura da tela. Agora o botão que não cabe desce inteiro para a
+  linha de baixo, e o mesmo vale para as outras fileiras de botões (a ata, o
+  PC e os Ajustes). O app Android vai para o 0.4.1-transcricao.
+- **Plural de verdade:** "1 gravação vai" e "2 gravações vão" (no lugar de
+  "gravação(ões)") e "1 trecho silenciado" no celular, e "1 arquivo não
+  reconhecido" no PC.
+
 ## [0.24.0] - 2026-09-27
 
 A versão em que o celular transcreve sozinho e o Copilot fica mais rápido: sem
