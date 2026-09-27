@@ -16,6 +16,8 @@ No console da página:
     __sim.scenario('idle')      # nenhuma reunião em andamento
     __sim.scenario('no-key')    # sem provider de IA configurado
     __sim.scenario('error')     # última análise falhou
+    __sim.scenario('filter')    # filtro do Jev ligado (lendo os trechos)
+    __sim.scenario('filter-off')# filtro do Jev caiu nesta reunião (sem crédito)
     __sim.play()                # despeja o roteiro inteiro de uma vez
     __sim.step()                # avança uma fala
     __sim.analyzing(true)       # liga/desliga o estado "analisando"
@@ -139,6 +141,12 @@ MOCK = r"""
       error: S.scenario === 'error' ? 'status 429: limite de requisições do provider' : S.error,
       generation: S.generation,
       notes_saved: S.savedMeeting !== null,
+      // Filtro do Jev (copilot_filter.rs): ligado e lendo, ou caído na reunião.
+      filter: S.scenario === 'filter'
+        ? { paragraphs: 3 * S.cursor, flagged: S.cursor, failures: 0, cost_usd: 0.00009 * S.cursor, disabled: null }
+        : S.scenario === 'filter-off'
+          ? { paragraphs: 12, flagged: 5, failures: 0, cost_usd: 0.0004, disabled: 'sem créditos na TypeSafe (402)' }
+          : null,
     };
   }
 
