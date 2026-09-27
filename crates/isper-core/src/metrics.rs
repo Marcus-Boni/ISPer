@@ -83,6 +83,10 @@ pub struct DiarizeStats {
     pub turns: usize,
     /// Grupos fracos absorvidos pelo grupo forte mais próximo no tempo.
     pub absorbed_clusters: usize,
+    /// Falantes juntados a outro na conferência com a voz inteira: a mesma
+    /// pessoa que o agrupamento partiu em dois. Relatórios antigos não têm.
+    #[serde(default)]
+    pub merged_same_voice: usize,
     /// Mediana da duração dos turnos publicados, em segundos.
     pub median_turn_secs: f32,
     /// Turnos publicados com menos de 500 ms.

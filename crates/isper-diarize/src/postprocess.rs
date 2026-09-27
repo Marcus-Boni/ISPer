@@ -9,6 +9,10 @@
 //! 2. **renumeração por ordem de aparição**: quem fala primeiro é o 0. Sem
 //!    isto os ids têm buracos e o leitor vê "Participante 1, 4, 9".
 //!
+//! Depois delas, a **conferência com a voz inteira** ([`same_voice_groups`],
+//! [`apply_same_voice`]) junta falantes que são a mesma voz. A medida da voz
+//! precisa do ONNX e fica no `lib.rs`; a regra de junção é pura e mora aqui.
+//!
 //! O que a limpeza NÃO faz: esconder que houve problema. Tudo o que ela mexeu
 //! sai em [`DiarizeMetrics`].
 
@@ -27,6 +31,13 @@ pub struct DiarizeMetrics {
     pub turns: usize,
     /// Grupos que a limpeza absorveu por serem fracos demais.
     pub absorbed_clusters: usize,
+    /// Falantes que a conferência com a voz inteira juntou a outro: eram a
+    /// mesma pessoa partida em dois grupos.
+    pub merged_same_voice: usize,
+    /// A semelhança (cosseno, de −1 a 1) entre as vozes de cada par de
+    /// falantes que sobrou da limpeza, na conferência com a voz inteira — com
+    /// a numeração de antes da junção.
+    pub voice_similarities: Vec<(u32, u32, f32)>,
     /// Mediana da duração dos turnos publicados.
     pub median_turn_secs: f32,
     /// Turnos de menos de 500 ms — sintoma de fragmentação.
@@ -100,6 +111,89 @@ pub fn postprocess(
     metrics.very_short_turns = renumbered.iter().filter(|t| t.secs() < 0.5).count();
     metrics.median_turn_secs = median(&renumbered);
     (renumbered, metrics)
+}
+
+/// Quais falantes são a mesma voz, pela conferência com a voz inteira de cada
+/// um. `similarities` traz a semelhança (cosseno) de cada par que foi medido.
+///
+/// Dois grupos só se juntam se TODOS os pares entre eles passarem de
+/// `threshold` — ligação completa, o mesmo critério do agrupamento —, então
+/// duas pessoas parecidas com uma terceira não viram uma só por tabela. Um par
+/// sem medida (voz curta demais para a impressão) nunca junta.
+///
+/// Devolve `(falante, falante em que ele foi juntado)` para cada um; quem
+/// não juntou aponta para si mesmo. O destino é o de menor número, que é o que
+/// aparece primeiro (a numeração já está em ordem de aparição).
+pub fn same_voice_groups(
+    speakers: &[u32],
+    similarities: &[(u32, u32, f32)],
+    threshold: f32,
+) -> Vec<(u32, u32)> {
+    let sim = |a: u32, b: u32| {
+        similarities
+            .iter()
+            .find(|(x, y, _)| (*x == a && *y == b) || (*x == b && *y == a))
+            .map(|(_, _, s)| *s)
+    };
+    let mut groups: Vec<Vec<u32>> = speakers.iter().map(|s| vec![*s]).collect();
+    loop {
+        let mut best: Option<(usize, usize, f32)> = None;
+        for i in 0..groups.len() {
+            for j in i + 1..groups.len() {
+                // A menor semelhança entre os membros (ligação completa).
+                let weakest = groups[i]
+                    .iter()
+                    .flat_map(|a| groups[j].iter().map(move |b| (*a, *b)))
+                    .map(|(a, b)| sim(a, b))
+                    .try_fold(f32::INFINITY, |m, s| s.map(|s| m.min(s)));
+                if let Some(w) = weakest
+                    && w >= threshold
+                    && best.is_none_or(|(_, _, m)| w > m)
+                {
+                    best = Some((i, j, w));
+                }
+            }
+        }
+        let Some((i, j, _)) = best else { break };
+        let moved = groups.remove(j);
+        groups[i].extend(moved);
+    }
+    let mut out = Vec::with_capacity(speakers.len());
+    for g in &groups {
+        let into = g.iter().copied().min().unwrap_or_default();
+        out.extend(g.iter().map(|s| (*s, into)));
+    }
+    out.sort_unstable();
+    out
+}
+
+/// Aplica as junções de [`same_voice_groups`]: cada turno vai para o falante
+/// do seu grupo, turnos vizinhos emendam e a numeração volta à ordem de
+/// aparição. As métricas de saída são refeitas.
+pub fn apply_same_voice(
+    turns: Vec<SpeakerTurn>,
+    into: &[(u32, u32)],
+    metrics: &mut DiarizeMetrics,
+    opts: &DiarizeOptions,
+) -> Vec<SpeakerTurn> {
+    let before = distinct(&turns);
+    let relabeled: Vec<SpeakerTurn> = turns
+        .into_iter()
+        .map(|mut t| {
+            if let Some((_, to)) = into.iter().find(|(from, _)| *from == t.speaker) {
+                t.speaker = *to;
+            }
+            t
+        })
+        .collect();
+    let renumbered = renumber(merge_adjacent(relabeled, opts.min_duration_off));
+    metrics.speakers = distinct(&renumbered);
+    metrics.merged_same_voice = before.saturating_sub(metrics.speakers);
+    metrics.turns = renumbered.len();
+    metrics.speech_secs = renumbered.iter().map(SpeakerTurn::secs).sum();
+    metrics.very_short_turns = renumbered.iter().filter(|t| t.secs() < 0.5).count();
+    metrics.median_turn_secs = median(&renumbered);
+    renumbered
 }
 
 fn distinct(turns: &[SpeakerTurn]) -> usize {
@@ -338,6 +432,48 @@ mod tests {
         assert_eq!(m.very_short_turns, 1);
         // Durações: 0,2 · 2 · 8 · 10 → mediana (2 + 8) / 2 = 5.
         assert!((m.median_turn_secs - 5.0).abs() < 0.001, "{m:?}");
+    }
+
+    #[test]
+    fn a_mesma_voz_em_dois_grupos_vira_um() {
+        // Uma pessoa só, partida em dois grupos grandes demais para a
+        // absorção (o áudio de 33 s do S21 FE, em 27/09).
+        let raw = vec![
+            t(0.0, 10.0, 0),
+            t(10.5, 12.0, 0),
+            t(12.2, 33.0, 1),
+            t(33.5, 35.0, 1),
+        ];
+        let (turns, mut m) = postprocess(raw, &opts());
+        assert_eq!(m.speakers, 2);
+        let into = same_voice_groups(&[0, 1], &[(0, 1, 0.83)], 0.6);
+        assert_eq!(into, vec![(0, 0), (1, 0)]);
+        let turns = apply_same_voice(turns, &into, &mut m, &opts());
+        assert_eq!(m.speakers, 1);
+        assert_eq!(m.merged_same_voice, 1);
+        assert_eq!(turns.len(), 1, "os turnos emendaram: {turns:#?}");
+    }
+
+    #[test]
+    fn vozes_diferentes_ficam_separadas() {
+        let into = same_voice_groups(&[0, 1, 2], &[(0, 1, 0.12), (0, 2, 0.08), (1, 2, 0.3)], 0.6);
+        assert_eq!(into, vec![(0, 0), (1, 1), (2, 2)]);
+    }
+
+    #[test]
+    fn so_junta_se_todos_os_pares_passam() {
+        // 0 parece 1 e 1 parece 2, mas 0 não parece 2: juntar os três por
+        // tabela seria inventar uma pessoa. Junta o par mais parecido e para.
+        let sims = [(0, 1, 0.8), (1, 2, 0.7), (0, 2, 0.2)];
+        let into = same_voice_groups(&[0, 1, 2], &sims, 0.6);
+        assert_eq!(into, vec![(0, 0), (1, 0), (2, 2)]);
+    }
+
+    #[test]
+    fn par_sem_medida_nao_junta() {
+        // A voz do 2 foi curta demais para a impressão: sem medida, sem junção.
+        let into = same_voice_groups(&[0, 1, 2], &[(0, 1, 0.9)], 0.6);
+        assert_eq!(into, vec![(0, 0), (1, 0), (2, 2)]);
     }
 
     #[test]

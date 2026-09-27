@@ -63,6 +63,7 @@ impl Diarizer for SherpaDiarizer {
                 speakers: out.metrics.speakers,
                 turns: out.metrics.turns,
                 absorbed_clusters: out.metrics.absorbed_clusters,
+                merged_same_voice: out.metrics.merged_same_voice,
                 median_turn_secs: out.metrics.median_turn_secs,
                 very_short_turns: out.metrics.very_short_turns,
                 warnings: Vec::new(),
@@ -345,6 +346,7 @@ fn log_report(meeting_id: i64, canal: &str, out: &FinalTranscript) {
             grupos_brutos = d.raw_clusters,
             falantes = d.speakers,
             absorvidos = d.absorbed_clusters,
+            mesma_voz = d.merged_same_voice,
             turnos = d.turns,
             turnos_curtos = d.very_short_turns,
             "diarização do canal"

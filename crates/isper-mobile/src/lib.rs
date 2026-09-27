@@ -549,6 +549,7 @@ impl Diarizer for MobileDiarizer {
                 speakers: out.metrics.speakers,
                 turns: out.metrics.turns,
                 absorbed_clusters: out.metrics.absorbed_clusters,
+                merged_same_voice: out.metrics.merged_same_voice,
                 median_turn_secs: out.metrics.median_turn_secs,
                 very_short_turns: out.metrics.very_short_turns,
                 warnings: Vec::new(),

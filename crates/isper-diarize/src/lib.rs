@@ -33,6 +33,16 @@
 //! - uma contagem absurda de grupos **não é publicada em silêncio**: vira
 //!   aviso e `reliable = false`, para quem chamou decidir (ver
 //!   [`DiarizeOutcome`]).
+//!
+//! E um terceiro, desde a Fase 9.4: a **conferência com a voz inteira**. Com
+//! ligação completa, basta um par de trechos destoante para o agrupamento
+//! partir a mesma voz, e num áudio curto de uma pessoa só (uma gravação no
+//! celular) os dois pedaços ficam grandes demais para a absorção. Depois da
+//! limpeza, cada falante ganha uma impressão de voz tirada de até
+//! [`VOICE_SECS`] da fala dele — bem mais estável que a de um trecho —, e
+//! falantes com a mesma voz viram um. É o mesmo passo que o 3D-Speaker, de
+//! onde vem o modelo de impressão de voz, aplica depois do agrupamento; o
+//! limiar foi calibrado ([`DEFAULT_SAME_VOICE`]).
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -67,6 +77,40 @@ pub const APPROX_MB: u32 = 45;
 /// completa, 0,3 exige que todos os trechos de uma pessoa estejam a menos de
 /// 0,3 de distância entre si, o que voz comprimida não cumpre.
 pub const DEFAULT_THRESHOLD: f32 = 0.5;
+
+/// Semelhança (cosseno das impressões de voz inteiras) a partir da qual dois
+/// falantes são a mesma pessoa ([`DiarizeOptions::same_voice_similarity`]).
+///
+/// Calibrado em 27/09/2026 com o exemplo `conferir_vozes` do `isper-cli`
+/// (metade da fala de cada um contra a outra metade, e falante contra
+/// falante, nos turnos de referência):
+///
+/// | caso | semelhança |
+/// |---|---|
+/// | mesma voz, gravação real no celular (grupos de 3 a 7 s) | 0,54 a 0,71 |
+/// | mesma voz, voz sintética | 0,80 a 0,98 |
+/// | a mesma voz sintética a ±8 % de velocidade (as três "pessoas" da `reuniao-sintetica`) | 0,44 a 0,50 |
+/// | vozes diferentes | 0,14 a 0,27 |
+///
+/// 0,6 fica 0,1 acima do pior caso de vozes diferentes. Na dúvida, não junta:
+/// juntar duas pessoas apaga quem disse o quê, e uma pessoa partida em duas
+/// se conserta renomeando uma delas.
+pub const DEFAULT_SAME_VOICE: f32 = 0.6;
+
+/// Quanto da fala de cada falante entra na impressão de voz da conferência.
+pub const VOICE_SECS: f32 = 20.0;
+
+/// Abaixo disto de fala, a impressão de voz não vale nada: com 1 s, trechos
+/// da mesma pessoa deram semelhança perto de zero. O falante fica fora da
+/// conferência.
+pub const MIN_VOICE_SECS: f32 = 3.0;
+
+/// Turnos mais curtos que isto ficam fora da impressão de voz. É neles que
+/// moram o toque no botão, a respiração e o "hum" — trechos que o segmentador
+/// marca como fala e que puxam a impressão para longe da voz: numa gravação
+/// de uma pessoa só, metade da fala contra a outra deu 0,46 com eles dentro e
+/// de 0,54 a 0,65 sem eles.
+pub const MIN_TURN_SECS: f32 = 1.5;
 
 /// Um turno de fala: `[start, end)` em segundos e o índice do falante.
 ///
@@ -114,6 +158,11 @@ pub struct DiarizeOptions {
     /// automática ([`auto_threads`]). O `sherpa-rs` fixava 1, e era por isso
     /// que 30 min de reunião levavam 12,8 min para separar os falantes.
     pub threads: usize,
+    /// Na conferência com a voz inteira, dois falantes cujas impressões de
+    /// voz têm semelhança (cosseno) a partir disto viram um. 0 desliga a
+    /// conferência. Não roda com [`Self::num_speakers`]: quem disse quantos
+    /// são já decidiu.
+    pub same_voice_similarity: f32,
 }
 
 impl Default for DiarizeOptions {
@@ -130,6 +179,7 @@ impl Default for DiarizeOptions {
             min_speaker_turns: 2,
             max_plausible_speakers: 12,
             threads: 0,
+            same_voice_similarity: DEFAULT_SAME_VOICE,
         }
     }
 }
@@ -153,9 +203,9 @@ pub fn auto_threads() -> usize {
 pub const MAX_AUTO_THREADS: usize = 8;
 
 impl DiarizeOptions {
-    /// Lê `ISPER_DIARIZE_THRESHOLD`, `ISPER_DIARIZE_SPEAKERS` e
-    /// `ISPER_DIARIZE_THREADS` — calibrar e medir numa reunião real sem
-    /// recompilar continua possível.
+    /// Lê `ISPER_DIARIZE_THRESHOLD`, `ISPER_DIARIZE_SPEAKERS`,
+    /// `ISPER_DIARIZE_THREADS` e `ISPER_DIARIZE_SAME_VOICE` — calibrar e medir
+    /// numa reunião real sem recompilar continua possível.
     pub fn from_env() -> Self {
         let mut o = Self::default();
         if let Some(t) = std::env::var("ISPER_DIARIZE_THRESHOLD")
@@ -176,6 +226,12 @@ impl DiarizeOptions {
             .and_then(|v| v.parse::<usize>().ok())
         {
             o.threads = n;
+        }
+        if let Some(s) = std::env::var("ISPER_DIARIZE_SAME_VOICE")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+        {
+            o.same_voice_similarity = s;
         }
         o
     }
@@ -320,7 +376,32 @@ pub fn diarize_with_models(
         })
         .collect();
 
-    let (turns, mut metrics) = postprocess(raw, opts);
+    let (mut turns, mut metrics) = postprocess(raw, opts);
+
+    // A conferência com a voz inteira: a mesma pessoa partida em dois grupos
+    // vira uma. Se o extrator falhar, fica o resultado do agrupamento.
+    if opts.num_speakers.is_none() && metrics.speakers >= 2 {
+        match voice_similarities(embedding, samples_16k, &turns, threads) {
+            Ok(similarities) => {
+                tracing::info!(pares = ?similarities, "semelhança entre as vozes");
+                if opts.same_voice_similarity > 0.0 {
+                    let mut ids: Vec<u32> = turns.iter().map(|t| t.speaker).collect();
+                    ids.sort_unstable();
+                    ids.dedup();
+                    let into = postprocess::same_voice_groups(
+                        &ids,
+                        &similarities,
+                        opts.same_voice_similarity,
+                    );
+                    if into.iter().any(|(from, to)| from != to) {
+                        turns = postprocess::apply_same_voice(turns, &into, &mut metrics, opts);
+                    }
+                }
+                metrics.voice_similarities = similarities;
+            }
+            Err(e) => tracing::warn!("a conferência das vozes falhou ({e}): fica o agrupamento"),
+        }
+    }
     metrics.elapsed_secs = started.elapsed().as_secs_f32();
     metrics.audio_secs = samples_16k.len() as f32 / 16_000.0;
 
@@ -348,6 +429,7 @@ pub fn diarize_with_models(
         speakers = metrics.speakers,
         turns = metrics.turns,
         absorbed = metrics.absorbed_clusters,
+        same_voice = metrics.merged_same_voice,
         median_turn_secs = metrics.median_turn_secs,
         very_short_turns = metrics.very_short_turns,
         threads,
@@ -360,4 +442,92 @@ pub fn diarize_with_models(
         metrics,
         warnings,
     })
+}
+
+/// A semelhança (cosseno, de −1 a 1) entre as vozes de cada par de falantes de
+/// `turns`, com a impressão de voz de cada um tirada de até [`VOICE_SECS`] da
+/// fala dele. Um falante com menos de [`MIN_VOICE_SECS`] de fala fica fora dos
+/// pares.
+pub fn voice_similarities(
+    embedding: &Path,
+    samples_16k: &[f32],
+    turns: &[SpeakerTurn],
+    threads: usize,
+) -> Result<Vec<(u32, u32, f32)>> {
+    let config = sherpa_onnx::SpeakerEmbeddingExtractorConfig {
+        model: Some(embedding.to_string_lossy().into_owned()),
+        num_threads: threads.max(1) as i32,
+        ..Default::default()
+    };
+    let extractor = sherpa_onnx::SpeakerEmbeddingExtractor::create(&config).ok_or_else(|| {
+        DiarizeError::Engine("o sherpa-onnx não carregou o modelo de impressão de voz".into())
+    })?;
+    let prints = voice_prints(&extractor, samples_16k, turns);
+    let mut out = Vec::new();
+    for (i, (a, pa)) in prints.iter().enumerate() {
+        for (b, pb) in &prints[i + 1..] {
+            out.push((*a, *b, cosine(pa, pb)));
+        }
+    }
+    Ok(out)
+}
+
+/// A impressão de voz de cada falante, com até [`VOICE_SECS`] da fala dele:
+/// os turnos mais longos primeiro, que são os mais limpos, e nenhum abaixo de
+/// [`MIN_TURN_SECS`].
+fn voice_prints(
+    extractor: &sherpa_onnx::SpeakerEmbeddingExtractor,
+    samples_16k: &[f32],
+    turns: &[SpeakerTurn],
+) -> Vec<(u32, Vec<f32>)> {
+    const RATE: f32 = 16_000.0;
+    let mut ids: Vec<u32> = turns.iter().map(|t| t.speaker).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    let mut out = Vec::new();
+    for id in ids {
+        let mut own: Vec<&SpeakerTurn> = turns
+            .iter()
+            .filter(|t| t.speaker == id && t.secs() >= MIN_TURN_SECS)
+            .collect();
+        own.sort_by(|a, b| b.secs().total_cmp(&a.secs()));
+        let mut audio: Vec<f32> = Vec::new();
+        for t in own {
+            let a = ((t.start.max(0.0) * RATE) as usize).min(samples_16k.len());
+            let b = ((t.end.max(0.0) * RATE) as usize).min(samples_16k.len());
+            if b > a {
+                audio.extend_from_slice(&samples_16k[a..b]);
+            }
+            if audio.len() as f32 >= VOICE_SECS * RATE {
+                break;
+            }
+        }
+        if (audio.len() as f32) < MIN_VOICE_SECS * RATE {
+            continue;
+        }
+        let Some(stream) = extractor.create_stream() else {
+            continue;
+        };
+        stream.accept_waveform(RATE as i32, &audio);
+        stream.input_finished();
+        if !extractor.is_ready(&stream) {
+            continue;
+        }
+        if let Some(e) = extractor.compute(&stream) {
+            out.push((id, e));
+        }
+    }
+    out
+}
+
+/// Cosseno entre dois vetores (0 se algum for nulo).
+fn cosine(a: &[f32], b: &[f32]) -> f32 {
+    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
+    let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if na == 0.0 || nb == 0.0 {
+        0.0
+    } else {
+        dot / (na * nb)
+    }
 }

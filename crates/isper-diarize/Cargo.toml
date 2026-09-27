@@ -16,5 +16,8 @@ isper-models = { path = "../isper-models" }
 thiserror = "2"
 tracing = "0.1"
 
+[dev-dependencies]
+hound = "3.5.1"
+
 [lints]
 workspace = true
