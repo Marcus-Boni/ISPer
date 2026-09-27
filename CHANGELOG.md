@@ -11,6 +11,14 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-27
+
+A versão em que o celular transcreve sozinho e o Copilot fica mais rápido: sem
+o PC por perto, a gravação vira ata no próprio aparelho; e, com a chave da
+TypeSafe, o Copilot passa a ler cada trecho da reunião e mostra o card
+segundos depois de a frase ser dita. O resumo e a busca passam a usar a
+transcrição final.
+
 ### Adicionado
 - **O celular transcreve sozinho (Fase 9.4).** Sem o PC por perto, a gravação
   vira ata no próprio celular, com o mesmo passe final do PC: o modelo small
