@@ -31,6 +31,15 @@ Sem câmera ou sem o leitor de QR do Google no celular: no PC, clique em **Copia
 
 Se a conexão cair no meio, o envio continua de onde parou na próxima vez. Uma gravação que já chegou não vai de novo, nem vira uma segunda reunião.
 
+## Sem o PC por perto: o celular transcreve
+
+Numa visita, numa viagem ou sem PC pareado, o próprio celular transcreve as gravações que o PC ainda não recebeu, com o mesmo passe final do PC.
+
+- **Quando:** por padrão, só com o celular na tomada, porque transcrever ocupa o processador por um bom tempo. Em Biblioteca → **Ajustes** (a engrenagem), dá para escolher **Assim que a gravação termina** ou **Só no PC**. **Transcrever agora**, na gravação, faz na hora.
+- **O modelo:** o ISPer escolhe pela memória do aparelho (o small a partir de ~6 GB, com os falantes separados; o base abaixo disso). Na primeira vez, ele baixa o modelo, de ~60 a ~230 MB, no Wi-Fi.
+- **Se a tomada sair no meio**, a transcrição para e continua de onde parou na próxima vez.
+- Na Biblioteca, a gravação mostra **Transcreve ao carregar**, **No celular: 42%** e, no fim, **Ata do celular**. Quando a ata do PC chega, ela substitui a do celular, com o modelo maior e o resumo por IA, se houver.
+
 ## Desfazer o pareamento
 
 - **No PC:** Configurações → Celular → **Esquecer**, ao lado do aparelho.

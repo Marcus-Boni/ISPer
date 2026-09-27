@@ -24,6 +24,7 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0015](0015-sherpa-onnx-oficial.md) | O crate oficial do sherpa-onnx no lugar do sherpa-rs, com threads | aceita | 24/09/2026 |
 | [0016](0016-gravacao-no-celular-ogg-opus.md) | Gravação no celular: Ogg/Opus a 32 kbit/s, em páginas de 1 s, com um manifesto ao lado | aceita | 24/09/2026 |
 | [0017](0017-sincronia-celular-pc.md) | Sincronia celular → PC: iroh com a chave do PC no QR e um protocolo pequeno e retomável | aceita | 25/09/2026 |
+| [0018](0018-transcricao-no-celular.md) | Transcrição no celular: o passe final do PC, retomável, com o modelo pela memória | aceita | 26/09/2026 |
 
 ## Como escrever um ADR
 

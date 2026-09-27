@@ -71,6 +71,33 @@ recuperar; gravar com a tela apagada.
 receber` fazendo o papel do PC: colar o código, parear, gravar, a gravação
 chegar ao PC, a ata voltar e abrir, desconectar.
 
+## Transcrever no celular (Fase 9.4)
+
+Sem o PC por perto, o celular transcreve sozinho, com o passe final do PC
+([ADR 0018](../../docs/adr/0018-transcricao-no-celular.md)).
+
+- **O que entra na fila:** as gravações sem ata e que o PC ainda não recebeu
+  inteiras. As que o PC já tem ficam para a sincronia.
+- **Quando:** por padrão, só na tomada. Os Ajustes (a engrenagem da
+  Biblioteca) oferecem "assim que a gravação termina" e "só no PC", e
+  **Transcrever agora** faz na hora, em qualquer modo.
+- **O modelo:** pela memória do aparelho, o small a partir de ~6 GB (com os
+  falantes separados) e o base de ~3 a ~6 GB. Abaixo disso, só o PC. Nos
+  Ajustes dá para trocar. Os modelos ficam em `files/models`, a mesma pasta do
+  laboratório, e o download espera o Wi-Fi, a não ser que você peça para já.
+- **Continua de onde parou:** ao lado da gravação, `<id>.transcricao.jsonl`
+  guarda cada janela transcrita. Se a tomada sair, a transcrição para, e na
+  próxima vez continua dali, com o mesmo resultado.
+- **A ata:** sai em `<id>.ata.md`, o mesmo lugar da ata do PC, com um
+  `<id>.ata.json` que diz que ela é do celular. Quando a ata do PC chega, ela
+  a substitui. Uma falha fica em `<id>.transcricao.erro`, com o motivo, e a
+  gravação sai da fila até **Tentar de novo**.
+
+`tools/e2e/android-transcribe.ps1` testa isso num emulador, com o modelo Tiny.
+A gravação espera fora da tomada e começa na tomada. Tirada da tomada no
+meio, para, e de volta, continua e termina. O roteiro também cobre
+**Transcrever agora** na bateria e um áudio corrompido virando falha.
+
 ## O que o laboratório mede
 
 - tempo de cada etapa e o **fator de tempo real** (tempo total ÷ duração do
