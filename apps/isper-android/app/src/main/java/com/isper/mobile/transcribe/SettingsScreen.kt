@@ -3,6 +3,8 @@ package com.isper.mobile.transcribe
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,6 +48,7 @@ private fun gigabytes(mb: Long): String =
  * Ajustes da transcrição no celular (Fase 9.4): quando transcrever, com que
  * modelo, se separa os falantes aqui, e os modelos que estão no aparelho.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -140,7 +143,7 @@ fun SettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     stringResource(R.string.settings_models_on_device, megabytes(bytes)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(
                         onClick = { LocalTranscribe.downloadNow(context) },
                         modifier = Modifier.testTag("baixar-modelos"),

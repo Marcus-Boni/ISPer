@@ -875,7 +875,10 @@
   "settings.msg.sent": "sent ✓",
   "settings.msg.test-failed": "test failed: {e}",
   "settings.msg.theme-failed": "couldn't change the theme: {e}",
-  "settings.msg.unrecognized": "{n} file(s) not recognized",
+  "settings.msg.unrecognized": {
+    "one": "{n} file not recognized",
+    "other": "{n} files not recognized"
+  },
   "settings.msg.up-to-date": "You're already on the latest version ({v}).",
   "settings.msg.up-to-date-btn": "up to date ✓",
   "settings.msg.update-failed": "couldn't update: {e}",

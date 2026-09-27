@@ -875,7 +875,10 @@
   "settings.msg.sent": "enviada ✓",
   "settings.msg.test-failed": "teste falhou: {e}",
   "settings.msg.theme-failed": "não consegui trocar o tema: {e}",
-  "settings.msg.unrecognized": "{n} arquivo(s) não reconhecido(s)",
+  "settings.msg.unrecognized": {
+    "one": "{n} arquivo não reconhecido",
+    "other": "{n} arquivos não reconhecidos"
+  },
   "settings.msg.up-to-date": "Você já está na última versão ({v}).",
   "settings.msg.up-to-date-btn": "na última versão ✓",
   "settings.msg.update-failed": "não consegui atualizar: {e}",
