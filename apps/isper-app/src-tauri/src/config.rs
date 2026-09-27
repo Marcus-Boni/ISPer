@@ -90,6 +90,11 @@ pub struct AppConfig {
     /// Intervalo entre rodadas de insights, em minutos.
     #[serde(default = "default_insights_interval")]
     pub insights_interval_min: u32,
+    /// Filtro do Copilot: `off` · `jev` (cada parágrafo passa pelo Jev, da
+    /// TypeSafe, antes da IA — ver `copilot_filter.rs`). Desligado por
+    /// padrão: pede uma chave da TypeSafe e manda o texto a mais um serviço.
+    #[serde(default = "default_copilot_filter")]
+    pub copilot_filter: String,
     /// Indicador flutuante fixo na tela mesmo em repouso (botão "Indicador"
     /// do Início / bandeja); "ocultar" desfixa.
     #[serde(default)]
@@ -170,6 +175,7 @@ impl Default for AppConfig {
             call_detect: default_call_detect(),
             live_insights: false,
             insights_interval_min: default_insights_interval(),
+            copilot_filter: default_copilot_filter(),
             overlay_pinned: false,
             retention_days: 0,
             final_pass: true,
@@ -200,6 +206,10 @@ fn default_call_detect() -> String {
 
 fn default_insights_interval() -> u32 {
     5
+}
+
+fn default_copilot_filter() -> String {
+    "off".into()
 }
 
 fn default_meeting_shortcut() -> Option<String> {
@@ -328,6 +338,11 @@ impl AppConfig {
         if !crate::insights::INSIGHTS_INTERVALS.contains(&self.insights_interval_min) {
             self.insights_interval_min = default_insights_interval();
         }
+        pick(
+            &mut self.copilot_filter,
+            &crate::copilot_filter::FILTER_MODES,
+            "off",
+        );
         if !RETENTION_DAYS.contains(&self.retention_days) {
             self.retention_days = 0;
         }
@@ -549,9 +564,11 @@ mod tests {
             after_meeting: "banana".into(),
             call_detect: "AUTO".into(),
             insights_interval_min: 42,
+            copilot_filter: " JEV ".into(),
             ..AppConfig::default()
         };
         cfg.normalize();
+        assert_eq!(cfg.copilot_filter, "jev");
         assert_eq!(cfg.shortcut, None);
         assert_eq!(cfg.lang, "pt-br");
         assert_eq!(
@@ -606,10 +623,18 @@ mod tests {
         std::fs::create_dir_all(p.parent().unwrap()).unwrap();
         std::fs::write(&p, "isto nao e toml = = =").unwrap();
         assert_eq!(load_from(&p), AppConfig::default());
-        std::fs::write(&p, "call_detect = \"banana\"\ninsights_interval_min = 99\n").unwrap();
+        std::fs::write(
+            &p,
+            "call_detect = \"banana\"\ninsights_interval_min = 99\ncopilot_filter = \"laya\"\n",
+        )
+        .unwrap();
         let cfg = load_from(&p);
         assert_eq!(cfg.call_detect, "notify");
         assert_eq!(cfg.insights_interval_min, 5);
+        assert_eq!(
+            cfg.copilot_filter, "off",
+            "valor desconhecido volta ao padrão"
+        );
         let _ = std::fs::remove_dir_all(p.parent().unwrap());
     }
 }

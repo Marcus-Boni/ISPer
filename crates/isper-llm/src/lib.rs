@@ -8,6 +8,10 @@
 //!   não em arquivo de configuração nem em variável hardcoded.
 //! - **Provider trocável**: o trait [`LlmProvider`] abstrai a API — Claude,
 //!   Groq e Gemini implementados; trocar é editar uma linha de configuração.
+//! - **Decidir não é escrever**: o que só precisa de uma decisão (este
+//!   parágrafo merece card?) vai ao trait [`Classifier`] — hoje o Jev, da
+//!   TypeSafe, que responde em ~0,4 s e custa uma fração de centavo por hora
+//!   de reunião ([`systemone`]).
 
 pub mod copilot;
 pub mod embeddings;
@@ -16,13 +20,15 @@ mod polish;
 mod providers;
 mod settings;
 mod summary;
+pub mod systemone;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
 pub use copilot::{
-    CardKind, CardStatus, CardUrgency, CopilotAnalysis, CopilotCard, CopilotInput, TriggerKind,
-    analyze_meeting, card_id, detect_trigger, enrich_notes, enrich_notes_stream, is_same_card,
-    query_meeting, query_meeting_stream, render_decisions_markdown,
+    CardKind, CardStatus, CardUrgency, CopilotAnalysis, CopilotCard, CopilotInput,
+    FILTER_MIN_WORDS, FILTER_THRESHOLD, FilterVerdict, FocusHint, TriggerKind, analyze_meeting,
+    card_id, detect_trigger, enrich_notes, enrich_notes_stream, filter_questions, filter_state,
+    is_same_card, query_meeting, query_meeting_stream, read_filter, render_decisions_markdown,
 };
 pub use embeddings::{Embedder, EmbeddingSettings, embedder_from_settings};
 pub use insights::{InsightsInput, live_insights};
@@ -32,6 +38,7 @@ pub use settings::{
     LlmSettings, delete_api_key, get_api_key, load_settings, save_settings, set_api_key,
 };
 pub use summary::{MeetingSummary, summarize_meeting, summarize_meeting_titled};
+pub use systemone::{Answer, Classifier, Decision, JEV_MODEL, Jev, Question, TYPESAFE_KEY};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LlmError {

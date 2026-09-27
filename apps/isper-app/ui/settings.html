@@ -300,6 +300,20 @@
   </div>
   <p class="hint" data-i18n="settings.inteligencia.usa-provider-acima-cada-rodada">Usa o provider acima. Cada rodada envia os últimos ~15 minutos de transcrição (só texto) e atualiza o painel "Insights ao vivo" no card de reunião do Início. Rodadas sem fala nova são puladas; "Atualizar agora" força uma. Desligado, o painel ainda aceita rodadas avulsas.</p>
 
+  <h3 data-i18n="settings.inteligencia.filtro-copilot">Filtro do Copilot</h3>
+  <div class="stack mt4">
+    <label class="switch"><input type="checkbox" id="copfilter"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.inteligencia.filtro-copilot-switch">Ler cada trecho da reunião com o Jev (TypeSafe) e chamar a IA acima só quando parecer decisão, tarefa ou risco</span></label>
+  </div>
+  <label class="lbl" for="tskey"><span data-i18n="settings.inteligencia.tskey">Chave da TypeSafe</span> <span id="tskeystate" class="chip chip-ok" hidden data-i18n="settings.inteligencia.keystate">guardada ✓</span></label>
+  <div class="row">
+    <input type="password" id="tskey" class="field" placeholder="cole a chave e clique em Guardar" autocomplete="off" data-i18n-attr="placeholder:settings.inteligencia.cole-chave-clique-guardar.placeholder">
+    <button class="btn" id="savetskey" data-i18n="settings.inteligencia.savekey">Guardar chave</button>
+  </div>
+  <p class="hint" data-i18n="settings.inteligencia.filtro-copilot-hint">O Jev responde em menos de meio segundo e custa perto de US$ 0,01 por hora de reunião. Numa amostra de reuniões reais, pegou 92% dos momentos que viram card e dispensou 55% dos trechos: os cards chegam segundos depois de a frase ser dita, e a IA acima lê bem menos. Só vai o texto do trecho; a TypeSafe declara não treinar com os dados. Vale a partir da próxima reunião.</p>
+  <div class="row mt10">
+    <button class="btn btn-sm flex-none" id="tstest" data-i18n="settings.inteligencia.test">Testar conexão</button>
+  </div>
+
   <h3 data-i18n="settings.inteligencia.busca-semantica">Busca semântica</h3>
   <label class="lbl mt0" for="embprovider" data-i18n="settings.inteligencia.provider-embeddings">Provider de embeddings</label>
   <select id="embprovider" class="field">
@@ -485,6 +499,8 @@
       $('keystate').hidden = !s.llm_key_present;
       $('insights').checked = !!s.live_insights;
       $('insint').value = String(s.insights_interval_min || 5);
+      $('copfilter').checked = s.copilot_filter === 'jev';
+      $('tskeystate').hidden = !s.typesafe_key_present;
       $('embprovider').value = s.emb_provider || 'none';
       $('embmodel').value = s.emb_model || '';
       $('embbase').value = s.emb_base_url || '';
@@ -696,6 +712,7 @@
         call_detect: $('calldetect').value,
         live_insights: $('insights').checked,
         insights_interval_min: Number($('insint').value) || 5,
+        copilot_filter: $('copfilter').checked ? 'jev' : 'off',
         emb_provider: $('embprovider').value,
         emb_model: $('embmodel').value || null,
         emb_base_url: $('embbase').value || null,
@@ -756,6 +773,38 @@
     UI.busy(b, true, t('common.testing'));
     try {
       const reply = await invoke('test_llm');
+      UI.busy(b, false);
+      UI.flash(b, t('settings.msg.connected'));
+      status(reply, 'ok');
+    } catch (e) {
+      UI.busy(b, false);
+      UI.flash(b, t('common.failed'), 'err');
+      status(t('settings.msg.test-failed', { e }), 'err');
+    }
+  });
+
+  // ---- filtro do Copilot (Jev, da TypeSafe)
+  $('savetskey').addEventListener('click', async () => {
+    const b = $('savetskey');
+    UI.busy(b, true);
+    try {
+      await invoke('set_llm_key', { provider: 'typesafe', key: $('tskey').value });
+      $('tskey').value = '';
+      $('tskeystate').hidden = false;
+      UI.busy(b, false);
+      UI.flash(b, t('common.key-saved'));
+      status(t('settings.msg.key-saved'), 'ok');
+    } catch (e) {
+      UI.busy(b, false);
+      status(t('settings.msg.key-save-failed', { e }), 'err');
+    }
+  });
+
+  $('tstest').addEventListener('click', async () => {
+    const b = $('tstest');
+    UI.busy(b, true, t('common.testing'));
+    try {
+      const reply = await invoke('test_typesafe');
       UI.busy(b, false);
       UI.flash(b, t('settings.msg.connected'));
       status(reply, 'ok');

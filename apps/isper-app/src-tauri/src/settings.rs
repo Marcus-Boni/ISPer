@@ -36,6 +36,9 @@ pub(crate) struct SettingsDto {
     call_detect: String,
     live_insights: bool,
     insights_interval_min: u32,
+    /// Filtro do Copilot (`off` · `jev`) e se a chave da TypeSafe está guardada.
+    copilot_filter: String,
+    typesafe_key_present: bool,
     /// Busca semântica: provider (`none` = desligada), modelo, base URL e chave.
     emb_provider: String,
     emb_model: Option<String>,
@@ -95,6 +98,9 @@ pub(crate) struct SettingsPatch {
     live_insights: bool,
     #[serde(default)]
     insights_interval_min: Option<u32>,
+    /// Filtro do Copilot (ausente = mantém).
+    #[serde(default)]
+    copilot_filter: Option<String>,
     #[serde(default)]
     emb_provider: Option<String>,
     #[serde(default)]
@@ -354,6 +360,11 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         call_detect: cfg.call_detect,
         live_insights: cfg.live_insights,
         insights_interval_min: cfg.insights_interval_min,
+        copilot_filter: cfg.copilot_filter,
+        typesafe_key_present: isper_llm::get_api_key(isper_llm::TYPESAFE_KEY)
+            .ok()
+            .flatten()
+            .is_some(),
         emb_provider: if emb.is_configured() {
             emb_provider
         } else {
@@ -410,6 +421,9 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         call_detect: patch.call_detect.unwrap_or_default(),
         live_insights: patch.live_insights,
         insights_interval_min: patch.insights_interval_min.unwrap_or_default(),
+        copilot_filter: patch
+            .copilot_filter
+            .unwrap_or_else(|| previous.copilot_filter.clone()),
         overlay_pinned: previous.overlay_pinned,
         retention_days: patch.retention_days.unwrap_or_default(),
         // Avançado: o que a tela não mandar mantém o valor atual.
@@ -517,6 +531,35 @@ pub(crate) async fn test_llm() -> Result<String, String> {
             )
             .map(|r| format!("{} ({}): {}", provider.name(), provider.model(), r.trim()))
             .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Testa a chave da TypeSafe com um parágrafo de exemplo, pela pergunta real
+/// do filtro — o mesmo caminho da reunião, por uma fração de centavo.
+#[tauri::command]
+pub(crate) async fn test_typesafe() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let jev = isper_llm::Jev::from_keyring().map_err(|e| e.to_string())?;
+        let state = isper_llm::filter_state(
+            "Participantes: e aí, qual prazo a gente consegue?",
+            "Eu: então fica combinado, eu mando a proposta revisada até sexta.",
+        );
+        let started = Instant::now();
+        let decision =
+            isper_llm::Classifier::classify(&jev, &state, &isper_llm::filter_questions())
+                .map_err(|e| e.to_string())?;
+        let ms = started.elapsed().as_millis();
+        let verdict =
+            isper_llm::read_filter(&decision).ok_or("resposta sem a pergunta do filtro")?;
+        Ok(format!(
+            "{} · {ms} ms · p(card) {:.2} ({}) · {} tokens",
+            decision.model,
+            verdict.p_card,
+            verdict.kind.as_str(),
+            decision.input_tokens
+        ))
     })
     .await
     .map_err(|e| e.to_string())?

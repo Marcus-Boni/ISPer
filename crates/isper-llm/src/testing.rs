@@ -10,6 +10,7 @@
 use std::sync::Mutex;
 
 use crate::providers::LlmProvider;
+use crate::systemone::{Answer, Classifier, Decision, Question};
 use crate::{LlmError, Result};
 
 type Reply = Box<dyn Fn(&str, &str) -> Result<String> + Send + Sync>;
@@ -84,9 +85,105 @@ impl LlmProvider for FakeProvider {
     }
 }
 
+type Verdict = Box<dyn Fn(&serde_json::Value) -> Result<Decision> + Send + Sync>;
+
+/// Um [`Classifier`] de mentira para o filtro do Copilot: responde o que o
+/// teste mandar a partir do `state` e guarda cada `state` recebido.
+pub struct FakeClassifier {
+    reply: Verdict,
+    calls: Mutex<Vec<serde_json::Value>>,
+}
+
+impl FakeClassifier {
+    /// Resposta calculada a partir do `state` (ex.: marcar só o que tiver
+    /// "combinado" no parágrafo atual).
+    pub fn with(
+        reply: impl Fn(&serde_json::Value) -> Result<Decision> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            reply: Box::new(reply),
+            calls: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Sempre a mesma chance de card, com o tipo `kind` como o mais provável.
+    pub fn card_probability(p_card: f32, kind: &'static str) -> Self {
+        Self::with(move |_| Ok(filter_decision(p_card, kind)))
+    }
+
+    /// Falha sempre com o erro construído por `err`.
+    pub fn failing(err: impl Fn() -> LlmError + Send + Sync + 'static) -> Self {
+        Self::with(move |_| Err(err()))
+    }
+
+    pub fn calls(&self) -> Vec<serde_json::Value> {
+        self.calls
+            .lock()
+            .expect("registro do classificador falso")
+            .clone()
+    }
+}
+
+impl Classifier for FakeClassifier {
+    fn name(&self) -> &'static str {
+        "fake"
+    }
+
+    fn classify(&self, state: &serde_json::Value, _: &[(&str, Question)]) -> Result<Decision> {
+        self.calls
+            .lock()
+            .expect("registro do classificador falso")
+            .push(state.clone());
+        (self.reply)(state)
+    }
+}
+
+/// A resposta do filtro com `p_card` = 1 − p(nada), toda a massa restante no
+/// tipo `kind` (`"decision"`, `"action"` ou `"risk"`).
+pub fn filter_decision(p_card: f32, kind: &str) -> Decision {
+    let probabilities = ["decision", "action", "risk", "none"]
+        .iter()
+        .map(|l| {
+            let p = match *l {
+                "none" => 1.0 - p_card,
+                l if l == kind => p_card,
+                _ => 0.0,
+            };
+            ((*l).to_string(), p)
+        })
+        .collect();
+    Decision {
+        model: "fake-jev".into(),
+        answers: vec![(
+            "kind".into(),
+            Answer::Choice {
+                chosen: String::new(),
+                probabilities,
+                confidence: 0.5,
+            },
+        )],
+        input_tokens: 600,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn classificador_falso_responde_e_registra() {
+        let fake = FakeClassifier::card_probability(0.8, "risk");
+        let d = fake
+            .classify(
+                &serde_json::json!({"atual": "x"}),
+                &crate::filter_questions(),
+            )
+            .unwrap();
+        let v = crate::read_filter(&d).unwrap();
+        assert!(v.flagged);
+        assert_eq!(v.kind, crate::CardKind::Risk);
+        assert_eq!(fake.calls().len(), 1);
+    }
 
     #[test]
     fn registra_chamadas_e_responde_o_combinado() {

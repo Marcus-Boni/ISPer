@@ -22,6 +22,12 @@
 //! "então fica combinado", a rodada é antecipada, respeitando um intervalo
 //! mínimo ([`MIN_GAP_BETWEEN_ROUNDS_SECS`]) para não torrar API à toa.
 //!
+//! Com o filtro do Jev ligado (`copilot_filter = "jev"`), quem antecipa a
+//! rodada é ele: cada parágrafo fechado passa pelo Jev e, se parecer decisão,
+//! tarefa ou risco, sai uma rodada focada nos minutos recentes; o gatilho de
+//! frases fixas se cala e o pulso completo fica mais espaçado. Ver
+//! [`crate::copilot_filter`].
+//!
 //! ## Por que só com a janela aberta
 //!
 //! Até a 0.20 o loop analisava toda reunião gravada com provedor configurado,
@@ -88,6 +94,17 @@ const STREAM_FLUSH_EVERY: Duration = Duration::from_millis(50);
 pub(crate) enum CopilotCmd {
     Now,
     Stop,
+}
+
+/// Que rodada de análise é esta.
+enum Round {
+    /// O pulso ou a janela que abriu: só roda se houver conversa nova.
+    Pulse,
+    /// O botão Analisar ou o gatilho: roda mesmo sem conversa nova.
+    Forced,
+    /// O filtro marcou trechos: roda sobre os minutos recentes, com eles em
+    /// destaque (vazio = o filtro não respondeu e a janela vai sem marca).
+    Focused(Vec<isper_llm::FocusHint>),
 }
 
 /// O que o loop faz numa volta.
@@ -168,6 +185,8 @@ pub(crate) struct CopilotAppState {
     /// Em que reunião do banco estas notas já foram salvas. A partir daí, cada
     /// edição vai direto para ela.
     pub(crate) saved_meeting: Option<i64>,
+    /// O filtro do Jev nesta reunião: o que já leu, o que marcou, o custo.
+    pub(crate) filter: crate::copilot_filter::FilterState,
     last_round: Option<Instant>,
     last_metrics_emit: Option<Instant>,
 }
@@ -195,6 +214,7 @@ impl Default for CopilotAppState {
             generation: 0,
             watching: false,
             saved_meeting: None,
+            filter: Default::default(),
             last_round: None,
             last_metrics_emit: None,
         }
@@ -350,6 +370,8 @@ pub(crate) struct CopilotDto {
     pub(crate) generation: u64,
     /// As notas já foram salvas com a reunião (e cada edição regrava).
     pub(crate) notes_saved: bool,
+    /// O filtro do Jev, quando ligado nesta reunião (ou por que caiu).
+    pub(crate) filter: Option<crate::copilot_filter::FilterDto>,
 }
 
 /// Só a dinâmica de fala — o que pode sair a cada bloco transcrito.
@@ -387,6 +409,7 @@ pub(crate) fn copilot_dto(app: &AppHandle) -> CopilotDto {
         error: cop.error.clone(),
         generation: cop.generation,
         notes_saved: cop.saved_meeting.is_some(),
+        filter: cop.filter.dto(),
     }
 }
 
@@ -412,7 +435,14 @@ pub(crate) fn on_live_segment(app: &AppHandle, speaker: &str, secs: f32, text: &
         cop.note_speech(speaker, secs);
 
         // Gatilho local: de graça, sem rede, sobre o texto que acabou de sair.
-        let nudge = match isper_llm::detect_trigger(text) {
+        // Com o filtro do Jev funcionando, quem antecipa a rodada é ele — e
+        // com a rodada focada, mais barata que a completa que o gatilho pede.
+        let trigger = if cop.filter.active() {
+            None
+        } else {
+            isper_llm::detect_trigger(text)
+        };
+        let nudge = match trigger {
             Some(kind) => {
                 let ready = cop
                     .last_round
@@ -489,6 +519,18 @@ pub(crate) fn stop_copilot_loop(app: &AppHandle) {
         let _ = tx.send(CopilotCmd::Stop);
     }
     cop.running = false;
+    let f = &cop.filter;
+    if f.on {
+        tracing::info!(
+            paragraphs = f.paragraphs,
+            flagged = f.flagged,
+            failures = f.failures,
+            input_tokens = f.input_tokens,
+            cost_usd = f.cost_usd(),
+            disabled = f.disabled.as_deref().unwrap_or(""),
+            "copilot: filtro do Jev na reunião"
+        );
+    }
 }
 
 /// O que o Copilot deixa para a reunião que acabou: os cards validados (seção
@@ -621,7 +663,33 @@ fn ensure_copilot_loop(app: &AppHandle) {
 
     let app = app.clone();
     std::thread::spawn(move || {
-        let interval = Duration::from_secs(COPILOT_AUTO_INTERVAL_SECS);
+        // O filtro é decidido no começo da reunião: ligar ou desligar nas
+        // Configurações vale a partir da próxima.
+        let mode = app
+            .state::<AppState>()
+            .config
+            .lock_or_recover()
+            .copilot_filter
+            .clone();
+        let classifier = match crate::copilot_filter::classifier_for(&mode) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!("copilot: filtro ligado, mas sem a chave da TypeSafe: {e}");
+                let state = app.state::<AppState>();
+                let mut cop = state.copilot.lock_or_recover();
+                if cop.generation == my_gen {
+                    cop.filter.disabled = Some(e);
+                }
+                None
+            }
+        };
+        if classifier.is_some() {
+            let state = app.state::<AppState>();
+            let mut cop = state.copilot.lock_or_recover();
+            if cop.generation == my_gen {
+                cop.filter.on = true;
+            }
+        }
         // A primeira leitura sai cedo; depois o loop assume o ritmo normal.
         let mut next_pulse = Instant::now() + Duration::from_secs(FIRST_ROUND_SECS);
         let mut was_watching = false;
@@ -653,24 +721,40 @@ fn ensure_copilot_loop(app: &AppHandle) {
             let opened = watching && !was_watching;
             was_watching = watching;
 
+            // O filtro lê só com a janela na tela, como o resto; ao abrir, a
+            // rodada completa logo abaixo cobre o que passou.
+            let mut focused = false;
+            if let Some(c) = classifier.as_deref()
+                && watching
+            {
+                if opened {
+                    skip_filter_to_now(&app, my_gen);
+                } else {
+                    focused = filter_tick(&app, c, my_gen);
+                }
+            }
+
             match turn(asked, opened, watching, Instant::now() >= next_pulse) {
+                // A rodada focada acabou de ler a conversa recente: o pulso
+                // desta volta só seria a mesma leitura, mais longa.
+                Turn::Pulse if focused => next_pulse = Instant::now() + pulse_interval(&app),
                 Turn::Forced => {
-                    analyze_copilot_step(&app, true, my_gen);
-                    next_pulse = Instant::now() + interval;
+                    analyze_copilot_step(&app, Round::Forced, my_gen);
+                    next_pulse = Instant::now() + pulse_interval(&app);
                 }
                 // Lê a conversa agora, se houver o bastante. Sem isso, quem
                 // abre no meio da reunião esperaria o próximo pulso com a tela
                 // parada. Sem conversa nova, o pulso marcado continua valendo.
                 Turn::Opened => {
-                    if analyze_copilot_step(&app, false, my_gen) {
-                        next_pulse = Instant::now() + interval;
+                    if analyze_copilot_step(&app, Round::Pulse, my_gen) {
+                        next_pulse = Instant::now() + pulse_interval(&app);
                     }
                 }
                 Turn::Pulse => {
-                    analyze_copilot_step(&app, false, my_gen);
-                    next_pulse = Instant::now() + interval;
+                    analyze_copilot_step(&app, Round::Pulse, my_gen);
+                    next_pulse = Instant::now() + pulse_interval(&app);
                 }
-                Turn::SkipPulse => next_pulse = Instant::now() + interval,
+                Turn::SkipPulse => next_pulse = Instant::now() + pulse_interval(&app),
                 Turn::Idle => {}
             }
         }
@@ -825,9 +909,98 @@ fn recall_snippet(text: &str) -> String {
     format!("{}…", cut.trim_end())
 }
 
+/// O ritmo do pulso completo: espaçado com o filtro funcionando, o de sempre
+/// sem ele — inclusive quando ele cai no meio da reunião.
+fn pulse_interval(app: &AppHandle) -> Duration {
+    let active = app
+        .state::<AppState>()
+        .copilot
+        .lock_or_recover()
+        .filter
+        .active();
+    Duration::from_secs(if active {
+        crate::copilot_filter::FILTERED_PULSE_SECS
+    } else {
+        COPILOT_AUTO_INTERVAL_SECS
+    })
+}
+
+/// A janela abriu: o filtro recomeça do agora ([`FilterState::skip_to`]).
+///
+/// [`FilterState::skip_to`]: crate::copilot_filter::FilterState::skip_to
+fn skip_filter_to_now(app: &AppHandle, my_gen: u64) {
+    let state = app.state::<AppState>();
+    let Some(started) = *state.meeting_started.lock_or_recover() else {
+        return;
+    };
+    let mut cop = state.copilot.lock_or_recover();
+    if cop.generation == my_gen {
+        cop.filter.skip_to(started.elapsed().as_secs_f32());
+    }
+}
+
+/// Uma volta do filtro: passa pelo Jev os parágrafos que fecharam desde a
+/// última volta e, se algum foi marcado (ou ficou sem resposta), roda a
+/// rodada focada — respeitando o piso entre rodadas. Devolve se rodou.
+fn filter_tick(app: &AppHandle, classifier: &dyn isper_llm::Classifier, my_gen: u64) -> bool {
+    let state = app.state::<AppState>();
+    let Some(started) = *state.meeting_started.lock_or_recover() else {
+        return false;
+    };
+    let now = started.elapsed().as_secs_f32();
+    let (from, previous) = {
+        let cop = state.copilot.lock_or_recover();
+        if cop.generation != my_gen || !cop.filter.active() {
+            return false;
+        }
+        (cop.filter.read_upto_secs, cop.filter.previous.clone())
+    };
+    let paragraphs = {
+        let live = state.live.lock_or_recover();
+        crate::copilot_filter::closed_paragraphs(&live, from, now)
+    };
+    if !paragraphs.is_empty() {
+        // Rede, sem lock nenhum: a transcrição continua entrando.
+        let reads = crate::copilot_filter::classify_paragraphs(&previous, paragraphs, classifier);
+        let changed = {
+            let mut cop = state.copilot.lock_or_recover();
+            if cop.generation != my_gen {
+                return false;
+            }
+            let before = (cop.filter.flagged, cop.filter.disabled.is_some());
+            cop.filter.apply(reads);
+            before != (cop.filter.flagged, cop.filter.disabled.is_some())
+        };
+        if changed {
+            emit_copilot(app);
+        }
+    }
+
+    let focus = {
+        let mut cop = state.copilot.lock_or_recover();
+        let ready = cop
+            .last_round
+            .map(|t| t.elapsed().as_secs_f32() >= MIN_GAP_BETWEEN_ROUNDS_SECS)
+            .unwrap_or(true);
+        if cop.generation != my_gen || cop.running || !ready || !cop.filter.wants_round() {
+            return false;
+        }
+        let focus = cop.filter.take_focus();
+        // A tela explica o que acordou a rodada no idioma dela.
+        cop.last_trigger = focus.last().map(|f| f.kind.as_str().to_string());
+        focus
+    };
+    analyze_copilot_step(app, Round::Focused(focus), my_gen)
+}
+
 /// Uma rodada de análise. Devolve se chegou a chamar a IA — sem conversa
 /// nova o bastante, não chama.
-fn analyze_copilot_step(app: &AppHandle, force: bool, my_gen: u64) -> bool {
+fn analyze_copilot_step(app: &AppHandle, round: Round, my_gen: u64) -> bool {
+    let force = !matches!(round, Round::Pulse);
+    let (window_secs, focus) = match round {
+        Round::Focused(hints) => (crate::copilot_filter::FOCUS_WINDOW_SECS, hints),
+        _ => (COPILOT_WINDOW_SECS, Vec::new()),
+    };
     let state = app.state::<AppState>();
     if state.copilot.lock_or_recover().generation != my_gen {
         return false; // esta thread é de uma reunião que já acabou
@@ -855,7 +1028,7 @@ fn analyze_copilot_step(app: &AppHandle, force: bool, my_gen: u64) -> bool {
         }
     }
 
-    let window = transcript_window(app, COPILOT_WINDOW_SECS);
+    let window = transcript_window(app, window_secs);
     if window.trim().is_empty() {
         if force {
             let mut cop = state.copilot.lock_or_recover();
@@ -905,6 +1078,7 @@ fn analyze_copilot_step(app: &AppHandle, force: bool, my_gen: u64) -> bool {
             elapsed: &isper_core::meeting::fmt_ts(elapsed),
             elapsed_secs: elapsed as u32,
             previous_cards: &previous_cards,
+            focus: &focus,
         },
     );
 
