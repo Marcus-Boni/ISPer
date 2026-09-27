@@ -369,9 +369,11 @@ Onde mora cada parte:
 
 | Arquivo | O quê |
 |---|---|
-| `crates/isper-llm/src/copilot.rs` | Cards, prompt, parser do JSON, id estável, gatilhos locais, seção da ata |
+| `crates/isper-llm/src/copilot.rs` | Cards, prompt, parser do JSON, id estável, gatilhos locais, a pergunta do filtro, seção da ata |
 | `crates/isper-llm/src/providers.rs` | `complete_stream` (SSE) para Claude, Groq e Gemini |
+| `crates/isper-llm/src/systemone.rs` | O cliente do Jev (TypeSafe) e o trait `Classifier` |
 | `apps/isper-app/src-tauri/src/copilot.rs` | Estado da reunião, loop de análise, memória (RAG), comandos |
+| `apps/isper-app/src-tauri/src/copilot_filter.rs` | O filtro: parágrafos fechados, leitura pelo Jev, rodada focada |
 | `apps/isper-app/ui/copilot.html` | O HUD |
 | `apps/isper-app/ui/locales/{pt-BR,en}.json` | Os textos do HUD (chaves `copilot.*`) |
 
@@ -406,6 +408,21 @@ e notas continuam saindo em português.
 cada volta está em `turn()`, com testes. Com a janela aberta, numa conversa
 contínua, são perto de 80 chamadas por hora. Até a 0.20.0 o loop rodava em
 toda reunião, com o HUD aberto ou não.
+
+**Filtro do Jev** (opcional, `copilot_filter = "jev"`,
+[ADR 0019](docs/adr/0019-filtro-do-copilot-pelo-jev.md)):
+
+- Cada parágrafo fechado vai ao Jev, com a mesma regra da ata (4 s de pausa,
+  60 s no máximo).
+- Com p(card) ≥ 0,5 (`FILTER_THRESHOLD`), sai uma rodada focada nos últimos
+  3 min (`FOCUS_WINDOW_SECS`). O gatilho de frases fixas se cala, e o pulso
+  completo passa a 3 min (`FILTERED_PULSE_SECS`).
+- Em 450 parágrafos de reuniões reais, pegou 92% dos momentos que viram card,
+  contra 5% das frases fixas. Custa ~US$ 0,005 por hora (552 tokens por
+  parágrafo).
+- A pergunta (`filter_questions`) e o modelo (`jev-1.13.0`) são os medidos:
+  mudar pede medir de novo.
+- Chave: `isper-cli llm set-key typesafe` ou a tela de Configurações.
 
 **Notas:** o bloco vai com a reunião — seção "Notas da reunião" no fim do
 `.md`, coluna `notes` no banco (schema v4) e a Biblioteca. O fim da reunião

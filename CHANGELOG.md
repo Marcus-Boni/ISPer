@@ -25,6 +25,20 @@ bata com ela.
   (de ~60 a ~230 MB, com os falantes), no Wi-Fi. O app Android desta etapa é
   o 0.4.0-transcricao
   ([ADR 0018](docs/adr/0018-transcricao-no-celular.md)).
+- **Filtro do Copilot pelo Jev (opcional).** Com uma chave da TypeSafe
+  (Configurações → Inteligência → Filtro do Copilot), cada trecho da reunião
+  passa pelo Jev em ~0,4 s, e a IA só é chamada quando o trecho parece
+  decisão, tarefa ou risco. A rodada olha os últimos 3 minutos, com os trechos
+  marcados em destaque, e os cards chegam segundos depois de a frase ser
+  dita, em vez de esperar o pulso de 45 s.
+  - Medido em 450 trechos de reuniões reais: pega 92% dos momentos que viram
+    card, contra 5% das frases fixas de antes, e dispensa 55% dos trechos.
+  - Custa ~US$ 0,005 por hora de reunião e não usa RAM a mais.
+  - Desligado por padrão. Sem a chave, sem internet ou com o crédito
+    acabando, o Copilot segue como antes, e o motivo aparece no HUD.
+  - Uma alternativa local, o Laya, foi medida no mesmo teste e ficou de fora
+    ([ADR 0019](docs/adr/0019-filtro-do-copilot-pelo-jev.md);
+    [estudo](docs/estudos/gemini-transcribe-e-jev.md)).
 
 ### Corrigido
 - **O resumo por IA e a busca semântica passam a usar a transcrição final.**
