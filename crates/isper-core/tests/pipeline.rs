@@ -419,3 +419,93 @@ fn o_passe_final_ganha_do_fatiamento_antigo_no_mesmo_audio() {
     assert!(!novo.raw_text.is_empty());
     assert!(!novo.raw_segments.is_empty());
 }
+
+#[test]
+#[ignore = "precisa dos modelos Whisper e Silero instalados"]
+fn o_passe_final_interrompido_continua_de_onde_parou_com_o_mesmo_texto() {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    let Some(modelo) = modelo() else { return };
+    let Ok(vad_model) = isper_models::vad_path() else {
+        return;
+    };
+    if !vad_model.exists() {
+        return;
+    }
+    let raw = isper_core::audio::load_wav(std::path::Path::new(
+        "../../fixtures/reuniao-sintetica-16k.wav",
+    ))
+    .expect("fixture");
+    let samples = raw.into_whisper_input().expect("resample");
+    let engine =
+        WhisperEngine::new_with(&modelo, &isper_core::EngineOptions { dtw: true }).expect("modelo");
+    let cfg = isper_core::pipeline::FinalConfig::meeting_final(vad_model);
+    let ctx = MeetingContext::default();
+    let inteiro =
+        isper_core::pipeline::run(&engine, &samples, &cfg, &ctx, None, None).expect("inteiro");
+    let janelas = inteiro.report.vad.windows;
+    assert!(
+        janelas >= 3,
+        "a fixture precisa de várias janelas ({janelas})"
+    );
+
+    let ckpt = std::env::temp_dir().join(format!("isper-retomada-{}.jsonl", std::process::id()));
+    let _ = std::fs::remove_file(&ckpt);
+
+    // Primeira rodada: para no meio. O progresso chega ANTES de cada janela,
+    // então a janela em que o pedido chega ainda é transcrita.
+    let meio = janelas / 2;
+    let cancel = AtomicBool::new(false);
+    let para_no_meio = |feita: usize, _: usize| {
+        if feita == meio {
+            cancel.store(true, Ordering::Relaxed);
+        }
+    };
+    let parou = isper_core::pipeline::run_resumable(
+        &engine,
+        &samples,
+        &cfg,
+        &ctx,
+        None,
+        Some(&para_no_meio),
+        Some(&cancel),
+        Some(&ckpt),
+    );
+    assert!(
+        matches!(parou, Err(isper_core::IsperError::Cancelled)),
+        "a rodada devia ter parado"
+    );
+    let linhas = std::fs::read_to_string(&ckpt).expect("arquivo de retomada");
+    assert_eq!(
+        linhas.lines().count(),
+        1 + meio + 1,
+        "cabeçalho e as janelas até a do pedido"
+    );
+
+    // Segunda rodada: continua da janela seguinte e chega ao mesmo texto.
+    let primeira = AtomicUsize::new(usize::MAX);
+    let anota = |feita: usize, _: usize| {
+        let _ = primeira.compare_exchange(usize::MAX, feita, Ordering::Relaxed, Ordering::Relaxed);
+    };
+    let retomado = isper_core::pipeline::run_resumable(
+        &engine,
+        &samples,
+        &cfg,
+        &ctx,
+        None,
+        Some(&anota),
+        Some(&AtomicBool::new(false)),
+        Some(&ckpt),
+    )
+    .expect("retomado");
+    assert_eq!(
+        primeira.load(Ordering::Relaxed),
+        meio + 1,
+        "começou na janela seguinte à última guardada"
+    );
+    assert_eq!(retomado.raw_text, inteiro.raw_text);
+    assert_eq!(retomado.normalized_text, inteiro.normalized_text);
+    assert_eq!(retomado.raw_segments, inteiro.raw_segments);
+    assert_eq!(retomado.report.asr, inteiro.report.asr);
+    let _ = std::fs::remove_file(&ckpt);
+}

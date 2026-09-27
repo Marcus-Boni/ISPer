@@ -49,7 +49,7 @@ pub struct WhisperEngine {
 ///
 /// É o insumo da atribuição de falante: um segmento do Whisper pode conter
 /// duas pessoas, uma palavra não.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Word {
     /// A palavra, como o modelo a escreveu.
     pub text: String,
@@ -62,7 +62,7 @@ pub struct Word {
 }
 
 /// Um segmento que o Whisper devolveu: um trecho de texto com horário.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TranscriptSegment {
     /// Início do segmento, em segundos do áudio transcrito.
     pub start_secs: f32,

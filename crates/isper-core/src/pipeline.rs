@@ -24,7 +24,7 @@
 //! `isper-core` não depende do `sherpa-onnx` (30 MB de C++), então quem chama
 //! passa um [`Diarizer`]. O app e a CLI ligam os dois em cinco linhas.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
@@ -37,6 +37,7 @@ use crate::metrics::{
     AsrStats, DiarizeStats, PipelineReport, RunParams, StageTimings, VadStats, device,
 };
 use crate::profile::{DecodeConfig, TranscriptionProfile};
+use crate::resume::{Checkpoint, WindowDone};
 use crate::vad::{self, AsrWindow, SpeechRegion, Vad, VadOptions, WindowOptions};
 use crate::{Result, WHISPER_SAMPLE_RATE};
 
@@ -173,6 +174,43 @@ pub struct FinalTranscript {
     pub report: PipelineReport,
 }
 
+impl FinalTranscript {
+    /// A diarização rodou e deu um agrupamento plausível. Sem ela, ou com
+    /// avisos (dezenas de "falantes" num áudio de três pessoas), o rótulo
+    /// genérico é menos errado que pessoas inventadas.
+    pub fn speakers_reliable(&self) -> bool {
+        self.report
+            .diarization
+            .as_ref()
+            .is_some_and(|d| d.warnings.is_empty())
+    }
+
+    /// As falas como a ata as mostra: `(falante, início, fim, texto)`, com
+    /// "Participante N" quando a diarização é confiável e "Participantes"
+    /// quando não é. É a regra única do PC (reuniões importadas e o passe
+    /// final) e do celular.
+    pub fn speaker_rows(&self) -> Vec<(String, f32, f32, String)> {
+        let reliable = self.speakers_reliable();
+        self.utterances
+            .iter()
+            .map(|u| {
+                let speaker = match u.speaker.filter(|_| reliable) {
+                    Some(n) => crate::meeting::Speaker::Participant(n + 1).label(),
+                    None => crate::meeting::Speaker::Others.label(),
+                };
+                (speaker, u.start_secs, u.end_secs, u.text.clone())
+            })
+            .collect()
+    }
+}
+
+/// Até onde chegou uma rodada interrompida: `(janelas feitas, janelas)`, lido
+/// do arquivo de retomada de [`run_resumable`]. `None` sem arquivo, ou com um
+/// que não dá para ler.
+pub fn resume_progress(checkpoint: &Path) -> Option<(usize, usize)> {
+    crate::resume::progress(checkpoint)
+}
+
 /// Chamado a cada janela processada: `(feita, total)`.
 pub type Progress<'a> = &'a (dyn Fn(usize, usize) + Send + Sync);
 
@@ -203,6 +241,38 @@ pub fn run_cancellable(
     diarizer: Option<&dyn Diarizer>,
     progress: Option<Progress<'_>>,
     cancel: Option<&AtomicBool>,
+) -> Result<FinalTranscript> {
+    run_resumable(
+        engine,
+        samples_16k,
+        cfg,
+        ctx,
+        diarizer,
+        progress,
+        cancel,
+        None,
+    )
+}
+
+/// O mesmo que [`run_cancellable`], guardando em `checkpoint` cada janela
+/// transcrita (Fase 9.4). Se a rodada for interrompida — cancelada, ou o
+/// processo morto —, a próxima chamada com o mesmo arquivo, o mesmo áudio e a
+/// mesma configuração continua da janela seguinte à última guardada, e o
+/// resultado é o mesmo de uma rodada sem interrupção. Arquivo de outra rodada
+/// (outro modelo, outro áudio) é descartado. Quem chama apaga o arquivo depois
+/// de guardar o resultado.
+///
+/// O `progress` começa na primeira janela que falta.
+#[allow(clippy::too_many_arguments)]
+pub fn run_resumable(
+    engine: &WhisperEngine,
+    samples_16k: &[f32],
+    cfg: &FinalConfig,
+    ctx: &MeetingContext,
+    diarizer: Option<&dyn Diarizer>,
+    progress: Option<Progress<'_>>,
+    cancel: Option<&AtomicBool>,
+    checkpoint: Option<&Path>,
 ) -> Result<FinalTranscript> {
     let cancelled = || cancel.is_some_and(|c| c.load(Ordering::Relaxed));
     let started = Instant::now();
@@ -246,95 +316,150 @@ pub fn run_cancellable(
     let mut last_word_end = f32::MIN;
     let mut previous_window_end = f32::MIN;
 
-    for (i, w) in windows.iter().enumerate() {
+    // O que já foi transcrito numa rodada interrompida volta como estava.
+    let mut saved = match checkpoint {
+        Some(path) => Some(Checkpoint::open(
+            path,
+            &round_descriptor(engine, cfg, base_prompt.as_deref(), samples_16k, &windows),
+        )?),
+        None => None,
+    };
+    let mut first = 0;
+    if let Some(c) = saved.as_mut() {
+        for done in c.restored.drain(..) {
+            first = done.i + 1;
+            segments.extend(done.segments);
+            carried = done.carried;
+            last_word_end = done.last_word_end;
+            previous_window_end = done.previous_window_end;
+            asr.empty_windows += usize::from(done.empty);
+            asr.failed_windows += usize::from(done.failed);
+            asr.dropped_segments += done.dropped;
+            asr.windows_with_context += usize::from(done.with_context);
+        }
+        if first > 0 {
+            tracing::info!(
+                janelas = first,
+                de = windows.len(),
+                "passe final retomado de onde parou"
+            );
+        }
+    }
+
+    for (i, w) in windows.iter().enumerate().skip(first) {
         if cancelled() {
             return Err(crate::IsperError::Cancelled);
         }
         if let Some(p) = progress {
             p(i, windows.len());
         }
+        let mut done = WindowDone {
+            i,
+            segments: Vec::new(),
+            carried: None,
+            last_word_end,
+            previous_window_end,
+            empty: false,
+            failed: false,
+            dropped: 0,
+            with_context: false,
+        };
         let slice = vad::slice(samples_16k, w);
         if slice.is_empty() {
-            asr.empty_windows += 1;
-            continue;
-        }
-        let herda = cfg.carry_chars > 0 && w.continues_previous;
-        let prompt = if herda {
-            asr.windows_with_context += 1;
-            window_prompt(
-                base_prompt.as_deref(),
-                carried.as_deref().unwrap_or_default(),
-                cfg.carry_chars,
-            )
+            done.empty = true;
         } else {
-            base_prompt.clone()
-        };
-        let out = engine.transcribe_with(
-            slice,
-            TranscribeRequest {
-                lang: &cfg.lang,
-                decode: &cfg.decode,
-                prompt: prompt.as_deref(),
-            },
-        );
-        let out = match out {
-            Ok(o) => o,
-            Err(e) => {
-                tracing::warn!(
-                    janela = i,
-                    inicio = w.start_secs,
-                    "janela falhou ({e}) — a reunião segue sem ela"
-                );
-                asr.failed_windows += 1;
-                carried = None;
-                continue;
-            }
-        };
-        asr.dropped_segments += out.dropped_segments;
-        if out.segments.is_empty() {
-            asr.empty_windows += 1;
-            carried = None;
-            continue;
-        }
-
-        // O texto só atravessa para a próxima janela se o modelo confiou nele.
-        let confianca = mean(out.segments.iter().map(|s| s.avg_logprob));
-        carried = (confianca >= cfg.min_carry_logprob).then(|| out.text.clone());
-        if carried.is_none() {
-            tracing::debug!(
-                janela = i,
-                avg_logprob = confianca,
-                "texto pouco confiável não vira contexto da próxima janela"
+            let herda = cfg.carry_chars > 0 && w.continues_previous;
+            let prompt = if herda {
+                done.with_context = true;
+                window_prompt(
+                    base_prompt.as_deref(),
+                    carried.as_deref().unwrap_or_default(),
+                    cfg.carry_chars,
+                )
+            } else {
+                base_prompt.clone()
+            };
+            let out = engine.transcribe_with(
+                slice,
+                TranscribeRequest {
+                    lang: &cfg.lang,
+                    decode: &cfg.decode,
+                    prompt: prompt.as_deref(),
+                },
             );
-        }
+            match out {
+                Err(e) => {
+                    tracing::warn!(
+                        janela = i,
+                        inicio = w.start_secs,
+                        "janela falhou ({e}) — a reunião segue sem ela"
+                    );
+                    done.failed = true;
+                    carried = None;
+                }
+                Ok(out) if out.segments.is_empty() => {
+                    done.dropped = out.dropped_segments;
+                    done.empty = true;
+                    carried = None;
+                }
+                Ok(out) => {
+                    done.dropped = out.dropped_segments;
+                    // O texto só atravessa para a próxima janela se o modelo
+                    // confiou nele.
+                    let confianca = mean(out.segments.iter().map(|s| s.avg_logprob));
+                    carried = (confianca >= cfg.min_carry_logprob).then(|| out.text.clone());
+                    if carried.is_none() {
+                        tracing::debug!(
+                            janela = i,
+                            avg_logprob = confianca,
+                            "texto pouco confiável não vira contexto da próxima janela"
+                        );
+                    }
 
-        // Timestamps da janela → relógio da reunião. As janelas podem se
-        // sobrepor de propósito (corte forçado numa fala longa): o que já foi
-        // emitido não é emitido de novo.
-        let sobrepoe = w.start_secs < previous_window_end;
-        for mut s in out.segments {
-            s.start_secs += w.start_secs;
-            s.end_secs += w.start_secs;
-            for word in &mut s.words {
-                word.start_secs += w.start_secs;
-                word.end_secs += w.start_secs;
-            }
-            if sobrepoe {
-                s.words
-                    .retain(|word| word.start_secs >= last_word_end - 0.05);
-                if s.words.is_empty() && !s.text.is_empty() && s.end_secs <= previous_window_end {
-                    continue; // segmento inteiro já saiu na janela anterior
+                    // Timestamps da janela → relógio da reunião. As janelas
+                    // podem se sobrepor de propósito (corte forçado numa fala
+                    // longa): o que já foi emitido não é emitido de novo.
+                    let sobrepoe = w.start_secs < previous_window_end;
+                    for mut s in out.segments {
+                        s.start_secs += w.start_secs;
+                        s.end_secs += w.start_secs;
+                        for word in &mut s.words {
+                            word.start_secs += w.start_secs;
+                            word.end_secs += w.start_secs;
+                        }
+                        if sobrepoe {
+                            s.words
+                                .retain(|word| word.start_secs >= last_word_end - 0.05);
+                            if s.words.is_empty()
+                                && !s.text.is_empty()
+                                && s.end_secs <= previous_window_end
+                            {
+                                continue; // segmento inteiro já saiu na janela anterior
+                            }
+                        }
+                        last_word_end = s
+                            .words
+                            .last()
+                            .map(|w| w.end_secs)
+                            .unwrap_or(s.end_secs)
+                            .max(last_word_end);
+                        done.segments.push(s);
+                    }
+                    previous_window_end = w.end_secs;
                 }
             }
-            last_word_end = s
-                .words
-                .last()
-                .map(|w| w.end_secs)
-                .unwrap_or(s.end_secs)
-                .max(last_word_end);
-            segments.push(s);
         }
-        previous_window_end = w.end_secs;
+        asr.empty_windows += usize::from(done.empty);
+        asr.failed_windows += usize::from(done.failed);
+        asr.dropped_segments += done.dropped;
+        asr.windows_with_context += usize::from(done.with_context);
+        done.carried = carried.clone();
+        done.last_word_end = last_word_end;
+        done.previous_window_end = previous_window_end;
+        if let Some(c) = saved.as_mut() {
+            c.push(&done)?;
+        }
+        segments.extend(done.segments);
     }
     if let Some(p) = progress {
         p(windows.len(), windows.len());
@@ -461,6 +586,32 @@ pub fn run_cancellable(
         raw_text,
         normalized_text,
         report,
+    })
+}
+
+/// O que identifica uma rodada no arquivo de retomada: tudo o que muda o
+/// texto de uma janela. As janelas do VAD vêm do próprio áudio, então outro
+/// áudio (ou o mesmo cortado de outro jeito) não bate.
+fn round_descriptor(
+    engine: &WhisperEngine,
+    cfg: &FinalConfig,
+    prompt: Option<&str>,
+    samples_16k: &[f32],
+    windows: &[AsrWindow],
+) -> serde_json::Value {
+    serde_json::json!({
+        "modelo": engine.model_name(),
+        "dtw": engine.has_dtw(),
+        "idioma": cfg.lang,
+        "decodificacao": cfg.decode,
+        "contexto": cfg.carry_chars,
+        "confianca_minima": cfg.min_carry_logprob,
+        "prompt": prompt,
+        "amostras": samples_16k.len(),
+        crate::resume::WINDOWS_KEY: windows
+            .iter()
+            .map(|w| (w.start_secs, w.end_secs, w.continues_previous))
+            .collect::<Vec<_>>(),
     })
 }
 

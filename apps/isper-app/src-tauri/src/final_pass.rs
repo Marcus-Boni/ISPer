@@ -189,30 +189,20 @@ pub(crate) fn transcribe_mixed(
         cancel,
     )?;
     log_report(meeting_id, "participantes", &out);
-    // Agrupamento implausível: publicamos o texto, não os falantes. Um
-    // rótulo genérico é menos errado que dezenas de pessoas inventadas.
-    let confiavel = out
+    // Agrupamento implausível: publicamos o texto, não os falantes. A regra
+    // mora no núcleo (`speaker_rows`), a mesma do celular.
+    if out
         .report
         .diarization
         .as_ref()
-        .is_none_or(|d| d.warnings.is_empty());
-    if !confiavel {
+        .is_some_and(|d| !d.warnings.is_empty())
+    {
         tracing::warn!(
             meeting_id,
             "diarização implausível — as falas ficam como \"Participantes\""
         );
     }
-    Ok(out
-        .utterances
-        .iter()
-        .map(|u| {
-            let speaker = match u.speaker.filter(|_| confiavel) {
-                Some(n) => meeting::Speaker::Participant(n + 1).label(),
-                None => meeting::Speaker::Others.label(),
-            };
-            (speaker, u.start_secs, u.end_secs, u.text.clone())
-        })
-        .collect())
+    Ok(out.speaker_rows())
 }
 
 fn run(app: &AppHandle, meeting_id: i64, result: &MeetingResult) -> anyhow::Result<Option<usize>> {
