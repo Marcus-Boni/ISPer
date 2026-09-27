@@ -38,9 +38,10 @@ manutenção para versões antigas.
 - O **atualizador**: baixa o `latest.json` das releases do GitHub e só instala
   um pacote cuja assinatura minisign bata com a chave pública embutida no app
   ([`tauri.conf.json`](apps/isper-app/src-tauri/tauri.conf.json), `plugins.updater.pubkey`).
-- A integração opcional com provedores de IA (Claude, Groq, Gemini, Ollama):
-  só o **texto** do transcript ou do ditado viaja, e só se você configurar um
-  provedor; a chave de API fica no Gerenciador de Credenciais do Windows.
+- A integração opcional com provedores de IA (Claude, Groq, Gemini, Ollama)
+  e com o Jev, da TypeSafe (filtro do Copilot): só o **texto** do transcript
+  ou do ditado viaja, e só se você configurar o serviço; a chave de API fica
+  no Gerenciador de Credenciais do Windows.
 
 Fora do escopo: vulnerabilidades em dependências que não são exploráveis pelo
 ISPer (relate ao projeto upstream — e avise aqui se achar que nos afeta),

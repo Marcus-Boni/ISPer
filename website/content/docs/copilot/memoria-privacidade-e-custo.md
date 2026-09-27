@@ -34,6 +34,7 @@ O **áudio nunca sai**. A transcrição acontece localmente, e o que o Copilot e
 | Leitura da conversa (os cards) | Provedor de IA | Os últimos 20 minutos de transcrição, só com a janela aberta |
 | Pergunte à Reunião e Enriquecer notas | Provedor de IA | Os últimos 30 minutos, só quando você pede |
 | Memória | Provedor de embeddings | Uma frase com o assunto do momento |
+| Filtro do Copilot (opcional) | TypeSafe (Jev) | Cada trecho da conversa e o anterior, só com o filtro ligado e a janela aberta |
 
 Com o **Ollama** como provedor de embeddings, a memória não envia nada para fora. O provedor de IA dos cards é o mesmo dos resumos.
 
@@ -56,5 +57,26 @@ Isso dá algo perto de **80 leituras por hora com a janela aberta**, cada uma co
 
 - **Com provedores gratuitos** (Groq, Gemini), reuniões longas podem esbarrar no limite de uso da conta. Quando isso acontece, a faixa no topo da janela mostra o erro e oferece **Tentar de novo**.
 - **Com provedores pagos**, o consumo é proporcional ao tempo com a janela do Copilot aberta.
+
+## Filtro do Copilot (opcional)
+
+O filtro troca a releitura a cada 45 segundos por uma leitura **trecho a trecho**. Cada trecho da conversa passa pelo **Jev**, da TypeSafe, um modelo que não escreve nada: só diz, em menos de meio segundo, se aquilo parece decisão, tarefa ou risco. Quando parece, o provedor de IA lê os últimos 3 minutos com o trecho em destaque e cria o card.
+
+**O que muda**
+- Os cards aparecem segundos depois de a frase ser dita.
+- O provedor de IA lê bem menos: a releitura completa passa a sair a cada 3 minutos.
+- Numa amostra de reuniões reais, o filtro pegou 92% dos momentos que viraram card e dispensou 55% dos trechos.
+
+**Custo:** perto de US$ 0,01 por hora de reunião, pago à TypeSafe. Não usa memória do computador a mais.
+
+**Para ligar:**
+1. Crie uma chave em [console.typesafe.ai](https://console.typesafe.ai).
+2. Em **Configurações → Inteligência → Filtro do Copilot**, cole a chave, clique em **Guardar chave** e ligue o interruptor.
+3. **Testar conexão** faz uma leitura de exemplo.
+
+O filtro vale a partir da próxima reunião. Se a chave for recusada ou o crédito acabar, a faixa no topo do Copilot avisa, e ele segue pela releitura de sempre.
+
+> [!NOTE/Nota]
+> Só vai o texto do trecho e do trecho anterior; a TypeSafe declara não treinar modelos com os dados dos clientes. O filtro precisa do provedor de IA configurado: quem escreve os cards continua sendo ele.
 
 Os **Insights ao vivo** do Início são outro recurso: eles só fazem leituras periódicas se você ativá-los em **Configurações → Inteligência**. No Copilot, o interruptor é a própria janela. Até a versão 0.20.0, ele analisava toda reunião gravada com provedor configurado, com a janela aberta ou não.
