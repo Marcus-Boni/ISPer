@@ -26,6 +26,7 @@ use isper_sync::{SecretKey, SyncError};
 use serde::{Deserialize, Serialize};
 
 use crate::MobileError;
+use crate::local::{self, MinutesOrigin};
 
 const KEY_FILE: &str = "chave-sincronia.txt";
 const PC_FILE: &str = "pc.json";
@@ -93,7 +94,7 @@ fn load_record(dir: &Path, id: &str) -> SyncRecord {
 }
 
 /// Escreve de forma atômica: um arquivo pela metade nunca fica no lugar.
-fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, bytes)?;
     std::fs::rename(&tmp, path)
@@ -131,6 +132,7 @@ pub(crate) fn remote_view(dir: &Path, id: &str) -> RemoteView {
 pub(crate) fn forget_recording(dir: &Path, id: &str) {
     let _ = std::fs::remove_file(record_path(dir, id));
     let _ = std::fs::remove_file(minutes_path(dir, id));
+    local::forget(dir, id);
 }
 
 /// O PC pareado, como o app mostra.
@@ -251,7 +253,13 @@ impl PcLink {
             match rec.stage {
                 RemoteStage::NotSent | RemoteStage::Sending => to_send.push((m, rec)),
                 RemoteStage::Queued | RemoteStage::Processing => to_ask.push(m.id),
-                RemoteStage::Ready if !minutes_path(dir, &m.id).is_file() => to_fetch.push(m.id),
+                // A ata feita no celular (9.4) não impede a do PC de vir:
+                // ela a substitui.
+                RemoteStage::Ready
+                    if local::minutes_origin(dir, &m.id) != Some(MinutesOrigin::Pc) =>
+                {
+                    to_fetch.push(m.id)
+                }
                 _ => {}
             }
         }
@@ -397,6 +405,7 @@ impl PcLink {
             match session.minutes(&id).await? {
                 Some(minutes) => {
                     write_atomic(&minutes_path(dir, &id), minutes.markdown.as_bytes())?;
+                    local::pc_minutes_arrived(dir, &id);
                     rec.stage = RemoteStage::Ready;
                     rec.title = Some(minutes.title.clone());
                     rec.error = None;
@@ -738,7 +747,22 @@ mod tests {
         let info = &list_recordings(rec_dir_s.clone(), None).unwrap().recordings[0];
         assert_eq!(info.remote, RemoteStage::Queued);
 
-        // O PC terminou: a próxima rodada traz a ata.
+        // Enquanto isso, o próprio celular fez a ata dele (Fase 9.4).
+        std::fs::write(
+            minutes_path(&rec_dir, "20260925-100000"),
+            "# Reunião do celular\n",
+        )
+        .unwrap();
+        std::fs::write(
+            rec_dir.join("20260925-100000.ata.json"),
+            r#"{"origem":"device","modelo":"ggml-small-q5_1.bin","falantes":0}"#,
+        )
+        .unwrap();
+        let info = &list_recordings(rec_dir_s.clone(), None).unwrap().recordings[0];
+        assert_eq!(info.minutes_origin, Some(MinutesOrigin::Device));
+
+        // O PC terminou: a próxima rodada traz a ata, e ela substitui a do
+        // celular.
         host.done
             .lock()
             .unwrap()
@@ -759,6 +783,12 @@ mod tests {
         assert_eq!(info.remote_title.as_deref(), Some("Visita à fábrica"));
         let ata = std::fs::read_to_string(info.minutes_path.as_deref().unwrap()).unwrap();
         assert_eq!(ata, "# Visita à fábrica\n");
+        assert_eq!(
+            info.minutes_origin,
+            Some(MinutesOrigin::Pc),
+            "a do PC vale mais"
+        );
+        assert!(!rec_dir.join("20260925-100000.ata.json").exists());
 
         // O PC esquece o celular: a próxima conversa desfaz o pareamento aqui.
         let device: EndpointId = link.device_id().parse().unwrap();

@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use isper_core::capture::{self, CaptureManifest, CaptureRecorder, CaptureState, GapReason};
 
 use crate::MobileError;
+use crate::local::MinutesOrigin;
 use crate::sync::RemoteStage;
 
 /// Em que pé está uma gravação.
@@ -93,8 +94,15 @@ pub struct RecordingInfo {
     pub remote_title: Option<String>,
     /// Por que o envio ou o PC falhou, quando falhou.
     pub remote_error: Option<String>,
-    /// A ata que voltou do PC (Markdown), quando voltou.
+    /// A ata (Markdown), quando existe: a do PC ou a feita no celular.
     pub minutes_path: Option<String>,
+    /// De onde veio a ata (Fase 9.4).
+    pub minutes_origin: Option<MinutesOrigin>,
+    /// Quanto de uma transcrição no celular interrompida já foi feito, de 0 a
+    /// 1: ela continua de onde parou.
+    pub local_progress: Option<f32>,
+    /// Por que a transcrição no celular falhou, se falhou.
+    pub local_error: Option<String>,
 }
 
 fn info(dir: &Path, m: &CaptureManifest) -> RecordingInfo {
@@ -122,6 +130,9 @@ fn info(dir: &Path, m: &CaptureManifest) -> RecordingInfo {
         remote_title: remote.title,
         remote_error: remote.error,
         minutes_path: remote.minutes,
+        minutes_origin: crate::local::minutes_origin(dir, &m.id),
+        local_progress: crate::local::local_progress(dir, &m.id),
+        local_error: crate::local::local_error(dir, &m.id),
     }
 }
 
