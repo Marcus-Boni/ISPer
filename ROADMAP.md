@@ -7,7 +7,7 @@
 
 ---
 
-## Estado atual — 23/09/2026 · v0.20.0 (7.5 e 7.6 entregues; o que falta da F7 depende de terceiros ou é à mão)
+## Estado atual — 26/09/2026 · v0.23.0 (7.5 e 7.6 entregues; o que falta da F7 depende de terceiros ou é à mão)
 
 | Fase | Estado | Resumo |
 |---|---|---|
@@ -20,9 +20,9 @@
 | F6 Acabamento premium | ✅ | falta só a assinatura de código (→ 7.3) |
 | F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (criptografia em repouso adiada com decisão registrada); 7.5 com 5 de 6 (v0.19.0 — falta a rodada com o NVDA); 7.6 com 4 de 5 (v0.20.0 — falta o winget, em revisão no winget-pkgs) |
 | F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; só com a janela aberta e notas salvas com a reunião (23/09); 3 itens em aberto — validar a memória, idioma do que a IA escreve e ver o sync do portal numa release |
-| F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (~15 MB/h no celular, a mesma transcrição do WAV; já gravou num Galaxy Tab A9), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. O teste de 2 h e o do Motorola/Xiaomi ficaram para depois. **9.3 em 25/09**: o celular manda as gravações para o PC, pareado por QR (iroh, com a chave de cada lado e sem servidor de fora), e a ata volta com "Ata pronta". Falta a volta completa num aparelho de verdade. 9.4 a 9.7 ainda são proposta |
+| F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (~15 MB/h no celular, a mesma transcrição do WAV; já gravou num Galaxy Tab A9), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. O teste de 2 h e o do Motorola/Xiaomi ficaram para depois. **9.3 em 25/09**: o celular manda as gravações para o PC, pareado por QR (iroh, com a chave de cada lado e sem servidor de fora), e a ata volta com "Ata pronta". A volta completa rodou num Galaxy S21 FE em 26/09; falta gravar longe do PC. **9.4 em 26/09**: o celular transcreve sozinho, com o mesmo passe final do PC, por padrão ao carregar e continuando de onde parou; a ata do PC substitui a do celular. 9.5 a 9.7 ainda são proposta |
 
-**138 itens entregues · 15 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**145 itens entregues · 18 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -382,11 +382,28 @@ devolve a ata. É o que fecha o circuito que substitui o Plaud. Decisões no
 - [ ] Pronto quando você grava no celular longe do PC, chega perto dele e a ata aparece no celular sem tocar em nada — num aparelho de verdade, com o PC do dia a dia (é à mão)
 - [ ] Piloto interno: o APK do CI para o líder e o time
 
-### Depois da 9.3 (proposto, a decidir)
+### 9.4 Transcrição no celular
+
+Sem o PC por perto, o celular transcreve sozinho, com o mesmo passe final do
+PC, e a ata do PC, quando chega, substitui a do celular. Decisões no
+[ADR 0018](docs/adr/0018-transcricao-no-celular.md).
+
+- [x] O passe final continua de onde parou (26/09, `pipeline::run_resumable`): cada janela do VAD vira uma linha em `<id>.transcricao.jsonl`, com o estado que a próxima precisa; o cabeçalho descreve a rodada, comparado como texto (um número relido de um JSON muda o último bit). Interrompida no meio, a reunião sintética de 190 s chega ao mesmo texto, segmento por segmento
+- [x] O modelo pela memória (26/09, `device_plan`): small com os falantes a partir de ~6 GB (5 GB informados), base de ~3 a ~6 GB, só o PC abaixo disso; nos Ajustes, quem usa troca o modelo e liga ou desliga os falantes
+- [x] Quando transcrever (26/09): pelo WorkManager, por padrão só na tomada, ou assim que a gravação termina, ou só no PC; "Transcrever agora" em qualquer modo. Os modelos baixam antes (no Wi-Fi, a não ser que peça para já), e os dois trabalhos rodam em primeiro plano com a notificação do andamento
+- [x] O PC primeiro (26/09): o que o PC já recebeu não é transcrito no celular; a ata do celular fica em `<id>.ata.md` com um `<id>.ata.json`, e a do PC a substitui quando chega (a sincronia passou a buscá-la também nesse caso)
+- [x] Falha anotada (26/09): `<id>.transcricao.erro` tira a gravação da fila até "Tentar de novo"; uma gravação sem fala também vira falha, com o motivo
+- [x] Na Biblioteca e nos Ajustes (26/09): "Transcreve ao carregar", "No celular: 42%", "Ata do celular" e "Falhou no celular"; nos Ajustes, o modo, o modelo, os falantes e os modelos no aparelho (baixar e apagar). O app Android vai para o 0.4.0-transcricao
+- [x] Testes (26/09): a retomada no núcleo (`resume`, 7 testes, e o passe final interrompido com o modelo); a fila, a origem da ata e as falhas no `isper-mobile`, com a ata do PC substituindo a do celular na rodada de sincronia; `tools/e2e/android-transcribe.ps1` no emulador (30 verificações)
+- [ ] "Minha voz", opcional: rotular o dono do celular pela voz
+- [ ] Preservar as edições quando a ata do PC substitui a do celular (quando o celular editar a ata)
+- [ ] Pronto quando 1 h de reunião vira ata num intermediário de verdade, sem PC, na tomada, em até ~1,5× a duração (a meta pelo laboratório da 9.1) — é à mão
+
+### Depois da 9.4 (proposto, a decidir)
 
 Do plano de 23/09; cada etapa ganha caixas quando for aprovada.
 
-- 9.4 transcrição no próprio aparelho · 9.5 IA · 9.6 Play Store · 9.7 iOS
+- 9.5 IA · 9.6 Play Store · 9.7 iOS
 
 ## Boas práticas transversais
 

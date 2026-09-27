@@ -11,6 +11,21 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **O celular transcreve sozinho (Fase 9.4).** Sem o PC por perto, a gravação
+  vira ata no próprio celular, com o mesmo passe final do PC: o modelo small
+  a partir de ~6 GB de memória, com os falantes separados, e o base abaixo
+  disso. Por padrão, só com o celular na tomada. Nos Ajustes (a engrenagem da
+  Biblioteca), dá para escolher "assim que a gravação termina" ou "só no PC",
+  trocar o modelo e ligar ou desligar os falantes. "Transcrever agora" faz na
+  hora, na bateria mesmo. Se a tomada sair no meio, a transcrição para e
+  continua de onde parou na próxima vez, com o mesmo resultado. Uma gravação
+  que o PC já recebeu não é transcrita no celular, e a ata do PC, quando
+  chega, substitui a do celular. Na primeira vez, o celular baixa o modelo
+  (de ~60 a ~230 MB, com os falantes), no Wi-Fi. O app Android desta etapa é
+  o 0.4.0-transcricao
+  ([ADR 0018](docs/adr/0018-transcricao-no-celular.md)).
+
 ### Corrigido
 - **No celular, o microfone na barra de status fica só para a gravação em
   andamento.** As notificações "Gravação salva" e "Ata pronta" usavam o mesmo
