@@ -3219,6 +3219,7 @@ dependencies = [
 name = "isper-diarize"
 version = "0.1.0"
 dependencies = [
+ "hound",
  "isper-models",
  "sherpa-onnx",
  "thiserror 2.0.20",

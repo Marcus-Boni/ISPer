@@ -44,7 +44,7 @@ cargo clippy --workspace --all-targets --release --no-default-features -- -D war
 ```
 
 ```bash
-cargo test --release --no-default-features -p isper-core -p isper-llm -p isper-models -p isper-cli -p isper-app
+cargo test --release --no-default-features -p isper-core -p isper-llm -p isper-models -p isper-diarize -p isper-sync -p isper-mobile -p isper-cli -p isper-app
 ```
 
 ```bash

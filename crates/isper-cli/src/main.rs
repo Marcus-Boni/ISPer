@@ -127,6 +127,14 @@ enum Cmd {
         /// Turnos de referência (início<TAB>fim<TAB>falante), para calcular DER
         #[arg(long)]
         reference_turns: Option<PathBuf>,
+        /// Semelhança a partir da qual dois falantes são a mesma voz, na
+        /// conferência com a voz inteira (padrão: 0.6; 0 só mede, sem juntar)
+        #[arg(long)]
+        same_voice: Option<f32>,
+        /// Não absorve os grupos fracos — para medir a semelhança entre todos
+        /// os grupos que o agrupamento criou
+        #[arg(long)]
+        no_absorb: bool,
     },
     /// Roda o pipeline inteiro sobre um WAV e grava relatório + transcrições
     Bench {
@@ -288,7 +296,26 @@ fn main() -> anyhow::Result<()> {
             speakers,
             threshold,
             reference_turns,
-        } => run_diarize(path, *speakers, *threshold, reference_turns.as_deref()),
+            same_voice,
+            no_absorb,
+        } => {
+            let mut opts = isper_diarize::DiarizeOptions::from_env();
+            if let Some(t) = threshold {
+                opts.threshold = *t;
+            }
+            if speakers.is_some() {
+                opts.num_speakers = *speakers;
+            }
+            if let Some(s) = same_voice {
+                opts.same_voice_similarity = *s;
+            }
+            if *no_absorb {
+                opts.min_speaker_secs = 0.0;
+                opts.min_speaker_share = 0.0;
+                opts.min_speaker_turns = 0;
+            }
+            run_diarize(path, &opts, reference_turns.as_deref())
+        }
         Cmd::Bench { .. } => run_bench(&cli),
         Cmd::Compare { before, after } => bench::compare(before, after),
         Cmd::Import { dir, db, apply } => run_import(dir.as_deref(), db.as_deref(), *apply),
@@ -475,26 +502,18 @@ fn run_encode(audio: &Path, saida: &Path, kbps: u32) -> anyhow::Result<()> {
 
 fn run_diarize(
     path: &Path,
-    speakers: Option<u32>,
-    threshold: Option<f32>,
+    opts: &isper_diarize::DiarizeOptions,
     reference_turns: Option<&Path>,
 ) -> anyhow::Result<()> {
     let decoded = isper_core::decode::decode_to_16k(path, None, None)
         .with_context(|| format!("falha ao ler {}", path.display()))?;
     let secs = decoded.duration_secs();
     let samples = decoded.samples_16k;
-    let mut opts = isper_diarize::DiarizeOptions::from_env();
-    if let Some(t) = threshold {
-        opts.threshold = t;
-    }
-    if speakers.is_some() {
-        opts.num_speakers = speakers;
-    }
     match opts.num_speakers {
         Some(n) => println!("diarizando {secs:.1}s com {n} falante(s) conhecido(s)..."),
         None => println!("diarizando {:.1}s (limiar {})...", secs, opts.threshold),
     }
-    let out = isper_diarize::diarize_with(&samples, &opts)?;
+    let out = isper_diarize::diarize_with(&samples, opts)?;
     for t in &out.turns {
         println!(
             "[{:>6.1}s -> {:>6.1}s] Participante {}",
@@ -505,15 +524,30 @@ fn run_diarize(
     }
     let m = &out.metrics;
     println!(
-        "{} grupo(s) bruto(s) → {} falante(s) ({} absorvido(s)) · {} turno(s) · mediana {:.1}s · curtos {} · {:.1}s",
+        "{} grupo(s) bruto(s) → {} falante(s) ({} absorvido(s), {} pela voz) · {} turno(s) · mediana {:.1}s · curtos {} · {:.1}s",
         m.raw_clusters,
         m.speakers,
         m.absorbed_clusters,
+        m.merged_same_voice,
         m.turns,
         m.median_turn_secs,
         m.very_short_turns,
         m.elapsed_secs
     );
+    if !m.voice_similarities.is_empty() {
+        // Os números são os de antes da conferência juntar alguém.
+        let pares: Vec<String> = m
+            .voice_similarities
+            .iter()
+            .map(|(a, b, s)| format!("{}↔{} {:.2}", a + 1, b + 1, s))
+            .collect();
+        println!(
+            "conferência das vozes (limiar {}): {} → {} juntado(s)",
+            opts.same_voice_similarity,
+            pares.join(" · "),
+            m.merged_same_voice
+        );
+    }
     for w in &out.warnings {
         println!("AVISO: {w}");
     }

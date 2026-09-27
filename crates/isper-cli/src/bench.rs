@@ -51,6 +51,7 @@ impl Diarizer for SherpaDiarizer {
                 speakers: out.metrics.speakers,
                 turns: out.metrics.turns,
                 absorbed_clusters: out.metrics.absorbed_clusters,
+                merged_same_voice: out.metrics.merged_same_voice,
                 median_turn_secs: out.metrics.median_turn_secs,
                 very_short_turns: out.metrics.very_short_turns,
                 warnings: Vec::new(),
@@ -291,10 +292,11 @@ fn print_summary(r: &PipelineReport) {
     );
     if let Some(d) = &r.diarization {
         println!(
-            "diarização        {} grupos brutos → {} falantes ({} absorvidos) · {} turnos · mediana {:.1}s · curtos {}",
+            "diarização        {} grupos brutos → {} falantes ({} absorvidos, {} pela voz) · {} turnos · mediana {:.1}s · curtos {}",
             d.raw_clusters,
             d.speakers,
             d.absorbed_clusters,
+            d.merged_same_voice,
             d.turns,
             d.median_turn_secs,
             d.very_short_turns
