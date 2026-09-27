@@ -35,7 +35,7 @@ Verifique a fonte em Configurações > Reuniões. Se usar Teams, teste a opção
 
 ## A diarização separou mal os falantes
 
-Calibre `ISPER_DIARIZE_THRESHOLD`. Valores menores tendem a separar mais vozes.
+Informe quantas pessoas participam, em Configurações > Reuniões: é o ajuste de maior efeito. Uma pessoa partida em duas também se conserta na Biblioteca, renomeando uma delas com o nome da outra. Para calibrar o agrupamento, veja [Como a diarização separa as vozes](/docs/identificacao-de-falantes/diarizacao/).
 
 ## A atualização não instala durante reunião
 

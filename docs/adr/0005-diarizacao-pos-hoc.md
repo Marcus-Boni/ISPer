@@ -1,6 +1,6 @@
 # 0005 — Diarização depois da reunião, sobre o áudio contínuo
 
-- **Status:** aceita (revista em 18/09/2026)
+- **Status:** aceita (revista em 18/09/2026 e em 27/09/2026)
 - **Data:** 01/09/2026
 - **Atualização (24/09/2026):** a lentidão de uma thread só acabou com a troca
   do `sherpa-rs` pelo crate oficial do sherpa-onnx — ver [0015](0015-sherpa-onnx-oficial.md).
@@ -42,7 +42,17 @@ passe final ([0006](0006-dois-modos-ao-vivo-e-passe-final.md)), com:
 3. **absorção de grupos fracos** (menos que `max(6 s, 2% da fala)` ou menos
    de 2 turnos) pelo grupo forte mais próximo no tempo;
 4. **guarda:** acima de 12 grupos o resultado não é publicado — fica
-   "Participantes", com aviso no log, em vez de inventar dezenas de pessoas.
+   "Participantes", com aviso no log, em vez de inventar dezenas de pessoas;
+5. **conferência com a voz inteira** (revisão de 27/09): a ligação completa
+   partia a voz de uma pessoa só em dois grupos fortes numa gravação de 33 s
+   no celular. Cada falante que sobra da limpeza ganha uma impressão de voz
+   de até 20 s da fala dele, e falantes com semelhança de cosseno a partir de
+   0,6 viram um. É o passo que o 3D-Speaker aplica depois do agrupamento
+   (`merge_by_cos`); o limiar foi medido com o ERes2Net: a mesma voz real
+   deu 0,54 a 0,71, e o pior caso de vozes diferentes (a mesma voz sintética
+   a ±8 % de velocidade), 0,50. Não roda com o número de participantes
+   informado. Detalhes em
+   [`transcription-pipeline.md`](../transcription-pipeline.md), seção 6.
 
 ## Consequências
 
@@ -53,6 +63,10 @@ passe final ([0006](0006-dois-modos-ao-vivo-e-passe-final.md)), com:
   direto.
 - Fala sobreposta vira um falante só, e o modelo de embedding foi treinado em
   chinês — trocá-lo sem medir em voz real seria adivinhar.
+- A conferência erra para o lado de não juntar: duas pessoas de voz muito
+  parecida continuam separadas, e uma pessoa partida em dois grupos de fala
+  curta ou ruidosa pode continuar em dois. Renomear um deles conserta; juntar
+  duas pessoas não teria conserto na ata.
 - Reconhecer a mesma voz entre reuniões diferentes continua fora.
 
 ## Alternativas consideradas
@@ -69,4 +83,6 @@ passe final ([0006](0006-dois-modos-ao-vivo-e-passe-final.md)), com:
 `crates/isper-diarize/` (inclusive `postprocess.rs`),
 `apps/isper-app/src-tauri/src/final_pass.rs`,
 [`docs/transcription-pipeline.md`](../transcription-pipeline.md) (seção 6,
-com as tabelas medidas), `isper-cli diarize <wav> --speakers N --threshold T`.
+com as tabelas medidas), `isper-cli diarize <wav> --speakers N --threshold T
+--same-voice S --no-absorb` e o exemplo `conferir_vozes` do `isper-cli`, que
+refaz a calibração da conferência.

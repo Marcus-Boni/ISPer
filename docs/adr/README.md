@@ -11,7 +11,7 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0002](0002-rust-tauri-whisper-cpp.md) | Rust + Tauri 2 + whisper.cpp, tudo local | aceita | 25/08/2026 |
 | [0003](0003-llm-na-nuvem-so-texto.md) | IA de linguagem na nuvem, só com o texto | aceita | 26/08/2026 |
 | [0004](0004-loopback-wasapi-com-keepalive.md) | Loopback pelo WASAPI com keepalive, drenagem e watchdog | aceita | 02/09/2026 |
-| [0005](0005-diarizacao-pos-hoc.md) | Diarização depois da reunião, sobre o áudio contínuo | aceita | 01/09/2026 · revista 18/09/2026 |
+| [0005](0005-diarizacao-pos-hoc.md) | Diarização depois da reunião, sobre o áudio contínuo | aceita | 01/09/2026 · revista 18/09/2026 e 27/09/2026 |
 | [0006](0006-dois-modos-ao-vivo-e-passe-final.md) | Dois modos de transcrição: ao vivo e passe final | aceita | 18/09/2026 |
 | [0007](0007-interface-sem-build-step.md) | Interface em HTML/CSS/JS sem build step, com tudo embutido | aceita | 26/08/2026 · ampliada 23/09/2026 |
 | [0008](0008-release-em-runners-do-github.md) | Releases compiladas em runners do GitHub, em duas variantes | aceita | 14/09/2026 |

@@ -231,7 +231,7 @@ estourar o limiar, e o grupo nunca fecha. Extrapolando 34 grupos em 19 min
 para 2 h chega-se a ~200 — exatamente a ordem de grandeza do "Participante
 255" relatado (o `u8` saturava em 255; era o sintoma, não a causa).
 
-Três respostas, nesta ordem de eficácia:
+Quatro respostas, as três primeiras nesta ordem de eficácia:
 
 1. **informar o número de participantes** (Configurações → Reuniões). Com ele,
    o sherpa corta o dendrograma em exatamente N grupos (`cutree_k`) e ignora o
@@ -243,7 +243,33 @@ Três respostas, nesta ordem de eficácia:
    que `max(6 s, 2% da fala)` ou menos de 2 turnos não é um participante — é um
    trecho que o agrupamento não soube encaixar, e vai para o grupo forte mais
    próximo no tempo. O critério é uma *fração* da fala justamente para não
-   envelhecer com a duração.
+   envelhecer com a duração;
+4. **conferência com a voz inteira** (27/09, `lib.rs`): a ligação completa
+   também parte a mesma voz, e num áudio curto de uma pessoa só (33 s no
+   celular) os dois pedaços passam da absorção — "Participante 1" e "2" para
+   quem falou sozinho. Depois da limpeza, cada falante ganha uma impressão de
+   voz de até 20 s da fala dele (os turnos mais longos; nenhum abaixo de
+   1,5 s, onde moram o toque no botão e a respiração; com menos de 3 s, o
+   falante fica fora da conferência), e falantes com semelhança de cosseno a
+   partir de **0,6** viram um — com ligação completa também, para duas
+   pessoas parecidas com uma terceira não virarem uma só por tabela. Não roda
+   com o número de participantes informado. É o `merge_by_cos` que o próprio
+   3D-Speaker aplica depois do agrupamento; o limiar deles (0,8, sobre o
+   CAM++) não serve para o ERes2Net, e o nosso foi medido:
+
+   | caso (exemplo `conferir_vozes`) | semelhança |
+   |---|---:|
+   | mesma voz, gravação real no celular (grupos de 3 a 7 s) | 0,54 a 0,71 |
+   | mesma voz, voz sintética | 0,80 a 0,98 |
+   | a mesma voz sintética a ±8 % de velocidade (as "pessoas" da `reuniao-sintetica`) | 0,44 a 0,50 |
+   | vozes diferentes | 0,14 a 0,27 |
+
+   Na dúvida, não junta: juntar duas pessoas apaga quem disse o quê, e uma
+   pessoa partida em duas se conserta renomeando. Para refazer a medida:
+   `cargo run --release -p isper-cli --example conferir_vozes -- <áudio>
+   [turnos.tsv]`; `isper-cli diarize` mostra a semelhança entre os falantes
+   de qualquer áudio (`--same-voice` muda o limiar, `--no-absorb` desliga a
+   absorção).
 
 E uma guarda: acima de 12 grupos, o resultado **não é publicado em silêncio**.
 Vira aviso no log, `reliable() == false`, e o app mantém "Participantes" em vez
@@ -400,7 +426,8 @@ Padrões bons, avançado escondido. Em **Configurações → Reuniões**:
   sem comparar costuma piorar.
 
 Fora da interface, para calibrar sem recompilar:
-`ISPER_DIARIZE_THRESHOLD`, `ISPER_DIARIZE_SPEAKERS`.
+`ISPER_DIARIZE_THRESHOLD`, `ISPER_DIARIZE_SPEAKERS`, `ISPER_DIARIZE_THREADS`
+e `ISPER_DIARIZE_SAME_VOICE` (a conferência com a voz inteira; 0 desliga).
 
 Os parâmetros do pipeline não estão espalhados: `DecodeConfig` (decoder),
 `VadOptions` e `WindowOptions` (fronteiras), `AlignOptions` (falas),

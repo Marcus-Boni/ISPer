@@ -28,14 +28,16 @@ cargo run --release -p isper-cli -- models download-diarize
 
 ## Ajustar separação de vozes
 
-Se o ISPer juntar ou separar demais os falantes, calibre o threshold sem recompilar:
+Dois erros comuns o ISPer já corrige sozinho. Um trecho solto, que o agrupamento não soube encaixar, vai para quem estava falando ao redor. E dois "participantes" com a mesma voz, uma pessoa partida em duas (comum em gravação curta de uma pessoa só), viram um. Na dúvida, ele não junta: duas pessoas de voz parecida continuam separadas.
+
+Se ainda juntar ou separar demais, o ajuste de maior efeito é informar quantas pessoas participam, em Configurações > Reuniões. Para calibrar sem recompilar:
 
 ```powershell
-$env:ISPER_DIARIZE_THRESHOLD = "0.2"
+$env:ISPER_DIARIZE_THRESHOLD = "0.6"
 isper-cli diarize fixtures/duas-vozes-16k.wav
 ```
 
-Valores menores tendem a criar mais falantes distintos. O padrão documentado no projeto é `0.3`.
+O limiar do agrupamento é uma distância: valores menores criam mais falantes distintos. O padrão é `0.5`, o do próprio sherpa-onnx. A saída também mostra a semelhança entre as vozes de cada par de falantes; a partir de `0.6`, os dois viram um. `--same-voice` (ou `ISPER_DIARIZE_SAME_VOICE`) muda esse limite, e `0` desliga a junção.
 
 ## Renomear participantes
 
