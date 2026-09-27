@@ -40,6 +40,11 @@ pub use recording::{
     GapKind, Recorder, RecordingGap, RecordingInfo, RecordingList, RecordingState,
     delete_recording, import_recording, list_recordings,
 };
+pub mod local;
+pub use local::{
+    DevicePlan, LocalMinutes, LocalOptions, LocalTranscription, MinutesOrigin, device_plan,
+    mark_local_failed, pending_local, retry_local,
+};
 pub mod sync;
 pub use sync::{
     PcInfo, PcLink, ReadyMinutes, RemoteStage, SyncListener, SyncSummary, retry_recording,
@@ -69,6 +74,10 @@ pub enum MobileError {
     /// parear de novo.
     #[error("este celular não está mais pareado com o PC")]
     NotPaired,
+    /// A ata do PC chegou enquanto o celular transcrevia (Fase 9.4): ela vale
+    /// mais, e a do celular não é gravada.
+    #[error("a ata do PC já chegou")]
+    SupersededByPc,
 }
 
 impl From<std::io::Error> for MobileError {
@@ -247,6 +256,12 @@ pub fn download_diarize_models(
         listener.on_progress(Stage::Download, done, total)
     })?;
     Ok(())
+}
+
+/// O nome do arquivo do VAD que [`download_vad`] baixa.
+#[uniffi::export]
+pub fn vad_file_name() -> String {
+    isper_models::VAD_FILE.to_string()
 }
 
 /// Os modelos de diarização estão todos em `dir`?
