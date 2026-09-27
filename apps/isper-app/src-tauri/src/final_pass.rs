@@ -23,8 +23,10 @@
 //! ```
 //!
 //! O que sai daqui é o que a Biblioteca, o `.md`, a busca e o resumo por IA
-//! passam a usar. Se qualquer etapa falhar, a transcrição ao vivo continua no
-//! lugar: o passe final só substitui quando termina inteiro.
+//! passam a usar: o resumo e os vetores feitos na hora, sobre o ao vivo, são
+//! provisórios e são refeitos quando a transcrição final entra. Se qualquer
+//! etapa falhar, a transcrição ao vivo continua no lugar: o passe final só
+//! substitui quando termina inteiro.
 
 use crate::prelude::*;
 use isper_core::align::SpeakerTurn;
@@ -89,8 +91,17 @@ fn options(app: &AppHandle) -> Options {
 }
 
 /// Roda o passe final numa thread e, ao terminar, substitui a transcrição da
-/// reunião no banco e regrava o Markdown. Avisa as janelas nas duas pontas.
-pub(crate) fn run_in_background(app: AppHandle, meeting_id: i64, result: MeetingResult) {
+/// reunião no banco, regrava o Markdown e refaz sobre ela o resumo e a busca
+/// ([`refresh_derived`]). Avisa as janelas nas duas pontas.
+///
+/// `app_title` é o título que o app deu à reunião — o padrão, com a data, ou
+/// o do resumo provisório. Só ele pode dar lugar ao título do resumo final.
+pub(crate) fn run_in_background(
+    app: AppHandle,
+    meeting_id: i64,
+    result: MeetingResult,
+    app_title: String,
+) {
     {
         let state = app.state::<AppState>();
         *state.diarizing.lock_or_recover() = Some(meeting_id);
@@ -100,19 +111,28 @@ pub(crate) fn run_in_background(app: AppHandle, meeting_id: i64, result: Meeting
 
     std::thread::spawn(move || {
         let started = Instant::now();
-        match run(&app, meeting_id, &result) {
-            Ok(Some(n)) => tracing::info!(
-                meeting_id,
-                falas = n,
-                secs = started.elapsed().as_secs_f32(),
-                "transcrição final publicada"
-            ),
-            Ok(None) => tracing::info!(meeting_id, "passe final desligado na configuração"),
-            Err(e) => tracing::warn!(
-                meeting_id,
-                "passe final falhou ({e}) — a transcrição ao vivo foi mantida"
-            ),
-        }
+        let published = match run(&app, meeting_id, &result) {
+            Ok(Some(n)) => {
+                tracing::info!(
+                    meeting_id,
+                    falas = n,
+                    secs = started.elapsed().as_secs_f32(),
+                    "transcrição final publicada"
+                );
+                true
+            }
+            Ok(None) => {
+                tracing::info!(meeting_id, "passe final desligado na configuração");
+                false
+            }
+            Err(e) => {
+                tracing::warn!(
+                    meeting_id,
+                    "passe final falhou ({e}) — a transcrição ao vivo foi mantida"
+                );
+                false
+            }
+        };
         {
             let state = app.state::<AppState>();
             let mut d = state.diarizing.lock_or_recover();
@@ -122,7 +142,51 @@ pub(crate) fn run_in_background(app: AppHandle, meeting_id: i64, result: Meeting
         }
         notify_status(&app);
         let _ = app.emit("isper-state", json!({"state": "meeting-done"}));
+
+        // O Whisper já está livre (uma importação na fila pode seguir); daqui
+        // em diante é só rede. Sem evento para o indicador: ele já disse
+        // "pronto" e pode estar mostrando outra reunião.
+        if published {
+            refresh_derived(&app, meeting_id, &app_title);
+            notify_status(&app);
+        }
     });
+}
+
+/// A transcrição oficial mudou: o que tinha sido feito sobre a do ao vivo é
+/// refeito sobre ela.
+///
+/// - **Resumo e título por IA**, se houver provedor: o resumo final
+///   substitui o provisório, com as decisões validadas e sem as notas
+///   ([`summary_input`]); o título só muda se o usuário não tiver renomeado a
+///   reunião nesse meio-tempo. Se a IA falhar, o provisório fica.
+/// - **Busca semântica**: `replace_segments` já descartou os vetores do ao
+///   vivo; a reunião é indexada de novo, agora com o resumo final.
+fn refresh_derived(app: &AppHandle, meeting_id: i64, app_title: &str) {
+    // Excluída há instantes (janela do Desfazer aberta): não vale mandar o
+    // texto para a IA de uma reunião que está saindo.
+    if crate::undo::hidden_meetings().contains(&meeting_id) {
+        return;
+    }
+    let store = match open_store() {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(meeting_id, "resumo e busca ficaram os do ao vivo: {e}");
+            return;
+        }
+    };
+    match store.get_meeting(meeting_id) {
+        Ok(Some(detail)) => {
+            let text = summary_input(&detail);
+            summarize_saved(&store, meeting_id, &text, Some(app_title), || {
+                tracing::info!(meeting_id, "refazendo o resumo sobre a transcrição final");
+            });
+        }
+        // Excluída enquanto o passe final rodava.
+        Ok(None) => return,
+        Err(e) => tracing::warn!(meeting_id, "resumo ficou o do ao vivo: {e}"),
+    }
+    index_meeting_background(app, meeting_id);
 }
 
 /// O motor Whisper carregado, ou um erro que diz por quê.

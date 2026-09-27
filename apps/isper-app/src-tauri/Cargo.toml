@@ -54,6 +54,11 @@ chrono = "0.4.45"
 # Versão do Windows no pacote de diagnóstico (já vem compilado pelo isper-core).
 sysinfo = "0.39"
 
+[dev-dependencies]
+# O provider falso do isper-llm: o resumo refeito depois do passe final é
+# testado sem rede nem chave de API.
+isper-llm = { path = "../../../crates/isper-llm", features = ["testing"] }
+
 [target.'cfg(windows)'.dependencies]
 # SetWindowPos direto: reafirma o indicador no topo da faixa "sempre no topo"
 # (o tao não reaplica a flag quando ela já está ligada).

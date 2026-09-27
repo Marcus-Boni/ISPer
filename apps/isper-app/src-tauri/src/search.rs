@@ -90,12 +90,23 @@ fn meeting_chunks(store: &MeetingStore, meeting_id: i64) -> anyhow::Result<Vec<e
     Ok(chunks)
 }
 
+/// Uma indexação de reunião por vez.
+///
+/// A mesma reunião é indexada duas vezes em sequência: no fim da gravação,
+/// sobre o texto ao vivo, e de novo quando o passe final entra. Com um
+/// provider lento (um Ollama acordando), a primeira podia terminar depois da
+/// segunda e gravar por cima vetores de falas que já não existem. Com a
+/// trava, ler o texto, vetorizar e gravar é uma coisa só: a última a rodar
+/// leu o banco depois da anterior.
+static MEETING_INDEX: Mutex<()> = Mutex::new(());
+
 /// Indexa (ou reindexa) uma reunião. Devolve quantos trechos gravou.
 fn index_meeting(
     store: &MeetingStore,
     emb: &dyn Embedder,
     meeting_id: i64,
 ) -> anyhow::Result<usize> {
+    let _uma_por_vez = MEETING_INDEX.lock_or_recover();
     let chunks = meeting_chunks(store, meeting_id)?;
     if chunks.is_empty() {
         return Ok(0);

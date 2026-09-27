@@ -383,8 +383,10 @@ fn process(app: &AppHandle, job: &Job) -> Result<Done, Failure> {
         "gravação importada"
     );
 
-    // Título da IA só quando o nome do arquivo não dizia nada.
-    if let Some(t) = summarize_saved(&store, id, &md, named.is_none(), || {
+    // Título da IA só quando o nome do arquivo não dizia nada. Aqui o texto
+    // já é o do passe final: resumo e busca não precisam ser refeitos depois.
+    let rename_from = named.is_none().then_some(title.as_str());
+    if let Some(t) = summarize_saved(&store, id, &md, rename_from, || {
         set_stage(app, Stage::Summary, 0.0)
     }) {
         title = t;

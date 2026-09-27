@@ -5,6 +5,10 @@ edition = "2024"
 license = "MIT"
 publish = false
 
+[features]
+# O provider falso (`testing::FakeProvider`) para os testes de quem usa o crate.
+testing = []
+
 [dependencies]
 # HTTP sincrono (ureq 3): rustls + gzip + json, sem cookies/charset que a API nao usa.
 ureq = { version = "3", default-features = false, features = ["rustls", "gzip", "json"] }

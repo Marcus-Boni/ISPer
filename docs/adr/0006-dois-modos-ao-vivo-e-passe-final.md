@@ -47,6 +47,12 @@ desligado em Configurações → Reuniões → Avançado.
   19 min).
 - Há uma janela, depois de encerrar, em que a reunião mostra a transcrição do
   ao vivo; o Início e a Biblioteca sinalizam "refazendo a transcrição…".
+- O resumo por IA e os vetores da busca feitos ao encerrar são provisórios,
+  do texto ao vivo. Quando o passe final entra, os vetores antigos saem na
+  mesma transação, e o resumo e o índice são refeitos sobre o texto final. O
+  título da IA só troca o que o próprio app pôs, nunca um nome dado à mão
+  ([0009](0009-nada-some-sem-o-usuario-pedir.md)); se a IA falhar, o resumo
+  provisório fica ([0003](0003-llm-na-nuvem-so-texto.md)).
 - Tudo foi medido em voz sintética; o corpus certo é uma reunião real com um
   trecho corrigido à mão (`isper-cli bench --reference` já espera por ele).
 
