@@ -133,7 +133,7 @@ impl CaptureManifest {
 }
 
 /// Um nome de arquivo seguro para `id`: só letras, dígitos, `-` e `_`.
-fn check_id(id: &str) -> Result<()> {
+pub fn check_id(id: &str) -> Result<()> {
     if id.is_empty()
         || !id
             .chars()

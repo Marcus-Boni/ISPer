@@ -46,6 +46,7 @@ pub mod pipeline;
 pub mod profile;
 pub mod recorder;
 pub mod recording;
+mod resume;
 pub mod store;
 pub mod text;
 pub mod vad;
