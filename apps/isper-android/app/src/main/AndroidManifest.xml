@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Baixar os modelos (Hugging Face). O áudio nunca sai do aparelho. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -12,6 +13,12 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Fase 9.3: achar o PC na rede local (mDNS) quando o IP dele muda. -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- Fase 9.4: baixar os modelos e transcrever no celular, em primeiro
+         plano (com a notificação do andamento). "Processamento de mídia" a
+         partir do Android 15; antes, dataSync cobre "processar arquivos
+         locais". -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
 
     <!-- hasFragileUserData: ao desinstalar, o Android oferece manter os dados,
          e as gravações (Android/data/.../Gravacoes) ficam para a próxima
@@ -85,6 +92,13 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_record_info" />
         </receiver>
+
+        <!-- O serviço em primeiro plano do WorkManager, com os tipos que o
+             download dos modelos e a transcrição no celular usam (Fase 9.4). -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync|mediaProcessing"
+            tools:node="merge" />
 
         <!-- Compartilhar uma gravação com outro app sem expor a pasta. -->
         <provider

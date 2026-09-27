@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,20 +29,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.isper.mobile.R
 import com.isper.mobile.core.GapKind
+import com.isper.mobile.core.MinutesOrigin
 import com.isper.mobile.core.RecordingInfo
 import com.isper.mobile.core.RecordingState
 import com.isper.mobile.core.RemoteStage
-import com.isper.mobile.sync.PcSync
 import com.isper.mobile.recording.formatDuration
+import com.isper.mobile.transcribe.LocalSetup
+import com.isper.mobile.transcribe.LocalTranscribe
+import com.isper.mobile.transcribe.TranscribeMode
 import java.io.File
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -65,9 +72,11 @@ fun LibraryScreen(
     actions: LibraryViewModel,
     onMeasure: (RecordingInfo) -> Unit,
     onOpenMinutes: (RecordingInfo) -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val visible = state.recordings.filterNot { it.id in state.pendingDelete }
+    val localRunning by actions.localRunning.collectAsState()
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
     val pc by actions.pc.collectAsState()
     val sending by actions.sending.collectAsState()
@@ -84,13 +93,18 @@ fun LibraryScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Column(Modifier.padding(top = 8.dp, bottom = 8.dp)) {
-                Text(stringResource(R.string.lib_title), style = MaterialTheme.typography.headlineMedium)
-                Text(
-                    stringResource(R.string.lib_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f).padding(top = 8.dp, bottom = 8.dp)) {
+                    Text(stringResource(R.string.lib_title), style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        stringResource(R.string.lib_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = onOpenSettings, modifier = Modifier.testTag("ajustes")) {
+                    Icon(painterResource(R.drawable.ic_settings), contentDescription = stringResource(R.string.settings_title))
+                }
             }
         }
         item {
@@ -130,6 +144,8 @@ fun LibraryScreen(
                 paired = pc != null,
                 sendingFraction = sending?.takeIf { it.id == info.id }?.fraction,
                 onOpenMinutes = { onOpenMinutes(info) },
+                local = state.local,
+                localRunning = localRunning?.takeIf { it.id == info.id },
             )
         }
     }
@@ -148,8 +164,14 @@ private fun RecordingCard(
     paired: Boolean,
     sendingFraction: Float?,
     onOpenMinutes: () -> Unit,
+    local: LocalSetup?,
+    localRunning: LocalTranscribe.Running?,
 ) {
     val context = LocalContext.current
+    val remoteHasIt = info.remote == RemoteStage.QUEUED || info.remote == RemoteStage.PROCESSING
+    val canTranscribeHere = info.state != RecordingState.RECORDING && info.minutesPath == null &&
+        !remoteHasIt && localRunning == null && info.localError == null &&
+        local != null && (local.plan.onDevice || local.modelChoice != null)
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
@@ -179,7 +201,10 @@ private fun RecordingCard(
                 if (silenced > 0) {
                     Chip(stringResource(R.string.lib_chip_silenced, silenced), MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (info.state != RecordingState.RECORDING) RemoteChip(info, paired, sendingFraction)
+                if (info.state != RecordingState.RECORDING) {
+                    LocalChip(info, local, localRunning)
+                    RemoteChip(info, paired, sendingFraction)
+                }
             }
             if (info.remote == RemoteStage.FAILED && !info.remoteError.isNullOrBlank()) {
                 Text(
@@ -188,15 +213,32 @@ private fun RecordingCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            if (info.minutesPath != null || info.remote == RemoteStage.FAILED) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (!info.localError.isNullOrBlank()) {
+                Text(
+                    info.localError.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (info.minutesPath != null || info.remote == RemoteStage.FAILED || info.localError != null || canTranscribeHere) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (info.minutesPath != null) {
                         TextButton(onClick = onOpenMinutes, modifier = Modifier.testTag("ver-ata-${info.id}")) {
                             Text(stringResource(R.string.lib_open_minutes))
                         }
                     }
+                    if (canTranscribeHere) {
+                        TextButton(onClick = { actions.transcribeNow() }, modifier = Modifier.testTag("transcrever-${info.id}")) {
+                            Text(stringResource(R.string.lib_transcribe_now))
+                        }
+                    }
                     if (info.remote == RemoteStage.FAILED) {
                         TextButton(onClick = { actions.retry(info) }) { Text(stringResource(R.string.lib_retry)) }
+                    }
+                    if (info.localError != null) {
+                        TextButton(onClick = { actions.retryLocal(info) }, modifier = Modifier.testTag("tentar-no-celular-${info.id}")) {
+                            Text(stringResource(R.string.lib_retry))
+                        }
                     }
                 }
             }
@@ -221,6 +263,31 @@ private fun RecordingCard(
             }
         }
     }
+}
+
+/** A transcrição no próprio celular (Fase 9.4). */
+@Composable
+private fun LocalChip(info: RecordingInfo, local: LocalSetup?, running: LocalTranscribe.Running?) {
+    val (text, color) = when {
+        running != null ->
+            stringResource(R.string.lib_local_running, (running.fraction * 100).toInt()) to MaterialTheme.colorScheme.primary
+        info.minutesOrigin == MinutesOrigin.DEVICE ->
+            stringResource(R.string.lib_local_ready) to MaterialTheme.colorScheme.tertiary
+        info.minutesOrigin == MinutesOrigin.PC -> return
+        info.localError != null -> stringResource(R.string.lib_local_failed) to MaterialTheme.colorScheme.error
+        info.localProgress != null -> {
+            val pct = ((info.localProgress ?: 0f) * 100).toInt()
+            stringResource(
+                if (local?.mode == TranscribeMode.CHARGING) R.string.lib_local_partial_charging else R.string.lib_local_partial,
+                pct,
+            ) to MaterialTheme.colorScheme.primary
+        }
+        local?.enabled == true && local.mode == TranscribeMode.CHARGING &&
+            info.remote != RemoteStage.QUEUED && info.remote != RemoteStage.PROCESSING && info.remote != RemoteStage.READY ->
+            stringResource(R.string.lib_local_waiting_charge) to MaterialTheme.colorScheme.onSurfaceVariant
+        else -> return
+    }
+    Chip(text, color, textModifier = Modifier.testTag("local-${info.id}"))
 }
 
 /** Em que pé a gravação está no PC. */

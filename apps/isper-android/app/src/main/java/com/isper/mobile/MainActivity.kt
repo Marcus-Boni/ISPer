@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import com.isper.mobile.library.LibraryViewModel
 import com.isper.mobile.sync.PcSync
+import com.isper.mobile.transcribe.LocalTranscribe
 
 /**
  * A casa do app: três destinos (Gravar, Biblioteca, Laboratório).
@@ -61,6 +62,9 @@ class MainActivity : ComponentActivity() {
         library.refresh()
         // Abrir o app é uma boa hora para mandar o que falta ao PC.
         PcSync.syncSoon(this)
+        // E para agendar a transcrição no celular do que ainda não tem ata
+        // (Fase 9.4); o que já está na fila fica como está.
+        LocalTranscribe.schedule(this)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

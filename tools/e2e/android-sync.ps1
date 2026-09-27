@@ -29,25 +29,6 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('isper-e2e-android-sync-' + [guid]
 $pcDir = Join-Path $work 'pc'
 New-Item -ItemType Directory -Force $pcDir | Out-Null
 
-function Get-UiText([string]$Tag) {
-  Adb shell uiautomator dump /sdcard/isper-ui.xml 2>$null | Out-Null
-  $xml = (Adb shell cat /sdcard/isper-ui.xml 2>$null) -join ''
-  $m = [regex]::Match($xml, "<node[^>]*?text=""([^""]*)""[^>]*?resource-id=""$Tag""")
-  if ($m.Success) { return [System.Net.WebUtility]::HtmlDecode($m.Groups[1].Value) }
-  return $null
-}
-
-function Wait-UiText([string]$Tag, [scriptblock]$Cond = { param($t) $t }, [int]$Secs = 60) {
-  $deadline = (Get-Date).AddSeconds($Secs)
-  $t = $null
-  while ((Get-Date) -lt $deadline) {
-    $t = Get-UiText $Tag
-    if ($null -ne $t -and (& $Cond $t)) { return $t }
-    Start-Sleep -Milliseconds 800
-  }
-  return $t
-}
-
 # Digita num campo e confere: o teclado do emulador as vezes perde letras de
 # um texto longo. Digita em pedacos, le o que ficou e, se nao bater, apaga e
 # tenta de novo.
@@ -66,11 +47,6 @@ function Set-UiText([string]$Tag, [string]$Text) {
     if ((Get-UiText $Tag) -eq $Text) { return $true }
   }
   return $false
-}
-
-function Open-Tab([int]$Tab) {
-  Adb shell am start -n "$script:Pkg/.MainActivity" --ei com.isper.mobile.ABA $Tab 2>$null | Out-Null
-  Start-Sleep -Seconds 2
 }
 
 Start-IsperEmulator

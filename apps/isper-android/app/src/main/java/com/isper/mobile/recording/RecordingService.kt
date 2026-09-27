@@ -28,6 +28,7 @@ import com.isper.mobile.MainActivity
 import com.isper.mobile.R
 import com.isper.mobile.core.Recorder
 import com.isper.mobile.sync.PcSync
+import com.isper.mobile.transcribe.LocalTranscribe
 import java.util.concurrent.Executors
 import kotlin.math.sqrt
 
@@ -287,7 +288,12 @@ class RecordingService : Service() {
         // Pareado com um PC, a gravação vai para ele (Fase 9.3). Só depois do
         // cleanup: enquanto o RecorderBus diz "gravando", a rodada deixa esta
         // gravação de fora (e era isso que acontecia quando ela começava rápido).
-        if (saved) PcSync.syncSoon(this)
+        if (saved) {
+            PcSync.syncSoon(this)
+            // Sem PC por perto, o próprio celular transcreve (Fase 9.4): por
+            // padrão, quando estiver na tomada.
+            LocalTranscribe.schedule(this)
+        }
     }
 
     private fun cleanup() {

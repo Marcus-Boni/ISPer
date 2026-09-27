@@ -29,6 +29,7 @@ import com.isper.mobile.library.LibraryViewModel
 import com.isper.mobile.library.MinutesScreen
 import com.isper.mobile.recording.RecordScreen
 import com.isper.mobile.recording.RecorderBus
+import com.isper.mobile.transcribe.SettingsScreen
 
 /** Os três destinos do app, na ordem da barra de baixo. */
 private data class Destination(val label: Int, val icon: Int)
@@ -50,6 +51,8 @@ fun IsperApp(
     onMinutes: (String?) -> Unit,
 ) {
     val snackbars = remember { SnackbarHostState() }
+    // Os Ajustes (Fase 9.4), abertos pela engrenagem da Biblioteca.
+    var settings by rememberSaveable { mutableStateOf(false) }
     val undoLabel = stringResource(R.string.undo)
     LaunchedEffect(Unit) {
         library.notices.collect { notice ->
@@ -90,7 +93,9 @@ fun IsperApp(
                 val state by library.state.collectAsStateWithLifecycle()
                 // A ata aberta (pela Biblioteca ou pela notificação "Ata pronta").
                 val open = minutesId?.let { id -> state.recordings.firstOrNull { it.id == id && it.minutesPath != null } }
-                if (open != null) {
+                if (settings) {
+                    SettingsScreen(onBack = { settings = false; library.refresh() }, modifier = modifier)
+                } else if (open != null) {
                     MinutesScreen(info = open, onBack = { onMinutes(null) }, modifier = modifier)
                 } else {
                     LibraryScreen(
@@ -101,6 +106,7 @@ fun IsperApp(
                             onTab(MainActivity.TAB_LAB)
                         },
                         onOpenMinutes = { info -> onMinutes(info.id) },
+                        onOpenSettings = { settings = true },
                         modifier = modifier,
                     )
                 }

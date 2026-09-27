@@ -122,6 +122,33 @@ function Invoke-UiTap {
   return $false
 }
 
+# O texto de um no (pelo testTag), ou $null.
+function Get-UiText([string]$Tag) {
+  Adb shell uiautomator dump /sdcard/isper-ui.xml 2>$null | Out-Null
+  $xml = (Adb shell cat /sdcard/isper-ui.xml 2>$null) -join ''
+  $m = [regex]::Match($xml, "<node[^>]*?text=""([^""]*)""[^>]*?resource-id=""$Tag""")
+  if ($m.Success) { return [System.Net.WebUtility]::HtmlDecode($m.Groups[1].Value) }
+  return $null
+}
+
+# Le o texto ate a condicao valer (ou o prazo acabar) e devolve o ultimo lido.
+function Wait-UiText([string]$Tag, [scriptblock]$Cond = { param($t) $t }, [int]$Secs = 60) {
+  $deadline = (Get-Date).AddSeconds($Secs)
+  $t = $null
+  while ((Get-Date) -lt $deadline) {
+    $t = Get-UiText $Tag
+    if ($null -ne $t -and (& $Cond $t)) { return $t }
+    Start-Sleep -Milliseconds 800
+  }
+  return $t
+}
+
+# Abre o app numa aba (0 Gravar, 1 Biblioteca, 2 Laboratorio).
+function Open-Tab([int]$Tab) {
+  Adb shell am start -n "$script:Pkg/.MainActivity" --ei com.isper.mobile.ABA $Tab 2>$null | Out-Null
+  Start-Sleep -Seconds 2
+}
+
 function Start-IsperApp {
   Adb shell am start -n "$script:Pkg/.MainActivity" 2>$null | Out-Null
   Start-Sleep -Seconds 2

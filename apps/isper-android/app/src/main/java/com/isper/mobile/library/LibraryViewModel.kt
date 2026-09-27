@@ -13,12 +13,15 @@ import com.isper.mobile.core.RecordingInfo
 import com.isper.mobile.core.deleteRecording
 import com.isper.mobile.core.importRecording
 import com.isper.mobile.core.listRecordings
+import com.isper.mobile.core.retryLocal as retryLocalRecording
 import com.isper.mobile.core.retryRecording
 import com.isper.mobile.recording.RecEvent
 import com.isper.mobile.recording.RecorderBus
 import com.isper.mobile.recording.Storage
 import com.isper.mobile.recording.formatDuration
 import com.isper.mobile.sync.PcSync
+import com.isper.mobile.transcribe.LocalSetup
+import com.isper.mobile.transcribe.LocalTranscribe
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,6 +45,8 @@ data class LibraryState(
     val pendingDelete: Set<String> = emptySet(),
     /** O pareamento com o PC em andamento (Fase 9.3). */
     val pair: PairUi = PairUi.Idle,
+    /** Como o celular transcreve sozinho (Fase 9.4). */
+    val local: LocalSetup? = null,
 )
 
 /** Um aviso de rodapé, com "Desfazer" quando é uma exclusão. */
@@ -70,11 +75,16 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     val sending = PcSync.sending
     val lastError = PcSync.lastError
 
+    /** A transcrição no celular em andamento (Fase 9.4). */
+    val localRunning = LocalTranscribe.running
+
     init {
         PcSync.link(context)
         refresh()
         // Uma rodada de sincronia terminou: os estados "no PC" mudaram.
         viewModelScope.launch { PcSync.changed.collect { refresh() } }
+        // Uma ata ficou pronta no celular (ou a transcrição falhou).
+        viewModelScope.launch { LocalTranscribe.changed.collect { refresh() } }
         viewModelScope.launch {
             RecorderBus.events.collect { event ->
                 when (event) {
@@ -91,10 +101,10 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun refresh() {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { listRecordings(dir.path, RecorderBus.activeId) }
+                runCatching { listRecordings(dir.path, RecorderBus.activeId) to LocalTranscribe.setup(context) }
             }
-            result.onSuccess { list ->
-                _state.update { it.copy(recordings = list.recordings, loading = false) }
+            result.onSuccess { (list, local) ->
+                _state.update { it.copy(recordings = list.recordings, loading = false, local = local) }
                 list.recovered.forEach { r ->
                     notice(context.getString(R.string.lib_recovered, formatDuration(r.durationSecs ?: 0.0)))
                 }
@@ -129,6 +139,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                 refresh()
                 notice(context.getString(R.string.lib_imported, info.sourceName ?: info.id))
                 PcSync.syncSoon(context)
+                LocalTranscribe.schedule(context)
             }.onFailure { e -> notice(e.message ?: e.javaClass.simpleName) }
         }
     }
@@ -254,6 +265,21 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         retryRecording(dir.path, info.id)
         refresh()
         PcSync.syncSoon(context)
+    }
+
+    // ------------------------------------------- no celular (Fase 9.4)
+
+    /** "Transcrever agora": o que falta, já, na bateria mesmo. */
+    fun transcribeNow() {
+        LocalTranscribe.schedule(context, now = true)
+        notice(context.getString(R.string.lib_transcribe_now_started))
+    }
+
+    /** A transcrição no celular que falhou volta para a fila. */
+    fun retryLocal(info: RecordingInfo) {
+        runCatching { retryLocalRecording(dir.path, info.id) }
+        refresh()
+        LocalTranscribe.schedule(context)
     }
 
     override fun onCleared() {
