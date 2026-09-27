@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -199,7 +200,7 @@ private fun RecordingCard(
                 }
                 if (info.moments.isNotEmpty()) Chip("★ ${info.moments.size}", MaterialTheme.colorScheme.onSurfaceVariant)
                 if (silenced > 0) {
-                    Chip(stringResource(R.string.lib_chip_silenced, silenced), MaterialTheme.colorScheme.onSurfaceVariant)
+                    Chip(pluralStringResource(R.plurals.lib_chip_silenced, silenced, silenced), MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (info.state != RecordingState.RECORDING) {
                     LocalChip(info, local, localRunning)
@@ -250,7 +251,10 @@ private fun RecordingCard(
                 )
             }
             if (expanded && info.state != RecordingState.RECORDING) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Numa fileira fixa, o último botão era espremido até o texto
+                // quebrar letra por letra ("Apagar" na tela de 360 dp do S21
+                // FE). Aqui o botão que não cabe desce inteiro.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(onClick = { actions.togglePlay(info) }) {
                         Text(stringResource(if (playing) R.string.lib_stop_playing else R.string.lib_play))
                     }

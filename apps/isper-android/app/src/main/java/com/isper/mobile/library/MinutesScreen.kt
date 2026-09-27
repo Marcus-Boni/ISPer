@@ -8,8 +8,9 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,6 +42,7 @@ import java.io.File
  * Mostra o Markdown que o PC escreveu (títulos, citações, listas e o
  * **negrito** dos falantes) e o manda para outro app por "Compartilhar".
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MinutesScreen(info: RecordingInfo, onBack: () -> Unit, modifier: Modifier = Modifier) {
     BackHandler(onBack = onBack)
@@ -62,7 +64,7 @@ fun MinutesScreen(info: RecordingInfo, onBack: () -> Unit, modifier: Modifier = 
                     Text("← " + stringResource(R.string.minutes_back))
                 }
                 Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag("ata-titulo"))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { shareText(context, title, markdown) }, modifier = Modifier.testTag("compartilhar-ata")) {
                         Text(stringResource(R.string.minutes_share))
                     }

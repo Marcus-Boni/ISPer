@@ -105,7 +105,10 @@
     <string name="lib_chip_imported">Importada</string>
     <string name="lib_chip_imported_from">De %1$s</string>
     <string name="lib_chip_recording">Gravando</string>
-    <string name="lib_chip_silenced">%1$d trecho(s) silenciado(s)</string>
+    <plurals name="lib_chip_silenced">
+        <item quantity="one">%1$d trecho silenciado</item>
+        <item quantity="other">%1$d trechos silenciados</item>
+    </plurals>
     <string name="lib_play">Ouvir</string>
     <string name="lib_stop_playing">Parar</string>
     <string name="lib_share">Compartilhar</string>
@@ -138,7 +141,10 @@
     <string name="sync_pair_failed">Não deu para parear: %1$s</string>
     <string name="sync_connected">Conectado a %1$s</string>
     <string name="sync_sending">Enviando… %1$d%%</string>
-    <string name="sync_unreachable">O PC não está ao alcance; %1$d gravação(ões) vão quando ele estiver.</string>
+    <plurals name="sync_unreachable">
+        <item quantity="one">O PC não está ao alcance; %1$d gravação vai quando ele estiver.</item>
+        <item quantity="other">O PC não está ao alcance; %1$d gravações vão quando ele estiver.</item>
+    </plurals>
     <string name="sync_all_sent">Tudo enviado.</string>
     <string name="sync_send_now">Enviar agora</string>
     <string name="sync_sending_now">Procurando o PC…</string>

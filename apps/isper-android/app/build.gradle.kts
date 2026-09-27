@@ -40,8 +40,8 @@ android {
         // celular pareado: o minor diz a etapa (0.1 laboratório da 9.1, 0.2
         // gravador da 9.2, 0.3 sincronia da 9.3, 0.4 transcrição da 9.4), e o
         // patch, as correções.
-        versionCode = 5
-        versionName = "0.4.0-transcricao"
+        versionCode = 6
+        versionName = "0.4.1-transcricao"
         ndk { abiFilters += rustAbis }
     }
 

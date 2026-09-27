@@ -2,6 +2,8 @@ package com.isper.mobile.library
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -63,6 +65,7 @@ sealed interface PairUi {
  * O topo da Biblioteca: sem PC, o convite para parear; com PC, o estado da
  * sincronia e "Enviar agora".
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PcCard(
     pc: PcInfo?,
@@ -88,7 +91,7 @@ fun PcCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
                             scanQr(context, onCode = actions::startPair, onError = actions::notice)
@@ -108,7 +111,7 @@ fun PcCard(
                 )
                 val line = when {
                     sending != null -> stringResource(R.string.sync_sending, (sending.fraction * 100).toInt())
-                    lastError != null && unsent > 0 -> stringResource(R.string.sync_unreachable, unsent)
+                    lastError != null && unsent > 0 -> plural(R.plurals.sync_unreachable, unsent)
                     waiting > 0 -> plural(R.plurals.sync_waiting, waiting)
                     unsent > 0 -> plural(R.plurals.sync_unsent, unsent)
                     else -> stringResource(R.string.sync_all_sent)
@@ -122,7 +125,7 @@ fun PcCard(
                 if (sending != null) {
                     LinearProgressIndicator(progress = { sending.fraction }, modifier = Modifier.fillMaxWidth())
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = actions::sendNow, modifier = Modifier.testTag("enviar-agora")) {
                         Text(stringResource(R.string.sync_send_now))
                     }
