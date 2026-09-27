@@ -16,8 +16,8 @@ mod polish;
 mod providers;
 mod settings;
 mod summary;
-#[cfg(test)]
-pub(crate) mod testing;
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
 
 pub use copilot::{
     CardKind, CardStatus, CardUrgency, CopilotAnalysis, CopilotCard, CopilotInput, TriggerKind,

@@ -1,7 +1,11 @@
-//! Provider falso para os testes do crate: nenhuma rede, resposta sob controle
-//! e registro de tudo que foi pedido — assim resumo, título, polimento e
+//! Provider falso para os testes: nenhuma rede, resposta sob controle e
+//! registro de tudo que foi pedido — assim resumo, título, polimento e
 //! insights são testados de ponta a ponta (prompt → chamada → pós-processamento)
 //! sem chave de API nem provider real.
+//!
+//! Os testes do crate o usam direto; quem depende do `isper-llm` liga a
+//! feature `testing` nas `dev-dependencies` (o app testa assim o resumo que
+//! refaz depois do passe final).
 
 use std::sync::Mutex;
 
@@ -12,28 +16,26 @@ type Reply = Box<dyn Fn(&str, &str) -> Result<String> + Send + Sync>;
 
 /// Um [`LlmProvider`] de mentira: responde o que o teste mandar (texto fixo,
 /// erro ou uma função do prompt) e guarda cada par `(system, user)` recebido.
-pub(crate) struct FakeProvider {
+pub struct FakeProvider {
     reply: Reply,
     calls: Mutex<Vec<(String, String)>>,
 }
 
 impl FakeProvider {
     /// Responde sempre o mesmo texto.
-    pub(crate) fn replying(text: &str) -> Self {
+    pub fn replying(text: &str) -> Self {
         let text = text.to_string();
         Self::with(move |_, _| Ok(text.clone()))
     }
 
     /// Falha sempre com o erro construído por `err` (o `LlmError` não é
     /// clonável, por isso uma função).
-    pub(crate) fn failing(err: impl Fn() -> LlmError + Send + Sync + 'static) -> Self {
+    pub fn failing(err: impl Fn() -> LlmError + Send + Sync + 'static) -> Self {
         Self::with(move |_, _| Err(err()))
     }
 
     /// Resposta calculada a partir do prompt `(system, user)`.
-    pub(crate) fn with(
-        reply: impl Fn(&str, &str) -> Result<String> + Send + Sync + 'static,
-    ) -> Self {
+    pub fn with(reply: impl Fn(&str, &str) -> Result<String> + Send + Sync + 'static) -> Self {
         Self {
             reply: Box::new(reply),
             calls: Mutex::new(Vec::new()),
@@ -41,7 +43,7 @@ impl FakeProvider {
     }
 
     /// Todas as chamadas recebidas, na ordem: `(system, user)`.
-    pub(crate) fn calls(&self) -> Vec<(String, String)> {
+    pub fn calls(&self) -> Vec<(String, String)> {
         self.calls
             .lock()
             .expect("registro do provider falso")
@@ -49,7 +51,7 @@ impl FakeProvider {
     }
 
     /// A única chamada recebida — o caso comum; falha se houve 0 ou 2+.
-    pub(crate) fn single_call(&self) -> (String, String) {
+    pub fn single_call(&self) -> (String, String) {
         let calls = self.calls();
         assert_eq!(
             calls.len(),

@@ -115,6 +115,27 @@ pub(crate) fn meeting_markdown(detail: &MeetingDetail, summary: Option<&str>) ->
     md
 }
 
+/// O texto que vai ao provedor do resumo, a partir do banco: falas, momentos
+/// e decisões validadas — o mesmo que o fim da reunião manda. Sem o resumo
+/// anterior, que era de outro texto, e sem as notas: elas são rascunho do
+/// usuário e só saem da máquina quando ele pede.
+pub(crate) fn summary_input(detail: &MeetingDetail) -> String {
+    let mut md = meeting::render_markdown(
+        &detail.meeting.title,
+        &detail.meeting.started_at,
+        detail.meeting.duration_secs,
+        &segment_refs(detail),
+        None,
+        &detail.moments,
+    );
+    meeting::append_copilot_sections(
+        &mut md,
+        decisions_markdown(&detail.decisions).as_deref(),
+        None,
+    );
+    md
+}
+
 /// Regrava o Markdown da reunião a partir do banco (fonte única): título,
 /// falantes, resumo, decisões e notas sempre iguais aos da Biblioteca. Falha
 /// só vai ao log — o banco já está certo.
@@ -305,6 +326,20 @@ mod tests {
         let m = isper_core::import::parse_markdown("r.md", &md).expect("importa");
         assert_eq!(m.source_name.as_deref(), Some("Com fornecedor.m4a"));
         assert!(!meeting_markdown(&detalhe(None, None), None).contains("Importada do arquivo"));
+    }
+
+    #[test]
+    fn texto_do_resumo_leva_as_decisoes_mas_nao_as_notas_nem_o_resumo_anterior() {
+        let texto = summary_input(&detalhe(
+            Some("## Resumo\nDo ao vivo."),
+            Some("- ligar para o jurídico"),
+        ));
+        assert!(texto.contains("Fechamos em quarenta mil."));
+        assert!(texto.contains(meeting::COPILOT_DECISIONS_HEADING));
+        assert!(texto.contains("**Preço de 40 mil**"));
+        assert!(!texto.contains(meeting::NOTES_HEADING));
+        assert!(!texto.contains("ligar para o jurídico"));
+        assert!(!texto.contains("Do ao vivo."));
     }
 
     #[test]

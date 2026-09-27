@@ -254,15 +254,19 @@ pub(crate) fn finish_meeting(
     attach_saved_meeting(app, &copilot, &store, meeting_id);
 
     // Fase 5: título + resumo por IA de nuvem, numa chamada — só o TEXTO do
-    // transcript (com as decisões validadas) sai da máquina.
-    if let Some(t) = summarize_saved(&store, meeting_id, &para_resumo, true, || {
+    // transcript (com as decisões validadas) sai da máquina. É o resumo
+    // provisório, do texto ao vivo, para haver um na hora: o passe final o
+    // refaz sobre a transcrição oficial (ver `final_pass::refresh_derived`).
+    let rename_from = Some(title.as_str());
+    if let Some(t) = summarize_saved(&store, meeting_id, &para_resumo, rename_from, || {
         let _ = app.emit("isper-state", json!({"state": "meeting-summary"}));
     }) {
         title = t;
     }
 
     // Busca semântica: transcript + resumo viram vetores em segundo plano
-    // (só com provider de embeddings configurado).
+    // (só com provider de embeddings configurado). Também provisórios: o
+    // passe final descarta estes vetores e indexa o texto dele.
     index_meeting_background(app, meeting_id);
 
     // O que fazer com a reunião pronta: notificar (padrão), abrir o .md ou nada.
@@ -293,8 +297,10 @@ pub(crate) fn finish_meeting(
 
     // Passe final: a transcrição oficial, refeita sobre o áudio inteiro em
     // segundo plano (VAD, beam search, quem falou o quê). Quando termina,
-    // substitui a transcrição ao vivo no banco e regrava o `.md`.
-    final_pass::run_in_background(app.clone(), meeting_id, result);
+    // substitui a transcrição ao vivo no banco, regrava o `.md` e refaz o
+    // resumo e a busca. O título vai junto: é o que o app pôs, e só ele pode
+    // dar lugar ao título da IA.
+    final_pass::run_in_background(app.clone(), meeting_id, result, title);
 
     Ok(md_path.display().to_string())
 }
@@ -304,15 +310,16 @@ pub(crate) fn finish_meeting(
 /// transcrição já está salva.
 ///
 /// Com resposta, o resumo vai para o banco e o Markdown é regravado inteiro
-/// a partir dele — a fonte que a Biblioteca usa. Com `rename`, o título
-/// também passa a ser o da IA; `on_start` roda quando há provedor, antes da
-/// chamada (a tela avisa que o resumo está saindo). Devolve o título novo,
-/// quando ele mudou.
+/// a partir dele — a fonte que a Biblioteca usa. Com `rename_from`, o título
+/// também passa a ser o da IA, se o da reunião ainda for esse — o que o app
+/// pôs; o que o usuário escolheu à mão nunca é trocado. `on_start` roda
+/// quando há provedor, antes da chamada (a tela avisa que o resumo está
+/// saindo). Devolve o título novo, quando ele mudou.
 pub(crate) fn summarize_saved(
     store: &isper_core::store::MeetingStore,
     meeting_id: i64,
     text: &str,
-    rename: bool,
+    rename_from: Option<&str>,
     on_start: impl FnOnce(),
 ) -> Option<String> {
     let settings = isper_llm::load_settings();
@@ -328,7 +335,18 @@ pub(crate) fn summarize_saved(
         }
     };
     on_start();
-    let summary = match isper_llm::summarize_meeting_titled(provider.as_ref(), text) {
+    summarize_with(store, provider.as_ref(), meeting_id, text, rename_from)
+}
+
+/// [`summarize_saved`] com o provedor já em mãos (os testes passam um falso).
+fn summarize_with(
+    store: &isper_core::store::MeetingStore,
+    provider: &dyn isper_llm::LlmProvider,
+    meeting_id: i64,
+    text: &str,
+    rename_from: Option<&str>,
+) -> Option<String> {
+    let summary = match isper_llm::summarize_meeting_titled(provider, text) {
         Ok(s) => s,
         Err(e) => {
             tracing::warn!("resumo falhou (transcript preservado): {e}");
@@ -336,15 +354,18 @@ pub(crate) fn summarize_saved(
         }
     };
     let mut renamed = None;
-    if rename
+    if let Some(expected) = rename_from
         && let Some(t) = summary
             .title
             .as_deref()
             .map(str::trim)
             .filter(|t| !t.is_empty())
     {
-        let _ = store.rename_meeting(meeting_id, t);
-        renamed = Some(t.to_string());
+        match store.rename_meeting_if(meeting_id, expected, t) {
+            Ok(true) => renamed = Some(t.to_string()),
+            Ok(false) => tracing::info!(meeting_id, "título escolhido pelo usuário mantido"),
+            Err(e) => tracing::warn!(meeting_id, "não consegui trocar o título: {e}"),
+        }
     }
     let _ = store.set_summary(meeting_id, summary.body.trim());
     // Pelo banco, e não montado aqui: enquanto o resumo saía, o usuário pode
@@ -456,4 +477,147 @@ pub(crate) fn mark_moment(app: &AppHandle) -> anyhow::Result<f32> {
 #[tauri::command]
 pub(crate) fn mark_moment_cmd(app: AppHandle) -> Result<f32, String> {
     mark_moment(&app).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use isper_core::meeting::{ChannelAudio, MeetingResult, Speaker};
+    use isper_core::store::{MeetingStore, StoredDecision};
+    use isper_llm::testing::FakeProvider;
+
+    const TITULO_PADRAO: &str = "Reunião de 27/09/2026 10:00";
+
+    /// Uma reunião como o passe final a encontra: salva com o texto ao vivo,
+    /// com título e resumo provisórios da IA, uma decisão validada e notas
+    /// do usuário — e já com a transcrição final no lugar.
+    fn reuniao_com_transcricao_final(nome: &str) -> (MeetingStore, i64, PathBuf) {
+        let dir =
+            std::env::temp_dir().join(format!("isper-resumo-final-{nome}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let md = dir.join("reuniao.md");
+        let store = MeetingStore::open(&dir.join("isper.db")).unwrap();
+        let ao_vivo = MeetingResult {
+            segments: vec![MeetingSegment {
+                speaker: Speaker::Others,
+                start_secs: 0.0,
+                end_secs: 3.0,
+                text: "fechamos em quarenta mio".into(),
+            }],
+            duration_secs: 60.0,
+            others_audio: ChannelAudio::empty(),
+            me_audio: ChannelAudio::empty(),
+            forced_cuts: 0,
+        };
+        let id = store
+            .save(
+                TITULO_PADRAO,
+                "27/09/2026 10:00",
+                &ao_vivo,
+                Some(&md.to_string_lossy()),
+            )
+            .unwrap();
+        let provisorio = FakeProvider::replying("TÍTULO: Provisório\n\n## Resumo\nDo ao vivo.");
+        assert_eq!(
+            summarize_with(&store, &provisorio, id, "ao vivo", Some(TITULO_PADRAO)).as_deref(),
+            Some("Provisório")
+        );
+        store
+            .save_decisions(
+                id,
+                &[StoredDecision {
+                    kind: "decision".into(),
+                    title: "Preço de 40 mil".into(),
+                    description: "Aprovado pelo cliente".into(),
+                    owner: None,
+                    due_date: None,
+                    urgency: "high".into(),
+                    at_secs: 1.0,
+                }],
+            )
+            .unwrap();
+        store.set_notes(id, "- ligar para o jurídico").unwrap();
+        store
+            .replace_segments(
+                id,
+                &[(
+                    "Participante 1".to_string(),
+                    0.0,
+                    3.0,
+                    "Fechamos em quarenta mil.".to_string(),
+                )],
+            )
+            .unwrap();
+        (store, id, md)
+    }
+
+    fn detalhe(store: &MeetingStore, id: i64) -> isper_core::store::MeetingDetail {
+        store.get_meeting(id).unwrap().expect("a reunião existe")
+    }
+
+    #[test]
+    fn resumo_final_substitui_o_provisorio_com_as_decisoes_e_sem_as_notas() {
+        let (store, id, md) = reuniao_com_transcricao_final("substitui");
+        let ia = FakeProvider::replying("TÍTULO: Fechamento do contrato\n\n## Resumo\nDo final.");
+        let texto = summary_input(&detalhe(&store, id));
+        assert_eq!(
+            summarize_with(&store, &ia, id, &texto, Some("Provisório")).as_deref(),
+            Some("Fechamento do contrato")
+        );
+
+        // O que saiu da máquina: o texto final e a decisão validada; nem as
+        // notas, nem o resumo do ao vivo.
+        let (_, enviado) = ia.single_call();
+        assert!(enviado.contains("Fechamos em quarenta mil."));
+        assert!(!enviado.contains("quarenta mio"));
+        assert!(enviado.contains("Preço de 40 mil"));
+        assert!(!enviado.contains("ligar para o jurídico"));
+        assert!(!enviado.contains("Do ao vivo."));
+
+        let d = detalhe(&store, id);
+        assert_eq!(d.meeting.title, "Fechamento do contrato");
+        assert_eq!(d.summary.as_deref(), Some("## Resumo\nDo final."));
+        // A ata acompanha: resumo novo assinado, e as notas continuam nela.
+        let ata = std::fs::read_to_string(&md).unwrap();
+        assert!(ata.contains("Do final."));
+        assert!(ata.contains("_Resumo gerado via fake (fake-1)._"));
+        assert!(!ata.contains("Do ao vivo."));
+        assert!(ata.contains("ligar para o jurídico"));
+    }
+
+    #[test]
+    fn resumo_final_nao_troca_o_titulo_que_o_usuario_escolheu() {
+        let (store, id, md) = reuniao_com_transcricao_final("renomeada");
+        store.rename_meeting(id, "Com o João").unwrap();
+        let ia = FakeProvider::replying("TÍTULO: Fechamento do contrato\n\n## Resumo\nDo final.");
+        let texto = summary_input(&detalhe(&store, id));
+        assert_eq!(
+            summarize_with(&store, &ia, id, &texto, Some("Provisório")),
+            None
+        );
+        let d = detalhe(&store, id);
+        assert_eq!(d.meeting.title, "Com o João");
+        assert_eq!(d.summary.as_deref(), Some("## Resumo\nDo final."));
+        assert!(
+            std::fs::read_to_string(&md)
+                .unwrap()
+                .starts_with("# Com o João\n")
+        );
+    }
+
+    #[test]
+    fn falha_da_ia_no_resumo_final_mantem_o_provisorio() {
+        let (store, id, _) = reuniao_com_transcricao_final("falha");
+        let ia = FakeProvider::failing(|| isper_llm::LlmError::Http("status 429".into()));
+        let texto = summary_input(&detalhe(&store, id));
+        assert_eq!(
+            summarize_with(&store, &ia, id, &texto, Some("Provisório")),
+            None
+        );
+        let d = detalhe(&store, id);
+        assert_eq!(d.meeting.title, "Provisório");
+        assert_eq!(d.summary.as_deref(), Some("## Resumo\nDo ao vivo."));
+        assert_eq!(d.segments[0].text, "Fechamos em quarenta mil.");
+    }
 }

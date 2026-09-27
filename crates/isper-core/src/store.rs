@@ -789,6 +789,18 @@ impl MeetingStore {
         Ok(())
     }
 
+    /// Troca o título só se ele ainda for `expected` — o que o app pôs. É o
+    /// caminho do título da IA: se o usuário renomeou a reunião à mão nesse
+    /// meio-tempo, o nome dele fica. Numa instrução só, para não haver
+    /// janela entre conferir e trocar. Devolve se trocou.
+    pub fn rename_meeting_if(&self, meeting_id: i64, expected: &str, title: &str) -> Result<bool> {
+        let n = self.conn.execute(
+            "UPDATE meetings SET title = ?1 WHERE id = ?2 AND title = ?3",
+            params![title.trim(), meeting_id, expected],
+        )?;
+        Ok(n > 0)
+    }
+
     /// Aplica rótulos de falante segmento a segmento (casados pelo início, com
     /// tolerância) — usado quando a diarização termina em segundo plano, depois
     /// de a reunião já estar salva com "Participantes". Devolve quantos mudaram.
@@ -1073,6 +1085,11 @@ impl MeetingStore {
     /// palavra. Quando ele termina, a transcrição oficial é a dele — numa
     /// transação, para a Biblioteca nunca ver meia reunião.
     ///
+    /// Os vetores da busca semântica da reunião saem na mesma transação:
+    /// eram do texto antigo, e trechos que não existem mais não podem voltar
+    /// numa busca. Sem vetor, a reunião volta a contar como não indexada, e
+    /// o "Indexar tudo" a pega se a reindexação do app falhar.
+    ///
     /// Devolve quantos segmentos ficaram no lugar.
     pub fn replace_segments(
         &self,
@@ -1087,6 +1104,10 @@ impl MeetingStore {
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
             "DELETE FROM segments WHERE meeting_id = ?1",
+            params![meeting_id],
+        )?;
+        tx.execute(
+            "DELETE FROM embeddings WHERE kind = 'meeting' AND ref_id = ?1",
             params![meeting_id],
         )?;
         {
@@ -2520,6 +2541,78 @@ Curto.",
         // é sempre melhor que nenhuma.
         assert!(store.replace_segments(id, &[]).is_err());
         assert_eq!(segmentos(&store).len(), 2);
+    }
+
+    #[test]
+    fn passe_final_descarta_os_vetores_do_texto_antigo() {
+        // Os vetores eram do ao vivo: se a reindexação falhar, a reunião tem
+        // de aparecer como não indexada para o "Indexar tudo" refazê-la, e não
+        // devolver numa busca um trecho que já não existe.
+        let store = temp_store("replace-embed");
+        let id = store
+            .save("Reunião", "09/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        let outra = store
+            .save("Outra", "09/09/2026 11:00", &sample_result(), None)
+            .unwrap();
+        let ditado = store
+            .save_dictation("09/09/2026 12:00:00", "comprar pão", None, 1.0, 0.1)
+            .unwrap();
+        for (kind, ref_id) in [("meeting", id), ("meeting", outra), ("dictation", ditado)] {
+            store
+                .replace_embeddings(kind, ref_id, "fake/m", &[(Some(0.0), "olá", &[1.0])])
+                .unwrap();
+        }
+
+        // Passe final que falha não mexe em nada.
+        assert!(store.replace_segments(id, &[]).is_err());
+        assert_eq!(
+            store.embedded_ids("meeting", "fake/m").unwrap(),
+            vec![id, outra]
+        );
+
+        let finais = vec![("Eu".to_string(), 0.0f32, 2.0f32, "Olá.".to_string())];
+        store.replace_segments(id, &finais).unwrap();
+        assert_eq!(
+            store.embedded_ids("meeting", "fake/m").unwrap(),
+            vec![outra],
+            "só os vetores desta reunião saem"
+        );
+        assert_eq!(
+            store.embedded_ids("dictation", "fake/m").unwrap(),
+            vec![ditado]
+        );
+    }
+
+    #[test]
+    fn titulo_da_ia_nao_passa_por_cima_do_que_o_usuario_escolheu() {
+        let store = temp_store("rename-if");
+        let id = store
+            .save(
+                "Reunião de 09/09",
+                "09/09/2026 10:00",
+                &sample_result(),
+                None,
+            )
+            .unwrap();
+        let titulo = |store: &MeetingStore| store.meeting_row(id).unwrap().unwrap().title;
+
+        // Ainda com o título que o app pôs: troca.
+        assert!(
+            store
+                .rename_meeting_if(id, "Reunião de 09/09", " Kickoff ")
+                .unwrap()
+        );
+        assert_eq!(titulo(&store), "Kickoff");
+
+        // O usuário renomeou: o dele fica.
+        store.rename_meeting(id, "Com o João").unwrap();
+        assert!(
+            !store
+                .rename_meeting_if(id, "Kickoff", "Kickoff do projeto")
+                .unwrap()
+        );
+        assert_eq!(titulo(&store), "Com o João");
     }
 
     #[test]

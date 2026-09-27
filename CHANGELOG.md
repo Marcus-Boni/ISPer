@@ -27,6 +27,17 @@ bata com ela.
   ([ADR 0018](docs/adr/0018-transcricao-no-celular.md)).
 
 ### Corrigido
+- **O resumo por IA e a busca semântica passam a usar a transcrição final.**
+  Ao fim da reunião, o título, o resumo e os vetores da busca eram feitos
+  sobre a transcrição ao vivo e ficavam assim, mesmo depois de o passe final
+  trocá-la pela oficial, que erra bem menos (WER de 8,45% para 5,28% no
+  corpus). Agora o resumo da hora vale como provisório: quando o passe final
+  termina, o ISPer refaz o resumo sobre o texto final, com as decisões
+  validadas no Copilot e, como antes, sem as notas, e indexa a reunião de
+  novo para a busca. O título só muda se ainda for o que o ISPer deu: um
+  nome que você escolheu à mão fica. Se a IA falhar, o resumo provisório
+  continua no lugar. Com provedor de IA configurado, cada reunião gravada
+  passa a fazer duas chamadas de resumo em vez de uma.
 - **No celular, o microfone na barra de status fica só para a gravação em
   andamento.** As notificações "Gravação salva" e "Ata pronta" usavam o mesmo
   ícone de microfone da gravação, e, depois de parar, a barra de status
