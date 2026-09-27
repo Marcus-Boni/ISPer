@@ -168,4 +168,42 @@
     <string name="minutes_share_title">Compartilhar a ata</string>
     <string name="minutes_copy">Copiar</string>
     <string name="minutes_copied">Ata copiada</string>
+
+    <!-- Fase 9.4: a transcrição no próprio celular. -->
+    <string name="channel_transcribing">Transcrição no celular</string>
+    <string name="local_downloading_title">Baixando o modelo de transcrição</string>
+    <string name="local_downloading_text">%1$d%%</string>
+    <string name="local_transcribing_title">Transcrevendo no celular</string>
+    <string name="local_stage_reading">Lendo a gravação</string>
+    <string name="local_stage_transcribing">Transcrevendo: %1$d%%</string>
+    <string name="local_stage_speakers">Separando os falantes</string>
+    <string name="local_minutes_ready">Ata pronta (feita no celular)</string>
+    <string name="lib_local_running">No celular: %1$d%%</string>
+    <string name="lib_local_ready">Ata do celular</string>
+    <string name="lib_local_partial_charging">No celular: %1$d%% · continua ao carregar</string>
+    <string name="lib_local_partial">No celular: %1$d%% · continua</string>
+    <string name="lib_local_waiting_charge">Transcreve ao carregar</string>
+    <string name="lib_local_failed">Falhou no celular</string>
+    <string name="lib_transcribe_now">Transcrever agora</string>
+    <string name="lib_transcribe_now_started">Transcrevendo no celular. Acompanhe na notificação.</string>
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_back">Biblioteca</string>
+    <string name="settings_local_title">Transcrever no celular</string>
+    <string name="settings_local_intro">O celular transcreve as gravações que o PC ainda não recebeu, com o mesmo passe final do PC. Quando a ata do PC chega, ela substitui a do celular.</string>
+    <string name="settings_device">Este aparelho: %1$s de memória. %2$s.</string>
+    <string name="settings_when">Quando</string>
+    <string name="settings_mode_charging">Ao carregar (recomendado)</string>
+    <string name="settings_mode_charging_desc">Só com o celular na tomada: transcrever ocupa o processador por um bom tempo.</string>
+    <string name="settings_mode_now">Assim que a gravação termina</string>
+    <string name="settings_mode_now_desc">Na bateria mesmo. Uma reunião de 1 h leva mais de uma hora e gasta bateria.</string>
+    <string name="settings_mode_pc">Só no PC</string>
+    <string name="settings_mode_pc_desc">O celular só grava e manda para o PC pareado.</string>
+    <string name="settings_model">Modelo</string>
+    <string name="settings_model_auto">Automático: %1$s</string>
+    <string name="settings_model_size">%1$d MB</string>
+    <string name="settings_speakers">Separar os falantes no celular</string>
+    <string name="settings_speakers_desc">Mais ~45 MB de modelos e mais tempo. Sem isso, a ata do celular sai com “Participantes”, e a do PC traz os falantes.</string>
+    <string name="settings_models_on_device">Modelos no aparelho: %1$s</string>
+    <string name="settings_download_now">Baixar agora</string>
+    <string name="settings_delete_models">Apagar os modelos</string>
 </resources>
