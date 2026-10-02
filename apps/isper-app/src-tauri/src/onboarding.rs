@@ -1,7 +1,8 @@
-//! Primeira execução (fase 7.5): uma janela guiada — boas-vindas com idioma
-//! e tema, microfone com medidor de nível, modelo Whisper, atalho com um
-//! ditado de teste e IA opcional. Aparece uma vez: concluir, pular ou fechar
-//! a janela marcam `onboarding_done` e abrem a tela Início. Quem já usava o
+//! Primeira execução (fase 7.5): uma tela guiada, em tela cheia na janela
+//! principal — boas-vindas com idioma e tema, microfone com medidor de nível,
+//! modelo Whisper, atalho com um ditado de teste e IA opcional. Aparece uma
+//! vez: concluir, pular, fechar a janela ou sair dela marcam
+//! `onboarding_done`, e a janela segue no Início. Quem já usava o
 //! ISPer antes dela não a vê (migração 1 → 2 do `config.toml`); Configurações
 //! → Sistema a reabre.
 
@@ -20,8 +21,8 @@ const MIC_TEST_MAX: Duration = Duration::from_secs(60);
 /// Pedido de parada do teste de microfone em andamento (um por vez).
 static MIC_TEST: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
 
-/// Qual janela abre ao iniciar: a primeira configuração (uma vez), a tela
-/// Início (se o usuário não a desligou) ou nenhuma — no autostart o ISPer
+/// Com que tela a janela principal abre ao iniciar: a primeira configuração
+/// (uma vez), o Início (se o usuário não o desligou) ou nenhuma — no autostart o ISPer
 /// nasce quieto na bandeja.
 pub(crate) fn launch_window(cfg: &AppConfig, autostarted: bool) -> Option<&'static str> {
     if autostarted {
@@ -115,7 +116,7 @@ pub(crate) fn mic_test_start(app: AppHandle, device: Option<String>) {
         let device = device.filter(|d| !d.trim().is_empty());
         let result =
             isper_core::audio::monitor_input(device.as_deref(), MIC_TEST_MAX, &stop, |rms| {
-                let _ = app.emit_to(LABEL, "isper-mic-level", rms);
+                let _ = app.emit_to(MAIN, "isper-mic-level", rms);
             });
         {
             let mut slot = MIC_TEST.lock_or_recover();
@@ -141,7 +142,7 @@ pub(crate) fn mic_test_start(app: AppHandle, device: Option<String>) {
             );
         }
         let _ = app.emit_to(
-            LABEL,
+            MAIN,
             "isper-mic-end",
             json!({ "reason": reason, "message": message }),
         );
@@ -232,15 +233,12 @@ pub(crate) fn onboarding_set_provider(app: AppHandle, provider: String) -> Resul
     Ok(key_present)
 }
 
-/// Concluir ou pular: fecha a janela, e o fechamento marca a configuração
-/// como feita e abre a tela Início.
+/// Concluir ou pular: marca a configuração como feita e a janela vai para o
+/// Início, com o checklist do que faltou.
 #[tauri::command]
 pub(crate) fn onboarding_finish(app: AppHandle) {
-    if let Some(w) = app.get_webview_window(LABEL) {
-        let _ = w.close();
-    } else {
-        closed(&app);
-    }
+    mark_done(&app);
+    open_home(&app);
 }
 
 /// Reabre a primeira configuração (Configurações → Sistema).
@@ -250,10 +248,10 @@ pub(crate) async fn open_onboarding_window(app: AppHandle) -> Result<(), String>
     Ok(())
 }
 
-/// A janela fechou — pelo "Concluir", pelo "Pular" ou pelo × da barra de
-/// título: em qualquer caso a configuração não volta sozinha, e a tela
-/// Início (com o checklist do que faltou) assume.
-pub(crate) fn closed(app: &AppHandle) {
+/// A primeira configuração terminou — pelo "Concluir", pelo "Pular", pelo ×
+/// da janela ou saindo dela por outro caminho (a bandeja, uma notificação):
+/// em qualquer caso ela não volta sozinha.
+pub(crate) fn mark_done(app: &AppHandle) {
     mic_test_stop();
     match update_config(app, |c| c.onboarding_done = true) {
         Ok((previous, _)) if !previous.onboarding_done => {
@@ -262,7 +260,6 @@ pub(crate) fn closed(app: &AppHandle) {
         Ok(_) => {}
         Err(e) => tracing::warn!("não consegui gravar o fim da primeira configuração: {e}"),
     }
-    open_home(app);
 }
 
 #[cfg(test)]

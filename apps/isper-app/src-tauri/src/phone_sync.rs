@@ -216,7 +216,7 @@ impl Host for AppHost {
                 silent: false,
             },
             move || {
-                tauri::async_runtime::spawn(open_settings_window(app.clone()));
+                open_settings_section(&app, "celular");
             },
         );
         let app = self.app.clone();

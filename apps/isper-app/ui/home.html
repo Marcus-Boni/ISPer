@@ -7,12 +7,10 @@
 <script src="assets/i18n.js"></script>
 <link rel="stylesheet" href="assets/base.css">
 <style>
-  #b-settings .knob { fill: var(--panel); }
   body { display: grid; grid-template-rows: auto 1fr auto; height: 100vh; overflow: hidden; }
 
   /* ---- cabeçalho ---- */
-  .ver { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 2px 8px; }
-  .state { display: flex; align-items: center; gap: 8px; margin-left: 6px; font-size: 12.5px; color: var(--muted); transition: color var(--dur-3); }
+  .state { display: flex; align-items: center; gap: 8px; margin-left: 4px; font-size: 12.5px; color: var(--muted); transition: color var(--dur-3); }
   .state.meeting, .state.dictating { color: var(--ink); }
   .state.done { color: var(--good); }
   #statetext { transition: opacity var(--dur-2); }
@@ -121,25 +119,12 @@
 </head>
 <body class="atmos">
 <header class="bar">
-  <div class="brand">ISPer<span>.</span></div>
-  <span class="ver" id="ver">…</span>
+  <h1 class="page-title" data-i18n="shell.nav.home">Início</h1>
   <div class="state" id="state" role="status" aria-live="polite"><span class="dot" id="statedot"></span><span id="statetext" data-i18n="home.top.statetext">carregando…</span></div>
   <div class="spacer"></div>
   <button class="btn btn-ghost" id="b-indicator" aria-pressed="false" title="Mostrar o indicador flutuante (fica na tela até você ocultar)" data-i18n-attr="title:home.top.mostrar-indicador-flutuante-fica-tela.title">
     <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".45"/></svg>
     <span data-i18n="home.btn.indicator">Indicador</span>
-  </button>
-  <button class="btn btn-ghost" id="b-library">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h7.5A1.5 1.5 0 0 1 12 4v9.5H4.5A1.5 1.5 0 0 0 3 15z"/><path d="M3 12.5A1.5 1.5 0 0 1 4.5 11H12"/></svg>
-    <span data-i18n="home.btn.library">Biblioteca</span>
-  </button>
-  <button class="btn btn-ghost" id="b-settings">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 4.5h12M2 11.5h12"/><circle class="knob" cx="6" cy="4.5" r="1.9"/><circle class="knob" cx="10" cy="11.5" r="1.9"/></svg>
-    <span data-i18n="home.btn.settings">Configurações</span>
-  </button>
-  <button class="btn btn-ghost btn-icon theme-toggle" id="b-theme" type="button">
-    <svg class="ico-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2.9"/><path d="M8 1.6v1.5M8 12.9v1.5M1.6 8h1.5M12.9 8h1.5M3.5 3.5l1.1 1.1M11.4 11.4l1.1 1.1M3.5 12.5l1.1-1.1M11.4 4.6l1.1-1.1"/></svg>
-    <svg class="ico-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.3 9.7A5.5 5.5 0 0 1 6.3 2.7a5.5 5.5 0 1 0 7 7Z"/></svg>
   </button>
 </header>
 
@@ -246,7 +231,6 @@
   const { listen } = window.__TAURI__.event;
   const $ = (id) => document.getElementById(id);
   const { el, toast, countUp, fmtClock, fmtDur } = UI;
-  UI.themeToggle(document.getElementById('b-theme'));
   // Rótulos por valor da config, lidos na hora (o idioma pode mudar com a janela aberta).
   const LANG = { pt: () => t('home.lang.pt'), en: () => t('home.lang.en'), auto: () => t('home.lang.auto') };
   const SOURCE = { system: () => t('home.source.system'), teams: () => t('home.source.teams') };
@@ -261,7 +245,9 @@
   let dictation = null;      // 'recording' | 'transcribing' | 'done' | null — feedback ao vivo do ditado
   let firstRender = true;
 
-  const openSettings = () => invoke('open_settings_window').catch(e => toast(t('common.error', { e }), 'err'));
+  // Cada pendência leva direto à seção certa das Configurações.
+  const openSettings = (section = null) => invoke('open_settings_window', { section }).catch(e => toast(t('common.error', { e }), 'err'));
+  const settingsAt = (section) => () => openSettings(section);
   const openLibrary = (meeting = null) => invoke('open_library_window', { meeting }).catch(e => toast(t('common.error', { e }), 'err'));
 
   // ------------------------------------------------------------ render
@@ -415,7 +401,7 @@
       body.replaceChildren();
       const e = el('div', 'ins-empty');
       e.append(t('home.ins.connect'));
-      const b = el('button', 'btn btn-sm', t('home.ins.configure')); b.addEventListener('click', openSettings); e.appendChild(b);
+      const b = el('button', 'btn btn-sm', t('home.ins.configure')); b.addEventListener('click', settingsAt('inteligencia')); e.appendChild(b);
       body.appendChild(e);
       insightsSig = '';
       return;
@@ -560,15 +546,15 @@
 
   function renderTodo(st) {
     const e = st.engine, items = [];
-    if (e.kind === 'missing') items.push({ must: true, t: t('home.todo.model-t'), d: t('home.todo.model-d', { rec: st.gpu ? t('home.todo.model-gpu') : t('home.todo.model-cpu') }), a: t('home.todo.download-in-settings'), f: openSettings });
-    if (e.kind === 'failed') items.push({ must: true, t: t('home.todo.failed-t'), d: e.message, a: t('home.todo.see-models'), f: openSettings });
-    if (!st.shortcut || st.shortcut.startsWith('(')) items.push({ must: true, t: t('home.todo.shortcut-t'), d: t('home.todo.shortcut-d'), a: t('home.todo.shortcut-a'), f: openSettings });
+    if (e.kind === 'missing') items.push({ must: true, t: t('home.todo.model-t'), d: t('home.todo.model-d', { rec: st.gpu ? t('home.todo.model-gpu') : t('home.todo.model-cpu') }), a: t('home.todo.download-in-settings'), f: settingsAt('modelos') });
+    if (e.kind === 'failed') items.push({ must: true, t: t('home.todo.failed-t'), d: e.message, a: t('home.todo.see-models'), f: settingsAt('modelos') });
+    if (!st.shortcut || st.shortcut.startsWith('(')) items.push({ must: true, t: t('home.todo.shortcut-t'), d: t('home.todo.shortcut-d'), a: t('home.todo.shortcut-a'), f: settingsAt('ditado') });
     if (e.kind === 'ready' && st.stats.dictations === 0) items.push({ t: t('home.todo.first-dictation-t'), d: t('home.todo.first-dictation-d', { label: UI.keyLabel(st.shortcut) }) });
     if (st.stats.meetings === 0) items.push({ t: t('home.todo.first-meeting-t'), d: t('home.todo.first-meeting-d') });
-    if (!st.llm_provider) items.push({ t: t('home.todo.ai-t'), d: t('home.todo.ai-d'), a: t('home.ins.configure'), f: openSettings });
-    else if (!st.llm_key_present) items.push({ must: true, t: t('home.todo.key-t'), d: t('home.todo.key-d', { provider: PROVIDER[st.llm_provider] || st.llm_provider }), a: t('home.todo.key-a'), f: openSettings });
-    if (!st.diarize_installed) items.push({ t: t('home.todo.diar-t'), d: t('home.todo.diar-d'), a: t('home.todo.download-in-settings'), f: openSettings });
-    if (st.llm_provider && st.llm_key_present && !st.semantic_search && st.stats.meetings > 0) items.push({ t: t('home.todo.sem-t'), d: t('home.todo.sem-d'), a: t('home.todo.configure'), f: openSettings });
+    if (!st.llm_provider) items.push({ t: t('home.todo.ai-t'), d: t('home.todo.ai-d'), a: t('home.ins.configure'), f: settingsAt('inteligencia') });
+    else if (!st.llm_key_present) items.push({ must: true, t: t('home.todo.key-t'), d: t('home.todo.key-d', { provider: PROVIDER[st.llm_provider] || st.llm_provider }), a: t('home.todo.key-a'), f: settingsAt('inteligencia') });
+    if (!st.diarize_installed) items.push({ t: t('home.todo.diar-t'), d: t('home.todo.diar-d'), a: t('home.todo.download-in-settings'), f: settingsAt('reunioes') });
+    if (st.llm_provider && st.llm_key_present && !st.semantic_search && st.stats.meetings > 0) items.push({ t: t('home.todo.sem-t'), d: t('home.todo.sem-d'), a: t('home.todo.configure'), f: settingsAt('inteligencia') });
 
     const box = $('todo'), list = $('todo-list');
     const signature = items.map(i => i.t).join('|');
@@ -703,7 +689,6 @@
 
   function render(st) {
     current = st;
-    $('ver').textContent = 'v' + st.version;
     renderUpdate(st.update);
     renderCall(st);
     renderStatePill(st);
@@ -750,19 +735,14 @@
       refresh();
     }
   });
-  $('b-library').addEventListener('click', () => openLibrary());
   $('l-all').addEventListener('click', () => openLibrary());
-  $('b-settings').addEventListener('click', openSettings);
-  $('l-dictate').addEventListener('click', openSettings);
+  $('l-dictate').addEventListener('click', settingsAt('ditado'));
   $('l-folder').addEventListener('click', () => invoke('open_meetings_folder').catch(e => toast(t('common.error', { e }), 'err')));
   $('showhome').addEventListener('change', (ev) => {
     const show = ev.target.checked;
     invoke('set_show_home', { show })
       .then(() => toast(show ? t('home.showhome.on') : t('home.showhome.off'), 'ok'))
       .catch(e => toast(t('common.error', { e }), 'err'));
-  });
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') window.__TAURI__.window.getCurrentWindow().close();
   });
 
   // Feedback ao vivo do ditado: as teclas "afundam" enquanto o atalho está
