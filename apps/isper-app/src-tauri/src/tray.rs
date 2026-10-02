@@ -161,30 +161,23 @@ pub(crate) fn set_indicator_text(app: &AppHandle, visible: bool) {
     }
 }
 
-/// Ícone da bandeja com um ponto vermelho no canto (estado "gravando"),
-/// desenhado sobre o ícone normal — sem arquivo extra.
-pub(crate) fn recording_icon(base: &Image<'static>) -> Image<'static> {
-    let (w, h) = (base.width() as i32, base.height() as i32);
-    let mut rgba = base.rgba().to_vec();
-    let r = (w.min(h) as f32 * 0.30).max(2.0);
-    let (cx, cy) = (w as f32 - r - 1.0, h as f32 - r - 1.0);
-    for y in 0..h {
-        for x in 0..w {
-            let d = ((x as f32 + 0.5 - cx).powi(2) + (y as f32 + 0.5 - cy).powi(2)).sqrt();
-            let i = ((y * w + x) * 4) as usize;
-            if i + 3 >= rgba.len() {
-                continue;
-            }
-            if d <= r + 1.0 {
-                // borda escura fina para contraste em qualquer tema
-                rgba[i..i + 4].copy_from_slice(&[27, 15, 13, 255]);
-            }
-            if d <= r - 0.6 {
-                rgba[i..i + 4].copy_from_slice(&[240, 88, 72, 255]);
-            }
-        }
-    }
-    Image::new_owned(rgba, w as u32, h as u32)
+/// Os dois estados da bandeja: o ponto da marca é a luz de gravação.
+///
+/// Apagado enquanto o ISPer só espera, aceso na cor de gravação enquanto uma
+/// reunião grava. Antes, um ponto vermelho era pintado por cima do ícone do
+/// app — mas a marca agora já tem o seu, e pintar outro daria dois. Os pixels
+/// vêm prontos de `scripts/brand.py` em RGBA cru (32×32), o formato que
+/// `Image::new_owned` recebe, sem precisar do decodificador de PNG do Tauri.
+pub(crate) fn brand_tray_icons() -> (Image<'static>, Image<'static>) {
+    const SIDE: u32 = 32;
+    const IDLE: &[u8] = include_bytes!("../icons/tray.rgba");
+    const RECORDING: &[u8] = include_bytes!("../icons/tray-recording.rgba");
+    const _: () = assert!(IDLE.len() == (SIDE * SIDE * 4) as usize);
+    const _: () = assert!(RECORDING.len() == (SIDE * SIDE * 4) as usize);
+    (
+        Image::new_owned(IDLE.to_vec(), SIDE, SIDE),
+        Image::new_owned(RECORDING.to_vec(), SIDE, SIDE),
+    )
 }
 
 /// Troca o ícone e o tooltip da bandeja conforme a gravação de reunião.
