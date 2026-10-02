@@ -273,7 +273,9 @@ mod tests {
             ("index.html", include_str!("../../ui/index.html")),
             ("onboarding.html", include_str!("../../ui/onboarding.html")),
             ("copilot.html", include_str!("../../ui/copilot.html")),
+            ("app.html", include_str!("../../ui/app.html")),
             ("ui.js", include_str!("../../ui/assets/ui.js")),
+            ("shell.js", include_str!("../../ui/assets/shell.js")),
         ];
         let mut missing = Vec::new();
         for (name, src) in pages {

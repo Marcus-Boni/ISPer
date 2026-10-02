@@ -9,6 +9,7 @@ recompilar o app inteiro (o build com CUDA leva minutos).
     python tools/e2e/copilot-harness.py          # http://127.0.0.1:3112/copilot.html
                                                 # http://127.0.0.1:3112/library.html
                                                 # http://127.0.0.1:3112/home.html (só a barra)
+                                                # http://127.0.0.1:3112/app.html  (a janela principal)
 
 No console da página:
 
@@ -290,6 +291,8 @@ LIB_MOCK = r"""
 <script>
 /* --- Tauri de mentira para a Biblioteca: uma reuniao com decisoes. */
 (function () {
+  const shellState = {};
+  const emit = (name, payload) => (listeners[name] || []).forEach((cb) => cb({ payload }));
   const listeners = {};
   const SEGS = [
     ['Eu', 0, 6, 'Bom dia pessoal, queria fechar hoje o escopo da fase dois.'],
@@ -337,6 +340,20 @@ LIB_MOCK = r"""
           case 'list_meetings': return Promise.resolve([ROW, SEM_DECISOES]);
           case 'list_dictations': return Promise.resolve([]);
           case 'take_pending_meeting': return Promise.resolve(null);
+          // A janela principal (app.html): barra lateral e navegação.
+          case 'shell_status': return Promise.resolve(Object.assign({
+            version: '0.25.0', meeting_active: false, meeting_elapsed_secs: null, processing: false, update: null,
+            shortcut: 'Ctrl+Alt+Espaço', meeting_shortcut: 'Ctrl+Alt+M', mark_shortcut: 'Ctrl+Alt+K', copilot_shortcut: 'Ctrl+Alt+C',
+          }, shellState));
+          case 'shell_ready': return Promise.resolve({ view: 'home' });
+          case 'import_status': return Promise.resolve({ current: null });
+          case 'toggle_meeting_cmd':
+            shellState.meeting_active = !shellState.meeting_active;
+            shellState.meeting_elapsed_secs = shellState.meeting_active ? 0 : null;
+            return Promise.resolve(null);
+          case 'open_settings_window': emit('isper-nav', { view: 'settings', section: args.section || undefined }); return Promise.resolve(null);
+          case 'open_library_window': emit('isper-nav', { view: 'library' }); return Promise.resolve(null);
+          case 'open_home_window': emit('isper-nav', { view: 'home' }); return Promise.resolve(null);
           case 'embeddings_status': return Promise.resolve({ configured: false, key_present: false });
           case 'semantic_search': return Promise.resolve([]);
           // Como o app: grava a escolha e avisa as janelas (evento isper-ui).
@@ -361,6 +378,10 @@ LIB_MOCK = r"""
   };
   window.__lib = {
     decisions: () => DECISIONS,
+    // app.html: um pedido do app (bandeja, notificação) e a gravação.
+    nav(view, section) { emit('isper-nav', { view, section }); },
+    meeting(on, secs) { shellState.meeting_active = !!on; shellState.meeting_elapsed_secs = on ? (secs || 0) : null; emit('isper-status', null); },
+    update(v) { shellState.update = v || null; emit('isper-status', null); },
     // O tema mudou em outra janela (ou nas Configurações).
     theme(name) { (listeners['isper-ui'] || []).forEach((cb) => cb({ payload: { theme: name } })); return name; },
   };
@@ -397,14 +418,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         rota = self.path.split("?")[0]
         alvo = {"/": "copilot.html", "/copilot.html": "copilot.html",
-                "/library.html": "library.html", "/home.html": "home.html"}.get(rota)
+                "/library.html": "library.html", "/home.html": "home.html",
+                "/app.html": "app.html"}.get(rota)
         if alvo:
             path = os.path.join(ROOT, alvo)
             with open(path, encoding="utf-8") as fh:
                 html = fh.read()
             # O Início usa o mock da Biblioteca: o que ele pede e o mock não
             # conhece volta vazio, o bastante para exercitar a barra do topo.
-            mock = LIB_MOCK if alvo in ("library.html", "home.html") else MOCK
+            mock = LIB_MOCK if alvo in ("library.html", "home.html", "app.html") else MOCK
             # O app injeta o dicionário no nascimento da janela (ui.rs,
             # boot_script); aqui, o mesmo: ?lang=en abre em inglês.
             html = html.replace("<head>", "<head>\n" + ui_prefs_script(self.path) + mock, 1)

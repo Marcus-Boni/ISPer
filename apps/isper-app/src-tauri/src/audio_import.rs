@@ -797,7 +797,7 @@ pub(crate) async fn import_pick_files(app: AppHandle) -> Result<Queued, String> 
         .file()
         .set_title(title)
         .add_filter(filter, &decode::AUDIO_EXTENSIONS);
-    if let Some(parent) = app.get_webview_window("library") {
+    if let Some(parent) = app.get_webview_window(MAIN) {
         builder = builder.set_parent(&parent);
     }
     let picked = tauri::async_runtime::spawn_blocking(move || builder.blocking_pick_files())

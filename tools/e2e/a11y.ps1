@@ -70,11 +70,25 @@ foreach ($w in @('home.html', 'library.html', 'settings.html', 'onboarding.html'
 }
 
 # ---- volta de Tab com teclado de verdade
-function Test-Keyboard([string]$Target, [string]$Label, [string]$Media = '') {
+$script:Views = @{ 'home.html' = 'home'; 'library.html' = 'library'; 'settings.html' = 'settings'; 'onboarding.html' = 'onboarding' }
+function Test-Keyboard([string]$Target, [string]$Label, [string]$Media = '', [string]$View = '') {
+  # Telas da janela principal (ADR 0020): o Tab passa pela barra lateral e pela
+  # tela, como num navegador. A volta completa tem os controles das duas, e o
+  # teste da duas voltas (para ver o foco voltar ao primeiro).
+  $other = 0
+  if (-not $View -and $script:Views.ContainsKey($Target)) { $View = $script:Views[$Target] }
+  if ($View) {
+    Ev 'app.html' "window.ISPER_SHELL.show('$View'), 'ok'" | Out-Null
+    Start-Sleep -Milliseconds 500
+    $otherTarget = if ($Target -eq 'app.html') { "$View.html" } else { 'app.html' }
+    $op = EvJson $otherTarget $tabJs
+    if ($op) { $other = [int]$op.total }
+  }
   $prep = EvJson $Target $tabJs
   if ($null -eq $prep -or -not $prep.total) { Check $false "$Label`: preparacao da volta de Tab"; return }
+  $presses = if ($View) { 2 * ($prep.total + $other) + 12 } else { $prep.total + 12 }
   [Environment]::SetEnvironmentVariable('CDP_MEDIA', $(if ($Media) { $Media } else { $null }), 'Process')
-  try { & node $keys $Target ($prep.total + 12) 'Tab' | Out-Null }
+  try { & node $keys $Target $presses 'Tab' | Out-Null }
   finally { [Environment]::SetEnvironmentVariable('CDP_MEDIA', $null, 'Process') }
   $rep = EvJson $Target 'window.__a11yReport()'
   $missed = @($rep.missed); $noRing = @($rep.noRing)
@@ -83,6 +97,7 @@ function Test-Keyboard([string]$Target, [string]$Label, [string]$Media = '') {
   Check ([bool]$rep.wrapped) "$Label`: o foco da a volta (nada prende o Tab)"
 }
 Test-Keyboard 'home.html' 'Inicio'
+Test-Keyboard 'app.html' 'Barra lateral da janela' '' 'home'
 Test-Keyboard 'library.html' 'Biblioteca'
 Test-Keyboard 'settings.html' 'Configuracoes'
 # "Avancado" (details) abre pelo teclado e o que ele mostra entra na volta.
@@ -134,7 +149,7 @@ if ($hasMeeting) {
   }
 }
 
-EvJson 'onboarding.html' '(async () => { await window.__TAURI__.window.getCurrentWindow().close(); return "ok"; })()' | Out-Null
+Invoke-Isper 'onboarding_finish' 'undefined' 'onboarding.html' | Out-Null
 Start-Sleep -Seconds 1
 foreach ($w in @('home.html', 'library.html', 'settings.html')) {
   $errs = Get-JsErrors $w
