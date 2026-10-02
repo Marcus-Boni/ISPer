@@ -386,6 +386,21 @@ def outputs() -> dict[Path, bytes]:
     return out
 
 
+# O repositório normaliza fim de linha (`* text=auto`), então num clone do
+# Windows com autocrlf estes arquivos chegam ao disco com CRLF. Comparar bytes
+# acusaria todos como defasados sem nada ter mudado; o conteúdo é o que conta.
+TEXT_SUFFIXES = {".svg", ".xml", ".ts", ".md"}
+
+
+def up_to_date(path: Path, data: bytes) -> bool:
+    if not path.exists():
+        return False
+    current = path.read_bytes()
+    if path.suffix in TEXT_SUFFIXES:
+        return current.replace(b"\r\n", b"\n") == data
+    return current == data
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--check", action="store_true", help="não grava; sai 1 se algo estiver defasado")
@@ -393,8 +408,7 @@ def main() -> int:
 
     stale = []
     for path, data in outputs().items():
-        current = path.read_bytes() if path.exists() else None
-        if current == data:
+        if up_to_date(path, data):
             continue
         stale.append(path)
         if not args.check:
