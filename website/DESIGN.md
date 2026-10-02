@@ -128,6 +128,8 @@ Only the sections that carry the argument take the headline step — the thesis,
 
 Fraunces supplies the product's human, editorial voice. Hanken Grotesk keeps controls and long-form documentation calm. Monospace is reserved for commands, paths, timestamps and checksums.
 
+Both faces ship as one variable WOFF2 each, and Fraunces only as the roman: the italic in the headline is the browser slanting it. The share image is drawn by Satori, which reads neither WOFF2 nor variable axes and slants nothing, so `scripts/og-fonts.py` cuts static TTF instances from the same files at the weights and optical sizes the image uses, and the image repeats the browser's slant (a 1/4 shear) on the italic line. Change a weight or size there and regenerate; the image must never fall back to a generic serif again.
+
 ### Hierarchy
 
 - **Display:** variable 520 weight, up to 5.2rem, compact line-height; landing thesis only.
