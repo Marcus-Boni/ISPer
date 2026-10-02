@@ -384,13 +384,8 @@ fn main() {
             // Ícone na bandeja: clique esquerdo abre o Início; direito, o menu.
             // O menu mora em tray.rs: é remontado quando o idioma muda.
             let menu = build_menu(app.handle(), cfg.overlay_pinned)?;
-            // Duas versões do ícone: a normal e a com o ponto vermelho de gravação.
-            let base_icon = app
-                .default_window_icon()
-                .expect("ícone do app")
-                .clone()
-                .to_owned();
-            let rec_icon = recording_icon(&base_icon);
+            // Duas versões da marca: com o ponto apagado e com ele aceso, de gravação.
+            let (base_icon, rec_icon) = brand_tray_icons();
             let tray = TrayIconBuilder::new()
                 .icon(base_icon.clone())
                 .menu(&menu)

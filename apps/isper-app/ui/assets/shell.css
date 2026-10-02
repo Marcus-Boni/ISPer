@@ -44,7 +44,8 @@ body[data-view="onboarding"] .side { visibility: hidden; }
   padding: 4px; margin: -4px; border: 0; background: none; border-radius: var(--r-sm); cursor: pointer; color: var(--ink);
 }
 .brand-mark { width: 28px; height: 28px; flex: none; display: grid; place-items: center; }
-.brand-mark svg { width: 28px; height: 28px; fill: var(--accent); stroke: var(--accent-ink); stroke-width: 1.9; stroke-linecap: round; }
+/* O ícone do app, gerado por scripts/brand.py: o mesmo da barra de tarefas. */
+.brand-mark img { display: block; width: 28px; height: 28px; }
 .brand-btn .brand { font-size: 19px; }
 .icon-btn {
   width: 30px; height: 30px; flex: none; display: grid; place-items: center; padding: 0;

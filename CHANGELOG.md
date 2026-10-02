@@ -21,6 +21,15 @@ bata com ela.
   ("ISPer — Biblioteca"). O Copilot e o indicador flutuante continuam à
   parte, porque foram feitos para ficar ao lado da reunião
   ([ADR 0020](docs/adr/0020-janela-unica.md)).
+- **Uma marca só, no desktop, no celular e no portal.** O ISPer tinha três
+  logos; fica a do celular — cinco barras de fala centradas e o ponto de
+  gravação, o gesto do próprio indicador. O ícone do app, do instalador e da
+  barra de tarefas passa a ser essa marca, e nos tamanhos pequenos ela foi
+  ajustada à grade de pixels para não borrar a 16 e a 24 px
+  ([assets/brand](assets/brand/README.md)).
+- **Na bandeja, o ponto da marca é a luz de gravação.** Cinza enquanto o
+  ISPer espera, aceso enquanto uma reunião grava. Antes um ponto vermelho era
+  pintado no canto do ícone, o que com a marca nova daria dois.
 
 ### Adicionado
 - **Paleta de comandos (Ctrl+K):** ir para qualquer tela ou seção das
