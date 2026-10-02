@@ -11,6 +11,14 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-02
+
+A versão em que o ISPer vira uma janela só: Início, Biblioteca e
+Configurações numa janela com barra lateral, com a paleta de comandos
+(Ctrl+K) e a gravação sempre à mão. O app ganha a marca única, a mesma do
+celular e do portal, e o ponto dela na bandeja passa a ser a luz de
+gravação. E uma pessoa falando sozinha não vira mais dois participantes.
+
 ### Alterado
 - **O ISPer agora é uma janela só.** Início, Biblioteca, Configurações e a
   primeira configuração moram numa janela com barra lateral, no lugar de uma
@@ -898,7 +906,9 @@ dia e de noite, em português ou em inglês, e utilizável só pelo teclado.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.24.0...v0.25.0
+[0.24.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.20.0...v0.21.0
