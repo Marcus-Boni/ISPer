@@ -97,7 +97,7 @@ $wantCpu = $Variant -in 'both', 'cpu'
 if ($wantGpu) {
   foreach ($dll in 'cudart64_13.dll', 'cublas64_13.dll', 'cublasLt64_13.dll') {
     $p = Join-Path $tauriDir "resources\cuda\$dll"
-    if (-not (Test-Path $p)) { throw "DLL do CUDA ausente: $p (copie de <CUDA>\bin\x64; ver README)" }
+    if (-not (Test-Path $p)) { throw "DLL do CUDA ausente: $p (copie de <CUDA>\bin\x64; ver docs/DESENVOLVIMENTO.md)" }
   }
 }
 # sherpa-onnx: o exe importa a sherpa-onnx-c-api.dll, que puxa a onnxruntime; sem elas o

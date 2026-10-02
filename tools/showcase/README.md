@@ -1,6 +1,6 @@
 # Vitrine do repositório
 
-O GIF de demonstração do README e a imagem de prévia social do GitHub saem
+O GIF de demonstração das telas do app e a imagem de prévia social do GitHub saem
 daqui, das telas **do próprio app** — nada é desenhado à mão, então a vitrine
 acompanha a interface quando ela muda.
 
@@ -38,7 +38,7 @@ cargo build --release -p isper-app
 .\tools\showcase\compose.ps1
 ```
 
-O resultado vai para `docs/media/`: `isper-demo.gif` (o README usa) e
+O resultado vai para `docs/media/`: `isper-demo.gif` e
 `social-preview.png`. A prévia social não tem API: suba à mão em **GitHub →
 Settings → General → Social preview**.
 
