@@ -656,7 +656,7 @@ body[data-menu-open] {
      esmaecendo juntos havia um quadro com dois cursores no título. */
   animation:
     cursor-on 60ms linear var(--heard) forwards,
-    cursor-off 1ms steps(1, end) var(--off) forwards;
+    cursor-off 1ms linear var(--off) forwards;
 }
 
 .hero-title em .word-cursor { translate: 0.04em -46%; }
@@ -684,8 +684,13 @@ body[data-menu-open] {
 
 .word-cursor-dot { fill: var(--accent); }
 
-@keyframes cursor-on { to { opacity: 1; } }
-@keyframes cursor-off { to { opacity: 0; } }
+/* Os dois extremos explícitos. Com só `to`, o início de cursor-off herdava o 1
+   que cursor-on segura, e uma animação de 1 ms termina no navegador com
+   progresso 0,99999…, não 1 — em degraus, a saída ficava no início herdado e
+   o cursor, aceso para sempre. Constante em 0, o cursor some com qualquer
+   progresso (scripts/lib/hero-motion.test.mjs). */
+@keyframes cursor-on { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cursor-off { from, to { opacity: 0; } }
 
 /* Soltar o atalho: a voz silencia (as barras assentam na linha média), o ponto
    de gravação apaga, e a marca dá lugar ao cursor do app em que o texto caiu. */
