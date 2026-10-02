@@ -12,23 +12,54 @@ colors:
   ivory: "#ece7e1"
   ivory-soft: "#d3cbc3"
   muted: "#a79e96"
+  muted-quiet: "#8d847c"
   terracotta: "#f07e72"
   terracotta-light: "#f79f94"
+  terracotta-ink: "#1b0f0d"
+  terracotta-soft: "rgba(240, 126, 114, 0.14)"
   success: "#84c297"
   warning: "#e8c15a"
   information: "#7cc4f0"
+  speaker-1: "#9ab4ea"
+  speaker-2: "#c9a0f0"
+  speaker-3: "#f0c97c"
+  chart-context: "#7a6f66"
 typography:
   display:
     fontFamily: "Fraunces, Georgia, serif"
     fontSize: "clamp(3.4rem, 6vw, 5.2rem)"
+    fontWeight: 760
+    lineHeight: 0.88
+    letterSpacing: "-0.03em"
+  display-emphasis:
+    fontFamily: "Fraunces, Georgia, serif"
+    fontSize: "clamp(3.4rem, 6vw, 5.2rem)"
     fontWeight: 520
-    lineHeight: 0.92
+    lineHeight: 0.88
     letterSpacing: "-0.03em"
   headline:
     fontFamily: "Fraunces, Georgia, serif"
-    fontSize: "clamp(2.4rem, 6vw, 4.6rem)"
+    fontSize: "clamp(2.4rem, 4.6vw, 4.1rem)"
     fontWeight: 700
-    lineHeight: 0.98
+    lineHeight: 1
+    letterSpacing: "-0.028em"
+  section:
+    fontFamily: "Fraunces, Georgia, serif"
+    fontSize: "clamp(1.9rem, 2.8vw, 2.5rem)"
+    fontWeight: 700
+    lineHeight: 1.05
+    letterSpacing: "-0.02em"
+  title:
+    fontFamily: "Hanken Grotesk, system-ui, sans-serif"
+    fontSize: "1.35rem"
+    fontWeight: 400
+    lineHeight: 1.2
+    letterSpacing: "-0.015em"
+  lead:
+    fontFamily: "Hanken Grotesk, system-ui, sans-serif"
+    fontSize: "clamp(1.15rem, 1.6vw, 1.35rem)"
+    fontWeight: 400
+    lineHeight: 1.55
   body:
     fontFamily: "Hanken Grotesk, system-ui, sans-serif"
     fontSize: "1rem"
@@ -50,33 +81,51 @@ spacing:
   md: "16px"
   lg: "32px"
   section: "clamp(4rem, 9vw, 7rem)"
-shadows:
-  raised: "0 1px 2px rgba(0,0,0,0.32), 0 12px 28px -18px rgba(0,0,0,0.8)"
-  floating: "0 2px 6px rgba(0,0,0,0.3), 0 34px 70px -42px rgba(0,0,0,0.92)"
-  accent: "0 2px 5px rgba(0,0,0,0.28), 0 18px 34px -22px rgba(240,126,114,0.7)"
-motion:
-  easeOut: "cubic-bezier(0.16, 1, 0.3, 1)"
-  easeSoft: "cubic-bezier(0.32, 0.72, 0, 1)"
-  fast: "140ms"
-  mid: "260ms"
 components:
   button-primary:
     backgroundColor: "{colors.terracotta}"
-    textColor: "#1b0f0d"
+    textColor: "{colors.terracotta-ink}"
     rounded: "{rounded.md}"
-    padding: "14px 20px"
-    height: "52px"
+    padding: "0.7rem 1rem"
+    height: "2.75rem"
+  button-primary-hover:
+    backgroundColor: "{colors.terracotta-light}"
+    textColor: "{colors.terracotta-ink}"
+  button-primary-large:
+    backgroundColor: "{colors.terracotta}"
+    textColor: "{colors.terracotta-ink}"
+    rounded: "{rounded.md}"
+    padding: "0.9rem 1.15rem"
   button-secondary:
-    backgroundColor: "{colors.panel}"
+    backgroundColor: "rgba(30, 26, 24, 0.72)"
     textColor: "{colors.ivory}"
     rounded: "{rounded.md}"
-    padding: "14px 20px"
-    height: "52px"
+    padding: "0.7rem 1rem"
+    height: "2.75rem"
   card:
-    backgroundColor: "{colors.panel}"
+    backgroundColor: "rgba(30, 26, 24, 0.76)"
     textColor: "{colors.ivory}"
     rounded: "{rounded.lg}"
-    padding: "32px"
+    padding: "clamp(1.4rem, 2vw, 1.75rem)"
+  input-search:
+    backgroundColor: "{colors.warm-void-raised}"
+    textColor: "{colors.ivory}"
+    rounded: "{rounded.md}"
+    padding: "0 4.5rem 0 2.25rem"
+    height: "2.75rem"
+  variant-card:
+    backgroundColor: "{colors.warm-void-raised}"
+    textColor: "{colors.ivory}"
+    rounded: "{rounded.md}"
+    padding: "1rem"
+  variant-card-selected:
+    backgroundColor: "{colors.panel-raised}"
+    textColor: "{colors.ivory}"
+  listen-pill:
+    backgroundColor: "rgba(22, 19, 17, 0.95)"
+    textColor: "{colors.ivory}"
+    rounded: "{rounded.pill}"
+    padding: "0.55rem 0.95rem 0.55rem 0.75rem"
 ---
 
 # Design System: ISPer Portal
@@ -94,11 +143,32 @@ The landing uses Persuade mode with large Fraunces typography and a working ISPe
 - Warm near-black field with ivory text and rare terracotta emphasis.
 - Editorial serif headlines paired with legible sans-serif interfaces.
 - Product proof through working interface states, not decorative illustration.
-- One orchestrated scroll moment plus restrained state micro-interactions.
+- One authored arrival — the headline is dictated — one orchestrated scroll moment, and restrained state micro-interactions.
+- One mark, generated from a single geometry, on every surface that shows the brand.
 
 ## Colors
 
 The palette is dark and warm rather than blue-black. Terracotta marks action and active state; status colors keep their literal meaning.
+
+### Primary
+
+- **Terracotta** (`terracotta`): primary actions, active controls, the recording dot, the active docs entry.
+- **Terracotta Light** (`terracotta-light`): the hover of a primary action and the emphasised line of a headline — the italic "No seu computador." is set in it.
+- **Terracotta Ink** (`terracotta-ink`): text on terracotta. Ivory on terracotta fails contrast; this near-black does not.
+- **Terracotta Soft** (`terracotta-soft`): the tint behind an accent element — the optional-summary note, the halo of the recording light. Never a large surface.
+
+### Neutral
+
+- **Warm Void** (`warm-void`) and **Warm Void Raised** (`warm-void-raised`): the page and the recessed surfaces inside a card — fields, the download choices, the other app in the stage.
+- **Panel**, **Panel Raised**, **Panel Active** (`panel`, `panel-raised`, `panel-active`): cards and the steps above them; the selected download raises to Panel Raised.
+- **Line** and **Line Strong** (`line`, `line-strong`): the 1px warm borders that carry structure, Line Strong for controls and floating layers.
+- **Ivory**, **Ivory Soft**, **Muted**, **Muted Quiet** (`ivory`, `ivory-soft`, `muted`, `muted-quiet`): text from headline to metadata. Muted Quiet clears 4.5:1 only on Warm Void and Panel; on a raised surface, text takes Muted instead.
+
+### Status and speakers
+
+- **Success**, **Warning**, **Information** (`success`, `warning`, `information`): literal states only — saved, pasted, a caveat, a note.
+- **Speaker 1–3** (`speaker-1`, `speaker-2`, `speaker-3`): one color per speaker in a transcript, always beside the speaker's name.
+- **Chart Context** (`chart-context`): the de-emphasised series in a chart. Muted sits too close to terracotta in lightness for a chart to tell them apart; this step clears it.
 
 **The Scarce Coral Rule.** Terracotta is reserved for primary actions, active controls, recording state and the key phrase. Large surfaces remain neutral.
 
@@ -132,11 +202,13 @@ Both faces ship as one variable WOFF2 each, and Fraunces only as the roman: the 
 
 ### Hierarchy
 
-- **Display:** variable 520 weight, up to 5.2rem, compact line-height; landing thesis only.
-- **Headline:** 700 weight with balanced wrapping; section transitions and final CTA.
-- **Title:** 1.25–2rem; cards and documentation subsections.
-- **Body:** 1rem with 1.55–1.8 line-height and a 65–75ch reading measure.
-- **Label:** 0.7–0.9rem, semibold; metadata and compact interface states.
+- **Display** (760, up to 5.2rem, 0.88): the landing thesis only. Its second line is **Display Emphasis** (520) in Terracotta Light and italic — the roman slanted by the browser, since the font ships no italic.
+- **Headline** (700, up to 4.1rem, 1, balanced wrapping): the sections that carry the argument and the close; the download and docs page titles use the same weight and tracking.
+- **Section** (700, up to 2.5rem, 1.05): supporting sections — the shortcut detail, the FAQ.
+- **Title** (Hanken Grotesk 400, 1.35rem, 1.2): card and feature titles, chart heads. Set in the sans, a grid of them stays quieter than the serif headline above it.
+- **Lead** (400, up to 1.35rem, 1.55): the paragraph under a display or headline; 46ch on the landing.
+- **Body** (1rem with 1.55–1.8 line-height and a 65–75ch reading measure): documentation and running copy.
+- **Label** (0.7–0.9rem, semibold): metadata and compact interface states.
 
 ## Layout
 
@@ -152,11 +224,11 @@ Every shadow carries an offset as well as a blur; a zero-offset coloured halo is
 
 ## Shapes
 
-Radii come from the `rounded` scale only: 16px for cards and major panels, 12px for buttons, fields and inner surfaces, 8px for the smallest controls and focus rings. Buttons and fields use 8–12px. Full pills are limited to compact badges, chart switches and speaker labels. Borders and shadows are not stacked unless the shadow communicates a genuinely floating layer.
+Radii come from the `rounded` scale only: 16px for cards and major panels, 12px for buttons, fields and inner surfaces, 8px for the smallest controls and focus rings. Buttons and fields use 8–12px. Full pills are limited to compact badges — the version tag on the download button among them — chart switches, speaker labels and the floating ISPer indicator in the stage, which is a pill because the app's own indicator is one. Borders and shadows are not stacked unless the shadow communicates a genuinely floating layer.
 
 ## Motion
 
-Lenis owns wheel smoothing on pointer devices and is the single scroll source GSAP's ScrollTrigger listens to; touch and reduced-motion users keep native scrolling. Three registers, and no more:
+Lenis owns wheel smoothing on pointer devices and is the single scroll source GSAP's ScrollTrigger listens to; touch and reduced-motion users keep native scrolling. Four registers, and no more:
 
 1. **Arrival — the headline is dictated.** This is the page's one authored moment, and it comes from the product: hold the shortcut, speak, let go, and the words appear where you were typing. Each word goes through the three states ISPer really has — unheard, provisional (the live caption) and final (the final pass, which sweeps the whole headline left to right when the shortcut is released) — while the mark rides the insertion point as the cursor: bars talking, recording dot lit. On release the voice settles flat, the dot goes out, and the mark gives way to a text caret that blinks twice and leaves.
 
@@ -175,7 +247,7 @@ Motion never hides content it cannot restore. Anything already on screen animate
 
 ### Download selection
 
-Both installer variants stay on screen with their size and requirements. A 9,8 MB choice and a 422,8 MB choice cannot be compared from memory, and the difference between them is the most decision-relevant fact on the page. Selecting raises a card rather than erasing the other, and carries a check so the state is never held by colour alone.
+Both installer variants stay on screen with their size and requirements. The CPU build weighs tens of megabytes and the CUDA build hundreds (14,6 MB and 427,6 MB in 0.24.0); two sizes that far apart cannot be compared from memory, and the difference between them is the most decision-relevant fact on the page. Selecting raises a card rather than erasing the other, and carries a check so the state is never held by colour alone. From 0.20.0 the releases also carry a portable ZIP of each build; the page lists them below the installers, each with its size and hash, and only when the release has them.
 
 The page asks the reader to verify what they downloaded, so it shows both halves of that check as numbered steps: the PowerShell command that produces a hash for the file they just saved, and the published hash to compare it against. An instruction to compare a checksum without the command that produces one is an instruction nobody can follow, and this is a Windows-only product, so the command is the Windows one. The signed list opens in its own tab, because it should not replace the value being compared against. The unsigned-binary warning names the SmartScreen dialog and gives the literal steps through it; a warning without a recovery path just leaves the reader stuck at the scariest moment.
 
@@ -194,8 +266,8 @@ The page asks the reader to verify what they downloaded, so it shows both halves
 
 ### Inputs / Fields
 
-- Near-black field, warm line and 8px radius.
-- Focus shifts the border to terracotta and adds a low-opacity ring.
+- Recessed Warm Void Raised field, a warm line, 12px radius and the same 2.75rem height as a button.
+- Focus shifts the border to terracotta and adds a 3px ring of terracotta at 22%.
 - Search results remain keyboard reachable and use local Pagefind data.
 
 ### Navigation
@@ -228,7 +300,7 @@ Dictation is shown as the gesture, not as a microphone. The words are for some o
 
 The other app keeps the page's palette and says "another program" through structure alone, a thread and a reply field, so the demonstration does not invent a second visual world. Its empty field shows the caret before the placeholder, as a focused empty field does. The indicator's dot is the recording light here as in the tray: off while it waits, terracotta while it listens. Its bars are the mark's own five, talking only while words arrive.
 
-The stage reproduces real ISPer states with synthetic content, and the states have to be true to themselves: the meeting transcript fills and then holds rather than wrapping, because a recording clock that counts back to zero while the chip still reads "gravando reunião" tells the reader the whole thing is theatre — on a page whose thesis is that its numbers can be audited. It exposes dictation and meeting modes, speaker colors, waveform, keyboard shortcut and optional summary boundary without requesting microphone access.
+The stage reproduces real ISPer states with synthetic content, and the states have to be true to themselves: the meeting transcript fills and then holds rather than wrapping, because a recording clock that counts back to zero while the chip still reads "gravando reunião" tells the reader the whole thing is theatre — on a page whose thesis is that its numbers can be audited. It exposes dictation and meeting modes, speaker colors, the mark's talking bars, the keyboard shortcut and the optional summary boundary without requesting microphone access.
 
 ## Do's and Don'ts
 
