@@ -26,6 +26,7 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0017](0017-sincronia-celular-pc.md) | Sincronia celular → PC: iroh com a chave do PC no QR e um protocolo pequeno e retomável | aceita | 25/09/2026 |
 | [0018](0018-transcricao-no-celular.md) | Transcrição no celular: o passe final do PC, retomável, com o modelo pela memória | aceita | 26/09/2026 |
 | [0019](0019-filtro-do-copilot-pelo-jev.md) | Filtro do Copilot pelo Jev, na nuvem, e não um classificador local | aceita | 27/09/2026 |
+| [0020](0020-janela-unica.md) | Uma janela principal com barra lateral, e as telas em iframes vivos | aceita | 02/10/2026 |
 
 ## Como escrever um ADR
 
