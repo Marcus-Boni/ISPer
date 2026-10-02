@@ -168,6 +168,17 @@ Windows the app stays quietly in the tray. To keep it from opening on a
 manual launch, untick "Show this screen when opening ISPer" in the footer (or
 in Settings → System).
 
+It is **a single window**: Home, Library and Settings live in the sidebar,
+and switching screens keeps whatever was open. The sidebar also holds the
+record-meeting button (with the timer, "Mark" and "Stop" while recording) and
+collapses to icons only (Ctrl+B). **Ctrl+K** opens the command palette: go to
+any screen or Settings section, record, import audio, switch the theme or
+find a meeting. Ctrl+1/2/3 go to Home, the Library and Copilot, Ctrl+, to
+Settings, and **Ctrl+/** lists every shortcut. The window remembers its size,
+position and whether it was maximized. Copilot and the floating indicator
+stay separate, so they can sit beside your meeting
+([ADR 0020](docs/adr/0020-janela-unica.md)).
+
 The global shortcut is Ctrl+Alt+Space, or the first free one among
 Ctrl+Shift+Space / Ctrl+Alt+D / Ctrl+Alt+I — the hint in the tray menu shows
 which one was registered. Two modes:
