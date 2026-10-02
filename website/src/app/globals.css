@@ -596,16 +596,7 @@ body[data-menu-open] {
   letter-spacing: -0.03em;
 }
 
-/* Each authored line wipes up from behind its own edge; the mask has to clear
-   descenders, so it is padded and pulled back by the same amount. */
-.hero-line-mask {
-  display: block;
-  overflow: hidden;
-  padding-bottom: 0.14em;
-  margin-bottom: -0.14em;
-}
-
-.hero-line {
+.hero-title-line {
   display: block;
 }
 
@@ -613,6 +604,131 @@ body[data-menu-open] {
   color: var(--accent-2);
   font-style: italic;
   font-weight: 520;
+}
+
+/* ── O título é ditado ───────────────────────────────────────────────────
+   Cada palavra passa pelos três estados do produto: não ouvida, provisória
+   (a legenda ao vivo) e final (o passe final, que varre o título quando o
+   atalho é solto). O estado-base é o FINAL: sem a folha de estilos, sem
+   suporte a animação ou com movimento reduzido, o título simplesmente está lá.
+   "Não ouvida" é translúcida e nunca invisível, para o título ser pintado no
+   primeiro quadro — é ele o maior elemento da primeira tela. */
+
+.hero-word {
+  position: relative;
+  display: inline-block;
+}
+
+.hero-word-text {
+  display: inline-block;
+  animation:
+    word-heard 260ms var(--ease-out) var(--heard) both,
+    word-final 480ms var(--ease-out) var(--final) forwards;
+}
+
+@keyframes word-heard {
+  from { opacity: 0.12; filter: blur(0.1em); transform: translateY(0.05em); }
+  to { opacity: 0.58; filter: blur(0.014em); transform: none; }
+}
+
+/* `filter: none`, e não blur(0): um filtro zerado ainda rasteriza o texto
+   numa camada e o deixa levemente macio para sempre. */
+@keyframes word-final {
+  from { opacity: 0.58; filter: blur(0.014em); }
+  to { opacity: 1; filter: none; }
+}
+
+/* A marca como cursor: a mesma geometria do ícone, no ponto de inserção. Ela
+   aparece depois da palavra que acabou de ser dita e salta para a próxima,
+   como um cursor avança. Posição absoluta, para nunca mexer no fluxo do texto. */
+.word-cursor {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 0.13em);
+  width: 0.5em;
+  aspect-ratio: 47 / 40;
+  overflow: visible;
+  opacity: 0;
+  pointer-events: none;
+  translate: 0 -46%;
+  /* Um cursor salta; ele não se dissolve num cruzamento. O que sai some no
+     instante exato, e só o que chega tem um fio de entrada. Com os dois
+     esmaecendo juntos havia um quadro com dois cursores no título. */
+  animation:
+    cursor-on 60ms linear var(--heard) forwards,
+    cursor-off 1ms steps(1, end) var(--off) forwards;
+}
+
+.hero-title em .word-cursor { translate: 0.04em -46%; }
+
+.word-cursor rect {
+  fill: var(--ink);
+  transform-box: fill-box;
+  transform-origin: center;
+  /* Dez ciclos cobrem a frase inteira e param: um loop que segue rodando
+     depois que ninguém mais o vê é trabalho jogado fora. */
+  animation: bar-talk 420ms ease-in-out 10 alternate;
+}
+
+/* Períodos e fases diferentes por barra: uma onda de fala não sobe em bloco. */
+.word-cursor .bar-0 { animation-duration: 390ms; animation-delay: -140ms; }
+.word-cursor .bar-1 { animation-duration: 450ms; animation-delay: -60ms; }
+.word-cursor .bar-2 { animation-duration: 340ms; animation-delay: -200ms; }
+.word-cursor .bar-3 { animation-duration: 510ms; animation-delay: -90ms; }
+.word-cursor .bar-4 { animation-duration: 410ms; animation-delay: -170ms; }
+
+@keyframes bar-talk {
+  from { transform: scaleY(0.3); }
+  to { transform: scaleY(1); }
+}
+
+.word-cursor-dot { fill: var(--accent); }
+
+@keyframes cursor-on { to { opacity: 1; } }
+@keyframes cursor-off { to { opacity: 0; } }
+
+/* Soltar o atalho: a voz silencia (as barras assentam na linha média), o ponto
+   de gravação apaga, e a marca dá lugar ao cursor do app em que o texto caiu. */
+.word-cursor.is-last .word-cursor-voice {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: voice-settle 240ms var(--ease-out) var(--release) forwards;
+}
+
+.word-cursor.is-last .word-cursor-dot {
+  animation: dot-dim 280ms var(--ease-out) var(--release) forwards;
+}
+
+@keyframes voice-settle { to { transform: scaleY(0.14); } }
+@keyframes dot-dim { to { fill: var(--muted-2); } }
+
+/* O cursor de texto do app que recebeu as palavras: pisca duas vezes e some. */
+.hero-word.is-last::after {
+  position: absolute;
+  top: 0.12em;
+  bottom: 0.02em;
+  left: calc(100% + 0.1em);
+  width: 0.055em;
+  border-radius: 1px;
+  background: var(--accent-2);
+  opacity: 0;
+  content: "";
+  animation: caret-tail 1.1s steps(1, end) calc(var(--release) + 0.26s) forwards;
+}
+
+.hero-title em .hero-word.is-last::after { transform: skewX(-10deg); }
+
+@keyframes caret-tail {
+  0% { opacity: 1; }
+  25% { opacity: 0; }
+  50% { opacity: 1; }
+  75%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-word-text,
+  .hero-word.is-last::after { animation: none; }
+  .word-cursor { display: none; }
 }
 
 .hero-lead {
@@ -1795,10 +1911,9 @@ body[data-menu-open] {
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .caret, .chart-placeholder { animation: none !important; }
-  .waveform rect { transform: scaleY(1) !important; transition: none !important; }
+  .caret, .chart-placeholder, .target-caret, .listen-mark rect { animation: none !important; }
   .hero-stage .app-stage { position: static; }
-  [data-reveal], [data-reveal-item], .button, .dictation-orb, .transcript-row, .text-link svg, .github-link svg, .desktop-nav a::after {
+  [data-reveal], [data-reveal-item], .button, .transcript-row, .text-link svg, .github-link svg, .desktop-nav a::after {
     transition-duration: 0.01ms !important;
     transform: none !important;
   }
@@ -1913,21 +2028,84 @@ body[data-menu-open] {
 .stage-tabs { display: flex; gap: .4rem; padding: .8rem 1rem 0; }
 .stage-tabs button { min-height: 2.75rem; padding: .45rem .75rem; border: 1px solid transparent; background: transparent; border-radius: .5rem; color: var(--muted); font-size: .75rem; cursor: pointer; }
 .stage-tabs button[aria-selected="true"] { color: var(--ink); background: var(--panel-3); border-color: var(--line); }
-.dictation-view { min-height: 23rem; display: grid; justify-items: center; align-content: center; padding: 1.75rem 1.5rem; }
-.shortcut-line { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; color: var(--muted); font-size: .72rem; }
-.shortcut-line > div { display: flex; align-items: center; gap: .32rem; }
 kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: .38rem; background: var(--panel-2); color: var(--ink-2); font: .7rem var(--font-mono); text-align: center; }
-.shortcut-line b { color: var(--muted-2); font-weight: 400; }
-.dictation-orb { width: 4.6rem; height: 4.6rem; display: grid; place-items: center; margin: 3rem 0 1.1rem; border: 1px solid var(--line-2); border-radius: 50%; background: var(--panel-2); color: var(--accent); box-shadow: 0 16px 42px -22px #000; transition: transform .25s, box-shadow .25s, background .25s; }
-.dictation-orb.active { transform: scale(1.05); background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 12px var(--accent-soft), 0 24px 50px -24px rgba(240,126,114,.9); }
-.dictation-orb svg { width: 1.7rem; }
-.waveform { width: 100%; max-width: 22.5rem; height: 4.5rem; overflow: visible; }
-/* Bars scale about their own centre, so the wave opens symmetrically around the
-   midline. At rest they collapse toward that line; anime.js drives them while
-   recording and hands them back to this transition when it stops. */
-.waveform rect { fill: var(--accent); opacity: .72; transform-box: fill-box; transform-origin: center; transform: scaleY(.22); transition: transform 560ms var(--ease-out), opacity 560ms var(--ease-out); }
-.waveform.is-active rect { transform: scaleY(1); transition: none; }
-.dictation-copy { max-width: 25rem; min-height: 3rem; margin: .4rem 0 0; color: var(--ink-2); text-align: center; }
+
+/* ── The gesture: another app, and ISPer floating over it ─────────────────
+   The words are for some other program, so the scene is one: a team chat
+   with a question waiting. Its own structure says "another app" — a thread
+   and a reply field — while the palette stays the page's, so the
+   demonstration does not invent a second visual world. */
+.dictation-scene { position: relative; min-height: 23rem; display: grid; padding: 1rem 1.1rem 1.1rem; }
+
+.target-app { display: grid; grid-template-rows: auto 1fr auto; gap: .85rem; padding: .95rem; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg); }
+.target-head { display: flex; align-items: center; gap: .65rem; padding-bottom: .8rem; border-bottom: 1px solid var(--line); }
+.target-avatar { width: 2rem; height: 2rem; display: grid; flex: none; place-items: center; border-radius: 50%; background: var(--panel-2); color: var(--ink-2); font: 700 .7rem var(--font-sans); letter-spacing: .04em; }
+.target-head strong { display: block; color: var(--ink); font-size: .8rem; }
+.target-head small { color: var(--muted); font-size: .7rem; }
+.target-thread { display: grid; align-content: start; }
+.target-bubble { max-width: 82%; margin: 0; padding: .6rem .75rem; border-radius: var(--r-md) var(--r-md) var(--r-md) .25rem; background: var(--panel-2); color: var(--ink-2); font-size: .78rem; line-height: 1.45; }
+.target-bubble b { display: block; margin-bottom: .15rem; color: var(--p1); font-size: .7rem; font-weight: 650; }
+
+/* The reply field. Empty, its caret sits before the placeholder, the way a
+   focused empty field shows it; with text, after it. */
+.target-field { position: relative; display: flex; align-items: center; min-height: 2.7rem; padding: .55rem .75rem; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--panel); font-size: .82rem; line-height: 1.4; }
+.target-placeholder { color: var(--muted); }
+.target-text { color: var(--ink); transform-origin: left center; }
+.target-caret { width: 1.5px; height: 1.1em; flex: none; margin-left: 1px; background: var(--ink); animation: caret-blink 1.05s steps(1) infinite; }
+.target-field:has(.target-placeholder) .target-caret { order: -1; margin: 0 1px 0 0; }
+
+/* The ISPer indicator. It floats above the app the way the real one floats
+   above your desktop, and its dot is what it always is in the indicator: the
+   recording light — off while it waits, terracotta while it listens. */
+/* Centred by auto margins across the full width, not by left: 50% and a
+   translate: an absolutely positioned box anchored at the middle can only grow
+   as far as the right edge, so it wrapped "Colado no app" onto two lines with
+   half the scene still empty. */
+.listen-pill {
+  position: absolute;
+  top: 57%;
+  inset-inline: 0;
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  width: max-content;
+  max-width: calc(100% - 3.5rem);
+  margin-inline: auto;
+  padding: .55rem .95rem .55rem .75rem;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: rgba(22, 19, 17, 0.95);
+  box-shadow: var(--shadow-floating);
+  font-size: .78rem;
+  translate: 0 -50%;
+  transition: border-color var(--dur-mid) var(--ease-out);
+}
+
+.is-listening .listen-pill,
+.is-speaking .listen-pill { border-color: rgba(240, 126, 114, 0.5); }
+
+.listen-mark { width: 1.85rem; flex: none; aspect-ratio: 47 / 40; overflow: visible; }
+.listen-mark rect { fill: var(--ink); transform-box: fill-box; transform-origin: center; transform: scaleY(0.34); transition: transform var(--dur-mid) var(--ease-out); }
+.listen-mark.is-speaking rect { animation: bar-talk 420ms ease-in-out infinite alternate; }
+.listen-mark .bar-0 { animation-duration: 390ms; animation-delay: -140ms; }
+.listen-mark .bar-1 { animation-duration: 450ms; animation-delay: -60ms; }
+.listen-mark .bar-2 { animation-duration: 340ms; animation-delay: -200ms; }
+.listen-mark .bar-3 { animation-duration: 510ms; animation-delay: -90ms; }
+.listen-mark .bar-4 { animation-duration: 410ms; animation-delay: -170ms; }
+.listen-dot { fill: var(--muted-2); transition: fill var(--dur-mid) var(--ease-out); }
+.is-listening .listen-dot,
+.is-speaking .listen-dot { fill: var(--accent); }
+
+.listen-body { min-width: 0; }
+.listen-keys { display: inline-flex; align-items: center; gap: .3rem; color: var(--muted); white-space: nowrap; }
+.listen-keys kbd { min-width: 0; padding: .1rem .38rem; font-size: .7rem; }
+.listen-keys b { color: var(--muted-2); font-weight: 400; }
+/* Provisional, like the live caption: present, not yet settled. */
+.listen-caption { display: block; color: var(--ink); opacity: .72; line-height: 1.35; transition: opacity 200ms var(--ease-out); }
+.is-pasting .listen-caption { opacity: 0; }
+.listen-hint { color: var(--muted); font-style: italic; }
+.listen-done { display: inline-flex; align-items: center; gap: .35rem; color: var(--good); white-space: nowrap; }
+.listen-done svg { width: .95rem; height: .95rem; }
 .meeting-view { min-height: 23rem; padding: 1.25rem; }
 .meeting-toolbar { display: flex; justify-content: space-between; color: var(--muted); font-size: .75rem; }
 .meeting-toolbar span:first-child { display: flex; align-items: center; gap: .5rem; color: var(--ink); font-weight: 650; }
@@ -1946,6 +2124,8 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 .stage-controls { min-height: 3.6rem; display: flex; align-items: center; gap: .5rem; padding: .65rem 1rem; border-top: 1px solid var(--line); background: var(--panel); }
 .stage-controls button { display: inline-flex; align-items: center; gap: .45rem; min-height: 2.75rem; padding: .45rem .75rem; border: 1px solid var(--line); background: var(--panel-2); border-radius: .5rem; font-size: .7rem; cursor: pointer; }
 .stage-controls .stage-primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 650; }
+/* While the demonstration dictates, the button says so and stops inviting a click. */
+.stage-controls .stage-primary:disabled { background: var(--panel-3); color: var(--muted); cursor: default; }
 .stage-controls svg { width: .8rem; }
 .stage-controls span { display: flex; align-items: center; gap: .4rem; margin-left: auto; color: var(--muted); font-size: .65rem; }
 /* Emphasis comparison: thin marks, rounded only at the data end, values direct-
@@ -3509,7 +3689,7 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 @media (max-width: 640px) {
   .stage-caption { flex-direction: column; gap: .12rem; }
   .app-stage .app-window { transform: none; }
-  .shortcut-line { align-items: flex-start; flex-direction: column; }
-  .dictation-view, .meeting-view { min-height: 25rem; padding-inline: .9rem; }
+  .dictation-scene, .meeting-view { min-height: 25rem; padding-inline: .9rem; }
+  .listen-pill { max-width: calc(100% - 2.25rem); }
   .stage-controls span { display: none; }
 }

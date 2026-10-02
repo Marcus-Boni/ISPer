@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { ArrowRight, AudioLines, BookOpen, BrainCircuit, Check, Code2, Cpu, Download, Keyboard, LockKeyhole, Mic2, Search, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { CopyCommand } from "@/components/landing/copy-command";
+import { HeroHeadline } from "@/components/landing/hero-headline";
 import { InteractiveStage } from "@/components/landing/interactive-stage";
 import { AudioBoundary } from "@/components/landing/audio-boundary";
 import { ComparisonWrap } from "@/components/landing/comparison-wrap";
@@ -59,10 +60,7 @@ export default function Home() {
 
       <section className="hero shell">
         <div className="hero-copy">
-          <h1>
-            <span className="hero-line-mask"><span className="hero-line">Suas palavras.</span></span>
-            <span className="hero-line-mask"><span className="hero-line"><em>No seu computador.</em></span></span>
-          </h1>
+          <HeroHeadline />
           <p className="hero-lead">Dite em qualquer aplicativo e transcreva reuniões com IA local. Sem mensalidade e sem enviar seu áudio para uma API.</p>
           <div className="hero-actions">
             <Link className="button button-primary button-large" href="/download/" transitionTypes={["nav-forward"]}><Download aria-hidden="true" />Escolher instalador<span className="button-tag">{siteConfig.currentVersion}</span></Link>

@@ -4,10 +4,14 @@ import { useEffect } from "react";
 import { onLenisReady } from "@/components/motion/scroll-engine";
 
 /**
- * Landing motion. Three registers, deliberately distinct:
- * 1. the hero arrival, which plays once on load;
- * 2. the stage settle, the page's single scrubbed moment;
- * 3. section entrances, which differ per section role.
+ * Landing motion: the stage settle and the section entrances.
+ *
+ * The hero arrival is not here any more. The headline is dictated in pure CSS
+ * (hero-headline.tsx), which starts on the first frame the stylesheet arrives
+ * instead of waiting for hydration and this module's dynamic import — the
+ * delay that used to leave the hero sitting in its from-state. The stage
+ * plays its own demonstration once the headline is done, so it no longer
+ * needs to be driven by scroll beats from here.
  *
  * Nothing here is allowed to hide content it cannot bring back: elements already
  * on screen animate from a visible state, and a failsafe clears every from-state
@@ -32,19 +36,7 @@ export function RevealEffects() {
       const context = gsap.context(() => {
         const inView = (element: Element) => element.getBoundingClientRect().top < window.innerHeight * 0.92;
 
-        /* 1. Arrival. The headline wipes up behind its own mask, everything else follows it. */
-        const heroTimeline = gsap.timeline({ defaults: { ease: "expo.out" } });
-        heroTimeline
-          .from(".hero-copy .hero-line", { yPercent: 118, duration: 1.15, stagger: 0.08 })
-          .from(".hero-stage", { y: 34, opacity: 0, scale: 0.97, filter: "blur(10px)", duration: 1.25, clearProps: "filter" }, 0.18)
-          .from(".hero-lead", { y: 18, opacity: 0, duration: 0.8 }, 0.4)
-          .from(".hero-actions > *", { y: 16, opacity: 0, duration: 0.7, stagger: 0.08 }, 0.5)
-          .from(".hero-proof li, .command-card > *", { y: 12, opacity: 0, duration: 0.6, stagger: 0.05 }, 0.62)
-          .from(".trust-grid > *", { y: 10, opacity: 0, duration: 0.6, stagger: 0.05 }, 0.78);
-
-        /* 2. The one scrubbed moment: the app window settles square as the hero
-              leaves, and the stage plays the two things the page is about to
-              explain while it holds. The reader can take it over at any point. */
+        /* The one scrubbed moment: the app window settles square as the hero leaves. */
         const media = gsap.matchMedia();
         media.add("(min-width: 981px)", () => {
           gsap.to(".hero-stage .app-window", {
@@ -61,43 +53,9 @@ export function RevealEffects() {
               invalidateOnRefresh: true,
             },
           });
-
-          let released = false;
-          const onReleased = () => { released = true; };
-          window.addEventListener("isper:stage-released", onReleased);
-
-          let current = "";
-          const drive = (mode: "dictation" | "meeting", active: boolean) => {
-            if (released) return;
-            const next = `${mode}:${active}`;
-            if (next === current) return;
-            current = next;
-            window.dispatchEvent(new CustomEvent("isper:stage", { detail: { mode, active } }));
-          };
-
-          const beats: Array<[number, "dictation" | "meeting", boolean]> = [
-            [0, "dictation", false],
-            [0.28, "dictation", true],
-            [0.66, "meeting", true],
-          ];
-
-          ScrollTrigger.create({
-            trigger: ".hero",
-            start: "top top",
-            end: "bottom 42%",
-            invalidateOnRefresh: true,
-            onUpdate: (self) => {
-              const beat = [...beats].reverse().find(([at]) => self.progress >= at);
-              if (beat) drive(beat[1], beat[2]);
-            },
-            onLeave: () => drive("meeting", false),
-            onLeaveBack: () => drive("dictation", false),
-          });
-
-          return () => window.removeEventListener("isper:stage-released", onReleased);
         });
 
-        /* 3. Section entrances, one register per section role. */
+        /* Section entrances, one register per section role. */
         gsap.utils.toArray<HTMLElement>("[data-reveal]").forEach((section) => {
           if (inView(section)) return;
           const scrollTrigger = { trigger: section, start: "top 86%", once: true, invalidateOnRefresh: true };
@@ -127,7 +85,7 @@ export function RevealEffects() {
 
       /* Failsafe: never leave content that GSAP hid but never revealed. */
       const failsafe = window.setTimeout(() => {
-        const animated = "[data-reveal], [data-reveal-item], .hero-line, .hero-stage, .hero-lead, .hero-actions > *, .hero-proof li, .command-card > *, .trust-grid > *";
+        const animated = "[data-reveal], [data-reveal-item]";
         document.querySelectorAll<HTMLElement>(animated).forEach((element) => {
           if (Number(getComputedStyle(element).opacity) < 0.99) gsap.set(element, { clearProps: "all" });
         });
