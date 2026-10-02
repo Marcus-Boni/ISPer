@@ -1,705 +1,145 @@
+<div align="center">
+
+<a href="https://isper.pages.dev"><img src="assets/brand/isper-icon.svg" width="84" alt="ISPer"></a>
+
 # ISPer
 
-Ditado por voz 100% local (estilo Wispr Flow) em Rust + whisper.cpp, evoluindo para
-notetaker de reuniões do Teams. Roadmap completo em [ROADMAP.md](ROADMAP.md).
+**Suas palavras. No seu computador.**
 
-**Site oficial: [isper.pages.dev](https://isper.pages.dev)** — [baixar o instalador](https://isper.pages.dev/download/)
-· [documentação](https://isper.pages.dev/docs/)
+Dite em qualquer aplicativo e transcreva reuniões com IA local.<br>
+Sem mensalidade e sem enviar seu áudio para uma API.
 
-Este README é para quem vai compilar: toolchain, CUDA, testes, release. Quem só quer
-usar o ISPer encontra no site a instalação guiada, os checksums para conferir o
-download e os guias de uso — sem passar por aqui.
+[![Release](https://img.shields.io/github/v/release/Marcus-Boni/ISPer?style=flat-square&label=release&labelColor=161311&color=f07e72)](https://github.com/Marcus-Boni/ISPer/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/Marcus-Boni/ISPer/ci.yml?branch=main&style=flat-square&label=CI&labelColor=161311)](https://github.com/Marcus-Boni/ISPer/actions/workflows/ci.yml)
+[![Windows 10 e 11](https://img.shields.io/badge/Windows-10%20%C2%B7%2011-ece7e1?style=flat-square&labelColor=161311)](https://isper.pages.dev/download/)
+[![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-ece7e1?style=flat-square&labelColor=161311)](LICENSE)
 
-## Estrutura
+[**Baixar**](https://isper.pages.dev/download/) · [Documentação](https://isper.pages.dev/docs/) · [Site](https://isper.pages.dev) · [English](README.en.md)
 
-```
-crates/isper-core/   # motor: captura (cpal) → resample (rubato) → Whisper (whisper-rs)
-crates/isper-cli/    # laboratório da Fase 1: transcrição no terminal
-crates/isper-models/ # catálogo e download de modelos (SHA-256 do Hugging Face)
-crates/isper-llm/    # providers de IA (Groq, Gemini, Claude) e resumo pós-reunião
-crates/isper-diarize/# quem falou o quê (sherpa-onnx: pyannote + 3D-Speaker)
-apps/isper-app/      # app Tauri 2: src-tauri (Rust) + ui (HTML/CSS/JS sem build step)
-  src-tauri/src/     # main.rs (bootstrap) + módulos por responsabilidade: state,
-                     # shortcuts, tray, dictation, meetings, views, overlay,
-                     # settings, library, home, notify, updater, config, calls (chamada
-                     # do Teams), insights (IA ao vivo), search (busca semântica)
-  ui/assets/         # design system: base.css (tokens, componentes, movimento),
-                     # ui.js (toast, count-up, confirmação inline…) e fontes OFL locais
-scripts/release.ps1  # instaladores GPU e CPU assinados + latest*.json e, com -Publish, a release
-tools/e2e/           # testes ponta a ponta no app real via CDP (smoke, reunião, atualizador)
-CHANGELOG.md         # mudanças por versão; a seção da versão vira as notas da release
-models/              # modelos ggml (gitignored — baixar, ver abaixo)
-fixtures/            # WAVs de teste gerados com TTS do Windows (voz pt-BR Maria)
-```
+<br>
 
-A interface é vanilla e offline: as fontes (Fraunces e Hanken Grotesk, licença
-OFL) vão dentro do app — nada é baixado em tempo de execução. Animações usam só
-`transform`/`opacity` e respeitam `prefers-reduced-motion` do Windows
-("Efeitos de animação" desligados → interface estática).
+<a href="docs/media/isper-launch.mp4"><img src="docs/media/isper-hero.webp" width="880" alt="O título “Suas palavras. No seu computador.” sendo ditado palavra por palavra, com a marca do ISPer como cursor; depois, uma resposta ditada voando do indicador do ISPer para o campo de um chat, e o diagrama de que o áudio não sai do computador."></a>
 
-## Pré-requisitos de build (Windows)
+<sub>Os primeiros 15 segundos do vídeo de lançamento · [assista ao vídeo inteiro, com som](docs/media/isper-launch.mp4)</sub>
 
-| Ferramenta | Como foi instalado | Observação |
-|---|---|---|
-| Rust (rustup) | `rustup-init.exe -y` | a versão vem de [`rust-toolchain.toml`](rust-toolchain.toml) (1.98.0, com rustfmt e clippy): o rustup instala sozinho no primeiro `cargo`; o CI usa a mesma |
-| VS Build Tools 2022 | `winget install Microsoft.VisualStudio.2022.BuildTools` + workload VCTools | compila o whisper.cpp (C++) |
-| CMake | zip portátil em `%LOCALAPPDATA%\Programs\cmake-*\bin` (no PATH de usuário) | exigido pelo whisper-rs-sys |
-| libclang | `pip install --user libclang` | exigido pelo bindgen; `LIBCLANG_PATH` aponta p/ `%APPDATA%\Python\Python311\site-packages\clang\native` (persistido como env var de usuário) |
+</div>
 
-## Build
+<br>
 
-Basta:
+## Segure. Fale. Solte.
 
-```bash
-cargo build --release
-```
-
-CUDA vem **ligado por padrão** (`default = ["cuda"]` em `isper-cli` e
-`isper-app`); sem GPU NVIDIA use `--no-default-features`. As flags de
-otimização e SIMD ficam em [`.cargo/config.toml`](.cargo/config.toml) — o
-cargo as aplica automaticamente ao build script, de qualquer shell.
-
-**Por que elas existem (pegadinha crítica no Windows/MSVC):** o crate `cmake`
-engole os flags de otimização do modo Release — sem intervenção, o whisper.cpp
-sai compilado **sem `/O2`** (equivale a `/Od`, ~13× mais lento). O build.rs
-do `whisper-rs-sys` repassa qualquer env `GGML_*` ou `CMAKE_*` ao CMake, e é
-isso que o `.cargo/config.toml` explora. Se mudar essas flags, rode antes
-`cargo clean -p whisper-rs-sys --release`; para conferir os flags usados:
-`Select-String -Path target\release\build\whisper-rs-sys-*\output -Pattern 'CL\.exe /c'`.
-
-### Build com CUDA (Fase 3)
-
-Requer o CUDA Toolkit (`winget install Nvidia.CUDA`). Depois:
-
-```bash
-cargo build --release
-```
-
-(Num shell aberto **antes** da instalação do CUDA, exporte
-`CUDA_PATH` e `CUDA_PATH_V13_3` apontando para o toolkit — shells novos já
-os recebem do instalador. `CMAKE_CUDA_ARCHITECTURES=89` — só a arquitetura da
-RTX 4050 — já está no `.cargo/config.toml` e corta MUITO o tempo de build.)
-
-Pegadinhas encontradas:
-- Erro `The CUDA Toolkit directory '' does not exist` → o MSBuild não achou
-  `CUDA_PATH_V13_3` no ambiente (shells abertos antes da instalação não têm
-  a variável) — exporte-a como acima.
-- O instalador do CUDA pode não copiar a `Nvda.Build.CudaTasks.v13.3.dll` —
-  copie (como admin) os arquivos de
-  `<toolkit>\extras\visual_studio_integration\MSBuildExtensions\` para
-  `<BuildTools>\MSBuild\Microsoft\VC\v170\BuildCustomizations\`.
-
-- As DLLs de runtime do CUDA 13 (`cudart64_13.dll`, `cublas64_13.dll`…) ficam
-  em `<toolkit>\bin\x64` — o instalador põe no PATH de máquina, mas shells
-  abertos antes da instalação precisam adicionar o caminho manualmente
-  (sintoma: o exe morre na hora com STATUS_DLL_NOT_FOUND, sem mensagem).
-- O cargo não consegue substituir `isper-app.exe` com o app aberto
-  (`Acesso negado`) — feche pelo tray antes de rebuildar.
-
-Com CUDA, o app prefere `models/ggml-large-v3-turbo-q5_0.bin` automaticamente.
-Medido na RTX 4050: 10,4 s de áudio transcritos em 0,6 s (16× tempo real).
-
-## Modelos
-
-O ISPer tem um **gerenciador de modelos** (crate `isper-models`): catálogo,
-download com progresso e **SHA-256 verificado contra o publicado no Hugging
-Face**, tudo em `%LOCALAPPDATA%\com.isper.desktop\models`. Sem nenhum modelo instalado, o
-app abre as Configurações sozinho para você baixar um.
-
-```bash
-cargo run --release -p isper-cli -- models list
-```
-
-```bash
-cargo run --release -p isper-cli -- models download ggml-large-v3-turbo-q5_0.bin
-```
-
-No app: Configurações → **Modelos Whisper** (baixar, remover e escolher; a
-troca é a quente). Em desenvolvimento, arquivos em `models/` na raiz do
-repositório também são reconhecidos.
-
-## Uso
-
-### App de ditado (Fase 2)
-
-```bash
-cargo run --release -p isper-app
-```
-
-O app fica na **bandeja do sistema** e abre com a **tela Início**: uma janela
-central com o estado do motor (modelo carregado, GPU, atalho ativo), fonte de
-áudio das reuniões, diarização e IA, o botão de gravar reunião (com
-cronômetro), um checklist do que falta ou é opcional configurar, totais e as
-reuniões recentes (clique abre a Biblioteca já na reunião). Ela volta com um
-clique esquerdo no ícone da bandeja ou clicando de novo no atalho do ISPer;
-no início junto com o Windows o app nasce quieto na bandeja. Para não abri-la
-no lançamento manual, desmarque "Mostrar esta tela ao abrir" no rodapé (ou em
-Configurações → Sistema).
-
-É **uma janela só**: Início, Biblioteca e Configurações ficam na barra
-lateral, e trocar de tela não perde o que estava aberto. A barra também tem o
-botão de gravar reunião (com o cronômetro, "Marcar" e "Encerrar" durante a
-gravação) e recolhe para só os ícones (Ctrl+B). **Ctrl+K** abre a paleta de
-comandos: ir para qualquer tela ou seção das Configurações, gravar, importar
-áudio, alternar o tema ou achar uma reunião. Ctrl+1/2/3 levam ao Início, à
-Biblioteca e ao Copilot, Ctrl+, às Configurações e **Ctrl+/** lista todos os
-atalhos. A janela lembra tamanho, posição e se estava maximizada. O Copilot e
-o indicador flutuante continuam à parte, para ficar ao lado da reunião
-([ADR 0020](docs/adr/0020-janela-unica.md)).
-
-O atalho global é Ctrl+Alt+Espaço, ou o
-primeiro livre entre Ctrl+Shift+Espaço / Ctrl+Alt+D / Ctrl+Alt+I — a dica no
-menu da bandeja mostra qual foi registrado. Dois modos:
-
-- **Push-to-talk**: segure o atalho, fale, solte → o texto é colado no app
-  focado via Ctrl+V (o clipboard anterior é restaurado em seguida).
-- **Mãos-livres**: toque rápido no atalho, fale à vontade → ~1,2 s de
-  silêncio (ou um segundo toque) encerra e cola sozinho.
-
-Requer `models/ggml-small.bin` (ou a env `ISPER_MODEL` apontando para outro
-modelo ggml).
-
-Na bandeja, **"Configurações…"** abre a tela com: atalho global (trocado na
-hora, sem reiniciar — escolha na lista ou clique em **"Gravar atalho"** e
-pressione a combinação que quiser), **microfone** (vale para o ditado e para
-o canal "Eu" das reuniões; se desconectar, cai para o padrão), idioma,
-**dicionário pessoal** (termos que o Whisper deve grafar certo — viram o
-`initial_prompt`), provider de IA com chave e teste de conexão, e iniciar
-com o Windows. Cada ditado também fica no histórico (`%APPDATA%\ISPer\isper.db`,
-tabela `dictations`).
-
-**Comandos de voz** (ligados por padrão; Configurações → Ditado): diga
-*nova linha*, *novo parágrafo*, *ponto final*, *vírgula*, *ponto de
-interrogação*, *ponto de exclamação*, *dois pontos*, *ponto e vírgula*,
-*reticências*, *abre/fecha parênteses*, *abre/fecha aspas*, *travessão* ou
-*arroba* e o ISPer insere o símbolo, arruma o espaçamento e a maiúscula
-seguinte. No fim do ditado, *apagar isso* descarta tudo (nada é colado) e
-*tudo em maiúsculas* / *tudo em minúsculas* muda a caixa. É processamento
-de texto local, casado por palavra inteira e sem diferenciar acentos.
-
-**Qualidade da transcrição**: o motor suprime tokens que não são fala e filtra
-as alucinações clássicas do Whisper — "Legendas pela comunidade", loops de uma
-palavra repetida, trechos só de símbolos e segmentos que o próprio modelo
-marca como "não é fala" (probabilidade > 0,75). O dicionário pessoal, além de
-orientar o modelo, corrige por semelhança o que ele ainda errar ("ísper" →
-"ISPer", "opt solve" → "OptSolv"), no ditado e nas reuniões.
-
-**Polimento por IA (opcional)**: em Configurações → Inteligência, "Polir os
-ditados com IA antes de colar" tira hesitações ("é", "hã", "tipo"),
-repetições e arruma pontuação usando o provider configurado — estilo "só
-limpeza", formal ou casual. Só o texto do ditado é enviado; custa cerca de um
-segundo; se a API falhar ou não houver chave, o original é colado
-normalmente, e o histórico guarda os dois (selo "IA" na Biblioteca).
-
-### Notetaker de reuniões (Fase 4)
-
-No app: bandeja → **"Iniciar gravação de reunião"**, o botão da tela Início
-ou o **atalho global de reunião** (Ctrl+Alt+M por padrão; configurável). O
-ícone da bandeja ganha um **ponto vermelho** enquanto grava. O pill mostra o
-estado; o mesmo caminho encerra ("Encerrar e transcrever a reunião") — o
-transcript abre sozinho e fica salvo em `Documentos\ISPer\Reunioes\*.md` +
-SQLite em `%APPDATA%\ISPer\isper.db`. Mic = "Eu"; áudio do sistema
-(loopback) = "Participantes". Avise os participantes (LGPD).
-
-**Ao salvar**: por padrão o ISPer mostra uma **notificação do Windows**
-("Reunião salva — título · duração · resumo pronto"); clicar nela abre a
-Biblioteca já naquela reunião. Em Configurações → Reuniões dá para trocar por
-"abrir o arquivo .md" (comportamento antigo) ou "nada". Quando a
-identificação de falantes termina, chega uma segunda notificação, silenciosa.
-O ISPer registra o próprio nome e ícone para notificações no registro do
-usuário (`HKCU\Software\Classes\AppUserModelId\com.isper.desktop`) — por isso
-funciona mesmo rodando o `.exe` sem instalador. "Testar notificação" nas
-Configurações mostra uma de exemplo.
-
-**Sair com reunião em andamento** (bandeja → Sair) encerra e salva a reunião
-antes de fechar — nada se perde.
-
-**Ao vivo**: cada bloco de ~20 s é transcrito durante a reunião — as falas
-aparecem no card de reunião da tela Início conforme chegam, e a última fala
-passa pelo indicador flutuante. Tudo local; nenhum áudio ou texto sai da
-máquina nessa etapa.
-
-**Título automático**: com um provider de IA configurado, o resumo pós-reunião
-vem junto com um título curto do assunto ("Planejamento PCP da semana 37" em
-vez de "Reunião — data"); o `.md` é regravado inteiro com título e resumo.
-
-**Parágrafos legíveis**: falas consecutivas do mesmo falante são agrupadas
-só enquanto a pausa entre elas for menor que 4 s e o parágrafo não passar de
-60 s — cada parágrafo mantém o horário. Vale para o `.md`, o DOCX e a
-Biblioteca.
-
-**Biblioteca**: bandeja → "Biblioteca de reuniões…" (ou o botão na tela
-Início) lista todas as
-reuniões com busca no título, resumo e transcript; cada uma abre com resumo,
-transcript por falante, renomear, abrir o `.md` e excluir do histórico (o
-arquivo fica). A aba Ditados mostra o histórico do que você ditou, em largura
-inteira. Com a busca semântica configurada (abaixo), o botão **Semântica**
-acha reuniões e ditados pelo sentido e abre a reunião já no trecho.
-
-**Indicador flutuante**: arraste-o para onde quiser (a posição é lembrada);
-passe o mouse para ver `–` (modo mini: só o ponto + cronômetro da reunião) e
-`×` (ocultar). O botão **Indicador** da tela Início e o item da bandeja
-alternam mostrar/ocultar: em repouso ele fica **fixo na tela** ("pronto ·
-atalho") até você ocultá-lo, e volta sozinho no próximo ditado ou reunião.
-Enquanto visível ele fica **acima de qualquer janela**, inclusive de outras
-"sempre no topo" (Teams em chamada, players): o ISPer reafirma essa
-prioridade ao mostrá-lo e a cada 1,5 s, sem roubar o foco do que você está
-usando.
-
-**Legendas ao vivo**: o botão **CC** do indicador (ou o interruptor
-"Legendas no indicador" na tela Início, durante a reunião) troca o indicador
-para uma barra larga que mostra as duas últimas falas transcritas, com o
-falante — útil para acompanhar uma reunião sem ficar na tela Início. Volta ao
-normal pelo mesmo botão; a preferência é lembrada.
-
-**Momentos marcados**: durante a reunião, **Ctrl+Alt+K** (configurável), o
-botão **★** do indicador ou o "★ Marcar momento" da tela Início marcam o
-instante atual — para "isso é importante, quero voltar aqui". Os momentos
-viram a seção "Momentos marcados" do Markdown e do DOCX (com o trecho da fala
-em curso), chips clicáveis na Biblioteca que rolam até a fala destacada, e
-o resumo por IA dá prioridade a esses trechos. Dois toques em menos de 1,5 s
-contam como um.
-
-**Buscar dentro de uma reunião**: com a reunião aberta, a barra "buscar nesta
-reunião" (ou Ctrl+F) destaca cada ocorrência no resumo e no transcript — sem
-diferenciar maiúsculas nem acentos —, com contador, Enter/Shift+Enter para
-navegar e "Só trechos" para ver apenas as falas que contêm o termo. Se a
-reunião apareceu por causa da busca geral, o termo já vem destacado.
-
-**Nomear participantes**: clique no nome de um falante no transcript
-("Participante 1") e digite o nome real — vale para toda a reunião, o `.md`
-é regravado e a cor do falante se mantém. (Reconhecer a mesma voz em reuniões
-futuras fica para depois.)
-
-**Copiar e exportar**: botões "Copiar resumo" e "Copiar transcript" (texto
-puro com horários), e **Exportar SRT** (legendas) ou **DOCX** (Word) — o
-arquivo é gravado ao lado do `.md` e mostrado no Explorer.
-
-**Só o Teams**: em Configurações → Reuniões, escolha "Só o Microsoft Teams" —
-o ISPer usa o *process loopback* do Windows e ignora notificações, músicas e
-outros apps (se o Teams não estiver aberto, cai para o sistema e avisa).
-
-**Chamada detectada → "Gravar transcrição?"**: o ISPer percebe quando o Teams
-entra em chamada pelas **sessões de áudio do Windows** (em chamada, o Teams
-mantém o microfone aberto — sem bot, sem API do Teams, sem olhar janelas) e
-avisa por notificação (clicar grava), por um banner na tela Início e pelo
-indicador; quando a chamada termina com a gravação ligada, pergunta se
-encerra. Em Configurações → Reuniões → "Chamadas do Teams" você escolhe
-avisar (padrão), **gravar automaticamente** (e encerrar sozinho quando a
-chamada acabar) ou não detectar. A sondagem roda a cada 4 s com histerese
-(~8 s para começar, ~24 s para terminar), então o teste de microfone e sons
-de notificação não disparam nada.
-
-**Quem falou o quê**: Configurações → Reuniões → "Baixar modelos (~45 MB)"
-instala pyannote + 3D-Speaker (via sherpa-onnx, 100% local). A reunião é
-salva e aberta **na hora** com "Participantes"; a identificação roda **em
-segundo plano** (na CPU ela leva cerca de 40% da duração da reunião — o
-sherpa-onnx usa uma thread só) e, ao terminar, "Participantes" vira
-"Participante 1", "Participante 2"… no banco, na Biblioteca e no `.md`; o
-Início mostra "identificando falantes…" na reunião enquanto isso. O número
-de falantes é descoberto por agrupamento; se juntar ou separar demais,
-calibre o threshold sem recompilar: `ISPER_DIARIZE_THRESHOLD=0.2` (menor =
-mais falantes distintos; padrão 0.3). Para calibrar offline sem regravar:
-`isper-cli diarize fixtures/duas-vozes-16k.wav`. Fechar o ISPer no meio
-cancela a identificação daquela reunião (os rótulos genéricos ficam).
-
-Na CLI (laboratório):
-
-```bash
-cargo run --release -p isper-cli -- meeting 30 --source teams
-```
-
-```bash
-cargo run --release -p isper-cli -- models download-diarize
-```
-
-Depuração do loopback (taxa de entrega por segundo + WAV):
-
-```bash
-cargo run --release -p isper-cli --bin loopdump -- 15
-```
-
-### Inteligência de nuvem (Fase 5)
-
-Ao fim de cada reunião, o ISPer pode gerar **resumo, pontos principais,
-action items e decisões** via API de LLM — anexados ao Markdown e ao banco.
-Configure uma vez:
-
-```bash
-cargo run --release -p isper-cli -- llm use groq
-```
-
-```bash
-cargo run --release -p isper-cli -- llm set-key groq
-```
-
-```bash
-cargo run --release -p isper-cli -- llm test
-```
-
-Providers: `groq` (chave gratuita em console.groq.com/keys), `gemini`
-(aistudio.google.com/apikey) e `claude` (console.anthropic.com; usa
-`claude-opus-5` por padrão). Os catálogos de modelos mudam rápido e variam
-por conta — liste os que a SUA chave enxerga com `llm models` (ou o botão
-"Listar modelos" nas Configurações) e escolha com
-`llm use <provider> --model <id>`. A chave fica no **Credential Manager do
-Windows** — nunca em arquivo. Privacidade: só o TEXTO do transcript é
-enviado; o áudio nunca sai da máquina. Sem provider configurado, tudo
-funciona normalmente — apenas sem resumo.
-
-**Insights ao vivo** (Configurações → Inteligência, opt-in): durante a
-reunião, a cada 3, 5 ou 10 minutos os últimos ~15 min de transcrição vão ao
-provider com quatro perguntas — o que ficou pendente, o que "Eu" prometeu, o
-que foi decidido, o que ninguém respondeu — e a resposta anterior é
-consolidada em vez de recomeçar. O painel "Insights ao vivo" no card de
-reunião do Início mostra o resultado e tem "Atualizar agora" (que também
-serve como rodada avulsa com o recurso desligado). Rodadas sem fala nova são
-puladas para não gastar API.
-
-**Busca semântica** (Configurações → Inteligência): reuniões e ditados viram
-vetores (embeddings) guardados no SQLite ao lado do texto, e a Biblioteca
-ganha o botão **Semântica** — "quando falamos do orçamento?" acha o trecho
-mesmo sem a palavra exata. Provider à sua escolha: **Gemini**
-(`gemini-embedding-001`, free tier; reutiliza a chave do Gemini) ou qualquer
-endpoint **compatível com OpenAI** — inclusive um **Ollama local**
-(`ollama pull nomic-embed-text` ou `bge-m3`; base `http://localhost:11434/v1`,
-sem chave, nada sai da máquina). Cada reunião salva e cada ditado colado é
-indexado em segundo plano; "Indexar tudo" cobre o histórico anterior e
-refaz o índice quando o modelo muda. Os vetores de um modelo nunca se
-comparam com os de outro.
-
-### Copilot de reunião (Fase 8)
-
-Janela própria (`copilot.html`) que acompanha a reunião ao vivo: a fala de um
-lado e, do outro, cards de **decisão, ação, risco e pergunta** extraídos pela
-IA. O que o usuário confirma vira seção do Markdown da reunião e linha na
-tabela `decisions` (schema v3), que a Biblioteca mostra. Guia de uso no site:
-[Usar o Copilot](https://isper.pages.dev/docs/copilot/usar-o-copilot/).
-
-Onde mora cada parte:
-
-| Arquivo | O quê |
+| | |
 |---|---|
-| `crates/isper-llm/src/copilot.rs` | Cards, prompt, parser do JSON, id estável, gatilhos locais, a pergunta do filtro, seção da ata |
-| `crates/isper-llm/src/providers.rs` | `complete_stream` (SSE) para Claude, Groq e Gemini |
-| `crates/isper-llm/src/systemone.rs` | O cliente do Jev (TypeSafe) e o trait `Classifier` |
-| `apps/isper-app/src-tauri/src/copilot.rs` | Estado da reunião, loop de análise, memória (RAG), comandos |
-| `apps/isper-app/src-tauri/src/copilot_filter.rs` | O filtro: parágrafos fechados, leitura pelo Jev, rodada focada |
-| `apps/isper-app/ui/copilot.html` | O HUD |
-| `apps/isper-app/ui/locales/{pt-BR,en}.json` | Os textos do HUD (chaves `copilot.*`) |
+| **Segure** | o atalho (`Ctrl` + `Alt` + `Espaço`), em qualquer aplicativo: Teams, Outlook, navegador, editor. |
+| **Fale** | à vontade. A legenda aparece ao vivo no indicador do ISPer, flutuando sobre o que você estiver usando. |
+| **Solte** | e o texto cai onde o cursor estava, já com pontuação. Seu histórico guarda tudo. |
 
-Três decisões que valem a leitura antes de mexer:
+Prefere não segurar? Um toque rápido no atalho liga o modo mãos-livres, e uma pausa encerra sozinha.
 
-- **O id do card é derivado de `kind + título normalizado`, nunca o da IA.** O
-  modelo devolve `"c1"`, `"c2"` a cada rodada; ids que colidem entre rodadas
-  fariam "Confirmar" mexer em outro card. Títulos reformulados contam como o
-  mesmo card por semelhança de tokens (`SAME_CARD_SIMILARITY`).
-- **Cada thread de análise carrega a geração da reunião em que nasceu.**
-  Encerrar não interrompe uma chamada HTTP em voo; sem a geração, o resultado
-  atrasado cairia na reunião seguinte e a limpeza da thread velha apagaria o
-  canal da nova.
-- **Dois eventos, não um.** `isper-copilot` leva o estado inteiro e só sai
-  quando ele muda; `isper-copilot-metrics` leva a dinâmica de fala, a cada
-  bloco transcrito, com garganta. Mandar o estado inteiro a cada fala clonava
-  os cards e devolvia o bloco de notas para a tela no meio da digitação.
+## O que o ISPer faz
 
-Os parâmetros ficam em constantes no topo de `apps/isper-app/src-tauri/src/copilot.rs`:
-primeira leitura (`FIRST_ROUND_SECS`, 20 s), pulso (`COPILOT_AUTO_INTERVAL_SECS`,
-45 s), piso entre rodadas (`MIN_GAP_BETWEEN_ROUNDS_SECS`, 15 s), janela de
-transcrição (20 min na análise, 30 min no Q&A) e o corte da memória
-(`RECALL_MIN_SCORE`, 0,55 — escolhido para errar para o lado de calado, **ainda
-não calibrado com reuniões reais**). As frases-gatilho ficam em
-`DECISION_CUES`, `ACTION_CUES` e `RISK_CUES`, em `crates/isper-llm/src/copilot.rs`,
-e são em português, como o prompt: com a interface em inglês, cards, respostas
-e notas continuam saindo em português.
+<table>
+<tr>
+<td width="50%" valign="top">
 
-**Custo:** rodada, gatilho e memória só acontecem com a janela do HUD na tela
-— visível, mesmo atrás de outra, e não minimizada. O loop confere a cada 2 s
-(`WATCH_TICK`) e, quando a janela aparece, lê a conversa na hora; a decisão de
-cada volta está em `turn()`, com testes. Com a janela aberta, numa conversa
-contínua, são perto de 80 chamadas por hora. Até a 0.20.0 o loop rodava em
-toda reunião, com o HUD aberto ou não.
+**Ditado em qualquer aplicativo**<br>
+Comandos de voz para pontuação ("nova linha", "vírgula"…), dicionário pessoal para nomes e termos do seu trabalho, e polimento opcional por IA.
 
-**Filtro do Jev** (opcional, `copilot_filter = "jev"`,
-[ADR 0019](docs/adr/0019-filtro-do-copilot-pelo-jev.md)):
+</td>
+<td width="50%" valign="top">
 
-- Cada parágrafo fechado vai ao Jev, com a mesma regra da ata (4 s de pausa,
-  60 s no máximo).
-- Com p(card) ≥ 0,5 (`FILTER_THRESHOLD`), sai uma rodada focada nos últimos
-  3 min (`FOCUS_WINDOW_SECS`). O gatilho de frases fixas se cala, e o pulso
-  completo passa a 3 min (`FILTERED_PULSE_SECS`).
-- Em 450 parágrafos de reuniões reais, pegou 92% dos momentos que viram card,
-  contra 5% das frases fixas. Custa ~US$ 0,005 por hora (552 tokens por
-  parágrafo).
-- A pergunta (`filter_questions`) e o modelo (`jev-1.13.0`) são os medidos:
-  mudar pede medir de novo.
-- Chave: `isper-cli llm set-key typesafe` ou a tela de Configurações.
+**Reuniões do Teams, sem bot na chamada**<br>
+Grava o microfone e o áudio do computador, percebe quando uma chamada começa e separa quem falou o quê.
 
-**Notas:** o bloco vai com a reunião — seção "Notas da reunião" no fim do
-`.md`, coluna `notes` no banco (schema v4) e a Biblioteca. O fim da reunião
-captura o estado (`CopilotWrapUp`) com a geração; enquanto o estado ainda for
-daquela reunião, vale o texto mais recente, e depois de salva cada edição
-regrava banco e ata. As notas não vão para o provedor do resumo, só para o
-"Enriquecer". Toda regravação do `.md` passa por `meeting_markdown` (em
-`library.rs`), uma de cada vez, e põe decisões e notas no fim.
+</td>
+</tr>
+<tr>
+<td valign="top">
 
-**Janela nova precisa entrar na ACL.** Fora de `capabilities/default.json`, o
-Tauri nega `plugin:event|listen` e a janela não recebe evento nenhum — mas os
-comandos do app continuam respondendo (comandos próprios não passam pela ACL),
-então ela carrega o estado ao abrir e congela a partir dali. Foi assim que o
-Copilot nasceu sem transcrição ao vivo.
+**Biblioteca pesquisável**<br>
+Cada reunião vira uma ata em Markdown e DOCX, com momentos marcados (`Ctrl` + `Alt` + `K`), busca por palavra e, se você quiser, por sentido.
 
-Para iterar no HUD sem compilar o app com CUDA:
+</td>
+<td valign="top">
 
-```bash
-python tools/e2e/copilot-harness.py
+**IA quando você quiser**<br>
+Resumo, decisões e ações ao fim da reunião, e um Copilot que acompanha a conversa ao vivo. Com Groq, Gemini ou Claude, e só sobre o texto.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Rápido na sua máquina**<br>
+Whisper rodando localmente, em CPU ou em GPU NVIDIA. Numa RTX 4050, 10,4 s de áudio saem em 0,6 s.
+
+</td>
+<td valign="top">
+
+**Uma janela só**<br>
+Início, Biblioteca e Configurações numa barra lateral, com a paleta de comandos (`Ctrl` + `K`). Interface em português e inglês, nos temas claro e escuro.
+
+</td>
+</tr>
+</table>
+
+## O áudio não atravessa esta linha
+
+```mermaid
+flowchart LR
+  subgraph PC["Seu computador · Windows"]
+    direction LR
+    A["Microfone e sistema<br/>captura local, sem bot"] --> B["whisper.cpp<br/>transcrição e falantes"] --> C["SQLite<br/>histórico e busca no disco"]
+  end
+  C -. "só o texto, se você ativar" .-> D["Provedor de IA<br/>que você configurar"]
+
+  classDef local fill:#26211e,stroke:#4a403a,color:#ece7e1
+  classDef cloud fill:#1b1714,stroke:#4a403a,color:#a79e96,stroke-dasharray: 5 4
+  class A,B,C local
+  class D cloud
+  style PC fill:#161311,stroke:#f07e72,color:#f79f94
 ```
 
-Serve `/copilot.html` e `/library.html` com um Tauri simulado e uma reunião
-roteirizada (`__sim.play()`, `__sim.scenario('no-key')`, `__sim.lang('en')` no
-console; `?lang=en` abre em inglês). Ele **não**
-pega a ACL — lá `listen()` é mock. Detalhes em `tools/e2e/README.md`.
+A captura, a transcrição e a identificação de falantes acontecem no seu computador. Sem provedor de IA configurado, nada sai da máquina. Com um configurado, só o texto que você pedir para resumir vai até ele. A chave fica no Gerenciador de Credenciais do Windows, nunca em arquivo.
 
-### CLI (Fase 1)
+## Baixar
 
-```bash
-cargo run --release -p isper-cli -- rec 5
-```
-
-```bash
-cargo run --release -p isper-cli -- file fixtures/fala-16k.wav
-```
-
-Opções: `--model <caminho>` (padrão `models/ggml-small.bin`), `--lang <pt|en|auto>`.
-
-## Instalador e atualizações
-
-O ISPer é distribuído em duas variantes de instalador NSIS por usuário (sem
-UAC). A partir da 0.15.0 elas são compiladas no GitHub Actions no push da tag
-([`release.yml`](.github/workflows/release.yml) — a variante GPU instala o
-CUDA Toolkit no runner), com SBOM CycloneDX e `SHA256SUMS.txt` publicados
-junto; [`scripts/release.ps1`](scripts/release.ps1) faz o mesmo na máquina
-do mantenedor, como reserva. O processo completo, os segredos envolvidos e o
-caminho da assinatura Authenticode (SignPath Foundation) estão em
-[`docs/RELEASE.md`](docs/RELEASE.md).
-
-| Variante | Arquivo | Para quem | Atualiza por |
+| Versão | Para quem | Instalador | Portátil (zip) |
 |---|---|---|---|
-| GPU (CUDA) | `ISPer_<v>_x64-setup.exe` (~400 MB, DLLs do CUDA dentro) | GPU NVIDIA | `latest.json` |
-| CPU | `ISPer_<v>_x64-cpu-setup.exe` (~50 MB) | qualquer PC x64 com AVX2 | `latest-cpu.json` |
+| **CPU** | qualquer PC x64 com AVX2 (Windows 10 ou 11) | ~15 MB | ~21 MB |
+| **CUDA** | quem tem GPU NVIDIA | ~430 MB | ~455 MB |
 
-As duas trazem as DLLs do sherpa-onnx (identificação de falantes) e o runtime
-do Visual C++ ao lado do exe, então uma máquina limpa instala e abre. Na CPU
-prefira o modelo Small ou Medium; o Large é lento sem GPU.
+**[Escolher a versão no site →](https://isper.pages.dev/download/)** A página confere o tamanho e a soma SHA-256 de cada arquivo e mostra o comando que verifica o download. Todas as versões estão nas [releases do GitHub](https://github.com/Marcus-Boni/ISPer/releases).
 
-```powershell
-.\scripts\release.ps1
-```
+O app avisa quando sai uma versão nova e se atualiza com um clique, conferindo a assinatura antes de instalar. O instalador ainda não tem certificado Authenticode, então o Windows pergunta na primeira execução: *Mais informações → Executar assim mesmo*.
 
-```powershell
-.\scripts\release.ps1 -Publish
-```
+## Para quem desenvolve
 
-O script lê a versão do `Cargo.toml` do app (fonte única — o `tauri.conf.json`
-não a repete; o Tauri lê de lá), exige a seção
-`## [versão]` no [`CHANGELOG.md`](CHANGELOG.md) (que vira as notas da release),
-árvore do git limpa e, com `-Publish`, CI verde no commit. Depois copia para
-`resources/` as DLLs do sherpa-onnx e do Visual C++. As do sherpa-onnx vêm do
-pré-compilado que o build script do crate `sherpa-onnx` baixa em
-`target/sherpa-onnx-prebuilt`, e não de `target/release`, onde o tauri-build
-pode ter deixado uma cópia antiga. As do Visual C++ vêm do VS Build Tools.
-Então encerra as cópias do app que rodam de `target/`, roda `tauri build` por
-variante (`--config tauri.gpu.conf.json` com as DLLs do CUDA; `--config
-tauri.cpu.conf.json --no-default-features` em `target-cpu/`), assina e deixa
-tudo em `dist\v<versão>\`. Com `-Publish`, `gh release create v<versão>` sobe os seis
-arquivos; a tag dispara o workflow
-[`release.yml`](.github/workflows/release.yml), que valida tag × manifests ×
-CHANGELOG e roda o CI de novo. As DLLs do CUDA (`cudart64_13`, `cublas64_13`,
-`cublasLt64_13`, ~500 MB) vêm de `<CUDA>\bin\x64` e ficam em
-`apps/isper-app/src-tauri/resources/cuda/` (pasta gitignored).
-
-**Atualização automática**: o app consulta o manifest da sua variante em
-`https://github.com/Marcus-Boni/ISPer/releases/latest/download/` 45 s depois
-de abrir e uma vez por dia (Configurações → Sistema desliga). Havendo versão
-nova, a tela Início mostra um banner com as novidades e um toast silencioso
-avisa; "Atualizar agora" baixa o instalador, **verifica a assinatura minisign**
-com a chave pública embutida (`plugins.updater.pubkey` no `tauri.conf.json`) e
-o executa em modo passivo — o ISPer fecha e volta na versão nova. Nada é
-baixado sem um clique; durante uma reunião a atualização é recusada; um
-download que não bate com a assinatura é descartado. Validado de ponta a ponta
-na passagem 0.11.0 → 0.11.1 num app instalado.
-
-**Onde ficam as coisas**: programa em `%LOCALAPPDATA%\Programs\ISPer` (ou na
-pasta que você escolher no instalador); dados locais — modelos e logs — em
-`%LOCALAPPDATA%\com.isper.desktop`; configurações e banco em `%APPDATA%\ISPer`;
-transcrições em `Documentos\ISPer\Reunioes`. Até a 0.12.1 os dados locais
-ficavam em `%LOCALAPPDATA%\ISPer`, que é justamente a pasta padrão de
-instalação por usuário do Tauri — um instalador rodado à mão misturava programa
-e dados; o app move a pasta antiga sozinho na primeira abertura.
-
-**Chave de assinatura**: gerada uma vez com
-`npx @tauri-apps/cli@^2 signer generate -w %USERPROFILE%\.tauri\isper.key`.
-A privada (sem senha; para uma com senha, defina
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` antes de rodar o script) fica só nessa
-pasta (fora do repositório — `*.key` está no `.gitignore`) e a pública vai no
-`tauri.conf.json`. Quem tiver a privada consegue publicar atualizações que os
-ISPers instalados aceitam: faça backup dela e não a compartilhe. Se ela se
-perder, gere outra e publique uma versão com a nova pública — quem já tem o app
-instalado reinstala uma vez.
-
-**Política de assinatura de código**: o instalador ainda não tem certificado
-Authenticode, então o Windows avisa na primeira execução ("Mais informações →
-Executar assim mesmo"). A assinatura minisign protege a integridade das
-*atualizações* e o `SHA256SUMS.txt` de cada release permite conferir o
-download; nenhum dos dois substitui o certificado. O caminho escolhido é o
-programa para projetos open source da **SignPath Foundation** (candidatura em
-andamento; o job `sign` do [`release.yml`](.github/workflows/release.yml) já
-está pronto e é pulado até a aprovação), começando pela variante CPU — a GPU
-embute as DLLs redistribuíveis do CUDA. Quando aprovado, cada release passa a
-ser assinada no pipeline da SignPath, a partir do build feito nos runners do
-GitHub e depois de aprovação manual do mantenedor. Nos termos da Foundation:
-
-- *Free code signing provided by [SignPath.io](https://signpath.io),
-  certificate by [SignPath Foundation](https://signpath.org).*
-- **Equipe** — committers e reviewers: Marcus Boni
-  ([@Marcus-Boni](https://github.com/Marcus-Boni)); approvers: Marcus Boni.
-  Contribuições externas entram só por pull request revisado, com os três
-  checks do CI verdes ([CONTRIBUTING.md](CONTRIBUTING.md)).
-- **Privacidade** — *This program will not transfer any information to other
-  networked systems unless specifically requested by the user.* Na prática: o
-  áudio e as transcrições nunca saem da máquina; a verificação de atualização
-  consulta as releases do GitHub (desligável em Configurações → Sistema); só o
-  texto que você pedir para resumir vai ao provedor de IA que você mesmo
-  configurar, e só se configurar um. Detalhes em [SECURITY.md](SECURITY.md).
-
-A reputação no SmartScreen se forma com o tempo, a partir do certificado; a
-assinatura não elimina o aviso de imediato.
-
-## Logs e diagnóstico
-
-Pânicos também vão para o log, com mensagem, arquivo:linha, thread e
-backtrace: o exe não tem stderr, então sem isso um crash sumia sem rastro.
-
-O app grava logs em `%LOCALAPPDATA%\com.isper.desktop\logs\isper.log.<data>` (um arquivo
-por dia, 14 dias guardados) além do stdout. O arquivo é **JSON Lines**: um
-objeto por linha com `timestamp`, `level`, `message` e os campos do evento
-(`audio_secs`, `infer_secs`…), fácil de filtrar:
-
-```powershell
-Get-Content "$env:LOCALAPPDATA\com.isper.desktop\logs\isper.log.$(Get-Date -Format yyyy-MM-dd)" | ConvertFrom-Json | Where-Object level -eq WARN
-```
-
-Configurações → Sistema → **Diagnóstico** lista versão, motor, modelo, DLLs
-do CUDA, microfones, caminhos, a versão do schema do banco e as **métricas
-locais** dos últimos 30 dias (ditados e blocos de reunião: quantidade,
-falhas, p50/p95 da inferência e fator de tempo real — gravadas no banco, nunca
-enviadas). "**Exportar diagnóstico**" gera um `.zip` em `Documentos\ISPer`
-com o diagnóstico, as versões (ISPer, Tauri, WebView2, Windows), `config.toml`
-e `llm.toml` (sem chaves), as métricas e os três últimos logs — as linhas com
-texto ditado saem antes. É o que mandar ao pedir ajuda; nada é enviado sozinho.
-
-**Dados** (Configurações → Sistema): "Guardar reuniões e ditados por" define
-a retenção — 30, 90, 180 dias ou 1 ano. **O padrão é para sempre**: nada é
-apagado sem você escolher um prazo e confirmar na tela. Com um prazo, o ISPer
-apaga do banco e da pasta de Reuniões o que passou dele, ao abrir, uma vez
-por dia e ao encurtar o prazo (LGPD: guardar só o necessário), e antes de
-apagar grava um backup automático em `Documentos\ISPer\Backups` (ficam os
-três últimos) — o que saiu continua recuperável. "Fazer backup do banco"
-grava uma cópia íntegra em
-`Documentos\ISPer\Backups`, mesmo com o app aberto; para restaurar, feche o
-ISPer e copie o arquivo por cima de `%APPDATA%\ISPer\isper.db`. O banco tem
-schema versionado (`PRAGMA user_version`): uma versão nova migra o banco
-antigo ao abrir, e um banco de versão mais nova é recusado com aviso em vez
-de alterado.
-
-## Testes e CI
+O ISPer é escrito em **Rust**, com **Tauri 2** e **whisper.cpp**; a identificação de falantes usa **sherpa-onnx**. A interface é HTML, CSS e JavaScript sem etapa de build, e roda offline.
 
 ```bash
-cargo test --release -p isper-core -p isper-llm -p isper-models -p isper-cli -p isper-app
+cargo build --release
 ```
 
-(`--release` reaproveita o whisper.cpp já compilado; no perfil debug o
-`cargo test` recompila o whisper.cpp + CUDA do zero, o que leva minutos.)
-São 110 testes: unitários e de propriedade (`proptest`) no núcleo — corte em
-silêncio dos blocos, VAD por energia com relógio injetado, busca literal
-conferida contra o próprio SQLite —, *golden* das exportações (Markdown, SRT e
-DOCX comparados byte a byte com
-[`crates/isper-core/tests/golden/`](crates/isper-core/tests/golden/);
-`ISPER_UPDATE_GOLDEN=1 cargo test --release -p isper-core --test golden`
-regenera), a camada de IA com um provider falso (sem rede) e a lógica pura do
-app e da CLI (configuração, migração de pastas, posição do indicador, atalhos,
-definição da CLI). `clippy::unwrap_used` vale para todo o workspace: `unwrap()`
-só em testes. A estratégia completa, com o roteiro de validação manual dos
-casos de áudio (fone desconectado, suspensão, modo exclusivo, monitores), está
-em [`docs/TESTES.md`](docs/TESTES.md). A arquitetura do pipeline de
-transcrição — modos ao vivo e final, VAD, decodificação, diarização,
-atribuição de falante e como medir tudo isso — está em
-[`docs/transcription-pipeline.md`](docs/transcription-pipeline.md).
+O CUDA vem ligado por padrão; sem GPU NVIDIA, acrescente `--no-default-features`. O Windows precisa de VS Build Tools 2022, CMake e libclang.
 
-O GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda,
-a cada push e PR, formatação (`cargo fmt --check`), os testes de todos os
-crates (app e CLI sem CUDA), `cargo clippy --workspace --all-targets -- -D
-warnings`, `cargo deny` (vulnerabilidades, licenças, origens) e gitleaks. A
-versão do Rust é a de [`rust-toolchain.toml`](rust-toolchain.toml), lida pelo
-CI — um stable novo com lints novos não quebra o build de surpresa.
+| | |
+|---|---|
+| [**Desenvolvimento**](docs/DESENVOLVIMENTO.md) | estrutura, toolchain, CUDA, modelos, cada parte do app, instalador, diagnóstico e testes |
+| [Pipeline de transcrição](docs/transcription-pipeline.md) | ao vivo e passe final, VAD, falantes e como medir |
+| [Decisões (ADRs)](docs/adr/README.md) | por que o projeto é como é |
+| [Testes](docs/TESTES.md) · [Release](docs/RELEASE.md) | a estratégia de testes e como uma versão sai |
+| [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) | o que vem e o que mudou |
 
-**Cobertura** ([`coverage.yml`](.github/workflows/coverage.yml)): a cada push
-em `main`, `cargo llvm-cov` publica o resumo no sumário do job e envia o lcov
-ao [Coveralls](https://coveralls.io) — tendência, não gate: nenhum PR é
-bloqueado por cobertura. Para a linha aparecer, ative o repositório no
-Coveralls uma vez (login com o GitHub → *Add repos*).
+## Contribuir
 
-**Testes de rede** (API do Hugging Face e download com checksum) ficam
-`#[ignore]` para o CI rodar offline; depois de mexer no HTTP, rode à mão:
-
-```bash
-cargo test --release -p isper-models -- --ignored
-```
-
-**Fluxo de mudança**: a branch `main` é protegida por um ruleset do GitHub —
-sem push direto, sem force-push nem exclusão, histórico linear e PR
-obrigatório com os três checks do CI verdes. Toda mudança (do mantenedor, de
-quem contribui ou do Dependabot) entra por branch + PR:
-
-```bash
-git switch -c minha-mudanca
-```
-
-```bash
-gh pr create --fill
-```
-
-```bash
-gh pr merge --rebase --delete-branch
-```
-
-**Ponta a ponta**: [`tools/e2e`](tools/e2e/README.md) sobe o app real com a
-porta de depuração do WebView2 e verifica, via CDP, janelas, reunião com a
-fixture de duas vozes (ao vivo, legendas, momentos, exportações), o
-atualizador contra uma release falsa em localhost e a memória numa reunião
-longa (`soak.ps1`). O `smoke.ps1` roda toda noite no GitHub Actions
-([`e2e-nightly.yml`](.github/workflows/e2e-nightly.yml), runner Windows sem
-áudio nem GPU); os demais precisam de GPU e áudio: rode-os antes de lançar uma
-versão.
-
-```powershell
-.\tools\e2e\smoke.ps1 -Exe .\target\release\isper-app.exe
-```
-
-```powershell
-.\tools\e2e\soak.ps1 -Minutes 120 -Exe .\target\release\isper-app.exe
-```
-
-## Segurança e contribuição
-
-Achou uma vulnerabilidade? Relate em privado pelo GitHub
-(*Security → Report a vulnerability*); o que está no escopo, prazos e como o
-app se protege estão em [SECURITY.md](SECURITY.md). Para contribuir —
-ambiente, o que o CI exige, estilo e o fluxo por PR — veja
-[CONTRIBUTING.md](CONTRIBUTING.md); as regras de convivência estão no
-[Código de Conduta](CODE_OF_CONDUCT.md).
+Contribuições entram por pull request, com o CI verde. O [CONTRIBUTING.md](CONTRIBUTING.md) explica o ambiente e o fluxo, e o [Código de Conduta](CODE_OF_CONDUCT.md) as regras de convivência. Achou uma vulnerabilidade? Relate em privado pelo GitHub (*Security → Report a vulnerability*); os detalhes estão no [SECURITY.md](SECURITY.md).
 
 ## Licença
 
-[MIT](LICENSE). Whisper (MIT) · whisper.cpp (MIT) · Tauri (MIT/Apache-2.0) —
-todos os modelos usados têm pesos abertos.
+[MIT](LICENSE). Whisper (MIT) · whisper.cpp (MIT) · Tauri (MIT/Apache-2.0) · sherpa-onnx (Apache-2.0). Todos os modelos usados têm pesos abertos.
+
+<div align="center">
+<br>
+<sub>Feito para quem precisa registrar ideias e reuniões sem transformar áudio confidencial em dado de terceiros.</sub>
+</div>

@@ -15,7 +15,7 @@ o que o CI exige e como uma mudança entra em `main`.
 
 ## Ambiente
 
-Windows 10/11 x64. O [README](README.md#pré-requisitos-de-build-windows)
+Windows 10/11 x64. O [guia de desenvolvimento](docs/DESENVOLVIMENTO.md#pré-requisitos-de-build-windows)
 lista os pré-requisitos (VS Build Tools, CMake, libclang). A versão do Rust é
 a de [`rust-toolchain.toml`](rust-toolchain.toml) — o `rustup` a instala
 sozinho na primeira compilação.
