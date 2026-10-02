@@ -12,6 +12,15 @@ bata com ela.
 ## [Unreleased]
 
 ### Alterado
+- **O ISPer agora é uma janela só.** Início, Biblioteca, Configurações e a
+  primeira configuração moram numa janela com barra lateral, no lugar de uma
+  janela para cada tela. Trocar de tela é instantâneo e não perde o que
+  estava aberto: a reunião selecionada, o que você digitou nas
+  Configurações, a rolagem. A janela lembra o tamanho, a posição e se estava
+  maximizada. Na barra de tarefas e no Alt+Tab aparece o nome da tela
+  ("ISPer — Biblioteca"). O Copilot e o indicador flutuante continuam à
+  parte, porque foram feitos para ficar ao lado da reunião
+  ([ADR 0020](docs/adr/0020-janela-unica.md)).
 - **Uma marca só, no desktop, no celular e no portal.** O ISPer tinha três
   logos; fica a do celular — cinco barras de fala centradas e o ponto de
   gravação, o gesto do próprio indicador. O ícone do app, do instalador e da
@@ -21,6 +30,26 @@ bata com ela.
 - **Na bandeja, o ponto da marca é a luz de gravação.** Cinza enquanto o
   ISPer espera, aceso enquanto uma reunião grava. Antes um ponto vermelho era
   pintado no canto do ícone, o que com a marca nova daria dois.
+
+### Adicionado
+- **Paleta de comandos (Ctrl+K):** ir para qualquer tela ou seção das
+  Configurações, gravar e encerrar a reunião, marcar momento, importar
+  áudio, alternar o tema e achar uma reunião pelo título, resumo ou
+  transcript. A busca não diferencia acentos.
+- **Gravação sempre à mão:** a barra lateral mostra "Gravar reunião" em
+  qualquer tela e, durante a gravação, o cronômetro com "Marcar" e
+  "Encerrar". Depois, "Finalizando a ata…" até a ata ficar pronta.
+- **Atalhos da janela:** Ctrl+1 (Início), Ctrl+2 (Biblioteca), Ctrl+3
+  (Copilot), Ctrl+, (Configurações), Ctrl+B (recolher a barra lateral),
+  Alt+← e Alt+→ (tela anterior e próxima, também pelos botões laterais do
+  mouse) e Ctrl+/ para a lista de atalhos, com os globais junto.
+- **Configurações com índice:** as seções ficam listadas ao lado, com a
+  seção à vista destacada. O app abre direto na seção certa: o pedido de
+  pareamento do celular leva a Celular, o Copilot sem chave leva a
+  Inteligência e cada pendência do Início leva à sua seção. Ao sair com
+  alterações não salvas, o item ganha um ponto e um aviso oferece salvar.
+- **Soltar áudio em qualquer tela:** a janela leva os arquivos para a
+  Biblioteca, que importa como antes.
 
 ### Corrigido
 - **Uma pessoa falando sozinha não vira mais dois participantes.** Numa

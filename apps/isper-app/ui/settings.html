@@ -7,7 +7,18 @@
 <script src="assets/i18n.js"></script>
 <link rel="stylesheet" href="assets/base.css">
 <style>
-  body { padding: 20px 20px 84px; user-select: none; }
+  body { padding: 0 0 84px; user-select: none; }
+  /* Índice das seções à esquerda (some na tela estreita) e o conteúdo numa
+     coluna de leitura confortável, centralizados na janela. */
+  .page { display: grid; grid-template-columns: 184px minmax(0, 720px); gap: 36px; justify-content: center; padding: 24px 28px 0; }
+  .toc { position: sticky; top: 24px; align-self: start; display: grid; gap: 2px; padding-top: 48px; }
+  .toc a { display: block; padding: 7px 10px; border-radius: var(--r-sm); color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; transition: color var(--dur-2), background var(--dur-2), box-shadow var(--dur-2); }
+  .toc a:hover { color: var(--ink); background: var(--panel-2); }
+  .toc a[aria-current="true"] { color: var(--ink); background: var(--panel-2); box-shadow: inset 2px 0 0 var(--accent); }
+  @media (max-width: 880px) { .page { grid-template-columns: minmax(0, 1fr); padding: 20px 20px 0; } .toc { display: none; } }
+  .card { scroll-margin-top: 18px; }
+  .card.flash { animation: card-flash 1.4s var(--ease-out); }
+  @keyframes card-flash { from { box-shadow: 0 0 0 2px var(--accent), var(--shadow-2); } to { box-shadow: 0 0 0 2px transparent; } }
   h1 { font-family: var(--font-display); font-size: 24px; font-weight: 500; letter-spacing: -.015em; margin: 0 0 2px; }
   .sub { color: var(--muted); font-size: 12px; margin: 0 0 16px; }
   .card { margin-bottom: 14px; }
@@ -57,11 +68,14 @@
 </style>
 </head>
 <body class="atmos">
+<div class="page">
+  <nav class="toc" id="toc" aria-label="Seções" data-i18n-attr="aria-label:shell.settings.sections"></nav>
+  <div class="content">
 <h1 class="reveal" data-i="0" data-i18n="settings.top.configuracoes">Configurações</h1>
 <p class="sub reveal" data-i="0"><span data-i18n="settings.active.lead">Atalhos ativos agora: ditado</span> <b id="active">…</b> <span data-i18n="settings.active.meeting">· reunião</span> <b id="mactive">…</b> <span data-i18n="settings.active.mark">· marcar momento</span> <b id="kactive">…</b> <span data-i18n="settings.active.copilot">· Copilot</span> <b id="cactive">…</b></p>
 
-<div class="card reveal" data-i="1">
-  <h2 data-i18n="settings.aparencia.titulo">Aparência e idioma</h2>
+<section class="card reveal" id="aparencia" data-i="1" aria-labelledby="h-aparencia">
+  <h2 id="h-aparencia" data-i18n="settings.aparencia.titulo">Aparência e idioma</h2>
   <label class="lbl mt0" for="theme" data-i18n="settings.sistema.aparencia">Aparência</label>
   <select id="theme" class="field">
     <option value="system" data-i18n="settings.sistema.seguir-windows-padrao">Seguir o Windows (padrão)</option>
@@ -76,10 +90,10 @@
     <option value="en" lang="en">English</option>
   </select>
   <p class="hint" data-i18n="settings.sistema.ui-lang-hint">Muda os textos do ISPer na hora: janelas, bandeja e notificações. O idioma da fala (o que o Whisper transcreve) fica em Ditado.</p>
-</div>
+</section>
 
-<div class="card reveal" data-i="1">
-  <h2 data-i18n="settings.ditado.ditado">Ditado</h2>
+<section class="card reveal" id="ditado" data-i="1" aria-labelledby="h-ditado">
+  <h2 id="h-ditado" data-i18n="settings.ditado.ditado">Ditado</h2>
   <label class="lbl mt0" for="shortcut" data-i18n="settings.ditado.atalho-global-ditado">Atalho global do ditado</label>
   <div class="row">
     <select id="shortcut" class="field">
@@ -110,17 +124,17 @@
     <label class="switch"><input type="checkbox" id="voicecmd"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.ditado.interpretar-comandos-falados-ditado">Interpretar comandos falados no ditado</span></label>
   </div>
   <p class="hint" data-i18n-html="settings.ditado.diga-nova-linha-novo-paragrafo">Diga <b>nova linha</b>, <b>novo parágrafo</b>, <b>ponto final</b>, <b>vírgula</b>, <b>ponto de interrogação</b>, <b>ponto de exclamação</b>, <b>dois pontos</b>, <b>ponto e vírgula</b>, <b>reticências</b>, <b>abre/fecha parênteses</b>, <b>abre/fecha aspas</b>, <b>travessão</b>, <b>arroba</b>. No fim do ditado: <b>apagar isso</b> descarta tudo; <b>tudo em maiúsculas</b> / <b>tudo em minúsculas</b> muda a caixa.</p>
-</div>
+</section>
 
-<div class="card reveal" data-i="2">
-  <h2 data-i18n="settings.modelos-whisper.modelos-whisper">Modelos Whisper</h2>
+<section class="card reveal" id="modelos" data-i="2" aria-labelledby="h-modelos">
+  <h2 id="h-modelos" data-i18n="settings.modelos-whisper.modelos-whisper">Modelos Whisper</h2>
   <p class="hint m0 mb8" id="gpuhint"></p>
   <div id="modelslist"></div>
   <p class="hint" data-i18n-html="settings.modelos-whisper.baixados-hugging-face-verificacao-sha">Baixados do Hugging Face com verificação SHA-256 para <code>%LOCALAPPDATA%\com.isper.desktop\models</code>. Marque o que quer usar e clique em Salvar — a troca é a quente.</p>
-</div>
+</section>
 
-<div class="card reveal" data-i="3">
-  <h2 data-i18n="settings.reunioes.reunioes">Reuniões</h2>
+<section class="card reveal" id="reunioes" data-i="3" aria-labelledby="h-reunioes">
+  <h2 id="h-reunioes" data-i18n="settings.reunioes.reunioes">Reuniões</h2>
   <label class="lbl mt0" for="mshortcut" data-i18n="settings.reunioes.atalho-global-iniciar-encerrar-gravacao">Atalho global para iniciar/encerrar a gravação</label>
   <div class="row">
     <select id="mshortcut" class="field">
@@ -217,10 +231,10 @@
     </select>
     <p class="hint" data-i18n="settings.reunioes.distancia-maxima-entre-duas-vozes">Distância máxima entre duas vozes para serem a mesma pessoa. Mexer aqui sem comparar o resultado costuma piorar — prefira informar o número de participantes acima.</p>
   </details>
-</div>
+</section>
 
-<div class="card reveal" data-i="4">
-  <h2 data-i18n="settings.celular.titulo">Celular</h2>
+<section class="card reveal" id="celular" data-i="4" aria-labelledby="h-celular">
+  <h2 id="h-celular" data-i18n="settings.celular.titulo">Celular</h2>
   <label class="switch"><input type="checkbox" id="phonesync" aria-describedby="phonehint"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.celular.receber">Receber as gravações do ISPer no celular</span></label>
   <p class="hint" id="phonestate" role="status" aria-live="polite"></p>
   <p class="hint" id="phonehint" data-i18n="settings.celular.hint">O celular grava; o PC transcreve com o mesmo passe final e devolve a ata. A conexão é direta pela rede local e cifrada de ponta a ponta, e o celular só fala com este PC. Na primeira vez, o Windows pergunta se o ISPer pode usar a rede: marque "Redes privadas".</p>
@@ -261,10 +275,10 @@
     </div>
     <p class="hint" id="phonerelayhint" data-i18n="settings.celular.relay-hint">Vazio: só a rede local, sem falar com nenhum servidor de fora. Com um relay iroh (de preferência próprio), o celular também manda de fora da rede; o relay só repassa dados cifrados, que ele não consegue ler. Os celulares já pareados aprendem o relay na próxima conversa.</p>
   </details>
-</div>
+</section>
 
-<div class="card reveal" data-i="4">
-  <h2 data-i18n="settings.inteligencia.inteligencia">Inteligência</h2>
+<section class="card reveal" id="inteligencia" data-i="4" aria-labelledby="h-inteligencia">
+  <h2 id="h-inteligencia" data-i18n="settings.inteligencia.inteligencia">Inteligência</h2>
   <label class="lbl mt0" for="provider" data-i18n="settings.inteligencia.provider-resumo-reunioes-insights-polimento">Provider (resumo de reuniões, insights e polimento)</label>
   <select id="provider" class="field">
     <option value="none" data-i18n="settings.inteligencia.desligado">Desligado</option>
@@ -351,10 +365,10 @@
     </select>
   </div>
   <p class="hint" data-i18n="settings.inteligencia.usa-provider-acima-so-texto">Usa o provider acima; só o texto do ditado é enviado. Acrescenta cerca de um segundo antes de colar. Se a API falhar ou não houver chave, o texto original é colado normalmente — o histórico guarda os dois.</p>
-</div>
+</section>
 
-<div class="card reveal" data-i="5">
-  <h2 data-i18n="settings.sistema.sistema">Sistema</h2>
+<section class="card reveal" id="sistema" data-i="5" aria-labelledby="h-sistema">
+  <h2 id="h-sistema" data-i18n="settings.sistema.sistema">Sistema</h2>
   <div class="stack mt0">
     <label class="switch"><input type="checkbox" id="autostart"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.sistema.iniciar-isper-junto-windows">Iniciar o ISPer junto com o Windows</span></label>
     <label class="switch"><input type="checkbox" id="showhome"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.sistema.mostrar-tela-inicio-abrir-isper">Mostrar a tela Início ao abrir o ISPer</span></label>
@@ -400,6 +414,8 @@
     <button class="btn btn-sm flex-none" id="exportdiag" data-i18n="settings.sistema.exportdiag">Exportar diagnóstico (.zip)</button>
     <button class="btn btn-sm btn-ghost flex-none" id="openlogs" data-i18n="settings.sistema.openlogs">Abrir pasta de logs</button>
     <span class="hint m0" data-i18n-html="settings.sistema.logs-ficam-localappdata-isper-desktop">Os logs ficam em <code>%LOCALAPPDATA%\com.isper.desktop\logs</code> (um arquivo JSON por dia, 14 dias). Ao pedir ajuda, mande o .zip exportado: diagnóstico, configurações (sem chaves), versões, métricas e os três últimos logs — as linhas com texto ditado saem antes. Nada disso é enviado sozinho.</span>
+  </div>
+</section>
   </div>
 </div>
 
@@ -679,6 +695,82 @@
     } catch (e) { UI.busy(b, false); status(t('settings.msg.key-save-failed', { e }), 'err'); }
   });
 
+  // ---- seções: índice ao lado, seção à vista destacada, salto direto
+  // (a janela principal abre as Configurações já numa seção: { section }).
+  const cards = [...document.querySelectorAll('section.card[id]')];
+  function buildToc() {
+    const toc = $('toc');
+    toc.replaceChildren();
+    for (const c of cards) {
+      const a = el('a', null, c.querySelector('h2').textContent);
+      a.href = '#' + c.id;
+      a.dataset.target = c.id;
+      a.addEventListener('click', (ev) => { ev.preventDefault(); goTo(c.id); });
+      toc.appendChild(a);
+    }
+    paintToc(spied);
+  }
+  let spied = cards[0] && cards[0].id;
+  function paintToc(id) {
+    spied = id;
+    $('toc').querySelectorAll('a').forEach((a) => a.setAttribute('aria-current', String(a.dataset.target === id)));
+  }
+  function goTo(id) {
+    const card = $(id);
+    if (!card || !card.classList.contains('card')) return;
+    card.scrollIntoView({ behavior: UI.reduce() ? 'auto' : 'smooth', block: 'start' });
+    paintToc(id);
+    card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+    // O foco vai para o título da seção: o leitor de tela anuncia onde chegou.
+    const h = card.querySelector('h2');
+    h.tabIndex = -1;
+    h.focus({ preventScroll: true });
+    // Logo depois de abrir, a lista de modelos e o Diagnóstico ainda chegam e
+    // empurram o conteúdo: a seção fica presa no topo até a página assentar
+    // (ou até o usuário rolar, clicar ou teclar).
+    pinned = { id, until: Date.now() + 2500 };
+  }
+  let pinned = null;
+  new ResizeObserver(() => {
+    if (!pinned || Date.now() > pinned.until) { pinned = null; return; }
+    $(pinned.id).scrollIntoView({ block: 'start' });
+    paintToc(pinned.id);
+  }).observe(document.querySelector('.content'));
+  for (const ev of ['wheel', 'pointerdown', 'keydown', 'touchstart']) addEventListener(ev, () => { pinned = null; }, { passive: true });
+  // A seção à vista é a que cruza a faixa de cima da tela.
+  const spy = new IntersectionObserver((entries) => {
+    const vis = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+    if (vis.length) paintToc(vis[0].target.id);
+  }, { rootMargin: '-15% 0px -70% 0px' });
+  cards.forEach((c) => spy.observe(c));
+  buildToc();
+  document.addEventListener('isper-i18n', buildToc);
+
+  // ---- alterações não salvas: a janela marca as Configurações na barra
+  // lateral e lembra de salvar ao trocar de tela. Só conta o que vai pelo
+  // Salvar (tema, idioma, chaves e o celular valem na hora, por conta própria).
+  const SAVED_BY_BUTTON = new Set(['shortcut', 'lang', 'dict', 'source', 'provider', 'model', 'autostart', 'showhome', 'mic',
+    'mshortcut', 'markshortcut', 'copilotshortcut', 'polish', 'pstyle', 'after', 'voicecmd', 'autoupdate', 'retention',
+    'speakers', 'finalpass', 'importwatch', 'diarthr', 'calldetect', 'insights', 'insint', 'copfilter', 'embprovider',
+    'embmodel', 'embbase']);
+  let isDirty = false;
+  function setDirty(on) {
+    if (isDirty === on) return;
+    isDirty = on;
+    if (window.ISPER_SHELL) window.ISPER_SHELL.setDirty('settings', on);
+  }
+  const markDirty = (ev) => { const n = ev.target; if (n && (SAVED_BY_BUTTON.has(n.id) || n.name === 'model')) setDirty(true); };
+  document.addEventListener('input', markDirty, true);
+  document.addEventListener('change', markDirty, true);
+
+  window.ISPER_VIEW = {
+    open(p) {
+      if (p.section) goTo(p.section);
+      if (p.checkUpdate) $('checkupd').click();
+    },
+    save() { $('save').click(); },
+  };
+
   $('save').addEventListener('click', async () => {
     const b = $('save');
     UI.busy(b, true, t('common.saving'));
@@ -718,6 +810,7 @@
         emb_base_url: $('embbase').value || null,
       }});
       $('active').textContent = keyLabel(label);
+      setDirty(false);
       UI.busy(b, false);
       UI.flash(b, t('common.saved'));
       status(t('settings.msg.saved-shortcut', { label: keyLabel(label) }), 'ok');
@@ -816,7 +909,6 @@
   });
 
   document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') window.__TAURI__.window.getCurrentWindow().close();
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); $('save').click(); }
   });
 

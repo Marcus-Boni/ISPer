@@ -136,6 +136,17 @@ no início junto com o Windows o app nasce quieto na bandeja. Para não abri-la
 no lançamento manual, desmarque "Mostrar esta tela ao abrir" no rodapé (ou em
 Configurações → Sistema).
 
+É **uma janela só**: Início, Biblioteca e Configurações ficam na barra
+lateral, e trocar de tela não perde o que estava aberto. A barra também tem o
+botão de gravar reunião (com o cronômetro, "Marcar" e "Encerrar" durante a
+gravação) e recolhe para só os ícones (Ctrl+B). **Ctrl+K** abre a paleta de
+comandos: ir para qualquer tela ou seção das Configurações, gravar, importar
+áudio, alternar o tema ou achar uma reunião. Ctrl+1/2/3 levam ao Início, à
+Biblioteca e ao Copilot, Ctrl+, às Configurações e **Ctrl+/** lista todos os
+atalhos. A janela lembra tamanho, posição e se estava maximizada. O Copilot e
+o indicador flutuante continuam à parte, para ficar ao lado da reunião
+([ADR 0020](docs/adr/0020-janela-unica.md)).
+
 O atalho global é Ctrl+Alt+Espaço, ou o
 primeiro livre entre Ctrl+Shift+Espaço / Ctrl+Alt+D / Ctrl+Alt+I — a dica no
 menu da bandeja mostra qual foi registrado. Dois modos:

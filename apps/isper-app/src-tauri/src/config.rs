@@ -146,9 +146,29 @@ pub struct AppConfig {
     /// concluída, pulada ou fechada — não abre de novo sozinha.
     #[serde(default)]
     pub onboarding_done: bool,
+    /// Onde a janela principal estava ao fechar (pixels físicos). `None` =
+    /// centralizada, no tamanho padrão.
+    #[serde(default)]
+    pub main_window: Option<WindowGeom>,
+    /// Barra lateral da janela principal recolhida (só os ícones).
+    #[serde(default)]
+    pub sidebar_collapsed: bool,
     /// Versão do formato deste arquivo — ver [`CONFIG_VERSION`].
     #[serde(default)]
     pub config_version: u32,
+}
+
+/// Posição e tamanho da janela principal no fechamento: o retângulo de
+/// tamanho normal (com as bordas, pixels físicos — o `WINDOWPLACEMENT` do
+/// Windows) e se ela estava maximizada.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WindowGeom {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    #[serde(default)]
+    pub maximized: bool,
 }
 
 impl Default for AppConfig {
@@ -187,6 +207,8 @@ impl Default for AppConfig {
             theme: default_theme(),
             ui_lang: default_ui_lang(),
             onboarding_done: false,
+            main_window: None,
+            sidebar_collapsed: false,
             config_version: CONFIG_VERSION,
         }
     }
@@ -600,6 +622,15 @@ mod tests {
             dictionary: vec!["Kanban".into()],
             overlay_pos: Some((120, -40)),
             polish: true,
+            // Uma tabela no meio dos valores simples: o TOML precisa aceitar.
+            main_window: Some(WindowGeom {
+                x: -1800,
+                y: 40,
+                width: 1280,
+                height: 800,
+                maximized: true,
+            }),
+            sidebar_collapsed: true,
             ..AppConfig::default()
         };
         save_to(&p, &cfg).unwrap();

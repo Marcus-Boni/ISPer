@@ -39,8 +39,7 @@ function Get-OnboardingDone {
 Stop-Isper
 Set-OnboardingPending
 Check (Start-Isper -Exe $exe -KeepOnboarding) "primeira execucao abre a primeira configuracao (CDP)"
-$targets = @(Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json" -TimeoutSec 3)
-Check (-not ($targets | Where-Object { $_.url -like '*home.html*' })) "o Inicio nao abre junto"
+Check (-not (Test-IsperView 'home.html')) "o Inicio nao abre junto"
 
 $probe = 'JSON.stringify({ lang: document.documentElement.lang, step: (document.querySelector(".step:not([hidden])") || {}).dataset.step, h1: (document.querySelector(".step:not([hidden]) h1") || {}).textContent, label: document.getElementById("steplabel").textContent, next: document.getElementById("next").textContent, back: !document.getElementById("back").hidden, focus: document.activeElement && document.activeElement.id, missing: (window.__isperErrors || []).filter(e => e.indexOf("i18n:") === 0) })'
 $next = '(async () => { document.getElementById("next").click(); await new Promise(r => setTimeout(r, 900)); return "ok"; })()'
@@ -121,8 +120,7 @@ Check (@($errs).Count -eq 0) "onboarding.html sem erros de JS$(Format-JsErrors $
 EvJson 'onboarding.html' 'document.getElementById("next").click(), "ok"' | Out-Null
 Check (Wait-IsperWindow 'home.html') "Abrir o ISPer abre a tela Inicio"
 Start-Sleep -Seconds 1
-$targets = @(Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json" -TimeoutSec 3)
-Check (-not ($targets | Where-Object { $_.url -like '*onboarding.html*' })) "a primeira configuracao fechou"
+Check (-not (Test-IsperView 'onboarding.html')) "a primeira configuracao saiu da janela"
 Check ((Get-OnboardingDone) -eq $true) "config.toml gravou onboarding_done = true"
 
 # ---- reabrir pelas Configuracoes e fechar pelo X
@@ -132,12 +130,15 @@ EvJson 'settings.html' 'document.getElementById("onboarding").click(), "ok"' | O
 Check (Wait-IsperWindow 'onboarding.html') "Configuracoes -> Sistema reabre a primeira configuracao"
 $p = EvJson 'onboarding.html' $probe
 Check ($p.step -eq 'welcome') "reaberta comeca do passo 1"
+# A primeira configuracao mora na janela principal: o X fecha a janela.
 EvJson 'onboarding.html' '(async () => { await window.__TAURI__.window.getCurrentWindow().close(); return "ok"; })()' | Out-Null
 Start-Sleep -Seconds 2
-$targets = @(Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json" -TimeoutSec 3)
-Check (-not ($targets | Where-Object { $_.url -like '*onboarding.html*' }) -and ($targets | Where-Object { $_.url -like '*home.html*' })) "o X fecha e o Inicio continua aberto"
+Check (-not (Test-IsperView 'app.html')) "o X fecha a janela (o app segue na bandeja)"
 Check ((Get-OnboardingDone) -eq $true) "onboarding_done continua true"
-foreach ($win in @('home.html', 'settings.html')) {
+Invoke-Isper 'open_home_window' 'undefined' $script:Overlay | Out-Null
+Check (Wait-IsperWindow 'home.html') "a janela reabre no Inicio"
+Check (-not (Test-IsperView 'onboarding.html')) "e nao volta a primeira configuracao"
+foreach ($win in @('home.html')) {
   $errs = Get-JsErrors $win
   Check (@($errs).Count -eq 0) "$win sem erros de JS$(Format-JsErrors $errs)"
 }

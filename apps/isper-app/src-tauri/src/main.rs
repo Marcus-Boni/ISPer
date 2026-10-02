@@ -145,17 +145,13 @@ fn main() {
 
     tauri::Builder::default()
         // Instância única: um segundo clique no atalho não abre outro ISPer —
-        // o pedido é encaminhado ao já aberto, que responde com a tela Início
-        // (ou com a primeira configuração, se ela ainda estiver aberta).
+        // o pedido é encaminhado ao já aberto, que traz a janela principal
+        // como ela estava (ou a abre no Início / na primeira configuração).
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if args.iter().any(|a| a == AUTOSTART_FLAG) {
                 return;
             }
-            if app.get_webview_window(onboarding::LABEL).is_some() {
-                open_onboarding(app);
-            } else {
-                open_home(app);
-            }
+            show_main(app);
         }))
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -248,6 +244,11 @@ fn main() {
             open_library_window,
             take_pending_meeting,
             open_settings_window,
+            open_home_window,
+            shell_ready,
+            shell_view,
+            shell_status,
+            set_sidebar_collapsed,
             show_indicator_cmd,
             overlay_toggle_pin,
             check_update,
@@ -411,7 +412,7 @@ fn main() {
                         ..
                     } = event
                     {
-                        open_home(tray.app_handle());
+                        show_main(tray.app_handle());
                     }
                 })
                 .build(app)?;
@@ -428,14 +429,14 @@ fn main() {
                 let _ = app.autolaunch().enable();
             }
 
-            // Primeira execução: a configuração guiada; depois, a tela Início —
-            // só no lançamento manual (e se o usuário não a desligou). Vem ANTES
-            // do carregamento do modelo: sem modelo, é uma delas quem orienta o
-            // download — as Configurações só abrem sozinhas se nenhuma existir.
-            // (No setup a criação direta é segura; fora dele, ver `open_or_focus`.)
+            // Primeira execução: a janela principal na configuração guiada;
+            // depois, no Início — só no lançamento manual (e se o usuário não
+            // o desligou). Vem ANTES do carregamento do modelo: sem modelo, é
+            // uma dessas telas quem orienta o download — as Configurações só
+            // abrem sozinhas se a janela não existir.
+            // (No setup a criação direta é segura; fora dele, ver `navigate`.)
             let first_window = match onboarding::launch_window(&cfg, autostarted) {
-                Some(onboarding::LABEL) => build_onboarding(app.handle()).map(drop),
-                Some(_) => build_home(app.handle()).map(drop),
+                Some(view) => build_main(app.handle(), &Route::to(view)).map(drop),
                 None => Ok(()),
             };
             if let Err(e) = first_window {

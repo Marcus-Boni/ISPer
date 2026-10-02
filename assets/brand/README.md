@@ -39,6 +39,7 @@ E, gerados nos lugares em que cada plataforma os procura:
 - **Desktop** — `apps/isper-app/src-tauri/icons/`: o que o `tauri.conf.json` empacota
   (`32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.ico`), os demais tamanhos, e os
   dois estados da bandeja (`tray.rgba`, `tray-recording.rgba`, com `.png` ao lado para revisão).
+  E `apps/isper-app/ui/assets/isper-icon.svg`, o ícone na barra lateral da janela.
 - **Android** — `apps/isper-android/app/src/main/res/drawable/ic_launcher_foreground.xml`,
   o primeiro plano do ícone adaptativo. Foi o desenho original; agora é derivado dele.
 - **Portal** — `website/src/app/icon.svg` e `favicon.ico`, `apple-icon.png`, os ícones do

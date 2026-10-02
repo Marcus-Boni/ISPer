@@ -22,7 +22,8 @@ Invoke-Isper 'open_settings_window' | Out-Null
 Wait-IsperWindow 'settings.html' | Out-Null
 Start-Sleep -Seconds 2
 
-$windows = @('home.html', 'library.html', 'settings.html')
+# app.html: a janela principal (barra lateral); as outras sao as telas dentro dela.
+$windows = @('app.html', 'home.html', 'library.html', 'settings.html')
 $probe = 'JSON.stringify({ theme: document.documentElement.dataset.theme, bg: getComputedStyle(document.body).backgroundColor, dark: matchMedia("(prefers-color-scheme: dark)").matches })'
 # Fundo do tema: --bg claro (#f6f1ec) e escuro (#161311).
 $light = 'rgb(246, 241, 236)'
@@ -78,7 +79,7 @@ Invoke-Isper 'set_ui_lang' "{ lang: '$origLang' }" 'settings.html' | Out-Null
 Start-Sleep -Milliseconds 600
 $o = EvJson 'onboarding.html' $onbSel
 Check ($null -ne $o -and $o.lang -eq $origLang) "e volta com o idioma original ('$($o.lang)')"
-EvJson 'onboarding.html' '(async () => { await window.__TAURI__.window.getCurrentWindow().close(); return "ok"; })()' | Out-Null
+Invoke-Isper 'onboarding_finish' 'undefined' 'onboarding.html' | Out-Null
 Start-Sleep -Seconds 1
 
 # "Seguir o Windows": o data-theme vira system e o fundo acompanha o prefers-color-scheme.
@@ -97,10 +98,16 @@ Invoke-Isper 'set_ui_theme' "{ theme: 'light' }" 'settings.html' | Out-Null
 # Fecha como o usuario fecha (o X da janela), pela API de janela do Tauri.
 EvJson 'settings.html' '(async () => { await window.__TAURI__.window.getCurrentWindow().close(); return "ok"; })()' | Out-Null
 Start-Sleep -Seconds 2
-Invoke-Isper 'open_settings_window' | Out-Null
+# A janela principal fechou: quem pede para reabrir e o indicador (a bandeja, no uso real).
+Invoke-Isper 'open_settings_window' 'undefined' $script:Overlay | Out-Null
 Wait-IsperWindow 'settings.html' | Out-Null
 $p = EvJson 'settings.html' $probe
 Check ($null -ne $p -and $p.theme -eq 'light' -and $p.bg -eq $light) "Configuracoes reabertas ja nascem no tema claro (sem piscar)"
+# A janela reaberta so tem as Configuracoes: as outras telas voltam para a checagem de erros.
+Invoke-Isper 'open_home_window' 'undefined' 'settings.html' | Out-Null
+Wait-IsperWindow 'home.html' | Out-Null
+Invoke-Isper 'open_library_window' '{ meeting: null }' 'settings.html' | Out-Null
+Wait-IsperWindow 'library.html' | Out-Null
 
 Invoke-Isper 'set_ui_theme' "{ theme: '$orig' }" 'settings.html' | Out-Null
 Check (((Invoke-Isper 'get_settings' 'undefined' 'settings.html').theme) -eq $orig) "tema de volta a '$orig'"
