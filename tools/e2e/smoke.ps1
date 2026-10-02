@@ -38,6 +38,22 @@ Check ($s.version -eq $st.version) "Configuracoes: versao $($s.version) (igual a
 $errs = Get-JsErrors 'settings.html'
 Check (@($errs).Count -eq 0) "Configuracoes sem erros de JS$(Format-JsErrors $errs)"
 
+# Janela unica (ADR 0020): Inicio, Biblioteca e Configuracoes moram numa
+# janela so — pedir uma tela troca a tela, nao abre outra janela.
+# @(...) antes do pipe: no PowerShell 5.1 o array do Invoke-RestMethod passaria inteiro, como um item so.
+$pages = @(@(Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json" -TimeoutSec 3) | Where-Object { $_.type -eq 'page' })
+Check (-not ($pages | Where-Object { $_.url -match 'home\.html|library\.html|settings\.html' })) "Inicio, Biblioteca e Configuracoes sem janela propria ($($pages.Count) janelas: $(($pages | ForEach-Object { $u = ($_.url -split '/')[-1]; if ($u) { $u } else { 'indicador' } }) -join ', '))"
+$sh = EvJson 'app.html' 'JSON.stringify({ view: document.body.dataset.view, frames: [...document.querySelectorAll("iframe.view")].map(f => f.dataset.view), cur: (document.querySelector(".nav-item[aria-current=page]") || {}).dataset?.view || null, errors: window.__isperErrors || [] })'
+Check ($sh.view -eq 'settings' -and $sh.cur -eq 'settings') "a janela mostra as Configuracoes e a barra lateral marca o item ($($sh.view))"
+Check ((@($sh.frames) -contains 'home') -and (@($sh.frames) -contains 'library')) "as telas visitadas continuam vivas ($(@($sh.frames) -join ', '))"
+Check (@($sh.errors).Count -eq 0) "janela principal sem erros de JS$(Format-JsErrors $sh.errors)"
+$pal = EvJson 'app.html' '(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true, bubbles: true })); await new Promise(r => setTimeout(r, 250)); const d = document.getElementById("palette"); const open = d.open; const i = document.getElementById("pal-input"); i.value = "bibli"; i.dispatchEvent(new Event("input")); await new Promise(r => setTimeout(r, 120)); const items = [...document.querySelectorAll(".pal-item .pi-text")].map(e => e.textContent); d.close(); return JSON.stringify({ open, items }); })()'
+Check ($null -ne $pal -and $pal.open -and @($pal.items).Count -gt 0 -and $pal.items[0] -like 'Bibli*') "Ctrl+K abre a paleta e a busca acha a Biblioteca ('$(@($pal.items)[0])')"
+Invoke-Isper 'open_settings_window' "{ section: 'celular' }" | Out-Null
+Start-Sleep -Seconds 1
+$sec = EvJson 'settings.html' 'JSON.stringify((document.querySelector(".toc a[aria-current=true]") || {}).dataset?.target || null)'
+Check ($sec -eq 'celular') "Configuracoes abrem direto na secao pedida ($sec)"
+
 # Recuperacao da Biblioteca (v0.16.1): o botao existe e o comando responde.
 # Rodar com a pasta ja indexada devolve 0 novas — idempotente por construcao.
 $reimp = EvJson 'settings.html' 'JSON.stringify({ btn: !!document.getElementById("reimport") })'

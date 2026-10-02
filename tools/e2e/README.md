@@ -3,8 +3,17 @@
 Testes que rodam o **ISPer real** (o exe, com WebView2, Whisper e tudo) e
 conversam com as janelas pelo Chrome DevTools Protocol: o app é aberto com
 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223` e o
-`cdp.mjs` avalia JavaScript em cada janela (chama comandos Tauri via
-`window.__TAURI__.core.invoke`, lê o DOM, ouve eventos). Complementam os
+`cdp.mjs` avalia JavaScript em cada tela (chama comandos Tauri via
+`window.__TAURI__.core.invoke`, lê o DOM, ouve eventos).
+
+Desde o [ADR 0020](../../docs/adr/0020-janela-unica.md), Início, Biblioteca,
+Configurações e a primeira configuração são iframes da janela principal
+(`app.html`). Para os scripts nada muda: a tela continua sendo pedida por um
+trecho da URL (`'settings.html'`). O `cdp-target.mjs` acha o iframe e avalia
+no contexto dele, e `cdp-shot.mjs` e `cdp-keys.mjs` põem a tela à vista
+antes. `'app.html'` é a própria janela (barra lateral, paleta), e
+`$script:Overlay` (o indicador) é de onde se reabre a janela depois de
+fechá-la. `node cdp.mjs --list` lista as telas abertas. Complementam os
 testes unitários dos crates (`cargo test`), que não conseguem cobrir janelas,
 atalhos globais, áudio e o atualizador.
 
@@ -58,7 +67,7 @@ usaria os seus dados, e por isso o roteiro é fechado e para ali.
 
 | Script | O que cobre | Duração |
 |---|---|---|
-| `smoke.ps1` | Início, Biblioteca, Configurações e indicador abrem sem erros de JS (inclusive violações de CSP); modos do indicador; indicador fixo alterna e volta ao estado original; `home_status` traz detecção de chamada e insights; busca semântica e atualizador respondem | ~45 s |
+| `smoke.ps1` | Início, Biblioteca, Configurações e indicador abrem sem erros de JS (inclusive violações de CSP); as três telas ficam na janela principal (nenhuma janela própria), as visitadas continuam vivas, Ctrl+K abre a paleta e as Configurações abrem direto numa seção; modos do indicador; indicador fixo alterna e volta ao estado original; `home_status` traz detecção de chamada e insights; busca semântica e atualizador respondem | ~45 s |
 | `meeting.ps1` | Reunião com a fixture de duas vozes: ao vivo, legendas, momentos (comando com debounce + atalho global), encerrar, banco, Markdown, DOCX, Biblioteca, limpeza | ~2 min |
 | `updater-local.ps1` | Atualizador completo contra uma release falsa assinada com a sua chave e servida em localhost: checagem, banner, download com assinatura, download adulterado recusado, recusa durante reunião (nada é instalado) | ~6 min |
 | `data.ps1` | Fase 7.4 no app real: schema do banco no Diagnóstico, retenção (aviso de confirmação, salvar e voltar), backup SQLite com o mesmo `user_version`, pacote de diagnóstico (entradas certas, sem texto ditado), log em JSON Lines | ~40 s |
