@@ -59,6 +59,9 @@
   window.__a11yStep = () => {
     const a = document.activeElement;
     if (!a || a === document.body || a === document.documentElement) { state.seen.push(-1); return; }
+    // Foco dentro de uma tela da janela principal (iframe): quem registra e o
+    // probe da propria tela; aqui conta como fora.
+    if (a.tagName === 'IFRAME') { state.seen.push(-1); return; }
     const idx = a.dataset.a11yIdx;
     if (idx === undefined) state.foreign.push(describe(a));
     else state.seen.push(Number(idx));

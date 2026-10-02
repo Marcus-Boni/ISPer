@@ -25,8 +25,8 @@ Wait-IsperWindow 'settings.html' | Out-Null
 Start-Sleep -Seconds 2
 
 $probe = 'JSON.stringify({ lang: document.documentElement.lang, h1: document.querySelector("h1").textContent.trim(), save: document.getElementById("save").textContent.trim(), gpu: document.getElementById("gpuhint").textContent.trim(), diag: (document.querySelector("#diag dt") || {}).textContent || null, ph: document.getElementById("model").getAttribute("placeholder"), missing: (window.__isperErrors || []).filter(e => e.indexOf("i18n:") === 0) })'
-$homeProbe = 'JSON.stringify({ lang: document.documentElement.lang, lib: document.querySelector("#b-library span").textContent.trim(), lead: document.getElementById("m-lead").textContent.trim(), meet: document.getElementById("b-meeting").textContent.trim(), todo: document.getElementById("todo-title").textContent.trim(), stat: (document.querySelector(".stat[data-key=dictations] .l") || {}).textContent || null, state: document.getElementById("statetext").textContent.trim(), aria: document.getElementById("stats").getAttribute("aria-label"), missing: (window.__isperErrors || []).filter(e => e.indexOf("i18n:") === 0) })'
-$libProbe = 'JSON.stringify({ lang: document.documentElement.lang, crumb: document.querySelector(".crumb").textContent.trim(), tab: document.querySelector("#tabs .tab").textContent.trim(), ph: document.getElementById("search").getAttribute("placeholder"), sel: (document.querySelector("#detail .placeholder span") || {}).textContent || null, items: document.querySelectorAll("#list .item").length, count: document.getElementById("count").textContent.trim(), missing: (window.__isperErrors || []).filter(e => e.indexOf("i18n:") === 0) })'
+$homeProbe = 'JSON.stringify({ lang: document.documentElement.lang, title: document.querySelector(".page-title").textContent.trim(), lead: document.getElementById("m-lead").textContent.trim(), meet: document.getElementById("b-meeting").textContent.trim(), todo: document.getElementById("todo-title").textContent.trim(), stat: (document.querySelector(".stat[data-key=dictations] .l") || {}).textContent || null, state: document.getElementById("statetext").textContent.trim(), aria: document.getElementById("stats").getAttribute("aria-label"), missing: (window.__isperErrors || []).filter(e => e.indexOf("i18n:") === 0) })'
+$libProbe = 'JSON.stringify({ lang: document.documentElement.lang, crumb: document.querySelector(".page-title").textContent.trim(), tab: document.querySelector("#tabs .tab").textContent.trim(), ph: document.getElementById("search").getAttribute("placeholder"), sel: (document.querySelector("#detail .placeholder span") || {}).textContent || null, items: document.querySelectorAll("#list .item").length, count: document.getElementById("count").textContent.trim(), missing: (window.__isperErrors || []).filter(e => e.indexOf("i18n:") === 0) })'
 $copFake = '(() => { const cards = [{ id: "c1", kind: "decision", title: "Entrega no dia 30", description: "Sem o modulo de relatorios", urgency: "high", at_secs: 45, status: "proposed" },{ id: "c2", kind: "action", title: "Enviar proposta", description: "", owner: "Carlos", urgency: "medium", at_secs: 60, status: "confirmed" },{ id: "c3", kind: "risk", title: "SLA de fim de semana", description: "", urgency: "low", at_secs: 70, status: "proposed" },{ id: "c4", kind: "question", title: "Qual o orcamento?", description: "", urgency: "low", at_secs: 80, status: "discarded" }]; render({ meeting_active: true, configured: true, running: true, error: null, last_trigger: "decision", last_updated: "10:00:00", active_topic: "", cards, memories: [{ id: "mem-1", meeting_id: 1, title: "Reuniao anterior", started_at: "2026-09-01 10:00", at_secs: 30, snippet: "prazo do MRP", score: 0.8 }], dynamics_note: null, me_talk_secs: 30, others_talk_secs: 30, monologue: false, elapsed_secs: 100, scratchpad: "" }); return JSON.stringify({ lang: document.documentElement.lang, tags: [...document.querySelectorAll(".card-kind-tag")].map(e => e.textContent.trim()), urgent: (document.querySelector(".urgency-high") || {}).textContent || null, chip: (document.querySelector(".card-item .chip-ok") || {}).textContent || null, acts: [...new Set([...document.querySelectorAll(".card-act-btn")].map(e => e.textContent.trim()))], status: document.getElementById("status-text").textContent, rec: document.getElementById("meeting-status-label").textContent, disc: document.getElementById("btn-show-discarded").textContent, topic: document.getElementById("topic-text").textContent, missing: (window.__isperErrors || []).filter(e => e.indexOf("i18n:") === 0) }); })()'
 $copProbe = 'JSON.stringify({ lang: document.documentElement.lang, h1: document.querySelector("h1").textContent.trim(), tab: document.querySelector("#tab-cards span").textContent.trim(), all: document.querySelector(".filter-chip span").textContent.trim(), topic: document.getElementById("topic-text").textContent, missing: (window.__isperErrors || []).filter(e => e.indexOf("i18n:") === 0) })'
 $ovProbe = 'JSON.stringify({ lang: document.documentElement.lang, markTitle: document.getElementById("mark").getAttribute("title"), status: document.getElementById("status").textContent.trim() })'
@@ -57,12 +57,15 @@ if ($Shots) {
 
 # ---- Inicio e Biblioteca, abertos durante a troca, refeitos em ingles
 $h = EvJson 'home.html' $homeProbe
-Check ($h.lang -eq 'en' -and $h.lib -eq 'Library' -and $h.lead -eq 'Record, transcribe and summarize.' -and $h.meet -eq 'Start recording a meeting') "Inicio em ingles na hora (botao '$($h.meet)')"
+Check ($h.lang -eq 'en' -and $h.title -eq 'Home' -and $h.lead -eq 'Record, transcribe and summarize.' -and $h.meet -eq 'Start recording a meeting') "Inicio em ingles na hora (botao '$($h.meet)')"
 Check ($h.todo -in 'Needs attention', 'To get the most out of it' -and $h.stat -eq 'dictations' -and $h.aria -eq 'totals') "texto montado pelo script do Inicio em ingles (checklist '$($h.todo)', totais '$($h.stat)')"
 Check ($h.state -notmatch 'pronto|carregando|nenhum|ditando|gravando') "estado do motor em ingles ('$($h.state)')"
 Check (@($h.missing).Count -eq 0) "Inicio sem chave ausente$(Format-JsErrors $h.missing)"
 $l = EvJson 'library.html' $libProbe
 Check ($l.lang -eq 'en' -and $l.crumb -eq 'Library' -and $l.tab -eq 'Meetings' -and $l.ph -like 'search titles*') "Biblioteca em ingles na hora (placeholder '$($l.ph)')"
+$shellProbe = 'JSON.stringify({ lang: document.documentElement.lang, lib: document.querySelector(".nav-item[data-view=library] .label").textContent.trim(), rec: document.querySelector("#rec-start .rec-text").textContent.trim(), search: document.querySelector("#open-palette .label").textContent.trim() })'
+$sh = EvJson 'app.html' $shellProbe
+Check ($sh.lang -eq 'en' -and $sh.lib -eq 'Library' -and $sh.rec -eq 'Record meeting' -and $sh.search -like 'Search*') "barra lateral da janela em ingles na hora ('$($sh.search)')"
 Check ($l.sel -eq 'Select a meeting on the left.' -and ($l.items -eq 0 -or $l.count -like '*meeting*')) "lista e detalhe da Biblioteca refeitos ('$($l.sel)', contador '$($l.count)')"
 Check (@($l.missing).Count -eq 0) "Biblioteca sem chave ausente$(Format-JsErrors $l.missing)"
 if ($l.items -gt 0) {
@@ -100,10 +103,16 @@ if ($Shots) {
 # ---- janela reaberta ja nasce em ingles
 EvJson 'settings.html' '(async () => { await window.__TAURI__.window.getCurrentWindow().close(); return "ok"; })()' | Out-Null
 Start-Sleep -Seconds 2
-Invoke-Isper 'open_settings_window' | Out-Null
+# A janela principal fechou: quem pede para reabrir e o indicador (a bandeja, no uso real).
+Invoke-Isper 'open_settings_window' 'undefined' $script:Overlay | Out-Null
 Wait-IsperWindow 'settings.html' | Out-Null
 $p = EvJson 'settings.html' $probe
 Check ($p.lang -eq 'en' -and $p.h1 -eq 'Settings') "Configuracoes reabertas ja nascem em ingles"
+# A janela reaberta so tem as Configuracoes: as outras telas voltam para as checagens abaixo.
+Invoke-Isper 'open_home_window' 'undefined' 'settings.html' | Out-Null
+Wait-IsperWindow 'home.html' | Out-Null
+Invoke-Isper 'open_library_window' '{ meeting: null }' 'settings.html' | Out-Null
+Wait-IsperWindow 'library.html' | Out-Null
 
 # ---- portugues de volta
 $r = Invoke-Isper 'set_ui_lang' "{ lang: 'pt-BR' }" 'settings.html'
@@ -114,7 +123,7 @@ $ov = EvJson 'http://tauri.localhost/' $ovProbe
 Check ($ov.lang -eq 'pt-BR' -and $ov.status -like 'pronto*') "indicador de volta ao portugues ('$($ov.status)')"
 $h = EvJson 'home.html' $homeProbe
 $l = EvJson 'library.html' $libProbe
-Check ($h.lang -eq 'pt-BR' -and $h.lib -eq 'Biblioteca' -and $l.crumb -eq 'Biblioteca' -and $l.tab -like 'Reuni*') "Inicio e Biblioteca de volta ao portugues"
+Check ($h.lang -eq 'pt-BR' -and $h.title -like 'In*cio' -and $l.crumb -eq 'Biblioteca' -and $l.tab -like 'Reuni*') "Inicio e Biblioteca de volta ao portugues"
 $c = EvJson 'copilot.html' $copProbe
 Check ($c.lang -eq 'pt-BR' -and $c.tab -like 'Decis*' -and $c.all -eq 'Tudo') "Copilot de volta ao portugues ('$($c.tab)')"
 

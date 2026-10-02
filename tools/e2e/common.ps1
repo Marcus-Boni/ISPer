@@ -148,6 +148,26 @@ function Stop-Isper {
   Start-Sleep -Seconds 1
 }
 
+function Get-IsperUrls {
+  # URLs de todas as telas abertas: as janelas (indicador, Copilot) e os
+  # iframes da janela principal (Inicio, Biblioteca, Configuracoes, primeira
+  # configuracao) — ver cdp-target.mjs.
+  # Via variavel: no PowerShell 5.1 o ConvertFrom-Json de um array sai como um
+  # item so; guardado e enumerado, vira a lista de URLs.
+  try { $list = (& node (Join-Path $PSScriptRoot 'cdp.mjs') --list) | ConvertFrom-Json } catch { return @() }
+  return @($list | ForEach-Object { [string]$_ })
+}
+
+function Test-IsperView {
+  # A tela (trecho da URL) esta aberta: janela propria ou iframe da principal.
+  param([Parameter(Mandatory)][string]$Target)
+  return [bool](@(Get-IsperUrls) | Where-Object { $_ -like "*$Target*" })
+}
+
+# O indicador flutuante: a janela que existe enquanto o app vive, mesmo com
+# a principal fechada — de onde se chamam comandos para reabri-la.
+$script:Overlay = 'http://tauri.localhost/'
+
 function Test-Cdp {
   try { $null = Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json" -TimeoutSec 2; return $true } catch { return $false }
 }
@@ -194,8 +214,9 @@ function Start-Isper {
   for ($i = 0; $i -lt 40; $i++) {
     Start-Sleep -Seconds 1
     try {
-      $targets = @(Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json")
-      $onb = $targets | Where-Object { $_.url -like '*onboarding.html*' }
+      $null = Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json" -TimeoutSec 2
+      $urls = @(Get-IsperUrls)
+      $onb = $urls | Where-Object { $_ -like '*onboarding.html*' }
       if ($onb -and $KeepOnboarding) {
         Start-Sleep -Seconds 2
         $ok = $true
@@ -208,7 +229,7 @@ function Start-Isper {
         $finished = $true
         continue
       }
-      if (-not $KeepOnboarding -and ($targets | Where-Object { $_.url -like '*home.html*' })) {
+      if (-not $KeepOnboarding -and ($urls | Where-Object { $_ -like '*home.html*' })) {
         Start-Sleep -Seconds 3
         $ok = $true
         break
@@ -264,18 +285,16 @@ function EvJson {
 }
 
 function Wait-IsperWindow {
-  # Espera a janela (trecho da URL, ex.: 'library.html') aparecer entre os alvos
-  # CDP — ate $Seconds. Um sleep fixo nao serve: o runner do CI abre janelas
-  # bem mais devagar que a maquina de desenvolvimento.
+  # Espera a tela (trecho da URL, ex.: 'library.html') abrir e terminar de
+  # carregar — ate $Seconds. Vale para janela propria e para tela da janela
+  # principal. Um sleep fixo nao serve: o runner do CI abre janelas bem mais
+  # devagar que a maquina de desenvolvimento.
   param([Parameter(Mandatory)][string]$Target, [int]$Seconds = 20)
   for ($i = 0; $i -lt $Seconds * 2; $i++) {
-    try {
-      $targets = @(Invoke-RestMethod "http://127.0.0.1:$script:CdpPort/json" -TimeoutSec 2)
-      if ($targets | Where-Object { $_.type -eq 'page' -and $_.url -like "*$Target*" }) {
-        Start-Sleep -Milliseconds 800   # a pagina ainda esta montando o DOM
-        return $true
-      }
-    } catch {}
+    if ((Ev $Target 'document.readyState') -match 'complete') {
+      Start-Sleep -Milliseconds 800   # a pagina ainda esta montando o DOM
+      return $true
+    }
     Start-Sleep -Milliseconds 500
   }
   Write-Host "  (diagnostico) a janela '$Target' nao apareceu em $Seconds s"
