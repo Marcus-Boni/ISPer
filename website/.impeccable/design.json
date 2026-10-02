@@ -1,29 +1,466 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-16T12:00:00-03:00",
+  "generatedAt": "2026-10-02T12:28:24-03:00",
   "title": "Design System: ISPer Portal",
   "extensions": {
     "colorMeta": {
-      "warm-void": { "role": "neutral", "displayName": "Warm Void", "canonical": "#161311", "tonalRamp": ["#110f0e", "#161311", "#1b1714", "#1e1a18"] },
-      "terracotta": { "role": "primary", "displayName": "Terracotta Coral", "canonical": "#f07e72", "tonalRamp": ["#7a3f39", "#c5665c", "#f07e72", "#f79f94"] },
-      "ivory": { "role": "neutral", "displayName": "Soft Ivory", "canonical": "#ece7e1", "tonalRamp": ["#7e756e", "#a79e96", "#d3cbc3", "#ece7e1"] }
+      "warm-void": {
+        "role": "neutral",
+        "displayName": "Warm Void",
+        "canonical": "#161311",
+        "oklch": "oklch(19.0% 0.006 56.0)",
+        "tonalRamp": [
+          "#0d0a09",
+          "#282422",
+          "#45413f",
+          "#64605e",
+          "#85817f",
+          "#a8a4a1",
+          "#ccc8c5",
+          "#f2edea"
+        ]
+      },
+      "warm-void-raised": {
+        "role": "neutral",
+        "displayName": "Warm Void Raised",
+        "canonical": "#1b1714",
+        "oklch": "oklch(20.8% 0.009 59.2)",
+        "tonalRamp": [
+          "#0e0a08",
+          "#282421",
+          "#46413d",
+          "#65605c",
+          "#86817d",
+          "#a9a4a0",
+          "#cec8c4",
+          "#f3ede9"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel",
+        "canonical": "#1e1a18",
+        "oklch": "oklch(22.2% 0.007 48.4)",
+        "tonalRamp": [
+          "#0e0a09",
+          "#282422",
+          "#45413f",
+          "#65605e",
+          "#86817e",
+          "#a9a4a1",
+          "#cdc8c5",
+          "#f3edea"
+        ]
+      },
+      "panel-raised": {
+        "role": "neutral",
+        "displayName": "Panel Raised",
+        "canonical": "#26211e",
+        "oklch": "oklch(25.2% 0.009 53.0)",
+        "tonalRamp": [
+          "#0e0a08",
+          "#292421",
+          "#46413d",
+          "#66605c",
+          "#87817d",
+          "#aaa3a0",
+          "#cec8c4",
+          "#f4ede9"
+        ]
+      },
+      "panel-active": {
+        "role": "neutral",
+        "displayName": "Panel Active",
+        "canonical": "#2f2824",
+        "oklch": "oklch(28.3% 0.013 51.7)",
+        "tonalRamp": [
+          "#100a07",
+          "#2a231f",
+          "#48403c",
+          "#675f5b",
+          "#89807c",
+          "#aca39e",
+          "#d0c7c2",
+          "#f6ece7"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "canonical": "#372f2b",
+        "oklch": "oklch(31.2% 0.014 48.3)",
+        "tonalRamp": [
+          "#100907",
+          "#2b231f",
+          "#48403c",
+          "#685f5b",
+          "#8a807b",
+          "#ada39e",
+          "#d1c7c2",
+          "#f7ece7"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Line Strong",
+        "canonical": "#4a403a",
+        "oklch": "oklch(38.0% 0.017 52.9)",
+        "tonalRamp": [
+          "#110905",
+          "#2c231d",
+          "#4a403a",
+          "#695f58",
+          "#8b8079",
+          "#aea29b",
+          "#d3c6bf",
+          "#f8ece4"
+        ]
+      },
+      "ivory": {
+        "role": "neutral",
+        "displayName": "Ivory",
+        "canonical": "#ece7e1",
+        "oklch": "oklch(93.0% 0.010 72.7)",
+        "tonalRamp": [
+          "#0e0b07",
+          "#282420",
+          "#45413c",
+          "#65605b",
+          "#86817c",
+          "#a9a49f",
+          "#cdc8c2",
+          "#f3eee8"
+        ]
+      },
+      "ivory-soft": {
+        "role": "neutral",
+        "displayName": "Ivory Soft",
+        "canonical": "#d3cbc3",
+        "oklch": "oklch(84.6% 0.014 67.6)",
+        "tonalRamp": [
+          "#0f0a05",
+          "#2a241e",
+          "#47413a",
+          "#676059",
+          "#88817a",
+          "#aba49c",
+          "#d0c8c0",
+          "#f5ede5"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#a79e96",
+        "oklch": "oklch(70.5% 0.016 64.3)",
+        "tonalRamp": [
+          "#100a05",
+          "#2b241d",
+          "#48403a",
+          "#686058",
+          "#898179",
+          "#aca39b",
+          "#d1c7bf",
+          "#f6ede4"
+        ]
+      },
+      "muted-quiet": {
+        "role": "neutral",
+        "displayName": "Muted Quiet",
+        "canonical": "#8d847c",
+        "oklch": "oklch(61.9% 0.016 64.2)",
+        "tonalRamp": [
+          "#100a05",
+          "#2b241d",
+          "#484039",
+          "#685f58",
+          "#898179",
+          "#aca39b",
+          "#d1c7bf",
+          "#f7ece4"
+        ]
+      },
+      "terracotta": {
+        "role": "primary",
+        "displayName": "Terracotta",
+        "canonical": "#f07e72",
+        "oklch": "oklch(71.9% 0.142 27.4)",
+        "tonalRamp": [
+          "#1f0001",
+          "#4d0103",
+          "#7c1010",
+          "#a23831",
+          "#c95b51",
+          "#f17f73",
+          "#ffb3a9",
+          "#ffe9e6"
+        ]
+      },
+      "terracotta-light": {
+        "role": "primary",
+        "displayName": "Terracotta Light",
+        "canonical": "#f79f94",
+        "oklch": "oklch(78.8% 0.107 27.5)",
+        "tonalRamp": [
+          "#1f0000",
+          "#4d0103",
+          "#702520",
+          "#94463e",
+          "#ba685e",
+          "#e08a80",
+          "#feb3a9",
+          "#fee9e6"
+        ]
+      },
+      "terracotta-ink": {
+        "role": "primary",
+        "displayName": "Terracotta Ink",
+        "canonical": "#1b0f0d",
+        "oklch": "oklch(18.4% 0.021 29.7)",
+        "tonalRamp": [
+          "#130806",
+          "#2f211f",
+          "#4d3e3b",
+          "#6d5d5a",
+          "#8f7e7b",
+          "#b2a09d",
+          "#d7c4c1",
+          "#fceae6"
+        ]
+      },
+      "terracotta-soft": {
+        "role": "primary",
+        "displayName": "Terracotta Soft",
+        "canonical": "rgba(240, 126, 114, 0.14)",
+        "oklch": "oklch(71.9% 0.142 27.4 / 0.14)",
+        "tonalRamp": [
+          "#1f0001",
+          "#4d0103",
+          "#7c1010",
+          "#a23831",
+          "#c95b51",
+          "#f17f73",
+          "#ffb3a9",
+          "#ffe9e6"
+        ]
+      },
+      "success": {
+        "role": "status",
+        "displayName": "Success",
+        "canonical": "#84c297",
+        "oklch": "oklch(76.0% 0.089 153.6)",
+        "tonalRamp": [
+          "#000f05",
+          "#002e15",
+          "#0d4f2b",
+          "#337049",
+          "#559269",
+          "#78b68b",
+          "#9cdbaf",
+          "#c6ffd6"
+        ]
+      },
+      "warning": {
+        "role": "status",
+        "displayName": "Warning",
+        "canonical": "#e8c15a",
+        "oklch": "oklch(82.5% 0.129 88.5)",
+        "tonalRamp": [
+          "#100a00",
+          "#302301",
+          "#533f01",
+          "#785d05",
+          "#a07d05",
+          "#c6a035",
+          "#ebc45e",
+          "#ffedc2"
+        ]
+      },
+      "information": {
+        "role": "status",
+        "displayName": "Information",
+        "canonical": "#7cc4f0",
+        "oklch": "oklch(78.9% 0.096 236.6)",
+        "tonalRamp": [
+          "#000d17",
+          "#02293c",
+          "#014867",
+          "#1b6990",
+          "#438bb4",
+          "#67aed9",
+          "#8cd3ff",
+          "#dff2fe"
+        ]
+      },
+      "speaker-1": {
+        "role": "speaker",
+        "displayName": "Speaker 1",
+        "canonical": "#9ab4ea",
+        "oklch": "oklch(77.0% 0.083 264.6)",
+        "tonalRamp": [
+          "#00052d",
+          "#10224d",
+          "#2c406e",
+          "#496091",
+          "#6982b5",
+          "#8ba5da",
+          "#afc9ff",
+          "#e7efff"
+        ]
+      },
+      "speaker-2": {
+        "role": "speaker",
+        "displayName": "Speaker 2",
+        "canonical": "#c9a0f0",
+        "oklch": "oklch(77.2% 0.119 307.3)",
+        "tonalRamp": [
+          "#140023",
+          "#350a50",
+          "#532c72",
+          "#734c95",
+          "#956eba",
+          "#b990df",
+          "#dbb7ff",
+          "#f4eafe"
+        ]
+      },
+      "speaker-3": {
+        "role": "speaker",
+        "displayName": "Speaker 3",
+        "canonical": "#f0c97c",
+        "oklch": "oklch(85.3% 0.105 83.4)",
+        "tonalRamp": [
+          "#110a00",
+          "#312201",
+          "#563d01",
+          "#7c5b05",
+          "#a17c2d",
+          "#c59f52",
+          "#eac376",
+          "#ffecca"
+        ]
+      },
+      "chart-context": {
+        "role": "data",
+        "displayName": "Chart Context",
+        "canonical": "#7a6f66",
+        "oklch": "oklch(54.9% 0.019 61.7)",
+        "tonalRamp": [
+          "#110904",
+          "#2c231b",
+          "#4a4038",
+          "#6a5f56",
+          "#8b8077",
+          "#aea399",
+          "#d3c7bd",
+          "#f9ece2"
+        ]
+      }
     },
     "typographyMeta": {
-      "display": { "displayName": "Editorial Display", "purpose": "Landing thesis and major section transitions." },
-      "body": { "displayName": "Readable Interface", "purpose": "Controls, product copy and documentation." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "The landing thesis only."
+      },
+      "display-emphasis": {
+        "displayName": "Display Emphasis",
+        "purpose": "The headline's second line: Terracotta Light, the roman slanted by the browser."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Sections that carry the argument, the close, and the download and docs page titles."
+      },
+      "section": {
+        "displayName": "Section",
+        "purpose": "Supporting sections such as the shortcut detail and the FAQ."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card and feature titles, chart heads — in the sans."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "The paragraph under a display or headline."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Documentation and running copy, 65–75ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Metadata and compact interface states."
+      }
     },
     "shadows": [
-      { "name": "panel-float", "value": "0 30px 80px -60px rgba(0,0,0,0.85)", "purpose": "Large floating product panels." },
-      { "name": "coral-action", "value": "0 18px 36px -24px rgba(240,126,114,0.9)", "purpose": "Primary action emphasis." }
+      {
+        "name": "raised",
+        "value": "0 1px 2px rgba(0, 0, 0, 0.32), 0 12px 28px -18px rgba(0, 0, 0, 0.8)",
+        "purpose": "A surface lifted one step: the selected download choice."
+      },
+      {
+        "name": "floating",
+        "value": "0 2px 6px rgba(0, 0, 0, 0.3), 0 34px 70px -42px rgba(0, 0, 0, 0.92)",
+        "purpose": "Layers that float over content: the ISPer indicator in the stage, menus."
+      },
+      {
+        "name": "accent",
+        "value": "0 2px 5px rgba(0, 0, 0, 0.28), 0 18px 34px -22px rgba(240, 126, 114, 0.7)",
+        "purpose": "Under the primary action only."
+      },
+      {
+        "name": "stage-window",
+        "value": "0 40px 90px -38px #000, 0 18px 50px -30px rgba(240, 126, 114, 0.3)",
+        "purpose": "The product window in the hero."
+      }
     ],
     "motion": [
-      { "name": "state-fast", "value": "160ms ease", "purpose": "Hover and active state changes." },
-      { "name": "reveal", "value": "720ms power3.out", "purpose": "One-time section reveals." }
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Default for arrivals and state changes; also the stage's shared-element flight."
+      },
+      {
+        "name": "ease-soft",
+        "value": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "purpose": "Softer settles."
+      },
+      {
+        "name": "dur-fast",
+        "value": "140ms",
+        "purpose": "Hover and focus."
+      },
+      {
+        "name": "dur-mid",
+        "value": "260ms",
+        "purpose": "Component state changes; a word being heard in the dictated headline."
+      },
+      {
+        "name": "dur-page",
+        "value": "420ms",
+        "purpose": "Route transitions (content travel)."
+      }
     ],
     "breakpoints": [
-      { "name": "mobile", "value": "640px" },
-      { "name": "compact", "value": "980px" },
-      { "name": "wide-motion", "value": "1081px" }
+      {
+        "name": "phone",
+        "value": "640px",
+        "purpose": "Below: primary actions span the width, the stage loses perspective."
+      },
+      {
+        "name": "landing-single",
+        "value": "980px",
+        "purpose": "Below: the landing becomes one column."
+      },
+      {
+        "name": "docs-rails",
+        "value": "1024px",
+        "purpose": "Above: documentation shows the navigation rail."
+      },
+      {
+        "name": "docs-wide",
+        "value": "1280px",
+        "purpose": "Above: documentation adds the on-page contents rail."
+      }
     ]
   },
   "components": [
@@ -31,49 +468,272 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Main download or completion action.",
-      "html": "<button class=\"ds-btn-primary\">BAIXAR PARA WINDOWS</button>",
-      "css": ".ds-btn-primary{background:var(--accent);color:var(--accent-ink);padding:14px 20px;border:0;border-radius:12px;font:650 14px var(--font-hanken);box-shadow:0 18px 36px -24px rgba(240,126,114,.9);transition:background .16s,transform .16s}.ds-btn-primary:hover{background:var(--accent-2);transform:translateY(-1px)}.ds-btn-primary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}"
+      "description": "The one primary action of a view — the download.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Escolher instalador<span class=\"ds-btn-tag\">v0.24.0</span></button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:.55rem;min-height:2.75rem;padding:.7rem 1rem;border:1px solid transparent;border-radius:12px;background:var(--accent, #f07e72);color:var(--accent-ink, #1b0f0d);font:750 1rem var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif);box-shadow:0 2px 5px rgba(0,0,0,.28),0 18px 34px -22px rgba(240,126,114,.7);cursor:pointer;transition:background-color .14s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),transform .14s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1))}.ds-btn-primary:hover{background:var(--accent-2, #f79f94);transform:translateY(-1px)}.ds-btn-primary:active{transform:none;transition-duration:60ms}.ds-btn-primary:focus-visible{outline:2px solid var(--accent, #f07e72);outline-offset:3px}.ds-btn-tag{margin-left:.15rem;padding:.1rem .45rem;border-radius:999px;background:rgba(27,15,13,.14);font:600 .75rem ui-monospace,Consolas,monospace}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every other action beside the primary one.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Ver instalação</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;gap:.55rem;min-height:2.75rem;padding:.7rem 1rem;border:1px solid var(--line-2, #4a403a);border-radius:12px;background:rgba(30,26,24,.72);color:var(--ink, #ece7e1);font:750 1rem var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif);cursor:pointer;transition:border-color .14s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),transform .14s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1))}.ds-btn-secondary:hover{border-color:#584c45;transform:translateY(-1px)}.ds-btn-secondary:active{transform:none;transition-duration:60ms}.ds-btn-secondary:focus-visible{outline:2px solid var(--accent, #f07e72);outline-offset:3px}"
     },
     {
       "name": "Search Field",
       "kind": "input",
-      "description": "Documentation or library search.",
-      "html": "<input class=\"ds-search\" placeholder=\"Buscar guias, CUDA, Teams...\">",
-      "css": ".ds-search{background:var(--bg-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:320px}.ds-search:focus{border-color:var(--accent);outline:2px solid rgba(240,126,114,.22);outline-offset:0}"
+      "refersTo": "input-search",
+      "description": "The documentation search: a recessed field the height of a button.",
+      "html": "<label class=\"ds-search\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m20 20-3.5-3.5\"/></svg><input class=\"ds-search-input\" type=\"search\" placeholder=\"Buscar na documentação\"><span class=\"ds-search-hint\">Ctrl K</span></label>",
+      "css": ".ds-search{position:relative;display:block;width:22rem}.ds-search svg{position:absolute;left:.7rem;top:50%;width:1rem;height:1rem;translate:0 -50%;fill:none;stroke:var(--muted, #a79e96);stroke-width:2;stroke-linecap:round}.ds-search-input{width:100%;height:2.75rem;padding:0 4.5rem 0 2.25rem;border:1px solid var(--line, #372f2b);border-radius:12px;background:var(--bg-2, #1b1714);color:var(--ink, #ece7e1);font:400 .875rem var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif);outline:none;transition:border-color .14s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),box-shadow .14s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1))}.ds-search-input::placeholder{color:var(--muted, #a79e96)}.ds-search-input:focus{border-color:var(--accent, #f07e72);box-shadow:0 0 0 3px rgba(240,126,114,.22)}.ds-search-hint{position:absolute;right:.6rem;top:50%;translate:0 -50%;pointer-events:none;color:var(--muted, #a79e96);font:400 .65rem var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif)}.ds-search:focus-within .ds-search-hint{display:none}"
     },
     {
-      "name": "Product Panel",
+      "name": "Feature Card",
       "kind": "card",
       "refersTo": "card",
-      "description": "Warm floating container for the app stage and release selector.",
-      "html": "<section class=\"ds-panel\">ISPer product content</section>",
-      "css": ".ds-panel{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:32px;box-shadow:0 30px 80px -60px rgba(0,0,0,.85)}"
+      "description": "A landing feature: a translucent panel with one border, a sans title and the product's own UI inside.",
+      "html": "<article class=\"ds-card\"><h3 class=\"ds-card-title\">Fale onde o cursor estiver</h3><p class=\"ds-card-text\">Segure o atalho em qualquer aplicativo, fale e solte: o texto aparece onde você estava escrevendo.</p></article>",
+      "css": ".ds-card{max-width:24rem;padding:clamp(1.4rem,2vw,1.75rem);border:1px solid var(--line, #372f2b);border-radius:16px;background:rgba(30,26,24,.76);box-shadow:0 30px 80px -60px rgba(0,0,0,.85);transition:border-color .26s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),background-color .26s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1))}.ds-card:hover{border-color:var(--line-2, #4a403a);background:rgba(38,33,30,.76)}.ds-card-title{margin:0;color:var(--ink, #ece7e1);font:400 1.35rem/1.2 var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif);letter-spacing:-.015em}.ds-card-text{margin:.6rem 0 0;color:var(--ink-2, #d3cbc3);font:400 .95rem/1.6 var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif)}"
     },
     {
-      "name": "Speaker Label",
+      "name": "Download Choice",
+      "kind": "card",
+      "refersTo": "variant-card",
+      "description": "A build to choose: both stay on screen with their size; the chosen one is raised and checked, never the other erased.",
+      "html": "<div class=\"ds-variants\"><button class=\"ds-variant\" type=\"button\" aria-pressed=\"false\"><strong>CPU</strong><span>14,6 MB · qualquer PC x64</span></button><button class=\"ds-variant is-selected\" type=\"button\" aria-pressed=\"true\"><strong>CUDA <svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg></strong><span>427,6 MB · GPU NVIDIA</span></button></div>",
+      "css": ".ds-variants{display:grid;grid-template-columns:repeat(2,minmax(0,13rem));gap:.75rem}.ds-variant{display:grid;gap:.5rem;align-content:start;padding:1rem;border:1px solid var(--line, #372f2b);border-radius:12px;background:var(--bg-2, #1b1714);color:var(--ink, #ece7e1);text-align:left;font:400 .85rem var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif);cursor:pointer;transition:border-color .14s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),background-color .14s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)),box-shadow .26s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1))}.ds-variant strong{display:flex;align-items:center;justify-content:space-between;font:700 1.05rem var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif)}.ds-variant span{color:var(--muted, #a79e96)}.ds-variant svg{width:1rem;height:1rem;fill:none;stroke:var(--accent, #f07e72);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}.ds-variant:hover{border-color:var(--line-2, #4a403a)}.ds-variant:focus-visible{outline:2px solid var(--accent, #f07e72);outline-offset:3px}.ds-variant.is-selected{border-color:var(--accent, #f07e72);background:var(--panel-2, #26211e);box-shadow:0 1px 2px rgba(0,0,0,.32),0 12px 28px -18px rgba(0,0,0,.8)}"
+    },
+    {
+      "name": "Speaker Line",
       "kind": "chip",
-      "description": "Speaker identity with both name and color.",
-      "html": "<span class=\"ds-speaker\">Participante 1</span>",
-      "css": ".ds-speaker{display:inline-flex;color:var(--p1);border:1px solid currentColor;border-radius:999px;padding:6px 10px;font:650 12px var(--font-hanken)}"
+      "refersTo": null,
+      "description": "A transcript line: the speaker's color always beside the speaker's name, never alone.",
+      "html": "<div class=\"ds-row\"><time>00:10</time><p><strong class=\"ds-speaker\" style=\"--speaker:#f0c97c\">Eu</strong>A página de download precisa explicar CPU e CUDA sem ambiguidade.</p></div>",
+      "css": ".ds-row{display:grid;grid-template-columns:2.65rem 1fr;gap:.65rem;max-width:30rem;padding:.75rem 0;border-top:1px solid var(--line, #372f2b)}.ds-row time{padding-top:.2rem;color:var(--muted-2, #8d847c);font:.65rem ui-monospace,Consolas,monospace}.ds-row p{margin:0;color:var(--ink-2, #d3cbc3);font:400 .8rem/1.5 var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif)}.ds-speaker{display:block;margin-bottom:.2rem;color:var(--speaker);font:700 .7rem var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif)}"
     },
     {
-      "name": "Sticky Header",
+      "name": "Site Header",
       "kind": "nav",
-      "description": "Warm translucent global navigation.",
-      "html": "<nav class=\"ds-nav\"><strong>ISPer.</strong><a>Documentação</a><a>Download</a></nav>",
-      "css": ".ds-nav{display:flex;align-items:center;gap:28px;background:rgba(22,19,17,.9);color:var(--ink);border-bottom:1px solid var(--line);padding:16px 24px;backdrop-filter:blur(14px)}.ds-nav a:hover{color:var(--accent-2)}"
+      "refersTo": null,
+      "description": "Quiet until hover: a 1px terracotta underline grows from the label's left edge; the current page keeps it. The brand is the wordmark with its terracotta period.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-brand\" href=\"#\">ISPer<span>.</span></a><ul><li><a href=\"#\">Recursos</a></li><li><a href=\"#\">Benchmarks</a></li><li><a href=\"#\" aria-current=\"page\">Documentação</a></li><li><a href=\"#\">Download</a></li></ul></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:2rem;min-height:4.25rem;padding:0 1rem}.ds-brand{color:var(--ink, #ece7e1);font:720 1.8rem var(--font-display, Fraunces, Georgia, serif);letter-spacing:-.02em;text-decoration:none}.ds-brand span{color:var(--accent, #f07e72)}.ds-nav ul{display:flex;gap:1.6rem;margin:0;padding:0;list-style:none}.ds-nav ul a{position:relative;padding-block:.35rem;color:var(--muted, #a79e96);font:400 .95rem var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif);text-decoration:none;transition:color .14s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1))}.ds-nav ul a::after{content:'';position:absolute;inset:auto 0 0;height:1px;background:var(--accent, #f07e72);transform:scaleX(0);transform-origin:0 50%;transition:transform .26s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1))}.ds-nav ul a:hover,.ds-nav ul a[aria-current]{color:var(--ink, #ece7e1)}.ds-nav ul a:hover::after,.ds-nav ul a:focus-visible::after,.ds-nav ul a[aria-current]::after{transform:scaleX(1)}.ds-nav a:focus-visible{outline:2px solid var(--accent, #f07e72);outline-offset:3px;border-radius:8px}"
+    },
+    {
+      "name": "ISPer Indicator",
+      "kind": "custom",
+      "refersTo": "listen-pill",
+      "description": "The app's floating indicator as the stage shows it: the mark's bars and its recording dot, off while waiting, terracotta while listening.",
+      "html": "<div class=\"ds-pill\"><svg class=\"ds-mark\" viewBox=\"34 34 47 40\" aria-hidden=\"true\"><g fill=\"currentColor\"><rect x=\"34\" y=\"46\" width=\"4\" height=\"16\" rx=\"2\"/><rect x=\"42\" y=\"40\" width=\"4\" height=\"28\" rx=\"2\"/><rect x=\"50\" y=\"34\" width=\"4\" height=\"40\" rx=\"2\"/><rect x=\"58\" y=\"42\" width=\"4\" height=\"24\" rx=\"2\"/><rect x=\"66\" y=\"48\" width=\"4\" height=\"12\" rx=\"2\"/></g><circle class=\"ds-mark-dot\" cx=\"76\" cy=\"54\" r=\"5\"/></svg><span>Segure <kbd>Ctrl</kbd><b>+</b><kbd>Alt</kbd><b>+</b><kbd>Espaço</kbd></span></div><div class=\"ds-pill is-listening\"><svg class=\"ds-mark\" viewBox=\"34 34 47 40\" aria-hidden=\"true\"><g fill=\"currentColor\"><rect x=\"34\" y=\"46\" width=\"4\" height=\"16\" rx=\"2\"/><rect x=\"42\" y=\"40\" width=\"4\" height=\"28\" rx=\"2\"/><rect x=\"50\" y=\"34\" width=\"4\" height=\"40\" rx=\"2\"/><rect x=\"58\" y=\"42\" width=\"4\" height=\"24\" rx=\"2\"/><rect x=\"66\" y=\"48\" width=\"4\" height=\"12\" rx=\"2\"/></g><circle class=\"ds-mark-dot\" cx=\"76\" cy=\"54\" r=\"5\"/></svg><span class=\"ds-caption\">Consigo sim, reviso depois do almoço</span></div>",
+      "css": ".ds-pill{display:inline-flex;align-items:center;gap:.7rem;margin:.4rem;padding:.55rem .95rem .55rem .75rem;border:1px solid var(--line-2, #4a403a);border-radius:999px;background:rgba(22,19,17,.95);color:var(--muted, #a79e96);font:400 .78rem var(--font-sans, 'Hanken Grotesk', system-ui, sans-serif);box-shadow:0 2px 6px rgba(0,0,0,.3),0 34px 70px -42px rgba(0,0,0,.92)}.ds-pill span{display:inline-flex;align-items:center;gap:.3rem;white-space:nowrap}.ds-pill kbd{padding:.1rem .38rem;border:1px solid var(--line-2, #4a403a);border-bottom-width:2px;border-radius:6px;background:var(--panel-2, #26211e);color:var(--ink-2, #d3cbc3);font:.7rem ui-monospace,Consolas,monospace}.ds-pill b{color:var(--muted-2, #8d847c);font-weight:400}.ds-mark{width:1.85rem;flex:none;color:var(--ink, #ece7e1)}.ds-mark-dot{fill:var(--muted-2, #8d847c);transition:fill .26s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1))}.ds-pill.is-listening{border-color:rgba(240,126,114,.5)}.ds-pill.is-listening .ds-mark-dot{fill:var(--accent, #f07e72)}.ds-caption{color:var(--ink, #ece7e1);opacity:.72}"
     }
   ],
   "narrative": {
     "northStar": "The Warm Transcript Desk",
-    "overview": "A warm editorial interface that makes local processing tangible through real product states. Persuasion, operation and reading share one quiet visual grammar.",
-    "keyCharacteristics": ["Warm near-black surfaces", "Editorial Fraunces display", "Terracotta used sparingly", "Product UI as proof", "Motion with static fallback"],
-    "rules": [
-      { "name": "Scarce Coral", "body": "Reserve terracotta for action, active state and recording.", "section": "colors" },
-      { "name": "Named Speakers", "body": "Speaker color always accompanies a textual name.", "section": "colors" }
+    "overview": "The portal expands the desktop application's dark, warm and editorial identity into a public product surface. It should feel like a private working desk after a meeting: quiet enough to read, exact enough to trust and alive only when an interaction explains the product.\n\nThe landing uses Persuade mode with large Fraunces typography and a working ISPer stage. Download uses Operate mode with explicit CPU/CUDA choice and verifiable release data. Documentation uses Read mode with constrained measure, persistent wayfinding and local search.",
+    "keyCharacteristics": [
+      "Warm near-black field with ivory text and rare terracotta emphasis.",
+      "Editorial serif headlines paired with legible sans-serif interfaces.",
+      "Product proof through working interface states, not decorative illustration.",
+      "One authored arrival — the headline is dictated — one orchestrated scroll moment, and restrained state micro-interactions.",
+      "One mark, generated from a single geometry, on every surface that shows the brand.",
+      "",
+      " Colors",
+      "",
+      "e palette is dark and warm rather than blue-black. Terracotta marks action and active state; status colors keep their literal meaning.",
+      "",
+      "# Primary",
+      "",
+      "**Terracotta** (`terracotta`): primary actions, active controls, the recording dot, the active docs entry.",
+      "**Terracotta Light** (`terracotta-light`): the hover of a primary action and the emphasised line of a headline — the italic \"No seu computador.\" is set in it.",
+      "**Terracotta Ink** (`terracotta-ink`): text on terracotta. Ivory on terracotta fails contrast; this near-black does not.",
+      "**Terracotta Soft** (`terracotta-soft`): the tint behind an accent element — the optional-summary note, the halo of the recording light. Never a large surface.",
+      "",
+      "# Neutral",
+      "",
+      "**Warm Void** (`warm-void`) and **Warm Void Raised** (`warm-void-raised`): the page and the recessed surfaces inside a card — fields, the download choices, the other app in the stage.",
+      "**Panel**, **Panel Raised**, **Panel Active** (`panel`, `panel-raised`, `panel-active`): cards and the steps above them; the selected download raises to Panel Raised.",
+      "**Line** and **Line Strong** (`line`, `line-strong`): the 1px warm borders that carry structure, Line Strong for controls and floating layers.",
+      "**Ivory**, **Ivory Soft**, **Muted**, **Muted Quiet** (`ivory`, `ivory-soft`, `muted`, `muted-quiet`): text from headline to metadata. Muted Quiet clears 4.5:1 only on Warm Void and Panel; on a raised surface, text takes Muted instead.",
+      "",
+      "# Status and speakers",
+      "",
+      "**Success**, **Warning**, **Information** (`success`, `warning`, `information`): literal states only — saved, pasted, a caveat, a note.",
+      "**Speaker 1–3** (`speaker-1`, `speaker-2`, `speaker-3`): one color per speaker in a transcript, always beside the speaker's name.",
+      "**Chart Context** (`chart-context`): the de-emphasised series in a chart. Muted sits too close to terracotta in lightness for a chart to tell them apart; this step clears it.",
+      "",
+      "The Scarce Coral Rule.** Terracotta is reserved for primary actions, active controls, recording state and the key phrase. Large surfaces remain neutral.",
+      "",
+      "One name per thing.** The provedor is the only part of the system that can carry text off the machine, so it has one spelling everywhere — \"provedor\", never \"provider\". Two names for the load-bearing noun in a privacy claim reads as a draft, and that is the sentence an evaluator screenshots. English identifiers survive only where they name a literal CLI value or app control, inside code formatting.",
+      "",
+      "e Scarce Coral Rule is easiest to break in documentation, where a marker on every bullet and a colour on every inline code token spend it on ordinary prose — so by the time a real control appears the colour no longer signals anything. In the docs, terracotta belongs to the active navigation item and the active contents entry, and nothing else.",
+      "",
+      "The Named Speaker Rule.** Speaker color always appears with a textual speaker name. Color never carries identity alone.",
+      "",
+      "One mark.** The ISPer mark is five ivory speech bars centred on a midline and a terracotta recording dot — the gesture of the app's own listening indicator. It is the same mark on the desktop, the tray, the Android launcher, the favicon and the share image, and every file of it is generated by `scripts/brand.py` from a single geometry; editing an icon by hand is how the project once had three. In components, read the geometry from `src/lib/brand-mark.ts` rather than redrawing it. See [`assets/brand/`](../assets/brand/README.md) for the optical sizes and the rule that the dot is a recording light.",
+      "",
+      " Typography",
+      "",
+      "e scale runs display → headline → **section** → title → body → label. The",
+      "ction step exists because without it every headline arrived at one volume:",
+      "x H2s at the same size meant the FAQ shouted as loudly as the closing call,",
+      "d nothing on the page could be second-loudest. Supporting sections — the",
+      "ortcut detail, the FAQ — take the section step; the thesis, the library, the",
+      "nchmarks and the close keep the headline.",
+      "",
+      "Display Font:** Fraunces with Georgia fallback.",
+      "",
+      "Body Font:** Hanken Grotesk with system-ui fallback.",
+      "Code Font:** Cascadia Mono with JetBrains Mono and Consolas fallbacks.",
+      "",
+      "ly the sections that carry the argument take the headline step — the thesis, the audited numbers, and the close. Everything else takes the section step. When five of seven headlines shared one size the page had a single volume, and a reader could not tell which section mattered.",
+      "",
+      "aunces supplies the product's human, editorial voice. Hanken Grotesk keeps controls and long-form documentation calm. Monospace is reserved for commands, paths, timestamps and checksums.",
+      "",
+      "th faces ship as one variable WOFF2 each, and Fraunces only as the roman: the italic in the headline is the browser slanting it. The share image is drawn by Satori, which reads neither WOFF2 nor variable axes and slants nothing, so `scripts/og-fonts.py` cuts static TTF instances from the same files at the weights and optical sizes the image uses, and the image repeats the browser's slant (a 1/4 shear) on the italic line. Change a weight or size there and regenerate; the image must never fall back to a generic serif again.",
+      "",
+      "# Hierarchy",
+      "",
+      "**Display** (760, up to 5.2rem, 0.88): the landing thesis only. Its second line is **Display Emphasis** (520) in Terracotta Light and italic — the roman slanted by the browser, since the font ships no italic.",
+      "**Headline** (700, up to 4.1rem, 1, balanced wrapping): the sections that carry the argument and the close; the download and docs page titles use the same weight and tracking.",
+      "**Section** (700, up to 2.5rem, 1.05): supporting sections — the shortcut detail, the FAQ.",
+      "**Title** (Hanken Grotesk 400, 1.35rem, 1.2): card and feature titles, chart heads. Set in the sans, a grid of them stays quieter than the serif headline above it.",
+      "**Lead** (400, up to 1.35rem, 1.55): the paragraph under a display or headline; 46ch on the landing.",
+      "**Body** (1rem with 1.55–1.8 line-height and a 65–75ch reading measure): documentation and running copy.",
+      "**Label** (0.7–0.9rem, semibold): metadata and compact interface states.",
+      "",
+      " Layout",
+      "",
+      "e page uses a centered shell around 1180px. Landing sections alternate dense demonstrations with quiet explanatory space. Bento items use a six-column desktop grid; documentation uses navigation, article and on-page contents at wide breakpoints.",
+      "",
+      "low 980px the landing becomes one column. Below 640px primary actions span the available width, the app stage loses perspective, and documentation navigation becomes a collapsed disclosure before the article. No page-level horizontal scrolling is permitted.",
+      "",
+      " Elevation & Depth",
+      "",
+      "pth is mainly tonal. Panels move from warm-void to panel and panel-raised; 1px warm borders define structure. Broad soft shadows belong to floating product windows, download focus and the final CTA. The sticky header is transparent at the top of the page and only takes its border, tint and 14px backdrop blur after scrolling.",
+      "",
+      "ery shadow carries an offset as well as a blur; a zero-offset coloured halo is decoration, not elevation. Demonstration surfaces nested inside a card — the typed note, the search result, the command field — are recessed rather than raised, so they read as the application's own chrome instead of a second card.",
+      "",
+      " Shapes",
+      "",
+      "dii come from the `rounded` scale only: 16px for cards and major panels, 12px for buttons, fields and inner surfaces, 8px for the smallest controls and focus rings. Buttons and fields use 8–12px. Full pills are limited to compact badges — the version tag on the download button among them — chart switches, speaker labels and the floating ISPer indicator in the stage, which is a pill because the app's own indicator is one. Borders and shadows are not stacked unless the shadow communicates a genuinely floating layer.",
+      "",
+      " Motion",
+      "",
+      "nis owns wheel smoothing on pointer devices and is the single scroll source GSAP's ScrollTrigger listens to; touch and reduced-motion users keep native scrolling. Four registers, and no more:",
+      "",
+      " **Arrival — the headline is dictated.** This is the page's one authored moment, and it comes from the product: hold the shortcut, speak, let go, and the words appear where you were typing. Each word goes through the three states ISPer really has — unheard, provisional (the live caption) and final (the final pass, which sweeps the whole headline left to right when the shortcut is released) — while the mark rides the insertion point as the cursor: bars talking, recording dot lit. On release the voice settles flat, the dot goes out, and the mark gives way to a text caret that blinks twice and leaves.",
+      "",
+      " It is pure CSS, timed from one table in `hero-headline.tsx`. It starts on the first frame the stylesheet arrives, so it waits for neither hydration nor `requestAnimationFrame`, and it never hides the headline: \"unheard\" is translucent, not invisible, so the largest element of the first screen paints on frame one and the LCP is not held until the last word lands. The cursor is a sibling of the word's text, never a child, or it inherits the provisional blur and the recording dot comes out soft. A cursor jumps: the outgoing one disappears on the exact frame the incoming one starts. Any keyframes that hold a final value write both ends: with only `to`, the implicit start inherits whatever the animation underneath holds, and a browser finishes a short animation at progress 0.99999…, not 1 — the cursors once stayed lit after the headline was done, while a timeline seeked to round instants looked perfect (`scripts/lib/hero-motion.test.mjs` guards it). The lead, the actions and the proof list do not animate at all — they are usable from the first frame, and the headline is the only thing asking to be watched.",
+      " **The settle** — the hero's product window is sticky while the copy scrolls past it, and a single scrubbed timeline squares its perspective as the hero leaves. This is the page's one orchestrated scroll moment. It needs runway: the hero runs past one viewport so the stage has somewhere to hold, and the stage's column stretches to the full row so the sticky child has slack. At exactly one viewport the column was 84px taller than the stage, which is a twitch, not a moment.",
+      "",
+      " The stage plays its own demonstration rather than being driven by scroll: once, after the headline has finished being dictated — two dictations at once would be noise — and only while it is on screen, so a phone reader who scrolls to it later still sees it happen. Any deliberate click or keypress inside the stage cancels the autoplay for good, because a reader operating the demo should not have the page argue with them.",
+      " **Entrances** — sections differ by role: headings and their supporting line lead, grids stagger their own items, and the shortcut keys press in.",
+      " **Navigation** — React's `<ViewTransition>` animates route changes. Content travels and the header does not: it is the reader's spatial anchor, so it holds its `view-transition-name` and its animation is suppressed. Going deeper slides left, coming back slides right, and moves between siblings lift in place instead, because a slide would claim a journey that did not happen. Direction is derived from route depth rather than hand-tagged per link, so the same header link reads correctly from every page.",
+      "",
+      "d content leaves in 150ms so it stops competing for attention; new content arrives over 210ms, delayed until the exit has cleared, while its movement runs the full 420ms.",
+      "",
+      "tion never hides content it cannot restore. Anything already on screen animates from a visible state, and a failsafe clears every from-state if the scroll layer stops reporting.",
+      "",
+      " Components",
+      "",
+      "# Download selection",
+      "",
+      "th installer variants stay on screen with their size and requirements. The CPU build weighs tens of megabytes and the CUDA build hundreds (14,6 MB and 427,6 MB in 0.24.0); two sizes that far apart cannot be compared from memory, and the difference between them is the most decision-relevant fact on the page. Selecting raises a card rather than erasing the other, and carries a check so the state is never held by colour alone. From 0.20.0 the releases also carry a portable ZIP of each build; the page lists them below the installers, each with its size and hash, and only when the release has them.",
+      "",
+      "e page asks the reader to verify what they downloaded, so it shows both halves of that check as numbered steps: the PowerShell command that produces a hash for the file they just saved, and the published hash to compare it against. An instruction to compare a checksum without the command that produces one is an instruction nobody can follow, and this is a Windows-only product, so the command is the Windows one. The signed list opens in its own tab, because it should not replace the value being compared against. The unsigned-binary warning names the SmartScreen dialog and gives the literal steps through it; a warning without a recovery path just leaves the reader stuck at the scariest moment.",
+      "",
+      "# Buttons",
+      "",
+      "Primary buttons use terracotta, dark text and a soft downward shadow.",
+      "Secondary buttons use a raised neutral surface and strong warm border.",
+      "Hover moves at most one pixel; active state returns toward the surface.",
+      "Focus uses a visible terracotta outline with offset.",
+      "",
+      "# Cards / Containers",
+      "",
+      "Warm neutral surfaces with one border and 12–16px radii.",
+      "Bento cards may receive a localized glow tied to their subject.",
+      "Nested cards are reserved for real application UI, charts and search results.",
+      "",
+      "# Inputs / Fields",
+      "",
+      "Recessed Warm Void Raised field, a warm line, 12px radius and the same 2.75rem height as a button.",
+      "Focus shifts the border to terracotta and adds a 3px ring of terracotta at 22%.",
+      "Search results remain keyboard reachable and use local Pagefind data.",
+      "",
+      "# Navigation",
+      "",
+      "Desktop navigation remains quiet until hover.",
+      "Mobile navigation uses an explicit menu control.",
+      "Documentation uses a sticky desktop tree and a collapsed mobile disclosure.",
+      "",
+      "chors come to rest one header-and-a-half below the top of the viewport, and that distance is declared exactly once, as `scroll-padding-top` on the scrollport. Repeating it per target as `scroll-margin-top` does not reinforce it: the browser and Lenis each subtract *both*, which rested every anchor a full header too low. The scrollport is also the only one of the two that reaches focus and find-in-page.",
+      "",
+      "cross-route anchor cannot trust a single measurement. The incoming page is still growing when it commits — a dynamic import resolves, a font swaps, the reveal effects release their from-states — and a smooth-scroll library clamps to the document height it measured last, which is still the outgoing page's. So measure, correct, and keep correcting until two consecutive frames agree. Then stop — and stop at once if the reader scrolls, because from that moment the scroll is theirs.",
+      "",
+      "# The audio boundary",
+      "",
+      "e product's irreducible claim is that audio never leaves the machine, and a claim of that weight cannot live only in prose inside a collapsed disclosure. The landing draws it: capture, transcription and storage sit inside a bounded region labelled as the reader's own computer, and the single dashed line that crosses the boundary carries text, only to a provider the reader configured, and is labelled as such.",
+      "",
+      " is geometry, not illustration — boxes, arrows and a boundary, authored twice so that a horizontal flow is never squeezed into a phone. Both variants are decorative to assistive technology; the figure's caption states the same flow in a sentence.",
+      "",
+      "# Documentation rails",
+      "",
+      "th rails are sticky columns offset by `--header-h`, so nothing they hold can end up beneath the header. Within a rail only the list scrolls: the search field and the section title stay put, because a reader mid-scroll should not lose the control they were reaching for. A list that genuinely overflows is masked at both edges to say there is more; one that fits is left alone rather than dimmed for symmetry.",
+      "",
+      "ooth scrolling releases the wheel to any nested scroller that still has room, and those scrollers contain their own overscroll so reaching the end of a list does not carry on into the page.",
+      "",
+      "ading anchors are slugged with the same implementation that renders the ids. Two slug functions for one document is a broken link waiting to happen, and in Portuguese it is most of them.",
+      "",
+      "# Interactive App Stage",
+      "",
+      "ctation is shown as the gesture, not as a microphone. The words are for some other program, so the scene is one — a team chat with a question waiting for an answer — and the ISPer indicator floats over it the way the real one floats over the desktop. The reply streams into the indicator as a provisional caption; on release it flies out of the indicator and lands in the reply field. The flight is a shared-element move: the reply is rendered in the field already final and, for one moment, drawn from where the caption sat, so the reader sees the same words travel rather than one disappear and another appear. Without motion it crossfades, and under reduced motion the stage opens on the outcome — the reply already in the field — so the result stays legible with nothing moving.",
+      "",
+      "e other app keeps the page's palette and says \"another program\" through structure alone, a thread and a reply field, so the demonstration does not invent a second visual world. Its empty field shows the caret before the placeholder, as a focused empty field does. The indicator's dot is the recording light here as in the tray: off while it waits, terracotta while it listens. Its bars are the mark's own five, talking only while words arrive.",
+      "",
+      "e stage reproduces real ISPer states with synthetic content, and the states have to be true to themselves: the meeting transcript fills and then holds rather than wrapping, because a recording clock that counts back to zero while the chip still reads \"gravando reunião\" tells the reader the whole thing is theatre — on a page whose thesis is that its numbers can be audited. It exposes dictation and meeting modes, speaker colors, the mark's talking bars, the keyboard shortcut and the optional summary boundary without requesting microphone access.",
+      "",
+      " Do's and Don'ts",
+      "",
+      "# Do:",
+      "",
+      "**Do** use product data and actual interface states as the primary visual material.",
+      "**Do** label synthetic transcripts, illustrative costs and unsupported features.",
+      "**Do** preserve native scrolling and static content when motion is reduced.",
+      "**Do** keep download integrity, version and hardware choice visible together.",
+      "",
+      "# Don't:",
+      "",
+      "**Don't** describe optional cloud summaries as fully local.",
+      "**Don't** turn every section into equal icon cards or add decorative glass layers.",
+      "**Don't** use gradients on text or monospace as a generic technical costume.",
+      "**Don't** hide article content behind the documentation navigation on mobile."
     ],
-    "dos": ["Use actual product states as visual material.", "Keep unsupported features explicit.", "Preserve static content with reduced motion."],
-    "donts": ["Do not claim cloud summaries are local.", "Do not turn every section into equal icon cards.", "Do not hide docs behind mobile navigation."]
+    "rules": [
+      {
+        "name": "Scarce Coral Rule",
+        "body": "Terracotta is reserved for primary actions, active controls, recording state and the key phrase. Large surfaces remain neutral.",
+        "section": "colors"
+      },
+      {
+        "name": "Named Speaker Rule",
+        "body": "Speaker color always appears with a textual speaker name. Color never carries identity alone.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "**Do** use product data and actual interface states as the primary visual material.",
+      "**Do** label synthetic transcripts, illustrative costs and unsupported features.",
+      "**Do** preserve native scrolling and static content when motion is reduced.",
+      "**Do** keep download integrity, version and hardware choice visible together."
+    ],
+    "donts": [
+      "**Don't** describe optional cloud summaries as fully local.",
+      "**Don't** turn every section into equal icon cards or add decorative glass layers.",
+      "**Don't** use gradients on text or monospace as a generic technical costume.",
+      "**Don't** hide article content behind the documentation navigation on mobile."
+    ]
   }
 }
