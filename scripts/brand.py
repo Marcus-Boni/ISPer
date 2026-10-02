@@ -373,6 +373,9 @@ def outputs() -> dict[Path, bytes]:
     for s in (30, 44, 71, 89, 107, 142, 150, 284, 310):
         out[TAURI / f"Square{s}x{s}Logo.png"] = png_bytes(tile_for(s))
     out[TAURI / "StoreLogo.png"] = png_bytes(tile_for(50))
+    # A barra lateral da janela única mostra o ícone do app a 28 px, a moldura
+    # pequena; vem daqui para a janela não desenhar uma marca só dela.
+    out[ROOT / "apps/isper-app/ui/assets/isper-icon.svg"] = svg_tile(FRAME_SMALL).encode()
 
     # Bandeja: o ponto é a luz de gravação. Apagado enquanto o ISPer só espera,
     # aceso enquanto grava — o mesmo símbolo do ícone, agora dizendo o estado.
