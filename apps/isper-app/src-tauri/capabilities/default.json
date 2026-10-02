@@ -1,14 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissoes das janelas do app: eventos, comandos internos e controle da propria janela (arrastar/redimensionar o indicador). Janela fora desta lista nao consegue nem ouvir eventos (plugin:event|listen e negado pela ACL) - foi o que deixou o Copilot sem transcricao ao vivo.",
+  "description": "Permissoes das janelas do app: eventos, comandos internos e controle da propria janela (arrastar/redimensionar o indicador). Janela fora desta lista nao consegue nem ouvir eventos (plugin:event|listen e negado pela ACL) - foi o que deixou o Copilot sem transcricao ao vivo. Inicio, Biblioteca, Configuracoes e a primeira configuracao moram na janela main (iframes que usam o __TAURI__ dela).",
   "windows": [
     "overlay",
-    "home",
-    "settings",
-    "copilot",
-    "library",
-    "onboarding"
+    "main",
+    "copilot"
   ],
   "permissions": [
     "core:default",

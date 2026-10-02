@@ -718,7 +718,7 @@
       text.textContent = t('copilot.status.no-provider');
       action.hidden = false;
       action.textContent = t('copilot.status.open-settings');
-      action.onclick = () => invoke('open_settings_window').catch((e) => UI.toast(String(e), 'err'));
+      action.onclick = () => invoke('open_settings_window', { section: 'inteligencia' }).catch((e) => UI.toast(String(e), 'err'));
       return;
     }
     if (d.error) {
@@ -736,7 +736,7 @@
       text.textContent = t('copilot.status.filter-off', { e: d.filter.disabled });
       action.hidden = false;
       action.textContent = t('copilot.status.open-settings');
-      action.onclick = () => invoke('open_settings_window').catch((e) => UI.toast(String(e), 'err'));
+      action.onclick = () => invoke('open_settings_window', { section: 'inteligencia' }).catch((e) => UI.toast(String(e), 'err'));
       return;
     }
     if (d.running) {

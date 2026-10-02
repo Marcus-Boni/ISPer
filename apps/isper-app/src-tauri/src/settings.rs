@@ -157,10 +157,10 @@ pub(crate) fn load_engine_in_background(app: AppHandle) {
         ) else {
             tracing::warn!("nenhum modelo instalado");
             set_engine_status(&app, EngineStatus::Missing);
-            if app.get_webview_window("home").is_none()
-                && app.get_webview_window(crate::onboarding::LABEL).is_none()
-            {
-                open_settings(&app);
+            // Com a janela aberta, o Início ou a primeira configuração já
+            // orientam o download; fechada, ela abre direto nos modelos.
+            if app.get_webview_window(MAIN).is_none() {
+                open_settings_section(&app, "modelos");
             }
             return;
         };
@@ -249,9 +249,8 @@ pub(crate) async fn download_model(app: AppHandle, file: String) -> Result<(), S
             if done - last >= 1_000_000 || done == total {
                 last = done;
                 let progress = json!({"file": file2, "done": done, "total": total});
-                for label in ["settings", crate::onboarding::LABEL] {
-                    let _ = app2.emit_to(label, "isper-model-progress", progress.clone());
-                }
+                // Configurações e primeira configuração ouvem (as duas moram na principal).
+                let _ = app2.emit_to(MAIN, "isper-model-progress", progress);
             }
         })
         .map(|_| ())
@@ -287,7 +286,7 @@ pub(crate) async fn download_diarize_models(app: AppHandle) -> Result<(), String
             if done - last >= 500_000 || done == total {
                 last = done;
                 let _ = progress_app.emit_to(
-                    "settings",
+                    MAIN,
                     "isper-model-progress",
                     json!({"file": "diarize", "name": name, "done": done, "total": total}),
                 );
@@ -439,6 +438,9 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         // O tema muda na hora por `set_ui_theme`, não pelo Salvar.
         theme: previous.theme.clone(),
         ui_lang: previous.ui_lang.clone(),
+        // A janela principal guarda o próprio tamanho e a barra lateral.
+        main_window: previous.main_window,
+        sidebar_collapsed: previous.sidebar_collapsed,
         onboarding_done: previous.onboarding_done,
         config_version: config::CONFIG_VERSION,
     };

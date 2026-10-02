@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ISPer</title>
+<script src="assets/boot.js"></script>
+<script src="assets/i18n.js"></script>
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/shell.css">
+</head>
+<!-- A janela principal do ISPer: barra lateral + uma tela por vez. Cada tela
+     (home/library/settings/onboarding.html) é um iframe criado na primeira
+     visita e mantido vivo — trocar de tela é instantâneo e não perde o que
+     estava aberto, digitado ou rolado. Ver shell.js e o ADR 0020. -->
+<body class="atmos">
+<a class="skip" href="#stage" data-i18n="shell.skip">Pular para o conteúdo</a>
+
+<aside class="side" id="side" aria-label="ISPer">
+  <div class="side-top">
+    <button class="brand-btn" id="brand" type="button" data-i18n-attr="title:shell.nav.home,aria-label:shell.nav.home">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="6.5"/><path d="M7.6 8.4v7.2M11.2 6.6v10.8M14.8 9.3v5.4M18.4 10.8v2.4"/></svg></span>
+      <span class="brand label">ISPer<span>.</span></span>
+    </button>
+    <button class="icon-btn collapse-btn" id="collapse" type="button" aria-controls="side" aria-expanded="true">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="2.2"/><path d="M6.2 2.5v11"/><path class="chev" d="M10.6 6.4 9 8l1.6 1.6"/></svg>
+    </button>
+  </div>
+
+  <button class="search-trigger" id="open-palette" type="button" aria-haspopup="dialog">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+    <span class="label" data-i18n="shell.search">Buscar…</span>
+    <kbd class="label">Ctrl K</kbd>
+  </button>
+
+  <nav class="nav" id="nav" aria-label="Navegação principal" data-i18n-attr="aria-label:shell.nav-aria">
+    <span class="nav-ind" id="nav-ind" aria-hidden="true"></span>
+    <button class="nav-item" type="button" data-view="home">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.2 8 2.6l5.5 4.6"/><path d="M3.9 6.2v6.6a.9.9 0 0 0 .9.9h2.3V10.4h1.8v3.3h2.3a.9.9 0 0 0 .9-.9V6.2"/></svg>
+      <span class="label" data-i18n="shell.nav.home">Início</span>
+    </button>
+    <button class="nav-item" type="button" data-view="library">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h7.5A1.5 1.5 0 0 1 12 4v9.5H4.5A1.5 1.5 0 0 0 3 15z"/><path d="M3 12.5A1.5 1.5 0 0 1 4.5 11H12"/></svg>
+      <span class="label" data-i18n="shell.nav.library">Biblioteca</span>
+      <span class="nav-badge busy" id="badge-library" hidden></span>
+    </button>
+    <button class="nav-item" type="button" data-action="copilot" id="nav-copilot">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8 9.4 5.9 13.5 7.3 9.4 8.7 8 12.8 6.6 8.7 2.5 7.3 6.6 5.9 8 1.8Z"/></svg>
+      <span class="label" data-i18n="shell.nav.copilot">Copilot</span>
+      <span class="nav-badge live" id="badge-copilot" hidden></span>
+      <svg class="ext label" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 3h3.5v3.5M13 3 8 8"/><path d="M11.5 9.5v2.8a.7.7 0 0 1-.7.7H3.7a.7.7 0 0 1-.7-.7V5.2a.7.7 0 0 1 .7-.7h2.8"/></svg>
+    </button>
+  </nav>
+
+  <div class="side-fill"></div>
+
+  <!-- Gravação de reunião: visível em qualquer tela. -->
+  <section class="rec" id="rec" data-state="idle" aria-live="polite">
+    <button class="rec-start" id="rec-start" type="button">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="label rec-text" data-i18n="shell.rec.start">Gravar reunião</span>
+      <kbd class="label" id="rec-key"></kbd>
+    </button>
+    <div class="rec-live">
+      <div class="rec-head">
+        <span class="rec-dot on" aria-hidden="true"></span>
+        <span class="label rec-text" id="rec-label" data-i18n="shell.rec.recording">Gravando</span>
+        <span class="label rec-timer num" id="rec-timer">00:00</span>
+      </div>
+      <div class="rec-actions">
+        <button class="btn btn-sm" id="rec-mark" type="button">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 1.9 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.7l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.9Z"/></svg>
+          <span data-i18n="shell.rec.mark">Marcar</span>
+        </button>
+        <button class="btn btn-sm rec-stop" id="rec-stop" type="button">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.6" fill="currentColor"/></svg>
+          <span data-i18n="shell.rec.stop">Encerrar</span>
+        </button>
+      </div>
+    </div>
+    <div class="rec-busy">
+      <span class="spin" aria-hidden="true"></span>
+      <span class="label rec-text" id="rec-busy-text" data-i18n="shell.rec.processing">Finalizando a ata…</span>
+    </div>
+  </section>
+
+  <div class="side-foot">
+    <button class="update-pill" id="update" type="button" hidden>
+      <span class="dot-new" aria-hidden="true"></span>
+      <span class="label" id="update-text"></span>
+    </button>
+    <button class="nav-item" type="button" data-view="settings">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 4.5h12M2 11.5h12"/><circle class="knob" cx="6" cy="4.5" r="1.9"/><circle class="knob" cx="10" cy="11.5" r="1.9"/></svg>
+      <span class="label" data-i18n="shell.nav.settings">Configurações</span>
+      <span class="nav-badge dirty" id="badge-settings" hidden></span>
+    </button>
+    <div class="foot-row">
+      <button class="btn btn-ghost btn-icon theme-toggle" id="theme" type="button">
+        <svg class="ico-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2.9"/><path d="M8 1.6v1.5M8 12.9v1.5M1.6 8h1.5M12.9 8h1.5M3.5 3.5l1.1 1.1M11.4 11.4l1.1 1.1M3.5 12.5l1.1-1.1M11.4 4.6l1.1-1.1"/></svg>
+        <svg class="ico-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.3 9.7A5.5 5.5 0 0 1 6.3 2.7a5.5 5.5 0 1 0 7 7Z"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon label" id="keys" type="button" data-i18n-attr="title:shell.keys.title,aria-label:shell.keys.title">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.8" y="4" width="12.4" height="8" rx="1.6"/><path d="M4.4 6.6h.01M6.8 6.6h.01M9.2 6.6h.01M11.6 6.6h.01M5 9.4h6"/></svg>
+      </button>
+      <span class="ver label" id="ver"></span>
+    </div>
+  </div>
+</aside>
+
+<main class="stage" id="stage" tabindex="-1">
+  <div class="stage-wait" id="stage-wait" hidden><span class="spin" aria-hidden="true"></span></div>
+</main>
+
+<!-- Soltar áudio em qualquer tela: a Biblioteca abre e importa. -->
+<div class="dropzone" id="dropzone" hidden>
+  <div class="box">
+    <div class="big" data-i18n="library.import.drop">Solte para transcrever</div>
+    <div class="small" data-i18n="library.import.drop-hint">MP3, M4A, WAV, FLAC, OGG ou Opus</div>
+  </div>
+</div>
+
+<dialog class="palette" id="palette" aria-label="Paleta de comandos" data-i18n-attr="aria-label:shell.palette.aria">
+  <div class="pal-search">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+    <input id="pal-input" type="text" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list"
+      placeholder="Ir para, executar ou buscar uma reunião…" data-i18n-attr="placeholder:shell.palette.placeholder,aria-label:shell.palette.aria">
+    <kbd>Esc</kbd>
+  </div>
+  <div class="pal-list" id="pal-list" role="listbox" aria-label="Resultados" data-i18n-attr="aria-label:shell.palette.results"></div>
+  <div class="pal-foot" data-i18n="shell.palette.hint">↑↓ navegar · Enter abrir · Esc fechar</div>
+</dialog>
+
+<dialog class="keys-dialog" id="keys-dialog" aria-labelledby="keys-title">
+  <div class="kd-head">
+    <h2 id="keys-title" data-i18n="shell.keys.title">Atalhos de teclado</h2>
+    <button class="btn btn-ghost btn-icon" id="keys-close" type="button" data-i18n-attr="aria-label:shell.keys.close,title:shell.keys.close">×</button>
+  </div>
+  <div class="kd-cols">
+    <section>
+      <p class="eyebrow" data-i18n="shell.keys.window">Nesta janela</p>
+      <dl class="kd-list" id="keys-window"></dl>
+    </section>
+    <section>
+      <p class="eyebrow" data-i18n="shell.keys.global">Em qualquer app</p>
+      <dl class="kd-list" id="keys-global"></dl>
+    </section>
+  </div>
+</dialog>
+
+<div class="sr-only" id="announce" aria-live="polite"></div>
+
+<script src="assets/ui.js"></script>
+<script src="assets/shell.js"></script>
+</body>
+</html>

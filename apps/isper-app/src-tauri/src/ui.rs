@@ -4,12 +4,14 @@
 //! Como chega à página sem piscar: cada janela nasce com um script de
 //! inicialização ([`boot_script`]) que define `window.__ISPER_UI`, e o
 //! `assets/boot.js` — o primeiro script do `<head>` — aplica o tema no
-//! `<html data-theme>` antes da primeira pintura. Uma mudança nas
-//! Configurações vale na hora: o evento `isper-ui` chega a todas as janelas
-//! abertas, e a barra de título nativa acompanha via `set_theme`. As
-//! páginas que têm os seletores (Configurações e primeira configuração)
-//! também os acertam por esse evento, para não mostrar uma escolha velha
-//! quando a mudança veio da outra janela.
+//! `<html data-theme>` antes da primeira pintura. As telas da janela principal
+//! são iframes dela e não recebem script de inicialização: o `boot.js` de
+//! cada uma copia `__ISPER_UI` (e o `__TAURI__`) da página-mãe. Uma mudança
+//! nas Configurações vale na hora: o evento `isper-ui` chega a todas as
+//! janelas e telas abertas, e a barra de título nativa acompanha via
+//! `set_theme`. As telas que têm os seletores (Configurações e primeira
+//! configuração) também os acertam por esse evento, para não mostrar uma
+//! escolha velha quando a mudança veio de outro lugar.
 //!
 //! O indicador flutuante e o Copilot continuam sempre escuros: o indicador
 //! flutua sobre qualquer app e precisa de contraste próprio; o Copilot ainda
@@ -20,8 +22,9 @@ use crate::prelude::*;
 /// Valores aceitos em `AppConfig::theme`.
 pub(crate) const THEMES: [&str; 3] = ["system", "light", "dark"];
 
-/// Janelas que acompanham o tema escolhido. As demais ficam escuras.
-pub(crate) const THEMED_WINDOWS: [&str; 4] = ["home", "library", "settings", "onboarding"];
+/// Janelas que acompanham o tema escolhido — a principal, onde moram Início,
+/// Biblioteca, Configurações e a primeira configuração. As demais ficam escuras.
+pub(crate) const THEMED_WINDOWS: [&str; 1] = [MAIN];
 
 /// O tema da barra de título nativa: `None` segue o Windows.
 pub(crate) fn native_theme(theme: &str) -> Option<tauri::Theme> {
@@ -82,32 +85,18 @@ pub(crate) fn apply(app: &AppHandle, prefs: &UiPrefs) {
             let _ = w.set_theme(native);
         }
     }
-    for (label, key) in WINDOW_TITLES {
+    // Títulos no idioma novo: a principal leva o nome da tela que mostra.
+    let titled = [
+        (MAIN, title_key(current_view())),
+        ("copilot", title_key("copilot")),
+    ];
+    for (label, key) in titled {
         if let Some(w) = app.get_webview_window(label) {
             let _ = w.set_title(&crate::i18n::tr_lang(&prefs.lang, key, &[]));
         }
     }
     refresh_menu(app);
     let _ = app.emit("isper-ui", prefs);
-}
-
-/// Título de cada janela, por chave do dicionário.
-pub(crate) const WINDOW_TITLES: [(&str, &str); 5] = [
-    ("home", "window.home"),
-    ("onboarding", "window.onboarding"),
-    ("library", "window.library"),
-    ("settings", "window.settings"),
-    ("copilot", "window.copilot"),
-];
-
-/// O título da janela `label` no idioma atual.
-pub(crate) fn window_title(app: &AppHandle, label: &str) -> String {
-    let key = WINDOW_TITLES
-        .iter()
-        .find(|(l, _)| *l == label)
-        .map(|(_, k)| *k)
-        .unwrap_or("window.home");
-    crate::i18n::tr(app, key)
 }
 
 /// Preferências para quem nasce sem o script de inicialização (o indicador,

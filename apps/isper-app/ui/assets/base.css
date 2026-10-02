@@ -444,3 +444,6 @@ kbd.key {
 kbd.key.pressed { transform: translateY(2px); border-bottom-width: 1px; background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Título da tela na barra do topo (Início, Biblioteca). */
+.page-title { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 19px; letter-spacing: -.012em; white-space: nowrap; }
