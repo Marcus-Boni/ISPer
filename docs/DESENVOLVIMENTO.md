@@ -73,7 +73,10 @@ cargo build --release
 (Num shell aberto **antes** da instalação do CUDA, exporte
 `CUDA_PATH` e `CUDA_PATH_V13_3` apontando para o toolkit — shells novos já
 os recebem do instalador. `CMAKE_CUDA_ARCHITECTURES=89` — só a arquitetura da
-RTX 4050 — já está no `.cargo/config.toml` e corta MUITO o tempo de build.)
+RTX 4050 — já está no `.cargo/config.toml` e corta MUITO o tempo de build.
+O exe que sai daí só roda em RTX 40 e 50; a release sobrescreve a variável no
+`release.yml` com `75-real;86-real;89-real;120`, para cobrir também RTX 20, GTX
+16 e RTX 30.)
 
 Pegadinhas encontradas:
 - Erro `The CUDA Toolkit directory '' does not exist` → o MSBuild não achou

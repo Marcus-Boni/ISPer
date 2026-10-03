@@ -11,6 +11,15 @@ bata com ela.
 
 ## [Unreleased]
 
+### Corrigido
+- **A versão CUDA roda também nas RTX 20 e RTX 30, e nas GTX 16.** Até a
+  0.25.0, o instalador CUDA só trazia código para as placas RTX 40 (que as
+  RTX 50 reaproveitavam): a release herdava a arquitetura única que o build
+  local usa para compilar mais rápido. Numa RTX 20 ou 30, o ISPer abria e
+  fechava na primeira transcrição. Agora a release compila para Turing,
+  Ampere, Ada e Blackwell, e o site passa a recomendar a versão CUDA para
+  essas placas assim que ela for publicada.
+
 ## [0.25.0] - 2026-10-02
 
 A versão em que o ISPer vira uma janela só: Início, Biblioteca e
