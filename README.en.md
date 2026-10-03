@@ -30,11 +30,9 @@ No subscription, and your audio never goes to an API.
 
 ## Hold. Speak. Release.
 
-| | |
-|---|---|
-| **Hold** | the shortcut (`Ctrl` + `Alt` + `Space`) in any app: Teams, Outlook, a browser, an editor. |
-| **Speak** | freely. A live caption appears in the ISPer indicator, floating over whatever you are using. |
-| **Release** | and the text lands where your cursor was, already punctuated. Your history keeps all of it. |
+| 1 · Hold | 2 · Speak | 3 · Release |
+|---|---|---|
+| the shortcut (`Ctrl` + `Alt` + `Space`) in any app: Teams, Outlook, a browser, an editor. | freely. A live caption appears in the ISPer indicator, which floats over whatever you are using. | and the text lands where your cursor was, already punctuated. Your history keeps all of it. |
 
 Rather not hold? A quick tap on the shortcut starts hands-free mode, and a pause ends it on its own.
 
@@ -88,12 +86,12 @@ Home, Library and Settings in one sidebar, with a command palette (`Ctrl` + `K`)
 ## Audio never crosses this line
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph PC["Your computer · Windows"]
     direction LR
     A["Microphone and system<br/>local capture, no bot"] --> B["whisper.cpp<br/>transcription and speakers"] --> C["SQLite<br/>history and search on disk"]
   end
-  C -. "text only, if you turn it on" .-> D["AI provider<br/>that you configure"]
+  PC -. "text only, if you turn it on" .-> D["AI provider<br/>that you configure"]
 
   classDef local fill:#26211e,stroke:#4a403a,color:#ece7e1
   classDef cloud fill:#1b1714,stroke:#4a403a,color:#a79e96,stroke-dasharray: 5 4
@@ -125,7 +123,7 @@ cargo build --release
 
 CUDA is on by default; without an NVIDIA GPU, add `--no-default-features`. Windows needs VS Build Tools 2022, CMake and libclang.
 
-| | |
+| Document | What's in it |
 |---|---|
 | [**Development**](docs/DEVELOPMENT.md) | layout, toolchain, CUDA, models, every part of the app, installer, diagnostics and tests |
 | [Transcription pipeline](docs/transcription-pipeline.md) | live and final passes, VAD, speakers and how to measure them |

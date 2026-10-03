@@ -28,11 +28,9 @@ Sem mensalidade e sem enviar seu áudio para uma API.
 
 ## Segure. Fale. Solte.
 
-| | |
-|---|---|
-| **Segure** | o atalho (`Ctrl` + `Alt` + `Espaço`), em qualquer aplicativo: Teams, Outlook, navegador, editor. |
-| **Fale** | à vontade. A legenda aparece ao vivo no indicador do ISPer, flutuando sobre o que você estiver usando. |
-| **Solte** | e o texto cai onde o cursor estava, já com pontuação. Seu histórico guarda tudo. |
+| 1 · Segure | 2 · Fale | 3 · Solte |
+|---|---|---|
+| o atalho (`Ctrl` + `Alt` + `Espaço`), em qualquer aplicativo: Teams, Outlook, navegador, editor. | à vontade. A legenda aparece ao vivo no indicador do ISPer, que flutua sobre o que você estiver usando. | e o texto cai onde o cursor estava, já com pontuação. Seu histórico guarda tudo. |
 
 Prefere não segurar? Um toque rápido no atalho liga o modo mãos-livres, e uma pausa encerra sozinha.
 
@@ -86,12 +84,12 @@ Início, Biblioteca e Configurações numa barra lateral, com a paleta de comand
 ## O áudio não atravessa esta linha
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph PC["Seu computador · Windows"]
     direction LR
     A["Microfone e sistema<br/>captura local, sem bot"] --> B["whisper.cpp<br/>transcrição e falantes"] --> C["SQLite<br/>histórico e busca no disco"]
   end
-  C -. "só o texto, se você ativar" .-> D["Provedor de IA<br/>que você configurar"]
+  PC -. "só o texto, se você ativar" .-> D["Provedor de IA<br/>que você configurar"]
 
   classDef local fill:#26211e,stroke:#4a403a,color:#ece7e1
   classDef cloud fill:#1b1714,stroke:#4a403a,color:#a79e96,stroke-dasharray: 5 4
@@ -123,7 +121,7 @@ cargo build --release
 
 O CUDA vem ligado por padrão; sem GPU NVIDIA, acrescente `--no-default-features`. O Windows precisa de VS Build Tools 2022, CMake e libclang.
 
-| | |
+| Documento | O que tem |
 |---|---|
 | [**Desenvolvimento**](docs/DESENVOLVIMENTO.md) | estrutura, toolchain, CUDA, modelos, cada parte do app, instalador, diagnóstico e testes |
 | [Pipeline de transcrição](docs/transcription-pipeline.md) | ao vivo e passe final, VAD, falantes e como medir |
