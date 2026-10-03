@@ -16,7 +16,7 @@ O ISPer é um aplicativo desktop para Windows. Ele roda a transcrição no próp
 
 - Windows x64 com WebView2.
 - Processador com AVX2 para a variante CPU (Intel Core desde 2013 ou AMD desde 2015; alguns Pentium e Celeron não têm). Sem AVX2, o app fecha na primeira transcrição.
-- Placa NVIDIA GeForce RTX 40 ou RTX 50 (ou RTX Ada/PRO) para a variante CUDA. RTX 20 e RTX 30 ainda não rodam a variante CUDA: nelas, use a CPU.
+- Placa NVIDIA para a variante CUDA: depois da 0.25.0, qualquer RTX 20, 30, 40 ou 50, GTX 16 ou RTX profissional; até a 0.25.0, só RTX 40 e RTX 50. GTX 10 e anteriores não rodam a variante CUDA: nelas, use a CPU.
 - Espaço livre para modelos Whisper em `%LOCALAPPDATA%\com.isper.desktop\models`.
 
 ## Baixar o instalador
@@ -25,8 +25,8 @@ A [página de Download](/download/) já recomenda a variante para o seu computad
 
 | Variante | Quando usar | Observação |
 |---|---|---|
-| GPU CUDA | PCs com NVIDIA RTX 40 ou mais nova | Inclui DLLs do CUDA e tem pacote maior. |
-| CPU | Qualquer PC x64 com AVX2 | A escolha segura sem uma RTX 40 ou mais nova. |
+| GPU CUDA | PCs com NVIDIA RTX 20 ou mais nova (até a 0.25.0, RTX 40 ou mais nova) | Inclui DLLs do CUDA e tem pacote maior. |
+| CPU | Qualquer PC x64 com AVX2 | A escolha segura sem uma placa NVIDIA que rode a variante CUDA. |
 
 Depois do download, confira o `SHA256SUMS.txt` publicado na release antes de instalar em ambientes controlados.
 

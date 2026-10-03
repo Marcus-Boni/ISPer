@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { Cpu, Download, MonitorCog } from "lucide-react";
 import { classifyGpu, recommendVariant } from "@/lib/download-guide.mjs";
-import { variantProfile } from "@/lib/download-profile";
+import { cudaMinimum, variantProfiles } from "@/lib/download-profile";
 import type { ReleaseAsset, ReleaseVariant } from "@/lib/releases";
 import { formatBytes } from "@/lib/releases";
 
@@ -32,9 +32,9 @@ function isWindows(): boolean {
 
 /* A máquina não muda enquanto a página está aberta: detecta uma vez e guarda. */
 let cached: Detected | null = null;
-function detect(): Detected {
+function detect(wideCuda: boolean): Detected {
   if (!cached) {
-    const gpu = classifyGpu(readRenderer());
+    const gpu = classifyGpu(readRenderer(), { wideCuda });
     cached = { ...recommendVariant({ windows: isWindows(), gpu }), gpuName: gpu.name };
   }
   return cached;
@@ -42,15 +42,16 @@ function detect(): Detected {
 const noSubscription = () => () => {};
 
 /** Uma frase, a do motivo. Fala do computador da pessoa, não da regra. */
-function reasonText(detected: Detected): string {
+function reasonText(detected: Detected, wide: boolean): string {
   const gpu = detected.gpuName;
+  const minimum = cudaMinimum(wide);
   switch (detected.reason) {
     case "cuda-ready":
-      return `Encontramos uma ${gpu ?? "placa NVIDIA RTX 40 ou mais nova"} neste computador: a versão CUDA usa a placa para transcrever mais rápido.`;
+      return `Encontramos uma ${gpu ?? `placa NVIDIA ${minimum}`} neste computador: a versão CUDA usa a placa para transcrever mais rápido.`;
     case "nvidia-older":
-      return `Encontramos uma ${gpu ?? "placa NVIDIA"}. A versão CUDA desta release só roda em placas RTX 40 ou mais novas, então a versão CPU é a que funciona aqui.`;
+      return `Encontramos uma ${gpu ?? "placa NVIDIA"}. A versão CUDA desta release roda em placas ${minimum}, então a versão CPU é a que funciona aqui.`;
     case "no-nvidia":
-      return `Este navegador usa ${gpu ? `a ${gpu}` : "uma placa que não é NVIDIA"}. Se o seu notebook também tem uma NVIDIA RTX 40 ou mais nova, a versão CUDA é a mais rápida.`;
+      return `Este navegador usa ${gpu ? `a ${gpu}` : "uma placa que não é NVIDIA"}. Se o seu notebook também tem uma NVIDIA ${minimum}, a versão CUDA é a mais rápida.`;
     case "not-windows":
       return "O ISPer é para Windows 10 e 11. Você pode baixar daqui e abrir o instalador no PC em que vai usar.";
     default:
@@ -58,10 +59,11 @@ function reasonText(detected: Detected): string {
   }
 }
 
-export function RecommendedDownload({ assets, version }: { assets: ReleaseAsset[]; version: string }) {
+export function RecommendedDownload({ assets, version, wideCuda }: { assets: ReleaseAsset[]; version: string; wideCuda: boolean }) {
   // O servidor não sabe nada da máquina: a CPU é a recomendação que nunca
   // deixa ninguém com um app que fecha. O navegador refina depois.
-  const detected = useSyncExternalStore(noSubscription, detect, () => null);
+  const detected = useSyncExternalStore(noSubscription, () => detect(wideCuda), () => null);
+  const variantProfile = variantProfiles(wideCuda);
 
   const variant: ReleaseVariant = detected?.variant ?? "cpu";
   const main = assets.find((a) => a.variant === variant) ?? assets[0];
@@ -93,7 +95,7 @@ export function RecommendedDownload({ assets, version }: { assets: ReleaseAsset[
         ) : null}
       </div>
       <p className="recommend-reason" aria-live="polite">
-        {detected ? reasonText(detected) : "Funciona em qualquer PC com Windows 10 ou 11 e processador com AVX2."}
+        {detected ? reasonText(detected, wideCuda) : "Funciona em qualquer PC com Windows 10 ou 11 e processador com AVX2."}
       </p>
     </section>
   );

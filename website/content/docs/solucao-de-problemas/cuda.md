@@ -7,11 +7,11 @@ order: 82
 
 # CUDA e desempenho
 
-A variante CUDA desta versão roda em placas NVIDIA GeForce RTX 40 e RTX 50 (e nas RTX Ada e PRO). Em qualquer outro computador, inclusive com RTX 20 ou RTX 30, instale a variante CPU.
+Depois da 0.25.0, a variante CUDA roda em qualquer placa NVIDIA RTX 20, 30, 40 ou 50, GTX 16 ou RTX profissional. Até a 0.25.0, ela só rodava em RTX 40 e RTX 50 (e nas RTX Ada e PRO). Com uma GTX 10 ou anterior, instale a variante CPU.
 
 ## O aplicativo fecha na primeira transcrição
 
-Se o ISPer abre, mas fecha quando você começa a ditar ou a gravar uma reunião, a placa não roda o código CUDA desta versão: é o caso das RTX 20 e RTX 30. Instale a variante CPU, que funciona em qualquer PC com AVX2.
+Se o ISPer abre, mas fecha quando você começa a ditar ou a gravar uma reunião, a placa não roda o código CUDA da versão instalada. Com uma RTX 20 ou RTX 30, atualize para a versão mais recente: até a 0.25.0 a variante CUDA não tinha código para elas. Com uma GTX 10 ou anterior, instale a variante CPU, que funciona em qualquer PC com AVX2.
 
 ## O aplicativo não abre
 

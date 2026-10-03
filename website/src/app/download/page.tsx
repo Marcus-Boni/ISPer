@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Code2, Cpu, Download, FileCheck2, FolderArchive, LifeBuoy, MonitorCog, ShieldCheck, TriangleAlert } from "lucide-react";
 import { IntegrityCheck } from "@/components/download/integrity-check";
 import { RecommendedDownload } from "@/components/download/recommended-download";
-import { variantProfile } from "@/lib/download-profile";
+import { cudaMinimum, hasWideCuda, variantProfiles } from "@/lib/download-profile";
 import {
   currentRelease,
   downloadVariants,
@@ -27,6 +27,9 @@ export default function DownloadPage() {
   // Todo instalador precisa estar assinado para a página parar de avisar.
   const signed = downloadVariants.length > 0 && downloadVariants.every((asset) => asset.authenticodeStatus === "verified");
   const published = currentRelease.publishedAt ? formatReleaseDate(currentRelease.publishedAt) : null;
+  // A promessa da CUDA segue a versão publicada, não o código desta página.
+  const wideCuda = hasWideCuda(currentRelease.version);
+  const variantProfile = variantProfiles(wideCuda);
   const portableOf = (variant: string) => portableVariants.find((asset) => asset.variant === variant);
 
   return (
@@ -47,7 +50,7 @@ export default function DownloadPage() {
           </dl>
         </header>
 
-        <RecommendedDownload assets={downloadVariants} version={currentRelease.version} />
+        <RecommendedDownload assets={downloadVariants} version={currentRelease.version} wideCuda={wideCuda} />
 
         {/* As duas versões lado a lado, com o que cada uma exige de verdade. Os
             requisitos são os do build: sem AVX2, ou com uma placa que a versão
@@ -126,7 +129,7 @@ export default function DownloadPage() {
                 Instale a versão mais recente, por esta página. Versões antigas tinham defeitos já corrigidos: a 0.17.0, por exemplo, fechava na primeira transcrição em PCs sem AVX-512, que são a maioria.
               </p>
               <p>
-                Se continuar, confira os requisitos da sua versão. A versão CPU precisa de um processador com AVX2. A versão CUDA desta release só roda em placas NVIDIA RTX 40 ou mais novas: com uma RTX 20, RTX 30 ou outra placa, instale a versão CPU.
+                Se continuar, confira os requisitos da sua versão. A versão CPU precisa de um processador com AVX2. A versão CUDA desta release roda em placas NVIDIA {cudaMinimum(wideCuda)}: com outra placa, instale a versão CPU.
               </p>
             </details>
             <details>
