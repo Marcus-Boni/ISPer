@@ -7,7 +7,11 @@ order: 82
 
 # CUDA e desempenho
 
-Use o instalador CUDA somente em uma máquina com GPU NVIDIA compatível. Em outros computadores, instale a variante CPU.
+A variante CUDA desta versão roda em placas NVIDIA GeForce RTX 40 e RTX 50 (e nas RTX Ada e PRO). Em qualquer outro computador, inclusive com RTX 20 ou RTX 30, instale a variante CPU.
+
+## O aplicativo fecha na primeira transcrição
+
+Se o ISPer abre, mas fecha quando você começa a ditar ou a gravar uma reunião, a placa não roda o código CUDA desta versão: é o caso das RTX 20 e RTX 30. Instale a variante CPU, que funciona em qualquer PC com AVX2.
 
 ## O aplicativo não abre
 

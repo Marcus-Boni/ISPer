@@ -32,11 +32,11 @@ const CHECKSUMS = "SHA256SUMS.txt";
 const DEFAULTS = {
   cpu: {
     authenticodeStatus: "not-signed",
-    requirements: ["Windows 10/11 x64", "CPU moderna com AVX2 recomendado", "8 GB de RAM ou mais"],
+    requirements: ["Windows 10/11 x64", "Processador com AVX2 (obrigatório)", "8 GB de RAM ou mais"],
   },
   cuda: {
     authenticodeStatus: "not-signed",
-    requirements: ["Windows 10/11 x64", "GPU NVIDIA compatível com CUDA", "VRAM conforme modelo Whisper escolhido"],
+    requirements: ["Windows 10/11 x64", "NVIDIA RTX 40 ou mais nova", "VRAM conforme modelo Whisper escolhido"],
   },
 };
 

@@ -81,13 +81,6 @@ export function formatReleaseDate(iso: string) {
 export const releaseIntegrityNotice =
   `Dados conferidos na release pública ${currentRelease.tag} em ${formatReleaseDate(currentRelease.fetchedAt)}.`;
 
-export const sourceInstallSteps = [
-  "Instale Rust stable, Visual Studio Build Tools com C++ e Git.",
-  "Clone o repositório oficial Marcus-Boni/ISPer.",
-  "Para CPU, compile com cargo build --release --no-default-features e abra com cargo run --release -p isper-app --no-default-features.",
-  "Para CUDA, use o caminho de release documentado no repositório e valide o driver NVIDIA.",
-];
-
 export const releaseLinks = {
   all: siteConfig.releases,
   current: currentRelease.releaseUrl,
