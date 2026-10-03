@@ -16,3 +16,10 @@
 
 /*.html
   Cache-Control: public, max-age=0, must-revalidate
+
+# A imagem de compartilhamento sai do export estático sem extensão, e o Pages
+# a servia como application/octet-stream. Com o nosniff acima, o LinkedIn
+# recusava a prévia do link.
+/opengraph-image
+  Content-Type: image/png
+  Cache-Control: public, max-age=3600
