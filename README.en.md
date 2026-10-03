@@ -31,10 +31,10 @@ No subscription, and your audio never goes to an API.
 ## Hold. Speak. Release.
 
 | 1 · Hold | 2 · Speak | 3 · Release |
-|---|---|---|
-| the shortcut (`Ctrl` + `Alt` + `Space`) in any app: Teams, Outlook, a browser, an editor. | freely. A live caption appears in the ISPer indicator, which floats over whatever you are using. | and the text lands where your cursor was, already punctuated. Your history keeps all of it. |
+|:---:|:---:|:---:|
+| the shortcut, in any app | a live caption appears | the text lands where you were |
 
-Rather not hold? A quick tap on the shortcut starts hands-free mode, and a pause ends it on its own.
+The shortcut is `Ctrl` + `Alt` + `Space` and works in Teams, Outlook, a browser or an editor. The caption shows in the ISPer indicator, which floats over whatever you are using, and the text arrives already punctuated. Rather not hold? A quick tap starts hands-free mode, and a pause ends it on its own. Everything you dictate stays in your history.
 
 ## What ISPer does
 

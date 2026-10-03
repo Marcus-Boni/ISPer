@@ -29,10 +29,10 @@ Sem mensalidade e sem enviar seu áudio para uma API.
 ## Segure. Fale. Solte.
 
 | 1 · Segure | 2 · Fale | 3 · Solte |
-|---|---|---|
-| o atalho (`Ctrl` + `Alt` + `Espaço`), em qualquer aplicativo: Teams, Outlook, navegador, editor. | à vontade. A legenda aparece ao vivo no indicador do ISPer, que flutua sobre o que você estiver usando. | e o texto cai onde o cursor estava, já com pontuação. Seu histórico guarda tudo. |
+|:---:|:---:|:---:|
+| o atalho, em qualquer app | a legenda aparece ao vivo | o texto cai onde você estava |
 
-Prefere não segurar? Um toque rápido no atalho liga o modo mãos-livres, e uma pausa encerra sozinha.
+O atalho é `Ctrl` + `Alt` + `Espaço` e vale no Teams, no Outlook, no navegador ou no editor. A legenda aparece no indicador do ISPer, que flutua sobre o que você estiver usando, e o texto chega já com pontuação. Prefere não segurar? Um toque rápido liga o modo mãos-livres, e uma pausa encerra sozinha. Tudo o que você dita fica no histórico.
 
 ## O que o ISPer faz
 
