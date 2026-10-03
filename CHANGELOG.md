@@ -11,6 +11,11 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-10-03
+
+A versão CUDA passa a rodar nas placas NVIDIA RTX 20 e RTX 30, e nas GTX 16,
+em que a 0.25.0 fechava na primeira transcrição. A versão CPU não muda.
+
 ### Corrigido
 - **A versão CUDA roda também nas RTX 20 e RTX 30, e nas GTX 16.** Até a
   0.25.0, o instalador CUDA só trazia código para as placas RTX 40 (que as
@@ -915,7 +920,8 @@ dia e de noite, em português ou em inglês, e utilizável só pelo teclado.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.25.1...HEAD
+[0.25.1]: https://github.com/Marcus-Boni/ISPer/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.22.0...v0.23.0
