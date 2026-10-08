@@ -40,7 +40,7 @@ jobs:
     env:
       # Os crates com testes: os mesmos nos dois passos de teste e no modelo
       # de PR (.github/pull_request_template.md).
-      PACOTES_COM_TESTE: -p isper-core -p isper-llm -p isper-models -p isper-diarize -p isper-sync -p isper-mobile -p isper-cli -p isper-app
+      PACOTES_COM_TESTE: -p isper-core -p isper-assist -p isper-llm -p isper-models -p isper-diarize -p isper-sync -p isper-mobile -p isper-cli -p isper-app
     steps:
       - uses: actions/checkout@v7
 

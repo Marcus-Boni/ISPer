@@ -258,7 +258,7 @@ fn like_pattern(q: &str) -> String {
 /// de versão maior (criado por um ISPer mais novo) é recusado em vez de
 /// alterado às cegas. Bancos anteriores a esta numeração chegam como 0 e
 /// passam pelo passo 1, que é idempotente sobre o que eles já têm.
-pub const SCHEMA_VERSION: i64 = 6;
+pub const SCHEMA_VERSION: i64 = 7;
 
 /// Eventos de métrica mais antigos que isto (90 dias) saem do banco.
 pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
@@ -380,6 +380,7 @@ fn migrate(conn: &Connection) -> Result<()> {
             3 => migrate_to_v4(&tx)?,
             4 => migrate_to_v5(&tx)?,
             5 => migrate_to_v6(&tx)?,
+            6 => migrate_to_v7(&tx)?,
             other => {
                 return Err(IsperError::Schema(format!(
                     "sem migração a partir da versão {other}"
@@ -589,6 +590,83 @@ fn migrate_to_v6(conn: &Connection) -> Result<()> {
              received_at  TEXT NOT NULL,
              PRIMARY KEY (device_id, recording_id)
          );",
+    )?;
+    Ok(())
+}
+
+/// Passo 7 (Fase 10, [ADR 0021]) — o assistente: tarefas, rotinas, memória e
+/// diário. As consultas moram no crate `isper-assist`; aqui fica só a forma,
+/// para o banco ter uma cadeia de migrações só (com a cópia de antes e a
+/// recusa de banco mais novo valendo para tudo).
+///
+/// Ids são UUID v7 em texto, e não `INTEGER` autoincremento: a sincronia com o
+/// celular (10.6) precisa de ids que nasçam em qualquer aparelho sem colidir.
+/// Instantes são milissegundos UTC; dias são `AAAA-MM-DD` no fuso local, que é
+/// como o usuário pensa "hoje". O diário só cresce: é dele que sai "o que já
+/// fiz hoje" e o desfazer de cada mudança.
+///
+/// [ADR 0021]: ../../../docs/adr/0021-assistente-pessoal-no-isper.md
+fn migrate_to_v7(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS tasks (
+             id            TEXT PRIMARY KEY,
+             title         TEXT NOT NULL,
+             notes         TEXT NOT NULL DEFAULT '',
+             status        TEXT NOT NULL DEFAULT 'open',
+             planned_on    TEXT,
+             planned_time  TEXT,
+             due_on        TEXT,
+             priority      INTEGER NOT NULL DEFAULT 0,
+             area          TEXT,
+             source_kind   TEXT NOT NULL,
+             source_ref    TEXT,
+             external_ref  TEXT,
+             routine_id    TEXT,
+             position      REAL NOT NULL DEFAULT 0,
+             created_at    INTEGER NOT NULL,
+             updated_at    INTEGER NOT NULL,
+             completed_at  INTEGER
+         );
+         CREATE INDEX IF NOT EXISTS idx_tasks_status_planned ON tasks(status, planned_on);
+         CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external_ref
+             ON tasks(external_ref) WHERE external_ref IS NOT NULL;
+         CREATE TABLE IF NOT EXISTS routines (
+             id            TEXT PRIMARY KEY,
+             title         TEXT NOT NULL,
+             rrule         TEXT NOT NULL,
+             verifier      TEXT,
+             action        TEXT,
+             mode          TEXT NOT NULL DEFAULT 'ask',
+             active        INTEGER NOT NULL DEFAULT 1,
+             learned_from  TEXT,
+             created_at    INTEGER NOT NULL,
+             updated_at    INTEGER NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS memories (
+             id            TEXT PRIMARY KEY,
+             text          TEXT NOT NULL,
+             kind          TEXT NOT NULL DEFAULT 'fact',
+             origin        TEXT NOT NULL DEFAULT 'user',
+             evidence      TEXT,
+             pinned        INTEGER NOT NULL DEFAULT 0,
+             created_at    INTEGER NOT NULL,
+             updated_at    INTEGER NOT NULL,
+             last_used_at  INTEGER,
+             archived_at   INTEGER
+         );
+         CREATE TABLE IF NOT EXISTS journal (
+             id            INTEGER PRIMARY KEY AUTOINCREMENT,
+             at            INTEGER NOT NULL,
+             day           TEXT NOT NULL,
+             actor         TEXT NOT NULL,
+             action        TEXT NOT NULL,
+             object_kind   TEXT NOT NULL,
+             object_id     TEXT NOT NULL,
+             summary       TEXT NOT NULL DEFAULT '',
+             data          TEXT
+         );
+         CREATE INDEX IF NOT EXISTS idx_journal_day ON journal(day);
+         CREATE INDEX IF NOT EXISTS idx_journal_object ON journal(object_kind, object_id);",
     )?;
     Ok(())
 }
@@ -1755,6 +1833,60 @@ mod tests {
         let antes = std::fs::metadata(&backup).unwrap().len();
         MeetingStore::open(&path).unwrap();
         assert_eq!(std::fs::metadata(&backup).unwrap().len(), antes);
+    }
+
+    #[test]
+    fn a_v7_cria_as_tabelas_do_assistente_sem_mexer_no_que_havia() {
+        let path = temp_path("v7-assistente");
+        {
+            let store = MeetingStore::open(&path).unwrap();
+            store
+                .save("Daily", "07/10/2026 09:15", &sample_result(), None)
+                .unwrap();
+            store
+                .conn
+                .execute_batch(
+                    "DROP TABLE tasks; DROP TABLE routines; DROP TABLE memories;
+                     DROP TABLE journal; PRAGMA user_version = 6;",
+                )
+                .unwrap();
+        }
+        let store = MeetingStore::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), 7);
+        for tabela in ["tasks", "routines", "memories", "journal"] {
+            let existe: bool = store
+                .conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+                    params![tabela],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert!(existe, "a v7 não criou {tabela}");
+        }
+        assert_eq!(
+            store.list_meetings().unwrap().len(),
+            1,
+            "a reunião continua lá"
+        );
+        assert!(
+            pre_migration_backup_path(&path, 6).exists(),
+            "a cópia de antes da v7 foi feita"
+        );
+
+        // O id externo é único só quando existe: duas tarefas sem origem de
+        // fora convivem, duas com o mesmo id do Notion não.
+        let inserir = |id: &str, externo: Option<&str>| {
+            store.conn.execute(
+                "INSERT INTO tasks (id, title, source_kind, external_ref, created_at, updated_at)
+                 VALUES (?1, 't', 'manual', ?2, 0, 0)",
+                params![id, externo],
+            )
+        };
+        inserir("a", None).unwrap();
+        inserir("b", None).unwrap();
+        inserir("c", Some("notion:1")).unwrap();
+        assert!(inserir("d", Some("notion:1")).is_err());
     }
 
     #[test]

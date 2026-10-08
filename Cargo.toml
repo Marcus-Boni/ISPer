@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/isper-core",
+    "crates/isper-assist",
     "crates/isper-llm",
     "crates/isper-models",
     "crates/isper-diarize",

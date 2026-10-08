@@ -1,0 +1,26 @@
+[package]
+name = "isper-assist"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "O assistente do ISPer (Fase 10): tarefas, rotinas, memória e diário sobre o isper.db"
+publish = false
+
+# Leve de propósito: só o banco e as datas. O schema (v7) é migrado pelo
+# `isper-core`, que tem a cadeia única de migrações do isper.db; este crate
+# abre o banco já migrado e não puxa o Whisper.
+[dependencies]
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+chrono = { version = "0.4.45", features = ["serde"] }
+# Ids que nascem em qualquer aparelho sem colidir (a sincronia da 10.6) e
+# que ordenam pelo instante em que foram criados.
+uuid = { version = "1.25", features = ["v7"] }
+
+[dev-dependencies]
+isper-core = { version = "0.1.0", path = "../isper-core" }
+
+[lints]
+workspace = true

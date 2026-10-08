@@ -8,7 +8,7 @@ pessoa com um fone na mão. Complementa a seção "Testes e CI" do
 
 | Camada | Onde | O que prova | Roda |
 |---|---|---|---|
-| Unitários | `crates/*/src/**`, `apps/isper-app/src-tauri/src/**` (`#[cfg(test)]`) | lógica pura: agrupamento de falas, exportações, dicionário e comandos de voz, catálogo de modelos, parsing das APIs de IA, configuração do app (`AppConfig::normalize`), migração de pastas, posição do indicador, atalhos, definição da CLI | `cargo test`; CI a cada push e PR |
+| Unitários | `crates/*/src/**`, `apps/isper-app/src-tauri/src/**` (`#[cfg(test)]`) | lógica pura: tarefas, dia, diário e desfazer do assistente (`isper-assist`, sobre um `isper.db` migrado pelo `isper-core`, com relógio parado e fuso explícito), agrupamento de falas, exportações, dicionário e comandos de voz, catálogo de modelos, parsing das APIs de IA, configuração do app (`AppConfig::normalize`), migração de pastas, posição do indicador, atalhos, definição da CLI | `cargo test`; CI a cada push e PR |
 | Propriedade (`proptest`) | `store.rs`, `meeting.rs`, `recorder.rs` | invariantes para QUALQUER entrada: a busca é literal (conferida contra o `LIKE … ESCAPE` do próprio SQLite), o corte de bloco cai no silêncio e nunca passa do buffer, o VAD não confunde ruído constante nem estalo com fala e encerra exatamente ao completar o silêncio | idem |
 | Golden | `crates/isper-core/tests/golden.rs` + `tests/golden/` | Markdown, SRT e DOCX byte a byte; qualquer mudança de formato aparece como diff no PR (`ISPER_UPDATE_GOLDEN=1 cargo test -p isper-core --test golden` regenera) | idem |
 | Integração sem rede | `crates/isper-llm/src/testing.rs` (`FakeProvider`) | resumo, título, polimento e insights do prompt ao pós-processamento, inclusive erros do provider | idem |

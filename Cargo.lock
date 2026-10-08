@@ -3170,6 +3170,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "isper-assist"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "isper-core",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "uuid",
+]
+
+[[package]]
 name = "isper-cli"
 version = "0.1.0"
 dependencies = [
