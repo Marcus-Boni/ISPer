@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ISPer</title>
+<script src="assets/boot.js"></script>
+<script src="assets/i18n.js"></script>
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  body { display: grid; grid-template-rows: auto 1fr; height: 100vh; overflow: hidden; }
+
+  /* ---- cabeçalho ---- */
+  .titles { display: grid; gap: 1px; min-width: 0; }
+  .date { font-size: 12px; color: var(--muted); text-transform: capitalize; white-space: nowrap; }
+  .summary { margin: 0; font-size: 12.5px; color: var(--muted); text-align: right; }
+
+  /* ---- conteúdo ---- */
+  main { overflow-y: auto; padding: 20px 22px 32px; }
+  .wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 22px; }
+
+  /* Nova tarefa: o campo é a primeira coisa da tela. */
+  .add { display: grid; grid-template-columns: 1fr auto; gap: 10px 10px; align-items: center; }
+  .add .field { font-size: 15px; padding: 11px 13px; }
+  .when { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .when .lbl { font-size: 12px; color: var(--muted); margin-right: 4px; }
+  .pick {
+    font: inherit; font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer;
+    background: transparent; border: 1px solid var(--line); border-radius: var(--r-pill); padding: 3px 11px;
+    transition: background var(--dur-2), color var(--dur-2), border-color var(--dur-2);
+  }
+  .pick:hover { border-color: var(--line-2); color: var(--ink); }
+  .pick[aria-checked="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); }
+
+  /* ---- seções ---- */
+  .sec-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; }
+  .sec-head .eyebrow { margin: 0; }
+  .count { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .sec-hint { font-size: 12px; color: var(--muted); margin: -2px 0 6px; }
+  details > summary { list-style: none; cursor: pointer; border-radius: var(--r-sm); }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary .eyebrow::after { content: "›"; display: inline-block; margin-left: 8px; transition: transform var(--dur-2) var(--ease-out); }
+  details[open] > summary .eyebrow::after { transform: rotate(90deg); }
+
+  /* ---- tarefas ---- */
+  .tasks { list-style: none; margin: 0; padding: 0; }
+  .task {
+    display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: start;
+    padding: 9px 8px; margin: 0 -8px; border-top: 1px solid var(--line); border-radius: var(--r-sm);
+    transition: background var(--dur-2);
+  }
+  .task:first-child { border-top: none; }
+  .task:hover, .task:focus-within { background: var(--panel-2); }
+  .task.reveal { animation: rise var(--dur-3) var(--ease-out) both; }
+
+  .check {
+    width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; padding: 0; cursor: pointer;
+    border: 1.5px solid var(--line-2); background: transparent; display: grid; place-items: center; color: var(--accent-ink);
+    transition: background var(--dur-2), border-color var(--dur-2), transform var(--dur-1) var(--ease-out);
+  }
+  .check:hover { border-color: var(--accent); }
+  .check:active { transform: scale(.9); }
+  .check svg { width: 12px; height: 12px; opacity: 0; transform: scale(.6); transition: opacity var(--dur-2), transform var(--dur-2) var(--ease-spring); }
+  .check[aria-checked="true"] { background: var(--good); border-color: var(--good); }
+  .check[aria-checked="true"] svg { opacity: 1; transform: scale(1); }
+
+  .body { min-width: 0; display: grid; gap: 3px; }
+  .title { overflow-wrap: anywhere; line-height: 1.4; cursor: text; }
+  .task.done .title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line-2); }
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; }
+  .meta:empty { display: none; }
+  .meta .chip { animation: none; }
+  .time { font-variant-numeric: tabular-nums; }
+  .edit { font-size: 14px; padding: 5px 8px; }
+
+  .acts { display: flex; gap: 4px; align-items: center; opacity: .0; transition: opacity var(--dur-2); }
+  .task:hover .acts, .task:focus-within .acts, .inbox .acts { opacity: 1; }
+  .acts .btn { padding: 3px 9px; font-size: 12px; }
+  .acts .btn-icon { width: 26px; height: 26px; }
+  .acts svg { width: 14px; height: 14px; }
+  /* Em toque ou com teclado, as ações não podem depender do mouse. */
+  @media (hover: none) { .acts { opacity: 1; } }
+
+  .empty { padding: 10px 0 4px; }
+</style>
+</head>
+<body class="atmos">
+
+<header class="bar">
+  <div class="titles">
+    <span class="date" id="date"></span>
+    <h1 class="page-title" data-i18n="shell.nav.today">Hoje</h1>
+  </div>
+  <div class="spacer"></div>
+  <p class="summary" id="summary" role="status" aria-live="polite"></p>
+</header>
+
+<main>
+  <div class="wrap">
+    <form class="add" id="add" autocomplete="off">
+      <label class="sr-only" for="add-title" data-i18n="today.add.label">Nova tarefa</label>
+      <input class="field" id="add-title" maxlength="500" placeholder="Nova tarefa… (Enter adiciona)" data-i18n-attr="placeholder:today.add.placeholder">
+      <button class="btn btn-primary" type="submit" data-i18n="today.add.submit">Adicionar</button>
+      <div class="when" role="radiogroup" aria-labelledby="when-lbl">
+        <span class="lbl" id="when-lbl" data-i18n="today.add.when">Para quando</span>
+        <button class="pick" type="button" role="radio" data-when="today" aria-checked="true" data-i18n="today.when.today">Hoje</button>
+        <button class="pick" type="button" role="radio" data-when="tomorrow" aria-checked="false" data-i18n="today.when.tomorrow">Amanhã</button>
+        <button class="pick" type="button" role="radio" data-when="someday" aria-checked="false" data-i18n="today.when.someday">Algum dia</button>
+      </div>
+    </form>
+
+    <section id="sec-planned" aria-labelledby="h-planned">
+      <div class="sec-head"><h2 class="eyebrow" id="h-planned" data-i18n="today.sec.planned">Para hoje</h2><span class="count" id="c-planned"></span></div>
+      <ul class="tasks" id="list-planned"></ul>
+    </section>
+
+    <section id="sec-inbox" class="inbox" aria-labelledby="h-inbox" hidden>
+      <div class="sec-head"><h2 class="eyebrow" id="h-inbox" data-i18n="today.sec.inbox">Caixa de entrada</h2><span class="count" id="c-inbox"></span></div>
+      <p class="sec-hint" data-i18n="today.inbox.hint">Chegou de reuniões e importações. Aceite o que é seu.</p>
+      <ul class="tasks" id="list-inbox"></ul>
+    </section>
+
+    <section id="sec-later" aria-labelledby="h-later" hidden>
+      <details id="later">
+        <summary><span class="sec-head"><span class="eyebrow" id="h-later" data-i18n="today.sec.later">Depois</span><span class="count" id="c-later"></span></span></summary>
+        <ul class="tasks" id="list-later"></ul>
+      </details>
+    </section>
+
+    <section id="sec-done" aria-labelledby="h-done" hidden>
+      <div class="sec-head"><h2 class="eyebrow" id="h-done" data-i18n="today.sec.done">Feito hoje</h2><span class="count" id="c-done"></span></div>
+      <ul class="tasks" id="list-done"></ul>
+    </section>
+  </div>
+</main>
+
+<script src="assets/ui.js"></script>
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
+  const $ = (id) => document.getElementById(id);
+  const { el, toast } = UI;
+
+  const lang = () => (window.I18N && window.I18N.lang) || 'pt-BR';
+  const pad = (n) => String(n).padStart(2, '0');
+  const iso = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const todayIso = () => iso(new Date());
+  const tomorrowIso = () => { const d = new Date(); d.setDate(d.getDate() + 1); return iso(d); };
+  // "2026-10-08" vira uma data local (sem o deslocamento de UTC do Date.parse).
+  const fromIso = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const shortDay = (s) => fromIso(s).toLocaleDateString(lang(), { weekday: 'short', day: '2-digit', month: '2-digit' });
+
+  // Origem → rótulo. "manual" não ganha selo: é o caso comum.
+  const SOURCES = {
+    meeting: 'today.src.meeting', copilot: 'today.src.copilot', notion: 'today.src.notion',
+    devops: 'today.src.devops', voice: 'today.src.voice', routine: 'today.src.routine',
+  };
+
+  let data = null;
+  let sig = '';
+  let when = 'today';
+
+  // ------------------------------------------------------------- ícones
+  const NS = 'http://www.w3.org/2000/svg';
+  function svg(d) {
+    const s = document.createElementNS(NS, 'svg');
+    s.setAttribute('viewBox', '0 0 16 16');
+    s.setAttribute('fill', 'none');
+    s.setAttribute('stroke', 'currentColor');
+    s.setAttribute('stroke-width', '1.6');
+    s.setAttribute('stroke-linecap', 'round');
+    s.setAttribute('stroke-linejoin', 'round');
+    s.setAttribute('aria-hidden', 'true');
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', d);
+    s.appendChild(p);
+    return s;
+  }
+  const I_CHECK = 'M3.5 8.4 6.6 11.4 12.5 4.8';
+  const I_DROP = 'M4 4l8 8M12 4l-8 8';
+  const I_EDIT = 'M10.5 2.8l2.7 2.7L6 12.7H3.3V10z';
+
+  // ------------------------------------------------------------ desfazer
+  // Toda mudança volta com o id dela no diário; o aviso oferece desfazer, e o
+  // Ctrl+Z também desfaz enquanto ele está na tela (fora de um campo).
+  let closeUndo = () => {};
+  let undoKey = null;
+  function undoToast(msg, change) {
+    closeUndo();
+    if (undoKey) removeEventListener('keydown', undoKey, true);
+    undoKey = null;
+    if (change == null) { toast(msg, 'ok'); return; }
+    let done = false;
+    const ms = 6000;
+    const finish = () => { done = true; if (undoKey) removeEventListener('keydown', undoKey, true); undoKey = null; };
+    const run = async () => {
+      if (done) return;
+      finish();
+      try {
+        await invoke('task_undo', { change });
+        toast(t('today.toast.undone'), 'ok', 1800);
+      } catch (e) { toast(t('common.error', { e }), 'err'); }
+      refresh();
+    };
+    undoKey = (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.key.toLowerCase() === 'z') {
+        const tag = (ev.target && ev.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        ev.preventDefault();
+        closeUndo();
+        run();
+      }
+    };
+    addEventListener('keydown', undoKey, true);
+    closeUndo = toast(msg, 'ok', ms, { action: { label: t('common.undo'), run } });
+    setTimeout(() => { if (!done) finish(); }, ms);
+  }
+
+  async function change(cmd, args, msg) {
+    try {
+      const r = await invoke(cmd, args);
+      if (msg) undoToast(msg, r.undo);
+    } catch (e) {
+      toast(t('common.error', { e }), 'err');
+    }
+    await refresh();
+  }
+
+  const setStatus = (task, status, msg) => change('task_set_status', { id: task.id, status }, msg);
+  const plan = (task, day, msg) => change('task_update', { id: task.id, patch: { planned_on: day } }, msg);
+
+  // -------------------------------------------------------------- linhas
+  function chips(task, section) {
+    const box = el('span', 'meta');
+    const today = todayIso();
+    if (task.planned_time) box.appendChild(el('span', 'chip chip-accent time', task.planned_time));
+    if (task.status === 'open' && task.planned_on && task.planned_on < today) {
+      box.appendChild(el('span', 'chip chip-warn', t('today.chip.late', { d: shortDay(task.planned_on) })));
+    }
+    if (task.due_on && task.status !== 'done') {
+      const label = task.due_on === today ? t('today.chip.due-today') : t('today.chip.due', { d: shortDay(task.due_on) });
+      box.appendChild(el('span', 'chip ' + (task.due_on <= today ? 'chip-warn' : ''), label));
+    }
+    if (section === 'later' && task.planned_on) box.appendChild(el('span', 'chip', shortDay(task.planned_on)));
+    if (SOURCES[task.source_kind]) box.appendChild(el('span', 'chip chip-info', t(SOURCES[task.source_kind])));
+    if (task.area) box.appendChild(el('span', 'chip', task.area));
+    return box;
+  }
+
+  function actButton(label, aria, run, cls = 'btn btn-ghost') {
+    const b = el('button', cls, label);
+    b.type = 'button';
+    if (aria) b.setAttribute('aria-label', aria);
+    b.addEventListener('click', run);
+    return b;
+  }
+  function iconButton(d, aria, run) {
+    const b = el('button', 'btn btn-ghost btn-icon');
+    b.type = 'button';
+    b.title = aria;
+    b.setAttribute('aria-label', aria);
+    b.appendChild(svg(d));
+    b.addEventListener('click', run);
+    return b;
+  }
+
+  function startEdit(task, titleNode) {
+    const input = el('input', 'field edit');
+    input.value = task.title;
+    input.maxLength = 500;
+    input.setAttribute('aria-label', t('today.edit.aria'));
+    let closed = false;
+    const finish = async (save) => {
+      if (closed) return;
+      closed = true;
+      const value = input.value.trim();
+      const changed = save && value && value !== task.title;
+      if (changed) titleNode.textContent = value;
+      // O campo sai antes de redesenhar: com ele em foco, a lista espera.
+      input.replaceWith(titleNode);
+      if (changed) await change('task_update', { id: task.id, patch: { title: value } }, t('today.toast.renamed'));
+      else render(null);
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
+    titleNode.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  function row(task, section) {
+    const li = el('li', 'task' + (task.status === 'done' ? ' done' : ''));
+    li.dataset.id = task.id;
+
+    const check = el('button', 'check');
+    check.type = 'button';
+    check.setAttribute('role', 'checkbox');
+    const done = task.status === 'done';
+    check.setAttribute('aria-checked', String(done));
+    check.setAttribute('aria-label', t(done ? 'today.act.reopen' : 'today.act.complete', { t: task.title }));
+    check.appendChild(svg(I_CHECK));
+    check.addEventListener('click', () => {
+      if (done) setStatus(task, 'open', t('today.toast.reopened'));
+      else setStatus(task, 'done', t('today.toast.done'));
+    });
+
+    const body = el('div', 'body');
+    const title = el('span', 'title', task.title);
+    if (!done) title.addEventListener('dblclick', () => startEdit(task, title));
+    body.appendChild(title);
+    body.appendChild(chips(task, section));
+
+    const acts = el('div', 'acts');
+    if (section === 'inbox') {
+      acts.appendChild(actButton(t('today.act.accept'), t('today.act.accept-aria', { t: task.title }),
+        () => change('task_accept', { id: task.id, plannedOn: todayIso() }, t('today.toast.accepted'))));
+      acts.appendChild(actButton(t('today.act.later'), t('today.act.later-aria', { t: task.title }),
+        () => change('task_accept', { id: task.id, plannedOn: null }, t('today.toast.later'))));
+    } else if (section === 'planned') {
+      acts.appendChild(actButton(t('today.act.tomorrow'), t('today.act.tomorrow-aria', { t: task.title }),
+        () => plan(task, tomorrowIso(), t('today.toast.tomorrow'))));
+    } else if (section === 'later') {
+      acts.appendChild(actButton(t('today.act.today'), t('today.act.today-aria', { t: task.title }),
+        () => plan(task, todayIso(), t('today.toast.today'))));
+    }
+    if (!done) {
+      acts.appendChild(iconButton(I_EDIT, t('today.act.edit-aria', { t: task.title }), () => startEdit(task, title)));
+      acts.appendChild(iconButton(I_DROP, t('today.act.drop-aria', { t: task.title }),
+        () => setStatus(task, 'dropped', t('today.toast.dropped'))));
+    }
+
+    li.append(check, body, acts);
+    return li;
+  }
+
+  // ------------------------------------------------------------ desenho
+  function fill(listId, tasks, section, fresh) {
+    const list = $(listId);
+    list.replaceChildren(...tasks.map((task) => {
+      const li = row(task, section);
+      if (fresh && fresh.has(task.id)) li.classList.add('reveal');
+      return li;
+    }));
+  }
+
+  function emptyState(text) {
+    const box = el('div', 'empty');
+    const art = el('div', 'empty-art');
+    art.setAttribute('aria-hidden', 'true');
+    art.append(el('i'), el('i'), el('i'));
+    box.append(art, el('span', null, text));
+    return box;
+  }
+
+  function render(fresh) {
+    if (!data) return;
+    const { planned, inbox, later, done_today: done } = data;
+
+    $('date').textContent = new Date().toLocaleDateString(lang(), { weekday: 'long', day: 'numeric', month: 'long' });
+    const parts = [t('today.summary.planned', { n: planned.length })];
+    if (inbox.length) parts.push(t('today.summary.inbox', { n: inbox.length }));
+    if (done.length) parts.push(t('today.summary.done', { n: done.length }));
+    $('summary').textContent = parts.join(' · ');
+
+    $('c-planned').textContent = planned.length ? String(planned.length) : '';
+    if (planned.length) fill('list-planned', planned, 'planned', fresh);
+    else $('list-planned').replaceChildren(emptyState(t(done.length ? 'today.empty-all-done' : 'today.empty')));
+
+    $('sec-inbox').hidden = !inbox.length;
+    $('c-inbox').textContent = String(inbox.length);
+    fill('list-inbox', inbox, 'inbox', fresh);
+
+    $('sec-later').hidden = !later.length;
+    $('c-later').textContent = String(later.length);
+    fill('list-later', later, 'later', fresh);
+
+    $('sec-done').hidden = !done.length;
+    $('c-done').textContent = String(done.length);
+    fill('list-done', done, 'done', fresh);
+  }
+
+  let seq = 0;
+  async function refresh() {
+    const mine = ++seq;
+    let next;
+    try { next = await invoke('today_load'); } catch (e) { toast(t('common.error', { e }), 'err'); return; }
+    if (mine !== seq) return;
+    const nextSig = JSON.stringify(next) + '|' + todayIso();
+    if (nextSig === sig) return;
+    const known = new Set(data ? [...data.planned, ...data.inbox, ...data.later, ...data.done_today].map((x) => x.id) : []);
+    const fresh = data ? new Set([...next.planned, ...next.inbox, ...next.later, ...next.done_today].map((x) => x.id).filter((id) => !known.has(id))) : null;
+    sig = nextSig;
+    data = next;
+    // Editando um título, a lista espera: redesenhar tiraria o campo do lugar.
+    if (document.activeElement && document.activeElement.classList.contains('edit')) return;
+    render(fresh);
+  }
+
+  // ---------------------------------------------------------- nova tarefa
+  function pickWhen(value) {
+    when = value;
+    document.querySelectorAll('.pick').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.when === value)));
+  }
+  document.querySelectorAll('.pick').forEach((b) => b.addEventListener('click', () => pickWhen(b.dataset.when)));
+  // Setas dentro do grupo, como num grupo de rádio de verdade.
+  $('add').querySelector('.when').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const picks = [...document.querySelectorAll('.pick')];
+    const i = picks.findIndex((b) => b.dataset.when === when);
+    const next = picks[(i + (e.key === 'ArrowRight' ? 1 : picks.length - 1)) % picks.length];
+    pickWhen(next.dataset.when);
+    next.focus();
+    e.preventDefault();
+  });
+
+  $('add').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = $('add-title');
+    const title = input.value.trim();
+    if (!title) { input.focus(); return; }
+    const planned_on = when === 'today' ? todayIso() : when === 'tomorrow' ? tomorrowIso() : null;
+    try {
+      await invoke('task_add', { task: { title, planned_on } });
+      input.value = '';
+    } catch (err) {
+      toast(t('common.error', { e: err }), 'err');
+    }
+    input.focus();
+    await refresh();
+  });
+
+  // ------------------------------------------------------------ eventos
+  listen('isper-tasks', () => refresh());
+  document.addEventListener('isper-view', (e) => { if (e.detail && e.detail.active) refresh(); });
+  document.addEventListener('isper-i18n', () => { sig = ''; render(null); });
+  // Virou o dia com a tela aberta: o "hoje" muda.
+  let lastDay = todayIso();
+  setInterval(() => { if (todayIso() !== lastDay) { lastDay = todayIso(); sig = ''; refresh(); } }, 60_000);
+
+  // Pedidos da janela principal (paleta de comandos).
+  window.ISPER_VIEW = {
+    open(p) {
+      if (p.focusAdd) { const i = $('add-title'); i.focus(); i.select(); }
+    },
+  };
+
+  refresh();
+</script>
+</body>
+</html>

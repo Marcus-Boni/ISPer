@@ -268,6 +268,7 @@ mod tests {
     fn toda_chave_usada_pelas_paginas_existe() {
         let pages = [
             ("home.html", include_str!("../../ui/home.html")),
+            ("today.html", include_str!("../../ui/today.html")),
             ("library.html", include_str!("../../ui/library.html")),
             ("settings.html", include_str!("../../ui/settings.html")),
             ("index.html", include_str!("../../ui/index.html")),

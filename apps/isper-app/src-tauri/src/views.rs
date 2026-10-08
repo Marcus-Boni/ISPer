@@ -17,7 +17,13 @@ use crate::prelude::*;
 pub(crate) const MAIN: &str = "main";
 
 /// As telas da janela principal (`<tela>.html` em `ui/`).
-pub(crate) const VIEWS: [&str; 4] = ["home", "library", "settings", crate::onboarding::LABEL];
+pub(crate) const VIEWS: [&str; 5] = [
+    "home",
+    "today",
+    "library",
+    "settings",
+    crate::onboarding::LABEL,
+];
 
 /// Para onde a janela principal deve ir: uma tela e, nas Configurações, a
 /// seção (`celular`, `inteligencia`…).
@@ -361,6 +367,7 @@ mod placement {
 /// Chave do título da janela para cada tela.
 pub(crate) fn title_key(view: &str) -> &'static str {
     match view {
+        "today" => "window.today",
         "library" => "window.library",
         "settings" => "window.settings",
         v if v == crate::onboarding::LABEL => "window.onboarding",
@@ -381,6 +388,11 @@ pub(crate) fn open_home(app: &AppHandle) {
 
 pub(crate) fn open_library(app: &AppHandle) {
     navigate(app, Route::to("library"));
+}
+
+/// A tela Hoje (Fase 10): as tarefas do dia.
+pub(crate) fn open_today(app: &AppHandle) {
+    navigate(app, Route::to("today"));
 }
 
 pub(crate) fn open_settings(app: &AppHandle) {

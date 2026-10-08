@@ -18,12 +18,14 @@ Stop-Isper
 Check (Start-Isper -Exe $exe) "app abriu com a tela Inicio (CDP)"
 Invoke-Isper 'open_library_window' '{ meeting: null }' | Out-Null
 Wait-IsperWindow 'library.html' | Out-Null
+Invoke-Isper 'open_today_window' | Out-Null
+Wait-IsperWindow 'today.html' | Out-Null
 Invoke-Isper 'open_settings_window' | Out-Null
 Wait-IsperWindow 'settings.html' | Out-Null
 Start-Sleep -Seconds 2
 
 # app.html: a janela principal (barra lateral); as outras sao as telas dentro dela.
-$windows = @('app.html', 'home.html', 'library.html', 'settings.html')
+$windows = @('app.html', 'home.html', 'today.html', 'library.html', 'settings.html')
 $probe = 'JSON.stringify({ theme: document.documentElement.dataset.theme, bg: getComputedStyle(document.body).backgroundColor, dark: matchMedia("(prefers-color-scheme: dark)").matches })'
 # Fundo do tema: --bg claro (#f6f1ec) e escuro (#161311).
 $light = 'rgb(246, 241, 236)'
