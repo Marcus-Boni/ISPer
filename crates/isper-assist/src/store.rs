@@ -276,6 +276,26 @@ impl AssistStore {
         Ok(after)
     }
 
+    /// Aceita uma tarefa da caixa de entrada para um dia (ou para "algum
+    /// dia"), numa mudança só: um desfazer devolve à caixa de entrada.
+    pub fn accept(&self, id: &str, planned_on: Option<NaiveDate>, actor: Actor) -> Result<Task> {
+        let before = self.task(id)?;
+        if before.status != TaskStatus::Inbox {
+            return Err(AssistError::Invalid(
+                "a tarefa não está na caixa de entrada".into(),
+            ));
+        }
+        let mut after = before.clone();
+        after.status = TaskStatus::Open;
+        after.planned_on = planned_on;
+        if planned_on.is_none() {
+            after.planned_time = None;
+        }
+        after.updated_at = self.clock.now_ms();
+        self.write(&before, &after, actor, "task.accepted", None)?;
+        Ok(after)
+    }
+
     /// Desfaz a mudança registrada na linha `journal_id` do diário.
     ///
     /// Só a mudança mais recente de cada tarefa pode ser desfeita. Desfazer a
@@ -722,6 +742,38 @@ mod tests {
             .pop()
             .unwrap();
         assert_eq!(ultima.action, "task.accepted");
+    }
+
+    #[test]
+    fn aceitar_para_um_dia_e_uma_mudanca_so() {
+        let (store, _) = store_at(quarta());
+        let t = store
+            .create_task(
+                NewTask {
+                    status: TaskStatus::Inbox,
+                    source_kind: SourceKind::Meeting,
+                    ..NewTask::titled("Mandar o link da gravação")
+                },
+                Actor::User,
+            )
+            .unwrap();
+        let aceita = store
+            .accept(&t.id, Some(day("2026-10-07")), Actor::User)
+            .unwrap();
+        assert_eq!(aceita.status, TaskStatus::Open);
+        assert_eq!(store.today().unwrap().planned.len(), 1);
+        let mudanca = store.last_change(&t.id).unwrap().unwrap();
+        let de_volta = store.undo(mudanca, Actor::User).unwrap();
+        assert_eq!(de_volta.status, TaskStatus::Inbox);
+        assert_eq!(de_volta.planned_on, None);
+        assert!(
+            store.accept(&aceita.id, None, Actor::User).is_ok(),
+            "depois de desfazer, está de novo na caixa"
+        );
+        assert!(
+            store.accept(&aceita.id, None, Actor::User).is_err(),
+            "aceitar de novo é erro: já não está na caixa"
+        );
     }
 
     #[test]

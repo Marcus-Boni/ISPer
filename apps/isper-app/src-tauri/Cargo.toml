@@ -27,6 +27,7 @@ tauri-plugin-dialog = "2"
 dirs = "6"
 toml = "1"
 isper-core = { path = "../../../crates/isper-core" }
+isper-assist = { path = "../../../crates/isper-assist" }
 isper-llm = { path = "../../../crates/isper-llm" }
 isper-models = { path = "../../../crates/isper-models" }
 isper-diarize = { path = "../../../crates/isper-diarize" }

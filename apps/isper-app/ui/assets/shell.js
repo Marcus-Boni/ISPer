@@ -26,8 +26,8 @@
   const body = document.body;
   const stage = $('stage');
 
-  const VIEWS = { home: 'home.html', library: 'library.html', settings: 'settings.html', onboarding: 'onboarding.html' };
-  const NAMES = { home: 'shell.nav.home', library: 'shell.nav.library', settings: 'shell.nav.settings', onboarding: 'window.onboarding' };
+  const VIEWS = { home: 'home.html', today: 'today.html', library: 'library.html', settings: 'settings.html', onboarding: 'onboarding.html' };
+  const NAMES = { home: 'shell.nav.home', today: 'shell.nav.today', library: 'shell.nav.library', settings: 'shell.nav.settings', onboarding: 'window.onboarding' };
   // Seções das Configurações (id do card em settings.html → título).
   const SECTIONS = [
     ['aparencia', 'settings.aparencia.titulo'],
@@ -166,7 +166,7 @@
 
   // -------------------------------------------------------- barra lateral
   const navItems = [...document.querySelectorAll('.nav-item[data-view]')];
-  const SHORTCUT_HINT = { home: 'Ctrl+1', library: 'Ctrl+2', settings: 'Ctrl+,' };
+  const SHORTCUT_HINT = { home: 'Ctrl+1', today: 'Ctrl+T', library: 'Ctrl+2', settings: 'Ctrl+,' };
 
   function paintNav() {
     for (const b of navItems) {
@@ -292,6 +292,18 @@
   listen('isper-moment', () => { if (current !== 'home') toast(t('shell.rec.marked'), 'ok', 1600); });
   listen('isper-import', (e) => { $('badge-library').hidden = !(e.payload && e.payload.current); });
   invoke('import_status').then((s) => { $('badge-library').hidden = !(s && s.current); }).catch(() => {});
+  // Quantas tarefas são para hoje: relido quando elas mudam e na virada do dia.
+  function paintTodayBadge() {
+    invoke('today_badge').then((n) => {
+      const b = $('badge-today');
+      b.textContent = n > 0 ? String(n) : '';
+      b.hidden = !(n > 0);
+    }).catch(() => {});
+  }
+  listen('isper-tasks', paintTodayBadge);
+  paintTodayBadge();
+  let badgeDay = new Date().toDateString();
+  setInterval(() => { const d = new Date().toDateString(); if (d !== badgeDay) { badgeDay = d; paintTodayBadge(); } }, 60_000);
 
   // ------------------------------------------------- soltar áudio em qualquer tela
   // Na Biblioteca, quem cuida é ela (área de soltar e fila próprias). Nas
@@ -312,6 +324,7 @@
   const SHORTCUTS = [
     { keys: 'Ctrl+K', name: 'shell.keys.palette', test: (e) => ctrl(e) && !e.shiftKey && e.key.toLowerCase() === 'k', run: () => openPalette() },
     { keys: 'Ctrl+1', name: 'shell.nav.home', test: (e) => ctrl(e) && e.code === 'Digit1', run: () => show('home') },
+    { keys: 'Ctrl+T', name: 'shell.nav.today', test: (e) => ctrl(e) && !e.shiftKey && e.key.toLowerCase() === 't', run: () => show('today') },
     { keys: 'Ctrl+2', name: 'shell.nav.library', test: (e) => ctrl(e) && e.code === 'Digit2', run: () => show('library') },
     { keys: 'Ctrl+3', name: 'shell.keys.copilot', test: (e) => ctrl(e) && e.code === 'Digit3', run: () => invoke('open_copilot_window').catch(() => {}) },
     { keys: 'Ctrl+,', name: 'shell.nav.settings', test: (e) => ctrl(e) && (e.key === ',' || e.code === 'Comma'), run: () => show('settings') },
@@ -400,6 +413,8 @@
     mic: 'M8 2.2a2 2 0 0 1 2 2v3.6a2 2 0 0 1-4 0V4.2a2 2 0 0 1 2-2ZM4.4 7.6a3.6 3.6 0 0 0 7.2 0M8 11.2v2.4',
     doc: 'M4 2h5l3 3v9H4zM9 2v3h3',
     search: 'M7 2.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9M10.5 10.5 14 14',
+    check: 'M8 2.2a5.8 5.8 0 1 0 0 11.6a5.8 5.8 0 1 0 0-11.6M5.4 8.1 7.2 9.9 10.7 6.2',
+    plus: 'M8 3v10M3 8h10',
   };
   function icon(name) {
     const NS = 'http://www.w3.org/2000/svg';
@@ -424,6 +439,7 @@
     const live = status && status.meeting_active;
     const out = [
       { group: 'shell.palette.group.nav', icon: 'home', label: t('shell.nav.home'), hint: 'Ctrl+1', run: () => show('home') },
+      { group: 'shell.palette.group.nav', icon: 'check', label: t('shell.nav.today'), hint: 'Ctrl+T', keywords: t('shell.cmd.today-keywords'), run: () => show('today') },
       { group: 'shell.palette.group.nav', icon: 'book', label: t('shell.cmd.meetings'), hint: 'Ctrl+2', run: () => show('library', { tab: 'meetings' }) },
       { group: 'shell.palette.group.nav', icon: 'mic', label: t('shell.cmd.dictations'), run: () => show('library', { tab: 'dictations' }) },
       { group: 'shell.palette.group.nav', icon: 'gear', label: t('shell.nav.settings'), hint: 'Ctrl+,', run: () => show('settings') },
@@ -434,6 +450,7 @@
     ];
     if (live) out.push({ group: 'shell.palette.group.actions', icon: 'star', label: t('shell.cmd.mark'), hint: status.mark_shortcut, run: markMoment });
     out.push(
+      { group: 'shell.palette.group.actions', icon: 'plus', label: t('shell.cmd.task-new'), keywords: t('shell.cmd.today-keywords'), run: () => show('today', { focusAdd: true }) },
       { group: 'shell.palette.group.actions', icon: 'upload', label: t('shell.cmd.import'), run: () => show('library', { import: true }) },
       { group: 'shell.palette.group.actions', icon: 'search', label: t('shell.cmd.search-library'), run: () => show('library', { focusSearch: true }) },
       { group: 'shell.palette.group.actions', icon: 'pill', label: t('shell.cmd.indicator'), run: () => invoke('overlay_toggle_pin').catch((e) => toast(String(e), 'err')) },
@@ -492,7 +509,7 @@
     if (tokens.length) ranked.sort((a, b) => b.s - a.s || a.i - b.i);
     // Sem busca, as seções das Configurações ficam de fora (a lista seria longa).
     shown = ranked.map((x) => x.it).filter((it) => tokens.length || it.group !== 'shell.palette.group.settings');
-    if (tokens.length) shown = shown.concat(meetings);
+    if (tokens.length) shown = shown.concat(quickTask(q), meetings);
     list.replaceChildren();
     if (!shown.length) {
       list.appendChild(el('div', 'pal-empty', t('shell.palette.empty', { q })));
@@ -530,6 +547,22 @@
     }
     shown = flat;
     paintSel();
+  }
+
+  // O texto digitado vira tarefa para hoje, sem sair da tela em que se está.
+  function quickTask(q) {
+    if (q.length < 2) return [];
+    return [{
+      group: 'shell.palette.group.actions', icon: 'plus', label: t('shell.cmd.task-create', { q }),
+      run: () => addTask(q),
+    }];
+  }
+  async function addTask(title) {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const today = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    await invoke('task_add', { task: { title, planned_on: today } });
+    if (current !== 'today') toast(t('shell.task.created'), 'ok', 4000, { action: { label: t('shell.task.open'), run: () => show('today') } });
   }
 
   function paintSel() {

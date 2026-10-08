@@ -11,6 +11,20 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **Tela Hoje, o começo do assistente (Fase 10).** Um item novo na barra
+  lateral, com o número de tarefas do dia ao lado (atalho Ctrl+T). As tarefas
+  ficam no seu PC. Dá para criar pelo campo da tela, escolhendo hoje, amanhã
+  ou algum dia, ou de qualquer tela pelo Ctrl+K: o que você digita vira
+  tarefa para hoje. Cada tarefa se conclui, vai para amanhã, é descartada ou,
+  se chegou de fora (uma reunião, uma importação), é aceita da caixa de
+  entrada; toda mudança tem Desfazer no aviso e no Ctrl+Z, e nada é apagado.
+  A lista mostra a hora, o atraso, o prazo e a origem de cada tarefa, e
+  "Feito hoje" guarda o que você concluiu no dia.
+- O banco passa para a versão 7 do schema, com as tabelas do assistente.
+  Antes de migrar, o ISPer guarda uma cópia do banco como estava
+  (`isper.db.v6.bak`), que abre na versão anterior do app.
+
 ### Segurança
 - **A captura do áudio da reunião usa o `wasapi` 0.25**, que corrige uma
   leitura além do fim de um formato de áudio (RUSTSEC-2026-0332). O ISPer não

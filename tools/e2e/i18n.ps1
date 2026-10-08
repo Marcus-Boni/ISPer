@@ -18,6 +18,8 @@ Stop-Isper
 Check (Start-Isper -Exe $exe) "app abriu com a tela Inicio (CDP)"
 Invoke-Isper 'open_library_window' '{ meeting: null }' | Out-Null
 Wait-IsperWindow 'library.html' | Out-Null
+Invoke-Isper 'open_today_window' | Out-Null
+Wait-IsperWindow 'today.html' | Out-Null
 Invoke-Isper 'open_copilot_window' | Out-Null
 Wait-IsperWindow 'copilot.html' | Out-Null
 Invoke-Isper 'open_settings_window' | Out-Null
@@ -56,6 +58,9 @@ if ($Shots) {
 }
 
 # ---- Inicio e Biblioteca, abertos durante a troca, refeitos em ingles
+$td = EvJson 'today.html' 'JSON.stringify({ lang: document.documentElement.lang, title: document.querySelector(".page-title").textContent.trim(), ph: document.getElementById("add-title").getAttribute("placeholder"), sec: document.getElementById("h-planned").textContent.trim(), missing: (window.__isperErrors || []).filter(e => e.indexOf("i18n:") === 0) })'
+Check ($td.lang -eq 'en' -and $td.title -eq 'Today' -and $td.sec -eq 'For today' -and $td.ph -like 'New task*') "Hoje em ingles na hora (titulo '$($td.title)', secao '$($td.sec)')"
+Check (@($td.missing).Count -eq 0) "Hoje sem chave ausente$(Format-JsErrors $td.missing)"
 $h = EvJson 'home.html' $homeProbe
 Check ($h.lang -eq 'en' -and $h.title -eq 'Home' -and $h.lead -eq 'Record, transcribe and summarize.' -and $h.meet -eq 'Start recording a meeting') "Inicio em ingles na hora (botao '$($h.meet)')"
 Check ($h.todo -in 'Needs attention', 'To get the most out of it' -and $h.stat -eq 'dictations' -and $h.aria -eq 'totals') "texto montado pelo script do Inicio em ingles (checklist '$($h.todo)', totais '$($h.stat)')"
@@ -132,7 +137,7 @@ $r = Invoke-Isper 'set_ui_lang' "{ lang: 'klingon' }" 'settings.html'
 Check ($r -eq 'auto') "idioma invalido vira 'auto' ($r)"
 Invoke-Isper 'set_ui_lang' "{ lang: '$orig' }" 'settings.html' | Out-Null
 Check (((Invoke-Isper 'get_settings' 'undefined' 'settings.html').ui_lang) -eq $orig) "idioma de volta a '$orig'"
-foreach ($w in @('home.html', 'library.html', 'settings.html', 'copilot.html')) {
+foreach ($w in @('home.html', 'today.html', 'library.html', 'settings.html', 'copilot.html')) {
   $errs = Get-JsErrors $w
   Check (@($errs).Count -eq 0) "$w sem erros de JS$(Format-JsErrors $errs)"
 }

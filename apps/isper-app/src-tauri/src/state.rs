@@ -155,11 +155,16 @@ pub(crate) struct LiveSegment {
     pub(crate) provisional: bool,
 }
 
-pub(crate) fn open_store() -> anyhow::Result<MeetingStore> {
+/// O `isper.db` do perfil: reuniões, ditados e, desde a v7, as tarefas.
+pub(crate) fn db_path() -> anyhow::Result<PathBuf> {
     let dir = crate::paths::roaming_dir()
         .ok_or_else(|| anyhow::anyhow!("pasta de dados do usuário (AppData) indisponível"))?;
     std::fs::create_dir_all(&dir)?;
-    Ok(MeetingStore::open(&dir.join("isper.db"))?)
+    Ok(dir.join("isper.db"))
+}
+
+pub(crate) fn open_store() -> anyhow::Result<MeetingStore> {
+    Ok(MeetingStore::open(&db_path()?)?)
 }
 
 /// `Documentos\ISPer\Reunioes` — onde os Markdowns das reuniões moram.

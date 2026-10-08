@@ -35,6 +35,7 @@ mod search;
 mod settings;
 mod shortcuts;
 mod state;
+mod today;
 mod tray;
 mod ui;
 mod undo;
@@ -245,6 +246,14 @@ fn main() {
             take_pending_meeting,
             open_settings_window,
             open_home_window,
+            today::open_today_window,
+            today::today_load,
+            today::today_badge,
+            today::task_add,
+            today::task_update,
+            today::task_set_status,
+            today::task_accept,
+            today::task_undo,
             shell_ready,
             shell_view,
             shell_status,
