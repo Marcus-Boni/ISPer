@@ -110,6 +110,8 @@ Invoke-Isper 'open_home_window' 'undefined' 'settings.html' | Out-Null
 Wait-IsperWindow 'home.html' | Out-Null
 Invoke-Isper 'open_library_window' '{ meeting: null }' 'settings.html' | Out-Null
 Wait-IsperWindow 'library.html' | Out-Null
+Invoke-Isper 'open_today_window' 'undefined' 'settings.html' | Out-Null
+Wait-IsperWindow 'today.html' | Out-Null
 
 Invoke-Isper 'set_ui_theme' "{ theme: '$orig' }" 'settings.html' | Out-Null
 Check (((Invoke-Isper 'get_settings' 'undefined' 'settings.html').theme) -eq $orig) "tema de volta a '$orig'"

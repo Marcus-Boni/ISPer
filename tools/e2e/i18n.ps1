@@ -118,6 +118,8 @@ Invoke-Isper 'open_home_window' 'undefined' 'settings.html' | Out-Null
 Wait-IsperWindow 'home.html' | Out-Null
 Invoke-Isper 'open_library_window' '{ meeting: null }' 'settings.html' | Out-Null
 Wait-IsperWindow 'library.html' | Out-Null
+Invoke-Isper 'open_today_window' 'undefined' 'settings.html' | Out-Null
+Wait-IsperWindow 'today.html' | Out-Null
 
 # ---- portugues de volta
 $r = Invoke-Isper 'set_ui_lang' "{ lang: 'pt-BR' }" 'settings.html'
