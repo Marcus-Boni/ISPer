@@ -27,6 +27,9 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0018](0018-transcricao-no-celular.md) | Transcrição no celular: o passe final do PC, retomável, com o modelo pela memória | aceita | 26/09/2026 |
 | [0019](0019-filtro-do-copilot-pelo-jev.md) | Filtro do Copilot pelo Jev, na nuvem, e não um classificador local | aceita | 27/09/2026 |
 | [0020](0020-janela-unica.md) | Uma janela principal com barra lateral, e as telas em iframes vivos | aceita | 02/10/2026 |
+| [0021](0021-assistente-pessoal-no-isper.md) | O assistente pessoal mora no ISPer, com tarefas, rotinas, memória e diário locais | aceita | 07/10/2026 |
+| [0022](0022-conectores-mcp-e-opttime.md) | Conectores por MCP, com o OptTime como porta corporativa | aceita | 07/10/2026 |
+| [0023](0023-escada-de-confianca.md) | Escada de confiança: ler é livre, escrever pede um toque, automático só com verificador | aceita | 07/10/2026 |
 
 ## Como escrever um ADR
 

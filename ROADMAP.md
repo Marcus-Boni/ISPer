@@ -21,8 +21,9 @@
 | F7 Maturidade de engenharia | 🟡 | 7.1 e 7.2 concluídas (11/09); 7.3 com 3 de 4 itens (candidatura à SignPath enviada em 13/09, aguardando); 7.4 com 3 de 4 itens (criptografia em repouso adiada com decisão registrada); 7.5 com 5 de 6 (v0.19.0 — falta a rodada com o NVDA); 7.6 com 4 de 5 (v0.20.0 — falta o winget, em revisão no winget-pkgs) |
 | F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; só com a janela aberta e notas salvas com a reunião (23/09); 3 itens em aberto — validar a memória, idioma do que a IA escreve e ver o sync do portal numa release |
 | F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (~15 MB/h no celular, a mesma transcrição do WAV; já gravou num Galaxy Tab A9), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. O teste de 2 h e o do Motorola/Xiaomi ficaram para depois. **9.3 em 25/09**: o celular manda as gravações para o PC, pareado por QR (iroh, com a chave de cada lado e sem servidor de fora), e a ata volta com "Ata pronta". A volta completa rodou num Galaxy S21 FE em 26/09; falta gravar longe do PC. **9.4 em 26/09**: o celular transcreve sozinho, com o mesmo passe final do PC, por padrão ao carregar e continuando de onde parou; a ata do PC substitui a do celular. 9.5 a 9.7 ainda são proposta |
+| F10 Assistente | 🟡 | **Aprovada em 07/10** ([ADRs 0021–0023](docs/adr/README.md)): tarefas, rotinas, memória e diário no ISPer; agenda, DevOps e horas pelo MCP do OptTime; Gemini 3.8 Flash na cota paga. **Pré-requisito no ar em 08/10**: OptTime v1.11.0 com agenda, work items, "Preencher meu dia" e aplicação idempotente pelo MCP, conferido, e os ajustes da revisão no ar no mesmo dia; o smoke de produção passou inteiro, agenda incluída, depois da correção do token Microsoft de segundo plano. 10.0 é a próxima |
 
-**145 itens entregues · 18 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**148 itens entregues · 38 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -404,6 +405,66 @@ PC, e a ata do PC, quando chega, substitui a do celular. Decisões no
 Do plano de 23/09; cada etapa ganha caixas quando for aprovada.
 
 - 9.5 IA · 9.6 Play Store · 9.7 iOS
+
+## Fase 10 — Assistente: o dia num lugar só (a partir de 07/10/2026)
+
+As tarefas do dia eram anotadas à mão no Notion, inclusive as que se repetem
+todo dia (registrar 8 horas no OptTime) e as que saem das reuniões. O
+assistente junta o que o ISPer já tem (voz, reuniões, ações do Copilot,
+celular) com o que o OptTime já tem (agenda consentida no Entra, Azure DevOps,
+"Preencher meu dia"), e põe as tarefas no PC. Decisões nos ADRs
+[0021](docs/adr/0021-assistente-pessoal-no-isper.md) (mora no ISPer, tarefas
+locais, Gemini 3.8 Flash na cota paga),
+[0022](docs/adr/0022-conectores-mcp-e-opttime.md) (conectores por MCP, OptTime
+como porta corporativa) e [0023](docs/adr/0023-escada-de-confianca.md) (ler é
+livre, escrever pede um toque, automático só com verificador).
+
+### Pré-requisito no OptTime
+
+- [x] O MCP do OptTime vira a porta corporativa (OptTime v1.11.0, no ar em 08/10): `opt_time_get_my_agenda` com o escopo novo `calendar:read`, `opt_time_list_my_work_items`, `opt_time_suggest_daily_entries` com a mesma lógica do "Preencher meu dia" da web, `opt_time_apply_suggestions` numa transação com `idempotencyKey`, `whoami` e resumo do dia com `outputSchema`, e o preset de token "Assistente pessoal (ISPer)". Conferido em 08/10: tipos sem erro, regras de lint limpas nos 58 arquivos mudados, as 36 checagens do `verify:assistant-gateway` e as suítes de registro de horas, colaboração, bot do Teams, memória e chamadas; duas revisões de código sem regressão no fluxo da web
+- [x] Ajustes da revisão de 08/10 (OptTime `d5a919c`, no ar em 08/10; especificação `docs/superpowers/specs/2026-10-08-isper-gateway-ajustes.md` no OptTime): erro de ferramenta sem `structuredContent` (código e dica em `_meta["opt-time/error"]`, que o SDK oficial aceita), repetição concorrente do `apply` devolve a resposta guardada, erro de projeto diz o item, `log_time` idempotente sem esgotar o pool, cache da agenda limpo em toda escrita, resposta automática "sempre ligada" não tira o dia útil, WIQL com aspas escapadas. Conferido: tipos sem erro, regras de lint limpas, 45 checagens do `verify:assistant-gateway` e as suítes de horas, colaboração, bot do Teams, memória, chamadas e Meu Tempo
+- [x] Smoke de produção (`verify:mcp:smoke`) com o token do preset guardado no Credential Manager em `opttime.ISPer`: tudo verde em 08/10, sem nenhum lançamento criado. A agenda lê o Outlook (`tokenUsable: true`) e as sugestões trazem reuniões e chamadas do Teams desde o OptTime `458a0f7`. A causa era o token Microsoft de segundo plano pegando uma conta velha, de março: 3 usuários tinham duas, e agora as linhas são escolhidas pela mesma regra do `whoami`, tentando as outras se a melhor falhar. A limpeza das 3 linhas velhas (`pnpm ops:microsoft-duplicates`) existe só como simulação, e não é necessária para funcionar
+
+### 10.0 Fundação
+
+- [ ] Tabelas de tarefa, rotina, memória e diário no `isper.db`, no crate novo `isper-assist`; a origem de cada tarefa sempre junto
+- [ ] Tela Hoje na barra lateral e "nova tarefa" pela paleta Ctrl+K
+- [ ] Importação única do Notion pela API REST, com token de integração interna
+- [ ] Pronto quando o Notion deixa de ser aberto para anotar o dia — é à mão
+
+### 10.1 Voz vira tarefa
+
+- [ ] Atalho de captura, parser de datas em pt-BR, extração em esquema estrito e cartões de revisão (Enter salva, Esc descarta, falar de novo corrige)
+- [ ] Corpus de 150 ditados reais rotulados à mão, fora do repositório como o do Jev; Gemini 3.8 Flash medido contra GLM-5.3-Flash e Claude Haiku 5.5
+- [ ] Pronto quando a extração passa de 0,9 de recall e 0,85 de precisão, e a fala vira cartões em menos de 5 s no p95
+
+### 10.2 Rotinas
+
+- [ ] Recorrência em RRULE, checklist do dia, verificador e ação por rotina
+- [ ] Cliente MCP (`rmcp`) com o OptTime e tela do conector pelo `opt_time_whoami` (Microsoft conectada, DevOps configurado, aviso das 17:30 ligado)
+- [ ] Rotina "Registrar 8h": `get_today_summary` às 17:00 de dia útil; se faltar, `suggest_daily_entries` e `apply_suggestions` depois do toque
+- [ ] Pronto quando 10 dias úteis seguidos fecham com 8h, cada um com no máximo um toque — é à mão
+
+### 10.3 Agenda e reuniões
+
+- [ ] Agenda no Hoje, reunião gravada casada com o evento, ações com dono "Eu" na caixa de entrada com o minuto exato, preparo 10 min antes
+- [ ] Pronto quando toda ação sua dita numa reunião gravada está na caixa quando a reunião acaba
+
+### 10.4 Agente
+
+- [ ] `LlmProvider` com chamada de ferramentas no Claude, no Groq e no Gemini, limpando os esquemas que o Gemini recusa (tipo em lista como `["integer","string"]` no `log_time`, `additionalProperties`)
+- [ ] Perguntas livres, resumo da manhã e fechamento do dia; tela de permissões e cartão de confirmação ([0023](docs/adr/0023-escada-de-confianca.md))
+- [ ] Pronto quando acerta 20 perguntas de teste sobre dias reais, citando a origem
+
+### 10.5 Aprendizado
+
+- [ ] Memória explícita e editável; padrão (a mesma tarefa em 3 dos últimos 4 dias iguais da semana) vira sugestão de rotina; aceitar e recusar ajustam
+- [ ] Pronto quando sugere as rotinas reais sem cadastro, e nunca muda nada sozinho
+
+### 10.6 No bolso
+
+- [ ] Tarefas e rotinas no `isper/sync` (o último a escrever vence, por campo); captura por voz e avisos no Android
+- [ ] Pronto quando uma tarefa ditada no celular aparece no PC na próxima sincronia
 
 ## Boas práticas transversais
 
