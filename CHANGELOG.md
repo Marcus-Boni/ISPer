@@ -11,6 +11,13 @@ bata com ela.
 
 ## [Unreleased]
 
+### Segurança
+- **A captura do áudio da reunião usa o `wasapi` 0.25**, que corrige uma
+  leitura além do fim de um formato de áudio (RUSTSEC-2026-0332). O ISPer não
+  chamava a função afetada; a troca é preventiva. A captura e a detecção de
+  chamada foram conferidas num dispositivo de verdade, com um teste novo que
+  roda à mão (`--test loopback_device -- --ignored`).
+
 ## [0.25.1] - 2026-10-03
 
 A versão CUDA passa a rodar nas placas NVIDIA RTX 20 e RTX 30, e nas GTX 16,
