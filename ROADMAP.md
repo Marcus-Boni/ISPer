@@ -23,7 +23,7 @@
 | F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (~15 MB/h no celular, a mesma transcrição do WAV; já gravou num Galaxy Tab A9), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. O teste de 2 h e o do Motorola/Xiaomi ficaram para depois. **9.3 em 25/09**: o celular manda as gravações para o PC, pareado por QR (iroh, com a chave de cada lado e sem servidor de fora), e a ata volta com "Ata pronta". A volta completa rodou num Galaxy S21 FE em 26/09; falta gravar longe do PC. **9.4 em 26/09**: o celular transcreve sozinho, com o mesmo passe final do PC, por padrão ao carregar e continuando de onde parou; a ata do PC substitui a do celular. 9.5 a 9.7 ainda são proposta |
 | F10 Assistente | 🟡 | **Aprovada em 07/10** ([ADRs 0021–0023](docs/adr/README.md)): tarefas, rotinas, memória e diário no ISPer; agenda, DevOps e horas pelo MCP do OptTime; Gemini 3.8 Flash na cota paga. **Pré-requisito no ar em 08/10**: OptTime v1.11.0 com agenda, work items, "Preencher meu dia" e aplicação idempotente pelo MCP, conferido, e os ajustes da revisão no ar no mesmo dia; o smoke de produção passou inteiro, agenda incluída, depois da correção do token Microsoft de segundo plano. 10.0 é a próxima |
 
-**150 itens entregues · 36 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**150 itens entregues · 35 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -429,8 +429,10 @@ livre, escrever pede um toque, automático só com verificador).
 
 - [x] Tabelas de tarefa, rotina, memória e diário no `isper.db` (schema v7), no crate novo `isper-assist`; a origem de cada tarefa sempre junto; cada mudança no diário com o antes e o depois, e o desfazer vale para a mudança mais recente de cada tarefa (08/10)
 - [x] Tela Hoje na barra lateral (Ctrl+T, com o número de tarefas do dia) e "nova tarefa" pela paleta Ctrl+K, inclusive criando direto do texto digitado; concluir, mover, descartar e aceitar da caixa de entrada com Desfazer e Ctrl+Z; e2e `tools/e2e/today.ps1` (08/10)
-- [ ] Importação única do Notion pela API REST, com token de integração interna
 - [ ] Pronto quando o Notion deixa de ser aberto para anotar o dia — é à mão
+
+A importação do Notion saiu do escopo em 08/10: nada vem de lá, e as tarefas
+começam do zero na tela Hoje ([revisão do ADR 0021](docs/adr/0021-assistente-pessoal-no-isper.md#revisão-de-08102026)).
 
 ### 10.1 Voz vira tarefa
 
