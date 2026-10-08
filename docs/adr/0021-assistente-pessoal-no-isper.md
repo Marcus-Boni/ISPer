@@ -1,7 +1,7 @@
 # 0021 — O assistente pessoal mora no ISPer, com tarefas, rotinas, memória e diário locais
 
 - **Status:** aceita
-- **Data:** 07/10/2026
+- **Data:** 07/10/2026 · revista 08/10/2026
 
 ## Contexto
 
@@ -79,3 +79,11 @@ Tarefas não existiam em nenhum dos dois.
   manteria as tarefas fora do alcance local.
 - **Claude Opus 5.5 como modelo.** Melhor qualidade esperada, mas ~US$ 17 por
   mês no mesmo uso. Fica como referência de qualidade no corpus.
+
+## Revisão de 08/10/2026
+
+A importação do Notion saiu do escopo, a pedido do usuário: nada do Notion vem
+para o ISPer, e as tarefas começam do zero na tela Hoje. A decisão de fundo não
+muda: as tarefas moram no ISPer, e o Notion deixa de ser onde o dia é anotado.
+O `AssistStore::import_task` continua, porque serve a qualquer origem de fora
+(um work item do DevOps, uma rotina), e não só ao Notion.
