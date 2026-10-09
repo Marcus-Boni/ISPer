@@ -220,6 +220,20 @@ impl AssistStore {
         Ok(out)
     }
 
+    /// A tarefa de rotina `task_id`, com a rotina e o dia de origem (o que
+    /// "Conferir agora" e as sugestões do dia usam).
+    pub fn occurrence(&self, task_id: &str) -> Result<Occurrence> {
+        let task = self.task(task_id)?;
+        let routine_id = task
+            .routine_id
+            .clone()
+            .ok_or_else(|| AssistError::Invalid("a tarefa não é de uma rotina".into()))?;
+        let routine = self.routine(&routine_id)?;
+        let day = occurrence_day(&task)
+            .ok_or_else(|| AssistError::Invalid("tarefa de rotina sem dia".into()))?;
+        Ok(Occurrence { task, routine, day })
+    }
+
     /// Guarda o resultado da última conferência na tarefa da rotina (em
     /// `source_ref.check`), para a tela Hoje mostrar "faltam 2h" sem consultar
     /// de novo. Ler é livre e não vai para o diário; o que muda o estado da
@@ -516,6 +530,14 @@ mod tests {
             abertas[1].routine.verifier.as_deref(),
             Some(VERIFY_OPTTIME_DAY)
         );
+
+        let uma = store.occurrence(&ontem.id).unwrap();
+        assert_eq!(uma.day, day("2026-10-07"));
+        assert_eq!(uma.routine.id, horas.id);
+        let solta = store
+            .create_task(NewTask::titled("x"), Actor::User)
+            .unwrap();
+        assert!(store.occurrence(&solta.id).is_err());
 
         store
             .set_status(&hoje.id, TaskStatus::Done, Actor::Routine)
