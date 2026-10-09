@@ -720,6 +720,7 @@
   "settings.assistente.tool.concluir_tarefa": "Concluir tarefa",
   "settings.assistente.tool.criar_tarefa": "Criar tarefa",
   "settings.assistente.tool.diario": "Ler o diário (o que mudou num dia)",
+  "settings.assistente.tool.lembrar": "Guardar na memória",
   "settings.assistente.tool.mover_tarefa": "Mover tarefa de dia",
   "settings.assistente.tool.reuniao": "Ler uma reunião (resumo e trechos)",
   "settings.assistente.tool.reunioes": "Listar as reuniões gravadas",

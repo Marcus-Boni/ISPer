@@ -21,6 +21,7 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 
 mod agente;
+mod aprender;
 mod bench;
 mod opttime;
 mod reunioes;
@@ -223,6 +224,50 @@ enum Cmd {
     /// (Fase 10.4)
     #[command(subcommand)]
     Agente(AgenteCmd),
+    /// A memória do assistente: os fatos que ele lê antes de responder
+    /// (Fase 10.5)
+    #[command(subcommand)]
+    Memoria(MemoriaCmd),
+}
+
+#[derive(Subcommand)]
+enum MemoriaCmd {
+    /// As memórias ativas (ou as arquivadas)
+    Listar {
+        /// As arquivadas em vez das ativas
+        #[arg(long)]
+        arquivadas: bool,
+        /// Banco (padrão: o do app, %APPDATA%\\ISPer\\isper.db)
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
+    /// Guarda um fato curto
+    Guardar {
+        /// O fato, entre aspas
+        texto: String,
+        /// É uma preferência, não um fato
+        #[arg(long)]
+        preferencia: bool,
+        /// Banco (padrão: o do app)
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
+    /// Arquiva (sai do assistente, mas não some)
+    Arquivar {
+        /// O id (de `memoria listar`)
+        id: String,
+        /// Banco (padrão: o do app)
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
+    /// Restaura uma arquivada
+    Restaurar {
+        /// O id (de `memoria listar --arquivadas`)
+        id: String,
+        /// Banco (padrão: o do app)
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -380,6 +425,13 @@ enum TarefasCmd {
         #[arg(long)]
         db: Option<PathBuf>,
     },
+    /// As rotinas sugeridas: tarefas que se repetem no mesmo dia da semana
+    /// (3 das últimas 4 semanas), com a evidência; só lê (Fase 10.5)
+    Sugestoes {
+        /// Banco (padrão: o do app, %APPDATA%\\ISPer\\isper.db)
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
     /// Mede a extração num corpus rotulado (precisão, recall, datas, latência)
     Avaliar {
         /// O corpus .jsonl
@@ -524,6 +576,7 @@ fn main() -> anyhow::Result<()> {
         Cmd::Tarefas(cmd) => run_tarefas(cmd),
         Cmd::Opttime(cmd) => run_opttime(cmd),
         Cmd::Agente(cmd) => run_agente(cmd),
+        Cmd::Memoria(cmd) => run_memoria(cmd),
         Cmd::Reunioes(ReunioesCmd::Acoes {
             id,
             provider,
@@ -1083,6 +1136,7 @@ fn run_tarefas(cmd: &TarefasCmd) -> anyhow::Result<()> {
             };
             tarefas::corpus_ditados(&db, desde, saida)
         }
+        TarefasCmd::Sugestoes { db } => aprender::sugestoes(&db_or_default(db)?),
         TarefasCmd::Avaliar {
             corpus,
             provider,
@@ -1099,11 +1153,28 @@ fn run_tarefas(cmd: &TarefasCmd) -> anyhow::Result<()> {
     }
 }
 
-fn run_agente(cmd: &AgenteCmd) -> anyhow::Result<()> {
-    let db_or_default = |db: &Option<PathBuf>| match db {
+/// O banco informado ou o do app.
+fn db_or_default(db: &Option<PathBuf>) -> anyhow::Result<PathBuf> {
+    match db {
         Some(p) => Ok(p.clone()),
         None => default_db().context("pasta de dados do usuário indisponível"),
-    };
+    }
+}
+
+fn run_memoria(cmd: &MemoriaCmd) -> anyhow::Result<()> {
+    match cmd {
+        MemoriaCmd::Listar { arquivadas, db } => aprender::listar(&db_or_default(db)?, *arquivadas),
+        MemoriaCmd::Guardar {
+            texto,
+            preferencia,
+            db,
+        } => aprender::guardar(&db_or_default(db)?, texto, *preferencia),
+        MemoriaCmd::Arquivar { id, db } => aprender::arquivar(&db_or_default(db)?, id, true),
+        MemoriaCmd::Restaurar { id, db } => aprender::arquivar(&db_or_default(db)?, id, false),
+    }
+}
+
+fn run_agente(cmd: &AgenteCmd) -> anyhow::Result<()> {
     match cmd {
         AgenteCmd::Semear { db } => agente::semear(db),
         AgenteCmd::Perguntar {

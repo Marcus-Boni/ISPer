@@ -165,10 +165,17 @@ fn run(
         Some(Ok(tools)) => (Some(tools), None),
         Some(Err(e)) => (None, Some(e)),
     };
+    // A memória que a pessoa vê e edita nas Configurações (Fase 10.5).
+    let memories: Vec<String> = crate::today::open_assist()
+        .ok()
+        .and_then(|s| s.memories_for_prompt().ok())
+        .map(|list| list.into_iter().map(|m| m.text).collect())
+        .unwrap_or_default();
     let system = system_prompt(
         crate::connectors::me_first_name().as_deref(),
         chrono::Local::now(),
         opttime.is_some(),
+        &memories,
     );
     let db = db_path().map_err(|e| AssistantError::new("failed", e.to_string()))?;
     let host = IsperHost::new(&db, opttime, chosen(app));

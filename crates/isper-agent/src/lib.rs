@@ -5,7 +5,8 @@
 //! ferramentas ([`IsperHost`]) e o que se pede ao modelo:
 //!
 //! - as do ISPer, sobre o `isper.db` (tarefas, diário, reuniões, ditados,
-//!   rotinas; criar, mover e concluir tarefa pedem o toque);
+//!   rotinas e as sugeridas; criar, mover e concluir tarefa pedem o toque, e
+//!   guardar na memória pede sempre);
 //! - as do OptTime, pelo catálogo do MCP, quando o conector está ligado
 //!   ([`OptTimeTools`]).
 //!
@@ -25,6 +26,14 @@ use local::LocalTools;
 use serde_json::Value;
 
 pub use opttime::{OptTimeTools, default_or_chosen};
+
+/// Se a ferramenta pede o toque sempre, sem poder ficar livre: guardar na
+/// memória ([ADR 0023]). As do OptTime que apagam também, pelas marcações.
+///
+/// [ADR 0023]: ../../../docs/adr/0023-escada-de-confianca.md
+pub fn ask_only(name: &str) -> bool {
+    LocalTools::ask_only(name)
+}
 
 /// As ferramentas do ISPer com a permissão padrão de cada uma (a tela de
 /// permissões lista estas e as do OptTime).
@@ -93,7 +102,8 @@ impl ToolHost for IsperHost {
     fn permission(&self, name: &str) -> Permission {
         if LocalTools::is_mine(name) {
             return match self.chosen.get(name) {
-                // Escrever no ISPer pode ficar liberado; ler não pode virar pergunta.
+                // Guardar na memória nunca fica livre.
+                Some(Permission::Allow) if LocalTools::ask_only(name) => Permission::Ask,
                 Some(p) => *p,
                 None => LocalTools::permission(name),
             };
@@ -137,9 +147,24 @@ fn weekday_pt(w: Weekday) -> &'static str {
     }
 }
 
-/// As instruções do agente: quem é a pessoa, que horas são e como citar.
-pub fn system_prompt(me: Option<&str>, now: DateTime<Local>, with_opttime: bool) -> String {
+/// As instruções do agente: quem é a pessoa, que horas são, o que ele sabe
+/// dela (a memória, que ela vê e edita) e como citar.
+pub fn system_prompt(
+    me: Option<&str>,
+    now: DateTime<Local>,
+    with_opttime: bool,
+    memories: &[String],
+) -> String {
     let who = me.map(|n| format!(" de {n}")).unwrap_or_default();
+    let memory = if memories.is_empty() {
+        String::new()
+    } else {
+        let lines: Vec<String> = memories.iter().map(|m| format!("- {m}")).collect();
+        format!(
+            "\n\nO que você sabe da pessoa (a memória dela, que ela vê e edita nas Configurações; vale mais que o seu palpite):\n{}",
+            lines.join("\n")
+        )
+    };
     let opttime = if with_opttime {
         "\n- As ferramentas opt_time_* são do OptTime da empresa: agenda do Outlook, horas lançadas, work items do Azure DevOps e sugestões para preencher o dia."
     } else {
@@ -155,7 +180,9 @@ Como responder:
 - Cite a origem de cada fato com a referência que vem nos resultados, entre colchetes duplos, logo depois do fato: [[tarefa:…]], [[reuniao:42@754]], [[opttime:…]]. Só cite referências que vieram das ferramentas.
 - \"Hoje\" é {iso}; \"ontem\" e \"amanhã\" contam a partir daí. Datas nas ferramentas vão como AAAA-MM-DD.
 - Para criar, mover ou concluir tarefa e para lançar horas, chame a ferramenta: o ISPer mostra um cartão e a pessoa confirma. Não peça confirmação em texto e não diga que fez antes do resultado.
-- Se uma ferramenta falhar ou for recusada, diga o que faltou em uma linha.{opttime}",
+- Se uma ferramenta falhar ou for recusada, diga o que faltou em uma linha.
+- Se a pessoa pedir para lembrar algo, ou disser um fato que vale para os próximos dias (quem é o gestor, um jeito de preferir), proponha guardar com `lembrar`. Nunca senha, segredo ou o que outra pessoa disse numa reunião.
+- Rotinas sugeridas (em `rotinas`) são só sugestões: conte, com a evidência, e diga que dá para aceitar na tela Hoje. Você não cria rotina.{opttime}{memory}",
         weekday = weekday_pt(now.weekday()),
         date = now.format("%d/%m/%Y"),
         iso = now.format("%Y-%m-%d"),
@@ -233,6 +260,57 @@ mod tests {
             !host.tools().iter().any(|t| t.name == "criar_tarefa"),
             "bloqueada nem aparece"
         );
+        let mut chosen = HashMap::new();
+        chosen.insert("lembrar".to_string(), Permission::Allow);
+        let host = IsperHost::new(&path, None, chosen);
+        assert_eq!(
+            host.permission("lembrar"),
+            Permission::Ask,
+            "guardar na memória nunca fica livre"
+        );
+        assert!(ask_only("lembrar") && !ask_only("criar_tarefa"));
+    }
+
+    #[test]
+    fn lembrar_guarda_depois_do_toque_e_rotinas_traz_as_sugeridas() {
+        let path = db();
+        let host = IsperHost::new(&path, None, HashMap::new());
+        let fake = FakeChat::new(vec![
+            call(
+                "m1",
+                "lembrar",
+                json!({"texto": "Meu gestor é o Carlos", "tipo": "fato"}),
+            ),
+            says("Guardei."),
+            call("r1", "rotinas", json!({})),
+            says("Nenhuma sugerida."),
+        ]);
+        let system = system_prompt(None, Local::now(), false, &[]);
+        let mut conv = Conversation::new("lembra que meu gestor é o Carlos");
+        let Step::Confirm { actions } = advance(&fake, &host, &system, &mut conv).unwrap() else {
+            panic!("guardar pede o toque");
+        };
+        assert_eq!(
+            actions[0].description,
+            "Guardar na memória “Meu gestor é o Carlos”"
+        );
+        let store = AssistStore::open(&path).unwrap();
+        assert!(
+            store.memories(false).unwrap().is_empty(),
+            "nada antes do toque"
+        );
+        resume(&fake, &host, &system, &mut conv, &["m1".into()]).unwrap();
+        let saved = store.memories(false).unwrap();
+        assert_eq!(saved[0].text, "Meu gestor é o Carlos");
+        assert_eq!(saved[0].origin, "assistant");
+
+        conv.ask("tem rotina sugerida?");
+        advance(&fake, &host, &system, &mut conv).unwrap();
+        let sent = fake.messages(3);
+        let isper_llm::ChatMessage::Tools { results } = sent.last().unwrap() else {
+            panic!("esperava o resultado de rotinas");
+        };
+        assert!(results[0].content.contains("\"sugeridas\":[]"));
     }
 
     #[test]
@@ -260,7 +338,7 @@ mod tests {
             ),
             says("Criei a tarefa."),
         ]);
-        let system = system_prompt(Some("Marcus"), Local::now(), false);
+        let system = system_prompt(Some("Marcus"), Local::now(), false, &[]);
         let mut conv = Conversation::new("o que eu tenho hoje?");
         let Step::Answer { sources, .. } = advance(&fake, &host, &system, &mut conv).unwrap()
         else {
@@ -299,10 +377,13 @@ mod tests {
     #[test]
     fn instrucoes_trazem_o_dia_e_o_jeito_de_citar() {
         let now = Local::now();
-        let s = system_prompt(Some("Marcus"), now, true);
+        let s = system_prompt(Some("Marcus"), now, true, &[]);
         assert!(s.contains(&now.format("%Y-%m-%d").to_string()));
         assert!(s.contains("[[reuniao:42@754]]"));
         assert!(s.contains("opt_time_"));
-        assert!(system_prompt(None, now, false).contains("não está conectado"));
+        assert!(!s.contains("O que você sabe da pessoa"));
+        assert!(system_prompt(None, now, false, &[]).contains("não está conectado"));
+        let s = system_prompt(None, now, false, &["Meu gestor é o Carlos".into()]);
+        assert!(s.ends_with("- Meu gestor é o Carlos"));
     }
 }

@@ -720,6 +720,7 @@
   "settings.assistente.tool.concluir_tarefa": "Complete a task",
   "settings.assistente.tool.criar_tarefa": "Create a task",
   "settings.assistente.tool.diario": "Read the journal (what changed on a day)",
+  "settings.assistente.tool.lembrar": "Save to memory",
   "settings.assistente.tool.mover_tarefa": "Move a task to another day",
   "settings.assistente.tool.reuniao": "Read a meeting (summary and excerpts)",
   "settings.assistente.tool.reunioes": "List recorded meetings",

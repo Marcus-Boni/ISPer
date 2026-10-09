@@ -615,9 +615,148 @@ pub struct JournalEntry {
     pub data: Option<serde_json::Value>,
 }
 
+/// Tamanho máximo de uma memória: um fato curto, não um texto.
+pub const MAX_MEMORY_CHARS: usize = 280;
+
+/// O tipo de uma memória.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryKind {
+    /// Um fato sobre a pessoa ("meu gestor é o Carlos").
+    Fact,
+    /// Um jeito de preferir ("reuniões só depois das 10h").
+    Preference,
+}
+
+impl MemoryKind {
+    /// O nome no banco.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Fact => "fact",
+            Self::Preference => "preference",
+        }
+    }
+
+    /// Lê o nome do banco.
+    pub fn parse(s: &str) -> Result<Self> {
+        Ok(match s {
+            "fact" => Self::Fact,
+            "preference" => Self::Preference,
+            other => {
+                return Err(AssistError::Invalid(format!(
+                    "tipo de memória desconhecido: {other}"
+                )));
+            }
+        })
+    }
+}
+
+/// Um fato curto sobre a pessoa, que ela vê e edita, e que o assistente lê
+/// antes de responder (Fase 10.5, [ADR 0021]).
+///
+/// [ADR 0021]: ../../../docs/adr/0021-assistente-pessoal-no-isper.md
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Memory {
+    /// UUID v7.
+    pub id: String,
+    /// O fato, numa linha.
+    pub text: String,
+    /// Fato ou preferência.
+    pub kind: MemoryKind,
+    /// Quem escreveu: `user` ou `assistant` (proposta por ele e aceita com
+    /// um toque).
+    pub origin: String,
+    /// De onde veio, quando o assistente propôs (a pergunta), em JSON.
+    pub evidence: Option<serde_json::Value>,
+    /// Fixada: vai sempre para o assistente, antes das outras.
+    pub pinned: bool,
+    /// Criada em (ms UTC).
+    pub created_at: i64,
+    /// Última mudança (ms UTC).
+    pub updated_at: i64,
+    /// Última vez que o assistente a leu (ms UTC).
+    pub last_used_at: Option<i64>,
+    /// Arquivada em (ms UTC): sai do assistente, mas não some.
+    pub archived_at: Option<i64>,
+}
+
+/// Uma memória nova.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct NewMemory {
+    /// O fato.
+    pub text: String,
+    /// `fact` (padrão) ou `preference`.
+    #[serde(default = "default_memory_kind")]
+    pub kind: MemoryKind,
+    /// De onde veio.
+    #[serde(default)]
+    pub evidence: Option<serde_json::Value>,
+}
+
+fn default_memory_kind() -> MemoryKind {
+    MemoryKind::Fact
+}
+
+impl NewMemory {
+    /// Um fato digitado.
+    pub fn fact(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            kind: MemoryKind::Fact,
+            evidence: None,
+        }
+    }
+}
+
+/// Mudança numa memória. Campo ausente fica como está.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+pub struct MemoryPatch {
+    /// Novo texto.
+    #[serde(default)]
+    pub text: Option<String>,
+    /// Novo tipo.
+    #[serde(default)]
+    pub kind: Option<MemoryKind>,
+    /// Fixar ou soltar.
+    #[serde(default)]
+    pub pinned: Option<bool>,
+}
+
+/// Apara, junta os espaços numa linha só e confere o tamanho.
+pub(crate) fn clean_memory(text: &str) -> Result<String> {
+    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if text.is_empty() {
+        return Err(AssistError::Invalid("memória vazia".into()));
+    }
+    if text.chars().count() > MAX_MEMORY_CHARS {
+        return Err(AssistError::Invalid(format!(
+            "a memória passa de {MAX_MEMORY_CHARS} caracteres; guarde um fato curto"
+        )));
+    }
+    Ok(text)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn memoria_vira_uma_linha_curta() {
+        assert_eq!(
+            clean_memory(
+                "  Meu gestor
+ é o   Carlos "
+            )
+            .unwrap(),
+            "Meu gestor é o Carlos"
+        );
+        assert!(clean_memory("   ").is_err());
+        assert!(clean_memory(&"a".repeat(MAX_MEMORY_CHARS + 1)).is_err());
+        assert_eq!(
+            MemoryKind::parse("preference").unwrap(),
+            MemoryKind::Preference
+        );
+    }
 
     fn task() -> Task {
         Task {

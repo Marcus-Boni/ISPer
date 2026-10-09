@@ -10,6 +10,8 @@
 //! - [`recur`]: a recorrência das rotinas, um pedaço do RRULE;
 //! - [`meeting`]: as ações de uma reunião gravada viram tarefas na caixa de
 //!   entrada, com o minuto em que foram ditas;
+//! - [`learn`]: a tarefa que se repete no mesmo dia da semana vira sugestão
+//!   de rotina, com os dias como evidência (aceitar e recusar são da pessoa);
 //! - [`clock`]: o relógio, injetável nos testes, que diz que dia é "hoje".
 //!
 //! O schema é a v7 do banco, migrada pelo `isper-core` (uma cadeia de
@@ -19,16 +21,20 @@
 
 pub mod capture;
 pub mod clock;
+pub mod learn;
 pub mod meeting;
 pub mod model;
 pub mod recur;
 pub mod store;
+mod text;
 pub mod when;
 
 pub use clock::{Clock, FixedClock, SystemClock};
+pub use learn::RoutineSuggestion;
 pub use model::{
-    ACTION_OPTTIME_FILL, Actor, JournalEntry, NewRoutine, NewTask, Occurrence, Routine,
-    RoutineMode, RoutinePatch, SourceKind, Task, TaskPatch, TaskStatus, Today, VERIFY_OPTTIME_DAY,
+    ACTION_OPTTIME_FILL, Actor, JournalEntry, Memory, MemoryKind, MemoryPatch, NewMemory,
+    NewRoutine, NewTask, Occurrence, Routine, RoutineMode, RoutinePatch, SourceKind, Task,
+    TaskPatch, TaskStatus, Today, VERIFY_OPTTIME_DAY,
 };
 pub use recur::Rule;
 pub use store::{AssistStore, ImportOutcome, SCHEMA_VERSION_REQUIRED};
