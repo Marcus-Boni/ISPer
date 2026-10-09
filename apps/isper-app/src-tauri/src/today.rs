@@ -10,7 +10,8 @@
 use crate::prelude::*;
 use isper_assist::when::{ParsedTask, parse_task};
 use isper_assist::{
-    Actor, AssistStore, Clock, NewTask, Routine, SystemClock, Task, TaskPatch, TaskStatus, Today,
+    Actor, AssistStore, Clock, NewTask, Routine, RoutineSuggestion, SystemClock, Task, TaskPatch,
+    TaskStatus, Today,
 };
 
 /// Evento que avisa as janelas de que as tarefas mudaram.
@@ -44,6 +45,8 @@ pub(crate) struct TodayView {
     #[serde(flatten)]
     today: Today,
     routines: Vec<Routine>,
+    /// As rotinas sugeridas pela tarefa que se repete (Fase 10.5).
+    suggestions: Vec<RoutineSuggestion>,
     opttime: bool,
 }
 
@@ -67,6 +70,11 @@ pub(crate) fn today_load(app: AppHandle) -> Result<TodayView, String> {
         Ok(TodayView {
             today: today_with_routines(&app, &store)?,
             routines: store.routines()?,
+            // Uma sugestão que não sai não pode esconder o dia.
+            suggestions: store.routine_suggestions().unwrap_or_else(|e| {
+                tracing::warn!("sugestões de rotina: {e}");
+                Vec::new()
+            }),
             opttime: crate::connectors::token_present(),
         })
     })()

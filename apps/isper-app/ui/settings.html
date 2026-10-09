@@ -71,6 +71,20 @@
   .conn-warn { color: var(--warn); }
   .conn-adv { margin-top: 12px; }
   .conn-adv > summary { cursor: pointer; display: inline-block; }
+  /* Memória do assistente (Fase 10.5). */
+  .mem-add { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; margin-top: 10px; }
+  .mem-add select { width: auto; }
+  .mem { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+  .mem-list { margin-top: 8px; }
+  .mem-list > .mem:first-child { border-top: none; }
+  .mem-text { font-size: 13px; overflow-wrap: anywhere; border-radius: 6px; padding: 2px 4px; margin: -2px -4px; }
+  .mem-list:not(.archived) .mem-text { cursor: text; }
+  .mem-list:not(.archived) .mem-text:hover { background: var(--panel-2); }
+  .mem-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .mem-meta .chip { animation: none; font-size: 10.5px; }
+  .mem-acts { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .mem-edit { font-size: 13px; padding: 5px 8px; }
+  @media (max-width: 560px) { .mem-add { grid-template-columns: 1fr; } .mem { grid-template-columns: 1fr; } .mem-acts { justify-content: flex-start; } }
   /* Assistente: o que cada ferramenta pode fazer sem perguntar (Fase 10.4). */
   .perm { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
   .perm-list > .perm:first-child { border-top: none; padding-top: 2px; }
@@ -440,6 +454,26 @@
       <button class="btn" id="otseturl" data-i18n="settings.conectores.url-use">Usar este endereço</button>
     </div>
     <p class="hint" data-i18n="settings.conectores.url-hint">Vazio usa o OptTime de produção. Só https (http só no próprio PC).</p>
+  </details>
+</section>
+
+<section class="card reveal" id="memoria" data-i="5" aria-labelledby="h-memoria">
+  <h2 id="h-memoria" data-i18n="settings.memoria.titulo">Memória</h2>
+  <p class="hint mt0" data-i18n="settings.memoria.lead">O que o assistente sabe de você e lê antes de responder: fatos curtos que você escreve, corrige e arquiva. Ele também propõe guardar o que você conta, mas só guarda com o seu toque. Fica no seu PC; para a IA vai só o texto, junto com a pergunta.</p>
+  <form class="mem-add" id="memadd" autocomplete="off">
+    <label class="sr-only" for="memtext" data-i18n="settings.memoria.new-label">Nova memória</label>
+    <input class="field" id="memtext" maxlength="280" placeholder="Ex.: meu gestor é o Carlos; trabalho no Portal do Cliente" data-i18n-attr="placeholder:settings.memoria.placeholder">
+    <select class="field" id="memkind" aria-label="Tipo da memória" data-i18n-attr="aria-label:settings.memoria.kind-aria">
+      <option value="fact" data-i18n="settings.memoria.kind.fact">Fato</option>
+      <option value="preference" data-i18n="settings.memoria.kind.preference">Preferência</option>
+    </select>
+    <button class="btn" type="submit" id="memsave" data-i18n="settings.memoria.save">Guardar</button>
+  </form>
+  <div class="mem-list" id="memlist" aria-live="polite"></div>
+  <p class="hint" id="memempty" hidden data-i18n="settings.memoria.empty">Nada guardado ainda. Escreva acima, ou peça ao assistente na tela Hoje: "lembra que…".</p>
+  <details class="conn-adv" id="memarchbox" hidden>
+    <summary class="hint" id="memarchsum"></summary>
+    <div class="mem-list archived" id="memarch"></div>
   </details>
 </section>
 
@@ -1118,6 +1152,125 @@
   document.addEventListener('isper-i18n', () => loadConnector(false));
   loadConnector(true);
 
+  // ---- memória do assistente (Fase 10.5): escrever, corrigir, fixar, arquivar
+  const MEM_KIND = { fact: 'settings.memoria.kind.fact', preference: 'settings.memoria.kind.preference' };
+  function memButton(label, aria, run) {
+    const b = el('button', 'btn btn-ghost btn-sm', label);
+    b.type = 'button';
+    if (aria) b.setAttribute('aria-label', aria);
+    b.addEventListener('click', run);
+    return b;
+  }
+  function editMem(m, node) {
+    const input = el('input', 'field mem-edit');
+    input.value = m.text;
+    input.maxLength = 280;
+    input.setAttribute('aria-label', t('settings.memoria.edit-aria'));
+    let done = false;
+    const finish = async (save) => {
+      if (done) return;
+      done = true;
+      const text = input.value.trim();
+      if (save && text && text !== m.text) {
+        try {
+          await invoke('memory_update', { id: m.id, patch: { text } });
+          status(t('settings.memoria.msg.edited'), 'ok');
+        } catch (e) { status(t('common.error', { e }), 'err'); }
+      }
+      loadMemory();
+    };
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+      if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
+    node.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+  function memRow(m, archived) {
+    const row = el('div', 'mem');
+    row.dataset.id = m.id;
+    const main = el('div');
+    const text = el('div', 'mem-text', m.text);
+    if (!archived) {
+      text.tabIndex = 0;
+      text.setAttribute('role', 'button');
+      text.title = t('settings.memoria.edit-hint');
+      text.setAttribute('aria-label', t('settings.memoria.edit-row-aria', { s: m.text }));
+      text.addEventListener('click', () => editMem(m, text));
+      text.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); editMem(m, text); } });
+    }
+    const meta = el('div', 'mem-meta');
+    meta.appendChild(el('span', 'chip', t(MEM_KIND[m.kind] || MEM_KIND.fact)));
+    if (m.origin === 'assistant') meta.appendChild(el('span', 'chip chip-info', t('settings.memoria.by-assistant')));
+    if (m.pinned) meta.appendChild(el('span', 'chip chip-accent', t('settings.memoria.pinned')));
+    main.append(text, meta);
+    const acts = el('div', 'mem-acts');
+    if (archived) {
+      acts.appendChild(memButton(t('settings.memoria.restore'), t('settings.memoria.restore-aria', { s: m.text }), async () => {
+        try { await invoke('memory_restore', { id: m.id }); status(t('settings.memoria.msg.restored'), 'ok'); } catch (e) { status(t('common.error', { e }), 'err'); }
+        loadMemory();
+      }));
+    } else {
+      acts.appendChild(memButton(t(m.pinned ? 'settings.memoria.unpin' : 'settings.memoria.pin'),
+        t(m.pinned ? 'settings.memoria.unpin-aria' : 'settings.memoria.pin-aria', { s: m.text }), async () => {
+          try { await invoke('memory_update', { id: m.id, patch: { pinned: !m.pinned } }); } catch (e) { status(t('common.error', { e }), 'err'); }
+          loadMemory();
+        }));
+      acts.appendChild(memButton(t('settings.memoria.archive'), t('settings.memoria.archive-aria', { s: m.text }), async () => {
+        try { await invoke('memory_archive', { id: m.id }); } catch (e) { status(t('common.error', { e }), 'err'); return; }
+        loadMemory();
+        toast(t('settings.memoria.msg.archived'), 'ok', 6000, {
+          action: {
+            label: t('common.undo'),
+            run: async () => {
+              try { await invoke('memory_restore', { id: m.id }); } catch (e) { status(t('common.error', { e }), 'err'); }
+              loadMemory();
+            },
+          },
+        });
+      }));
+    }
+    row.append(main, acts);
+    return row;
+  }
+  async function loadMemory() {
+    let active, archived;
+    try {
+      [active, archived] = await Promise.all([invoke('memory_list', { archived: false }), invoke('memory_list', { archived: true })]);
+    } catch (e) { status(t('common.error', { e }), 'err'); return; }
+    // Editando uma linha, a lista espera.
+    if (document.activeElement && document.activeElement.classList.contains('mem-edit')) return;
+    $('memlist').replaceChildren(...active.map((m) => memRow(m, false)));
+    $('memempty').hidden = !!active.length;
+    $('memarchbox').hidden = !archived.length;
+    $('memarchsum').textContent = t('settings.memoria.archived', { n: archived.length });
+    $('memarch').replaceChildren(...archived.map((m) => memRow(m, true)));
+  }
+  $('memadd').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const text = $('memtext').value.trim();
+    if (!text) { $('memtext').focus(); return; }
+    const b = $('memsave');
+    UI.busy(b, true);
+    try {
+      await invoke('memory_add', { text, kind: $('memkind').value });
+      $('memtext').value = '';
+      UI.busy(b, false);
+      UI.flash(b, t('common.saved'));
+      status(t('settings.memoria.msg.saved'), 'ok');
+    } catch (e) {
+      UI.busy(b, false);
+      status(t('common.error', { e }), 'err');
+    }
+    loadMemory();
+    $('memtext').focus();
+  });
+  listen('isper-memory', () => loadMemory());
+  document.addEventListener('isper-i18n', () => loadMemory());
+  loadMemory();
+
   // ---- assistente: o que cada ferramenta pode fazer sem perguntar (ADR 0023)
   const PERMS = ['allow', 'ask', 'never'];
   const PERM_KEY = { allow: 'settings.assistente.p.allow', ask: 'settings.assistente.p.ask', never: 'settings.assistente.p.never' };
@@ -1146,7 +1299,7 @@
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-checked', String(p === tool.effective));
       if (p === tool.default) b.title = t('settings.assistente.default');
-      if (p === 'allow' && tool.destructive) { b.disabled = true; b.title = t('settings.assistente.destructive'); }
+      if (p === 'allow' && tool.ask_only) { b.disabled = true; b.title = t(tool.destructive ? 'settings.assistente.destructive' : 'settings.assistente.ask-only'); }
       b.addEventListener('click', () => { if (p !== tool.effective) setPerm(tool, p); });
       seg.appendChild(b);
     }

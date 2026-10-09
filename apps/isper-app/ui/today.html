@@ -171,6 +171,21 @@
   .rv-wait { display: grid; gap: 10px; padding: 14px 0; color: var(--muted); font-size: 13px; }
   .rv-wait .skeleton { height: 46px; }
 
+  /* ---- rotina sugerida (Fase 10.5) ---- */
+  .suggest { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .sug {
+    display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center;
+    padding: 12px 14px; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--accent-soft) 55%, transparent); animation: rise var(--dur-3) var(--ease-out) both;
+  }
+  .sug .body { gap: 4px; }
+  .sug-title { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+  .sug-why { font-size: 12px; color: var(--ink-2); }
+  .sug-days { display: flex; gap: 4px; flex-wrap: wrap; }
+  .sug-days .chip { animation: none; font-variant-numeric: tabular-nums; }
+  .sug-acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  @media (max-width: 560px) { .sug { grid-template-columns: 1fr; } .sug-acts { justify-content: flex-start; } }
+
   /* ---- assistente (Fase 10.4) ---- */
   .assist { display: grid; gap: 8px; }
   .assist .sec-head { align-items: center; margin: 0; flex-wrap: wrap; }
@@ -281,6 +296,12 @@
       <div class="sec-head"><h2 class="eyebrow" id="h-inbox" data-i18n="today.sec.inbox">Caixa de entrada</h2><span class="count" id="c-inbox"></span></div>
       <p class="sec-hint" data-i18n="today.inbox.hint">Chegou de reuniões e importações. Aceite o que é seu.</p>
       <ul class="tasks" id="list-inbox"></ul>
+    </section>
+
+    <section id="sec-suggest" aria-labelledby="h-suggest" hidden>
+      <div class="sec-head"><h2 class="eyebrow" id="h-suggest" data-i18n="today.sec.suggest">Parece uma rotina</h2><span class="count" id="c-suggest"></span></div>
+      <p class="sec-hint" data-i18n="today.suggest.hint">O ISPer notou o que se repete no mesmo dia da semana. Nada vira rotina sem o seu toque.</p>
+      <ul class="suggest" id="list-suggest"></ul>
     </section>
 
     <section id="sec-later" aria-labelledby="h-later" hidden>
@@ -603,6 +624,8 @@
     $('c-inbox').textContent = String(inbox.length);
     fill('list-inbox', inbox, 'inbox', fresh);
 
+    renderSuggestions();
+
     $('sec-later').hidden = !later.length;
     $('c-later').textContent = String(later.length);
     fill('list-later', later, 'later', fresh);
@@ -808,6 +831,12 @@
       meta.appendChild(el('span', 'chip chip-info', t('today.routines.checked-opttime')));
       meta.appendChild(el('span', 'chip', t(r.mode === 'auto' ? 'today.routines.mode-auto' : 'today.routines.mode-ask')));
     }
+    if (r.learned_from) {
+      const learned = el('span', 'chip chip-info', t('today.routines.learned'));
+      const days = (r.learned_from.days || []).map(shortDay).join(', ');
+      if (days) learned.title = t('today.routines.learned-title', { days });
+      meta.appendChild(learned);
+    }
     if (!r.active) meta.appendChild(el('span', 'chip chip-warn', t('today.routines.paused')));
     body.appendChild(meta);
 
@@ -840,6 +869,52 @@
       if (msg) toast(msg, 'ok');
     } catch (e) { toast(t('common.error', { e: errText(e) }), 'err'); }
     await refresh();
+  }
+
+  // ------------------------------------------------ rotinas sugeridas (10.5)
+  // A tarefa que se repete no mesmo dia da semana vira um cartão com a
+  // evidência (os dias). Criar e recusar são da pessoa: o ISPer nunca liga
+  // uma rotina sozinho, e a recusada fica calada por 8 semanas.
+  function suggestionRow(s) {
+    const li = el('li', 'sug');
+    li.dataset.key = s.key;
+    const body = el('div', 'body');
+    body.appendChild(el('span', 'sug-title', s.title));
+    body.appendChild(el('span', 'sug-why', t('today.suggest.why', { n: s.hits, of: s.of, when: scheduleText({ rule: s.rule, rrule: s.rrule }) })));
+    const days = el('span', 'sug-days');
+    days.setAttribute('aria-label', t('today.suggest.days-aria'));
+    for (const d of s.days) days.appendChild(el('span', 'chip', shortDay(d)));
+    body.appendChild(days);
+    const acts = el('div', 'sug-acts');
+    acts.appendChild(actButton(t('today.suggest.accept'), t('today.suggest.accept-aria', { t: s.title }), () => decideSuggestion(s, true, li), 'btn btn-primary btn-sm'));
+    acts.appendChild(actButton(t('today.suggest.decline'), t('today.suggest.decline-aria', { t: s.title }), () => decideSuggestion(s, false, li), 'btn btn-ghost btn-sm'));
+    li.append(body, acts);
+    return li;
+  }
+
+  async function decideSuggestion(s, accept, li) {
+    const buttons = [...li.querySelectorAll('button')];
+    buttons.forEach((b) => { b.disabled = true; });
+    try {
+      if (accept) {
+        await invoke('routine_suggestion_accept', { key: s.key });
+        toast(t('today.toast.suggest-accepted', { t: s.title }), 'ok');
+      } else {
+        await invoke('routine_suggestion_decline', { key: s.key });
+        toast(t('today.toast.suggest-declined'), 'info', 3600);
+      }
+    } catch (e) {
+      buttons.forEach((b) => { b.disabled = false; });
+      toast(t('common.error', { e }), 'err');
+    }
+    refresh();
+  }
+
+  function renderSuggestions() {
+    const list = data.suggestions || [];
+    $('sec-suggest').hidden = !list.length;
+    $('c-suggest').textContent = list.length ? String(list.length) : '';
+    $('list-suggest').replaceChildren(...list.map(suggestionRow));
   }
 
   function renderRoutines() {

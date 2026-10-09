@@ -213,8 +213,10 @@ async fn drive(
             });
         }
     }
-    // O que o agente criou, moveu ou concluiu aparece na lista.
+    // O que o agente criou, moveu ou concluiu aparece na lista, e o que ele
+    // guardou, na memória.
     let _ = app.emit(crate::today::TASKS_EVENT, ());
+    let _ = app.emit(crate::memory::MEMORY_EVENT, ());
     let (step, opttime_error) = result?;
     Ok(AssistantReply {
         id,
@@ -331,6 +333,9 @@ pub(crate) struct ToolView {
     effective: Permission,
     /// Apaga ou sobrescreve: "liberada" não vale.
     destructive: bool,
+    /// Pede o toque sempre ("liberada" não vale): o que apaga e guardar na
+    /// memória.
+    ask_only: bool,
 }
 
 /// A tela de permissões.
@@ -358,8 +363,15 @@ pub(crate) async fn assistant_tools(app: AppHandle) -> Result<ToolsView, String>
                     description: spec.description,
                     default,
                     chosen: pick,
-                    effective: pick.unwrap_or(default),
+                    effective: match pick {
+                        Some(Permission::Allow) if isper_agent::ask_only(&spec.name) => {
+                            Permission::Ask
+                        }
+                        Some(p) => p,
+                        None => default,
+                    },
                     destructive: false,
+                    ask_only: isper_agent::ask_only(&spec.name),
                     name: spec.name,
                 }
             })
@@ -377,6 +389,7 @@ pub(crate) async fn assistant_tools(app: AppHandle) -> Result<ToolsView, String>
                     chosen: pick,
                     effective: default_or_chosen(t, pick),
                     destructive: t.destructive,
+                    ask_only: t.destructive,
                 }
             })),
             Some(Err(e)) => opttime_error = Some(e),

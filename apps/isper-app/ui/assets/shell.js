@@ -37,6 +37,7 @@
     ['celular', 'settings.celular.titulo'],
     ['inteligencia', 'settings.inteligencia.inteligencia'],
     ['conectores', 'settings.conectores.titulo'],
+    ['memoria', 'settings.memoria.titulo'],
     ['assistente', 'settings.assistente.titulo'],
     ['sistema', 'settings.sistema.sistema'],
   ];
@@ -454,6 +455,7 @@
     out.push(
       { group: 'shell.palette.group.actions', icon: 'plus', label: t('shell.cmd.task-new'), keywords: t('shell.cmd.today-keywords'), run: () => show('today', { focusAdd: true }) },
       { group: 'shell.palette.group.actions', icon: 'spark', label: t('shell.cmd.ask'), keywords: t('shell.cmd.ask-keywords'), run: () => show('today', { focusAsk: true }) },
+      { group: 'shell.palette.group.actions', icon: 'doc', label: t('shell.cmd.memory'), keywords: t('shell.cmd.memory-keywords'), run: () => show('settings', { section: 'memoria' }) },
       { group: 'shell.palette.group.actions', icon: 'upload', label: t('shell.cmd.import'), run: () => show('library', { import: true }) },
       { group: 'shell.palette.group.actions', icon: 'search', label: t('shell.cmd.search-library'), run: () => show('library', { focusSearch: true }) },
       { group: 'shell.palette.group.actions', icon: 'pill', label: t('shell.cmd.indicator'), run: () => invoke('overlay_toggle_pin').catch((e) => toast(String(e), 'err')) },
