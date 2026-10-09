@@ -98,7 +98,7 @@ pub(crate) const RETRY_WAITS: [std::time::Duration; 2] = [
 
 /// Erro que costuma passar sozinho: limite de taxa (429) e sobrecarga ou
 /// falha do servidor (5xx). O Gemini responde 503 em horário de pico.
-fn is_transient(err: &LlmError) -> bool {
+pub(crate) fn is_transient(err: &LlmError) -> bool {
     matches!(err, LlmError::Http(msg)
         if ["status 429", "status 500", "status 502", "status 503", "status 504"]
             .iter()

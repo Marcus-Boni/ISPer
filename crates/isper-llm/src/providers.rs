@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 
+use crate::chat::{ChatMessage, ChatReply, ToolSpec};
 use crate::settings::{LlmSettings, get_api_key};
 use crate::{LlmError, Result};
 
@@ -56,6 +57,21 @@ pub trait LlmProvider: Send + Sync {
         );
         parse_json_text(&self.complete(&system, user)?)
     }
+
+    /// Uma rodada de conversa com ferramentas (Fase 10.4): o modelo responde
+    /// ou pede ferramentas; quem chama roda as ferramentas e chama de novo
+    /// com os resultados (ver [`crate::agent`]). O padrão é não saber.
+    fn chat(
+        &self,
+        _system: &str,
+        _messages: &[ChatMessage],
+        _tools: &[ToolSpec],
+    ) -> Result<ChatReply> {
+        Err(LlmError::Unsupported(format!(
+            "o provider {} não conversa com ferramentas",
+            self.name()
+        )))
+    }
 }
 
 /// O JSON de uma resposta em texto: sem cercas Markdown e sem conversa em
@@ -66,23 +82,49 @@ pub(crate) fn parse_json_text(raw: &str) -> Result<Value> {
         .map_err(|e| LlmError::BadResponse(format!("JSON inválido na resposta: {e}")))
 }
 
-/// O esquema no dialeto do `responseSchema` do Gemini (subconjunto OpenAPI):
-/// tipos em maiúsculas, `["x", "null"]` vira `nullable`, e sem
-/// `additionalProperties`, que ele não aceita.
+/// Os campos do esquema que o Gemini aceita (subconjunto OpenAPI). O resto
+/// (`additionalProperties`, `$schema`, `format`, `default`, `oneOf`…) sai:
+/// um campo desconhecido derruba a chamada inteira.
+const GEMINI_SCHEMA_KEYS: [&str; 11] = [
+    "type",
+    "description",
+    "nullable",
+    "enum",
+    "properties",
+    "required",
+    "items",
+    "minItems",
+    "maxItems",
+    "minimum",
+    "maximum",
+];
+
+/// O esquema no dialeto do Gemini (subconjunto OpenAPI), para o
+/// `responseSchema` e os parâmetros das ferramentas: tipos em maiúsculas,
+/// `["x", "null"]` vira `nullable`, uma união com texto vira texto (o
+/// `["integer", "string"]` de um work item do OptTime) e só ficam os campos
+/// de [`GEMINI_SCHEMA_KEYS`].
 pub(crate) fn gemini_schema(schema: &Value) -> Value {
     match schema {
         Value::Object(map) => {
             let mut out = serde_json::Map::new();
             for (k, v) in map {
+                if !GEMINI_SCHEMA_KEYS.contains(&k.as_str()) {
+                    continue;
+                }
                 match k.as_str() {
-                    "additionalProperties" | "$schema" | "title" => {}
                     "type" => match v {
                         Value::Array(types) => {
-                            let main = types
+                            let names: Vec<&str> = types
                                 .iter()
                                 .filter_map(Value::as_str)
-                                .find(|t| *t != "null")
-                                .unwrap_or("string");
+                                .filter(|t| *t != "null")
+                                .collect();
+                            let main = if names.len() > 1 && names.contains(&"string") {
+                                "string"
+                            } else {
+                                names.first().copied().unwrap_or("string")
+                            };
                             out.insert("type".into(), json!(main.to_uppercase()));
                             if types.iter().any(|t| t.as_str() == Some("null")) {
                                 out.insert("nullable".into(), json!(true));
@@ -499,6 +541,27 @@ impl LlmProvider for Claude {
         Ok(ids_from_data(&resp))
     }
 
+    fn chat(
+        &self,
+        system: &str,
+        messages: &[ChatMessage],
+        tools: &[ToolSpec],
+    ) -> Result<ChatReply> {
+        // Sem `fallbacks`: o pensamento fica amarrado ao modelo e à conversa,
+        // e trocar de modelo no meio do laço o invalidaria.
+        let body = crate::chat::claude_body(&self.model, system, messages, tools);
+        let resp = post_json(
+            "https://api.anthropic.com/v1/messages",
+            &[
+                ("x-api-key", self.api_key.as_str()),
+                ("anthropic-version", "2023-06-01"),
+            ],
+            body,
+        )
+        .map_err(|e| map_model_error(e, &self.model))?;
+        crate::chat::claude_reply(&resp)
+    }
+
     fn complete_stream(
         &self,
         system: &str,
@@ -635,6 +698,22 @@ impl LlmProvider for Groq {
         Ok(ids_from_data(&resp))
     }
 
+    fn chat(
+        &self,
+        system: &str,
+        messages: &[ChatMessage],
+        tools: &[ToolSpec],
+    ) -> Result<ChatReply> {
+        let auth = format!("Bearer {}", self.api_key);
+        let resp = post_json(
+            "https://api.groq.com/openai/v1/chat/completions",
+            &[("authorization", auth.as_str())],
+            crate::chat::openai_body(&self.model, system, messages, tools),
+        )
+        .map_err(|e| map_model_error(e, &self.model))?;
+        crate::chat::openai_reply(&resp)
+    }
+
     fn complete_stream(
         &self,
         system: &str,
@@ -755,6 +834,36 @@ impl LlmProvider for Gemini {
             })
             .ok_or_else(|| LlmError::BadResponse("resposta sem texto".into()))?;
         parse_json_text(text)
+    }
+
+    fn chat(
+        &self,
+        system: &str,
+        messages: &[ChatMessage],
+        tools: &[ToolSpec],
+    ) -> Result<ChatReply> {
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
+            self.model
+        );
+        let mut body = crate::chat::gemini_body(system, messages, tools);
+        // No laço do agente, os Gemini 3 pensam pouco: o padrão (alto) deixa
+        // cada rodada lenta demais para uma pergunta sobre o dia.
+        if self.model.starts_with("gemini-3") {
+            body["generationConfig"]["thinkingConfig"] = json!({"thinkingLevel": "low"});
+        }
+        let key = [("x-goog-api-key", self.api_key.as_str())];
+        let resp = match post_json(&url, &key, body.clone()) {
+            Err(LlmError::Http(msg)) if msg.contains("status 400") && msg.contains("hinking") => {
+                if let Some(c) = body["generationConfig"].as_object_mut() {
+                    c.remove("thinkingConfig");
+                }
+                post_json(&url, &key, body)
+            }
+            other => other,
+        }
+        .map_err(|e| map_model_error(e, &self.model))?;
+        crate::chat::gemini_reply(&resp)
     }
 
     fn list_models(&self) -> Result<Vec<String>> {

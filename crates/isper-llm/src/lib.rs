@@ -13,6 +13,8 @@
 //!   TypeSafe, que responde em ~0,4 s e custa uma fração de centavo por hora
 //!   de reunião ([`systemone`]).
 
+pub mod agent;
+pub mod chat;
 pub mod copilot;
 pub mod embeddings;
 mod insights;
@@ -26,6 +28,7 @@ pub mod tasks;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
+pub use chat::{ChatMessage, ChatReply, StopReason, ToolCall, ToolResult, ToolSpec};
 pub use copilot::{
     CardKind, CardStatus, CardUrgency, CopilotAnalysis, CopilotCard, CopilotInput,
     FILTER_MIN_WORDS, FILTER_THRESHOLD, FilterVerdict, FocusHint, TriggerKind, analyze_meeting,
@@ -64,6 +67,8 @@ pub enum LlmError {
     Refused(String),
     #[error("erro de credencial: {0}")]
     Keyring(String),
+    #[error("{0}")]
+    Unsupported(String),
     #[error("erro de E/S: {0}")]
     Io(#[from] std::io::Error),
 }
