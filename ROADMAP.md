@@ -460,7 +460,7 @@ começam do zero na tela Hoje ([revisão do ADR 0021](docs/adr/0021-assistente-p
 
 ### 10.5 Aprendizado
 
-- [ ] Memória explícita e editável; padrão (a mesma tarefa em 3 dos últimos 4 dias iguais da semana) vira sugestão de rotina; aceitar e recusar ajustam
+- [x] Memória explícita e editável (Configurações → Memória: escrever, corrigir, fixar, arquivar com Desfazer; o assistente propõe pela ferramenta `lembrar`, que pede o toque sempre, e lê a memória antes de responder); padrão (a mesma tarefa em 3 dos últimos 4 dias iguais da semana, com dias úteis e a hora de costume) vira o cartão "Parece uma rotina" no Hoje, com a evidência; aceitar cria a rotina com `learned_from`, recusar cala por 8 semanas e muitas recusas pedem 4 de 4 (`isper_assist::learn`, decisões no diário). `isper-cli memoria` e `tarefas sugestoes`; e2e `tools/e2e/learning.ps1` (09/10)
 - [ ] Pronto quando sugere as rotinas reais sem cadastro, e nunca muda nada sozinho
 
 ### 10.6 No bolso

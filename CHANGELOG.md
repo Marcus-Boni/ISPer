@@ -74,6 +74,17 @@ bata com ela.
   Assistente, cada ferramenta fica livre, pergunta ou bloqueada (a bloqueada
   nem chega à IA), e o que apaga nunca fica livre. As ferramentas rodam no
   seu PC: a IA vê só o que elas devolvem para a pergunta.
+- **O ISPer nota o que se repete.** A tarefa que aparece no mesmo dia da
+  semana em 3 das últimas 4 semanas vira um cartão "Parece uma rotina" na
+  tela Hoje, com os dias em que você a fez e como ela ficaria ("toda segunda
+  às 09:00", "dias úteis"). "Criar rotina" liga a rotina; "Agora não" cala a
+  sugestão por 8 semanas. Nada vira rotina sem o seu toque, e quanto mais
+  você recusa, mais firme o padrão precisa ser para voltar.
+- **Memória do assistente.** Nas Configurações, em Memória, ficam os fatos
+  curtos que o assistente lê antes de responder ("meu gestor é o Carlos",
+  "prefiro reuniões depois das 10h"): escreva, corrija com um clique, fixe no
+  topo ou arquive (com Desfazer). Peça na tela Hoje, "lembra que…", e ele
+  propõe guardar num cartão; sem o seu toque, nada é guardado.
 - **IA compatível com OpenAI.** Nas Configurações, em Inteligência, o ISPer
   passa a falar com um modelo no seu PC (Ollama, LM Studio) ou com outro
   serviço compatível com a API da OpenAI, pelo endereço, com chave opcional.
