@@ -16,6 +16,8 @@ pub(crate) struct SettingsDto {
     has_gpu: bool,
     llm_provider: String,
     llm_model: Option<String>,
+    /// A base da API compatível com OpenAI (provider `openai`).
+    llm_base_url: Option<String>,
     llm_key_present: bool,
     autostart: bool,
     show_home_on_launch: bool,
@@ -77,6 +79,9 @@ pub(crate) struct SettingsPatch {
     meeting_source: String,
     llm_provider: String,
     llm_model: Option<String>,
+    /// A base da API compatível com OpenAI (ausente = mantém).
+    #[serde(default)]
+    llm_base_url: Option<String>,
     autostart: bool,
     #[serde(default = "default_true")]
     show_home_on_launch: bool,
@@ -355,6 +360,7 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
             llm.provider
         },
         llm_model: llm.model,
+        llm_base_url: llm.base_url,
         llm_key_present,
         autostart: app.autolaunch().is_enabled().unwrap_or(false),
         show_home_on_launch: cfg.show_home_on_launch,
@@ -460,8 +466,10 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         // O tema muda na hora por `set_ui_theme`, não pelo Salvar.
         theme: previous.theme.clone(),
         ui_lang: previous.ui_lang.clone(),
-        // O endereço do OptTime muda na hora, pela tela do conector.
+        // O endereço do OptTime e as permissões do assistente mudam na hora,
+        // pelas telas deles.
         opttime_url: previous.opttime_url.clone(),
+        agent_permissions: previous.agent_permissions.clone(),
         // A janela principal guarda o próprio tamanho e a barra lateral.
         main_window: previous.main_window,
         sidebar_collapsed: previous.sidebar_collapsed,
@@ -498,6 +506,10 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         patch.llm_provider.trim().to_lowercase()
     };
     let model = patch.llm_model.filter(|m| !m.trim().is_empty());
+    let base_url = match patch.llm_base_url {
+        Some(u) => Some(u.trim().trim_end_matches('/').to_string()).filter(|u| !u.is_empty()),
+        None => isper_llm::load_settings().base_url,
+    };
     // Busca semântica: provider próprio (Gemini ou endpoint compatível com OpenAI).
     let emb_provider = patch.emb_provider.unwrap_or_default().trim().to_lowercase();
     let embeddings = isper_llm::EmbeddingSettings {
@@ -518,6 +530,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
     isper_llm::save_settings(&isper_llm::LlmSettings {
         provider,
         model,
+        base_url,
         embeddings,
     })
     .map_err(|e| e.to_string())?;
@@ -597,11 +610,13 @@ pub(crate) async fn test_typesafe() -> Result<String, String> {
 pub(crate) async fn list_llm_models(
     provider: String,
     model: Option<String>,
+    base_url: Option<String>,
 ) -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let settings = isper_llm::LlmSettings {
             provider: provider.trim().to_lowercase(),
             model,
+            base_url: base_url.or_else(|| isper_llm::load_settings().base_url),
             embeddings: Default::default(),
         };
         let p = isper_llm::provider_from_settings(&settings).map_err(|e| e.to_string())?;

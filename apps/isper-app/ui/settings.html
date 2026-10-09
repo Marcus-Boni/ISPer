@@ -71,6 +71,24 @@
   .conn-warn { color: var(--warn); }
   .conn-adv { margin-top: 12px; }
   .conn-adv > summary { cursor: pointer; display: inline-block; }
+  /* Assistente: o que cada ferramenta pode fazer sem perguntar (Fase 10.4). */
+  .perm { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+  .perm-list > .perm:first-child { border-top: none; padding-top: 2px; }
+  .perm-name { font-size: 13px; min-width: 0; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+  .perm-name code { font-size: 10.5px; color: var(--muted); }
+  .perm .mnote { grid-column: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .perm .seg { grid-row: 1 / span 2; grid-column: 2; }
+  .seg { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--panel-2); }
+  .seg button {
+    font: inherit; font-size: 11.5px; font-weight: 500; padding: 3px 11px; border: none; border-radius: var(--r-pill);
+    background: transparent; color: var(--muted); cursor: pointer; transition: background var(--dur-2), color var(--dur-2);
+  }
+  .seg button:hover:not(:disabled) { color: var(--ink); }
+  .seg button[aria-checked="true"] { background: var(--panel); color: var(--ink); box-shadow: var(--shadow-1); }
+  .seg button[aria-checked="true"][data-p="allow"] { color: var(--good); }
+  .seg button[aria-checked="true"][data-p="never"] { color: var(--accent); }
+  .seg button:disabled { opacity: .4; cursor: not-allowed; }
+  @media (max-width: 560px) { .perm { grid-template-columns: 1fr; } .perm .seg { grid-row: auto; grid-column: 1; justify-self: start; } }
 </style>
 </head>
 <body class="atmos">
@@ -309,7 +327,13 @@
     <option value="groq" data-i18n="settings.inteligencia.groq-free-tier">Groq (free tier)</option>
     <option value="gemini" data-i18n="settings.inteligencia.gemini-free-tier">Gemini (free tier)</option>
     <option value="claude" data-i18n="settings.inteligencia.claude-api">Claude API</option>
+    <option value="openai" data-i18n="settings.inteligencia.openai-compat">Compatível com OpenAI — Ollama, LM Studio…</option>
   </select>
+  <div id="llmbasebox" hidden>
+    <label class="lbl" for="llmbase" data-i18n="settings.inteligencia.base-api">Base da API</label>
+    <input type="text" id="llmbase" class="field" spellcheck="false" placeholder="http://localhost:11434/v1">
+    <p class="hint" data-i18n="settings.inteligencia.openai-compat-hint">Um modelo rodando no seu PC (Ollama, LM Studio) ou outro serviço compatível com a API da OpenAI. Para o assistente responder com as ferramentas do ISPer, o modelo precisa saber chamar ferramentas (Llama 3.1, Qwen 2.5 e parecidos). A chave é opcional.</p>
+  </div>
   <label class="lbl" for="model" data-i18n="settings.inteligencia.modelo-vazio-padrao-provider">Modelo (vazio = padrão do provider)</label>
   <div class="row">
     <input type="text" id="model" class="field" list="models" placeholder="ex.: openai/gpt-oss-120b" data-i18n-attr="placeholder:settings.inteligencia.ex-openai-gpt-oss-120b.placeholder">
@@ -417,6 +441,16 @@
     </div>
     <p class="hint" data-i18n="settings.conectores.url-hint">Vazio usa o OptTime de produção. Só https (http só no próprio PC).</p>
   </details>
+</section>
+
+<section class="card reveal" id="assistente" data-i="5" aria-labelledby="h-assistente">
+  <h2 id="h-assistente" data-i18n="settings.assistente.titulo">Assistente</h2>
+  <p class="hint mt0" data-i18n="settings.assistente.lead">O que o assistente da tela Hoje pode fazer sem perguntar. Ler é livre; criar, mover, concluir e lançar horas pedem o seu toque num cartão. O que apaga nunca fica livre. As ferramentas rodam no seu PC: a IA só vê o que elas devolvem para a pergunta.</p>
+  <h3 data-i18n="settings.assistente.isper">No ISPer</h3>
+  <div class="perm-list" id="agisper"></div>
+  <h3 data-i18n="settings.assistente.opttime">No OptTime</h3>
+  <p class="hint mt0" id="agotnote" hidden></p>
+  <div class="perm-list" id="agopttime"></div>
 </section>
 
 <section class="card reveal" id="sistema" data-i="5" aria-labelledby="h-sistema">
@@ -566,6 +600,8 @@
       $('dict').value = s.dictionary || '';
       $('source').value = s.meeting_source || 'system';
       $('provider').value = s.llm_provider || 'none';
+      $('llmbase').value = s.llm_base_url || '';
+      $('llmbasebox').hidden = $('provider').value !== 'openai';
       $('model').value = s.llm_model || '';
       $('keystate').hidden = !s.llm_key_present;
       $('insights').checked = !!s.live_insights;
@@ -806,7 +842,8 @@
   // ---- alterações não salvas: a janela marca as Configurações na barra
   // lateral e lembra de salvar ao trocar de tela. Só conta o que vai pelo
   // Salvar (tema, idioma, chaves e o celular valem na hora, por conta própria).
-  const SAVED_BY_BUTTON = new Set(['shortcut', 'lang', 'dict', 'source', 'provider', 'model', 'autostart', 'showhome', 'mic',
+  $('provider').addEventListener('change', () => { $('llmbasebox').hidden = $('provider').value !== 'openai'; });
+  const SAVED_BY_BUTTON = new Set(['shortcut', 'lang', 'dict', 'source', 'provider', 'model', 'llmbase', 'autostart', 'showhome', 'mic',
     'mshortcut', 'markshortcut', 'copilotshortcut', 'captureshortcut', 'polish', 'pstyle', 'after', 'voicecmd', 'autoupdate', 'retention',
     'speakers', 'finalpass', 'importwatch', 'meetinginbox', 'meetingprep', 'diarthr', 'calldetect', 'insights', 'insint', 'copfilter', 'embprovider',
     'embmodel', 'embbase']);
@@ -840,6 +877,7 @@
         model: checked ? checked.value : null,
         meeting_source: $('source').value,
         llm_provider: $('provider').value,
+        llm_base_url: $('provider').value === 'openai' ? ($('llmbase').value.trim() || null) : null,
         llm_model: $('model').value || null,
         autostart: $('autostart').checked,
         show_home_on_launch: $('showhome').checked,
@@ -908,7 +946,7 @@
     const b = $('listmodels');
     UI.busy(b, true, t('common.querying'));
     try {
-      const models = await invoke('list_llm_models', { provider, model: null });
+      const models = await invoke('list_llm_models', { provider, model: null, baseUrl: provider === 'openai' ? ($('llmbase').value.trim() || null) : null });
       const dl = $('models');
       dl.replaceChildren();
       for (const m of models) { const o = document.createElement('option'); o.value = m; dl.appendChild(o); }
@@ -1079,6 +1117,65 @@
   listen('isper-connector', () => loadConnector(false));
   document.addEventListener('isper-i18n', () => loadConnector(false));
   loadConnector(true);
+
+  // ---- assistente: o que cada ferramenta pode fazer sem perguntar (ADR 0023)
+  const PERMS = ['allow', 'ask', 'never'];
+  const PERM_KEY = { allow: 'settings.assistente.p.allow', ask: 'settings.assistente.p.ask', never: 'settings.assistente.p.never' };
+  // As do ISPer têm nome traduzido; as do OptTime vêm com o título do servidor.
+  const toolKey = (name) => 'settings.assistente.tool.' + name;
+  function permRow(tool) {
+    const row = el('div', 'perm');
+    const title = tool.group === 'isper'
+      ? t(toolKey(tool.name), null, tool.name)
+      : (tool.title || tool.name);
+    const name = el('div', 'perm-name');
+    name.append(el('span', null, title), el('code', null, tool.name));
+    if (tool.chosen && tool.chosen !== tool.default) {
+      const back = el('button', 'btn btn-ghost btn-sm', t('settings.assistente.reset'));
+      back.type = 'button';
+      back.addEventListener('click', () => setPerm(tool, null));
+      name.appendChild(back);
+    }
+    const seg = el('div', 'seg');
+    seg.setAttribute('role', 'radiogroup');
+    seg.setAttribute('aria-label', t('settings.assistente.aria', { s: title }));
+    for (const p of PERMS) {
+      const b = el('button', null, t(PERM_KEY[p]) + (p === tool.default ? ' ·' : ''));
+      b.type = 'button';
+      b.dataset.p = p;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(p === tool.effective));
+      if (p === tool.default) b.title = t('settings.assistente.default');
+      if (p === 'allow' && tool.destructive) { b.disabled = true; b.title = t('settings.assistente.destructive'); }
+      b.addEventListener('click', () => { if (p !== tool.effective) setPerm(tool, p); });
+      seg.appendChild(b);
+    }
+    row.append(name, seg, el('div', 'mnote', tool.description));
+    return row;
+  }
+  async function setPerm(tool, p) {
+    try {
+      await invoke('assistant_set_permission', { name: tool.name, permission: p });
+      const s = tool.group === 'isper' ? t(toolKey(tool.name), null, tool.name) : (tool.title || tool.name);
+      status(p ? t('settings.assistente.msg.set', { s, p: t(PERM_KEY[p]) }) : t('settings.assistente.msg.reset', { s }), 'ok');
+    } catch (e) { status(t('common.error', { e }), 'err'); }
+    loadAgentTools();
+  }
+  async function loadAgentTools() {
+    let v;
+    try { v = await invoke('assistant_tools'); } catch (e) { $('agotnote').textContent = t('common.error', { e }); $('agotnote').hidden = false; return; }
+    $('agisper').replaceChildren(...v.tools.filter((x) => x.group === 'isper').map(permRow));
+    const ot = v.tools.filter((x) => x.group === 'opttime');
+    $('agopttime').replaceChildren(...ot.map(permRow));
+    const note = $('agotnote');
+    note.hidden = !!ot.length;
+    note.textContent = !v.opttime ? t('settings.assistente.ot-off')
+      : v.opttime_error ? t('settings.assistente.ot-error', { e: connErr(v.opttime_error) })
+      : t('settings.assistente.ot-empty');
+  }
+  listen('isper-connector', () => loadAgentTools());
+  document.addEventListener('isper-i18n', () => loadAgentTools());
+  loadAgentTools();
 
   // ---- diagnóstico (Sistema)
   let diagText = '';

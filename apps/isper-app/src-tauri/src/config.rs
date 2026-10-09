@@ -161,6 +161,11 @@ pub struct AppConfig {
     /// token fica no Credential Manager, nunca aqui.
     #[serde(default)]
     pub opttime_url: Option<String>,
+    /// O que cada ferramenta do assistente pode fazer sem perguntar (Fase
+    /// 10.4): nome → `allow` · `ask` · `never`. Ausente = o padrão (ler é
+    /// livre, escrever pergunta); o que apaga nunca fica liberado.
+    #[serde(default)]
+    pub agent_permissions: std::collections::BTreeMap<String, String>,
     /// Aviso de preparo 10 minutos antes das reuniões da agenda (Fase 10.3).
     #[serde(default = "default_true")]
     pub meeting_prep: bool,
@@ -226,6 +231,7 @@ impl Default for AppConfig {
             main_window: None,
             sidebar_collapsed: false,
             opttime_url: None,
+            agent_permissions: Default::default(),
             meeting_prep: true,
             meeting_inbox: true,
             config_version: CONFIG_VERSION,
@@ -365,6 +371,8 @@ impl AppConfig {
         clean(&mut self.input_device);
         clean(&mut self.phone_relay);
         clean(&mut self.opttime_url);
+        self.agent_permissions
+            .retain(|_, v| matches!(v.as_str(), "allow" | "ask" | "never"));
         lowered_or(&mut self.lang, default_lang());
         lowered_or(&mut self.meeting_source, default_source());
         let mut dictionary: Vec<String> = Vec::with_capacity(self.dictionary.len());

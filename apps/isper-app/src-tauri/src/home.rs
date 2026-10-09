@@ -170,6 +170,7 @@ mod tests {
         isper_llm::LlmSettings {
             provider: provider.into(),
             model: model.map(str::to_string),
+            base_url: None,
             embeddings: isper_llm::EmbeddingSettings::default(),
         }
     }

@@ -76,6 +76,11 @@ pub(crate) fn token_present() -> bool {
     isper_llm::get_api_key(SECRET_NAME).ok().flatten().is_some()
 }
 
+/// O endereço e o token do OptTime, para quem fala MCP direto (o agente).
+pub(crate) fn opttime_endpoint(app: &AppHandle) -> Result<Endpoint, McpError> {
+    Ok(opttime(app)?.endpoint().clone())
+}
+
 /// O conector pronto para chamar, com o token do cofre.
 pub(crate) fn opttime(app: &AppHandle) -> Result<OptTime, McpError> {
     let token = isper_llm::get_api_key(SECRET_NAME)
@@ -96,6 +101,7 @@ pub(crate) fn me_first_name() -> Option<String> {
 
 fn changed(app: &AppHandle) {
     crate::agenda::forget();
+    crate::assistant::forget();
     let _ = app.emit(CONNECTOR_EVENT, ());
     // A tela Hoje mostra "conecte o OptTime" nas rotinas que dependem dele.
     let _ = app.emit(crate::today::TASKS_EVENT, ());
