@@ -60,6 +60,23 @@ bata com ela.
   "reunião salva" já diz quantas. Vale também para gravações importadas.
 - **A reunião gravada ganha o nome do convite.** Gravando durante um evento da
   agenda, a reunião fica com o assunto do evento e ligada a ele.
+- **Pergunte ao assistente na tela Hoje.** Uma barra em cima da agenda
+  responde sobre o seu dia com o que está no ISPer (tarefas, diário,
+  reuniões gravadas, ditados, rotinas) e no OptTime (agenda, horas, work
+  items): "o que a Ana me pediu na daily?", "quando ficou o deploy?". Cada
+  fato vem com o número da fonte, e um clique abre a reunião no minuto ou
+  destaca a tarefa na lista. "Resumo da manhã" e "Fechar o dia" fazem os dois
+  pedidos de sempre num clique; o fechamento soma as horas lançadas no
+  OptTime e sugere o que mover para amanhã.
+- **Nada muda sem o seu toque.** Criar, mover e concluir tarefa, e lançar
+  horas, param num cartão "Confirme antes de eu fazer"; "Agora não", ou uma
+  pergunta nova com o cartão aberto, não faz nada. Nas Configurações, em
+  Assistente, cada ferramenta fica livre, pergunta ou bloqueada (a bloqueada
+  nem chega à IA), e o que apaga nunca fica livre. As ferramentas rodam no
+  seu PC: a IA vê só o que elas devolvem para a pergunta.
+- **IA compatível com OpenAI.** Nas Configurações, em Inteligência, o ISPer
+  passa a falar com um modelo no seu PC (Ollama, LM Studio) ou com outro
+  serviço compatível com a API da OpenAI, pelo endereço, com chave opcional.
 - **Conectores nas Configurações.** O OptTime entra com um token pessoal
   (preset "Assistente pessoal (ISPer)"), guardado no Credential Manager do
   Windows. "Testar conexão" mostra a conta, os escopos, se a Microsoft e o
