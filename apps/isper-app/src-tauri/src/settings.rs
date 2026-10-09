@@ -446,6 +446,8 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         // O tema muda na hora por `set_ui_theme`, não pelo Salvar.
         theme: previous.theme.clone(),
         ui_lang: previous.ui_lang.clone(),
+        // O endereço do OptTime muda na hora, pela tela do conector.
+        opttime_url: previous.opttime_url.clone(),
         // A janela principal guarda o próprio tamanho e a barra lateral.
         main_window: previous.main_window,
         sidebar_collapsed: previous.sidebar_collapsed,

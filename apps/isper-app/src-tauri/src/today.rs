@@ -10,7 +10,7 @@
 use crate::prelude::*;
 use isper_assist::when::{ParsedTask, parse_task};
 use isper_assist::{
-    Actor, AssistStore, Clock, NewTask, SystemClock, Task, TaskPatch, TaskStatus, Today,
+    Actor, AssistStore, Clock, NewTask, Routine, SystemClock, Task, TaskPatch, TaskStatus, Today,
 };
 
 /// Evento que avisa as janelas de que as tarefas mudaram.
@@ -25,7 +25,7 @@ pub(crate) struct TaskChange {
 
 /// O domínio do assistente sobre o `isper.db` do perfil. O `MeetingStore`
 /// abre antes porque é ele quem migra o banco (a v7 é da cadeia dele).
-fn open_assist() -> anyhow::Result<AssistStore> {
+pub(crate) fn open_assist() -> anyhow::Result<AssistStore> {
     let path = db_path()?;
     drop(isper_core::store::MeetingStore::open(&path)?);
     Ok(AssistStore::open(&path)?)
@@ -37,20 +37,48 @@ fn changed(app: &AppHandle, store: &AssistStore, task: Task) -> Result<TaskChang
     Ok(TaskChange { task, undo })
 }
 
+/// O dia como a tela Hoje mostra: as tarefas, as rotinas (para as tarefas
+/// de rotina saberem o verificador e o modo) e se o OptTime tem token.
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct TodayView {
+    #[serde(flatten)]
+    today: Today,
+    routines: Vec<Routine>,
+    opttime: bool,
+}
+
+/// O checklist do dia antes de montar o dia: as rotinas que caem hoje ganham
+/// a tarefa sem esperar o agendador (que dá a volta de minuto em minuto).
+fn today_with_routines(app: &AppHandle, store: &AssistStore) -> anyhow::Result<Today> {
+    if !store
+        .materialize_routines(store.clock().today())?
+        .is_empty()
+    {
+        let _ = app.emit(TASKS_EVENT, ());
+    }
+    Ok(store.today()?)
+}
+
 /// O dia: para hoje (e atrasadas), caixa de entrada, depois e feito hoje.
 #[tauri::command]
-pub(crate) fn today_load() -> Result<Today, String> {
-    open_assist()
-        .and_then(|s| Ok(s.today()?))
-        .map_err(|e| e.to_string())
+pub(crate) fn today_load(app: AppHandle) -> Result<TodayView, String> {
+    (|| {
+        let store = open_assist()?;
+        Ok(TodayView {
+            today: today_with_routines(&app, &store)?,
+            routines: store.routines()?,
+            opttime: crate::connectors::token_present(),
+        })
+    })()
+    .map_err(|e: anyhow::Error| e.to_string())
 }
 
 /// Quantas tarefas abertas são para hoje (ou estão atrasadas): o número ao
 /// lado de "Hoje" na barra lateral.
 #[tauri::command]
-pub(crate) fn today_badge() -> Result<usize, String> {
+pub(crate) fn today_badge(app: AppHandle) -> Result<usize, String> {
     open_assist()
-        .and_then(|s| Ok(s.today()?.planned.len()))
+        .and_then(|s| Ok(today_with_routines(&app, &s)?.planned.len()))
         .map_err(|e| e.to_string())
 }
 

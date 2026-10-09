@@ -16,6 +16,7 @@ mod audio_import;
 mod calls;
 mod capture;
 mod config;
+mod connectors;
 mod copilot;
 mod copilot_filter;
 mod data;
@@ -32,6 +33,7 @@ mod overlay;
 mod paths;
 mod phone_sync;
 mod prelude;
+mod routines;
 mod search;
 mod settings;
 mod shortcuts;
@@ -68,9 +70,10 @@ pub(crate) fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGua
     // O whisper.cpp e o ggml falam pelo `tracing` (ver `isper_core::engine`),
     // e falam MUITO: carga do modelo, buffers, uma linha por região de fala do
     // VAD. Numa reunião de duas horas isso enterra o que interessa, então eles
-    // ficam em WARN — `RUST_LOG=whisper_rs=info` traz tudo de volta.
+    // ficam em WARN — `RUST_LOG=whisper_rs=info` traz tudo de volta. O rmcp
+    // (conector do OptTime) descreve o servidor inteiro a cada conexão: WARN.
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,whisper_rs=warn"));
+        .unwrap_or_else(|_| EnvFilter::new("info,whisper_rs=warn,rmcp=warn"));
     let stdout = tracing_subscriber::fmt::layer()
         .with_target(false)
         .compact();
@@ -261,6 +264,18 @@ fn main() {
             capture::capture_save,
             capture::capture_discard,
             capture::capture_text,
+            connectors::opttime_status,
+            connectors::opttime_set_token,
+            connectors::opttime_clear_token,
+            connectors::opttime_set_url,
+            connectors::opttime_check,
+            routines::routines_list,
+            routines::routine_create,
+            routines::routine_update,
+            routines::routine_set_active,
+            routines::routine_check,
+            routines::opttime_day_suggestions,
+            routines::opttime_day_apply,
             today::today_load,
             today::today_badge,
             today::task_add,
@@ -483,6 +498,9 @@ fn main() {
 
             // Chamada do Teams em andamento? → "Gravar transcrição?" (ou grava sozinho).
             start_call_watcher(app.handle().clone());
+
+            // Rotinas (Fase 10.2): o checklist do dia e o verificador do OptTime.
+            routines::start(app.handle().clone());
 
             // Indicador fixo: quem o deixou visível em repouso o encontra onde estava.
             if cfg.overlay_pinned {

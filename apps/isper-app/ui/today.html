@@ -85,6 +85,58 @@
   @media (hover: none) { .acts { opacity: 1; } }
 
   .empty { padding: 10px 0 4px; }
+
+  /* ---- rotinas: a linha do verificador na tarefa do dia ---- */
+  .rline {
+    display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; margin-top: 4px;
+    padding: 7px 10px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--panel-2);
+    font-size: 12.5px; color: var(--ink-2);
+  }
+  .rline.ok { border-color: color-mix(in srgb, var(--good) 40%, transparent); background: var(--good-soft); }
+  .rline.warn { border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: var(--warn-soft); }
+  .rline.bad { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); }
+  .rline-text { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+  .rline-text small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+  .rline-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* ---- rotinas: a lista e o formulário ---- */
+  .task.routine { grid-template-columns: 1fr auto; }
+  .task.routine .acts { opacity: 1; }
+  .task.routine.paused .title { color: var(--muted); }
+  .rform { display: grid; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .rform .when { grid-column: auto; }
+  .rform-acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .field-sm { width: auto; padding: 4px 8px; font-size: 12.5px; }
+  .day-pick { min-width: 44px; text-transform: capitalize; }
+
+  /* ---- revisar as sugestões do OptTime ---- */
+  dialog.review {
+    width: min(680px, calc(100vw - 32px)); max-height: min(84vh, 760px); padding: 0; display: none;
+    border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--panel); color: var(--ink); box-shadow: var(--shadow-3);
+  }
+  dialog.review[open] { display: grid; grid-template-rows: auto 1fr auto; animation: rv-in var(--dur-3) var(--ease-out); }
+  dialog.review::backdrop { background: var(--scrim); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+  @keyframes rv-in { from { opacity: 0; transform: translateY(-10px) scale(.98); } }
+  .rv-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; padding: 18px 20px 10px; }
+  .rv-head h2 { margin: 0; font: 500 20px var(--font-display); letter-spacing: -.01em; }
+  .rv-sub { margin: 3px 0 0; font-size: 12.5px; color: var(--muted); }
+  .rv-body { overflow-y: auto; padding: 4px 20px 12px; }
+  .rv-list { list-style: none; margin: 0; padding: 0; }
+  .rv-item { display: grid; grid-template-columns: 22px 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .rv-item:first-child { border-top: none; }
+  .rv-item input[type=checkbox] { width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--accent); }
+  .rv-item.no-project { opacity: .7; }
+  .rv-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; cursor: pointer; }
+  .rv-line .chip { animation: none; }
+  .rv-edit { display: grid; grid-template-columns: 1fr 86px; gap: 6px; margin-top: 6px; }
+  .rv-edit .field { padding: 5px 8px; font-size: 12.5px; }
+  .rv-ev { margin: 4px 0 0; font-size: 11.5px; color: var(--muted); }
+  .rv-meta { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); }
+  .rv-foot { display: flex; gap: 8px; align-items: center; padding: 12px 20px 16px; border-top: 1px solid var(--line); }
+  .rv-note { flex: 1; font-size: 12px; color: var(--muted); }
+  .rv-note.err { color: var(--accent); }
+  .rv-wait { display: grid; gap: 10px; padding: 14px 0; color: var(--muted); font-size: 13px; }
+  .rv-wait .skeleton { height: 46px; }
 </style>
 </head>
 <body class="atmos">
@@ -136,8 +188,58 @@
       <div class="sec-head"><h2 class="eyebrow" id="h-done" data-i18n="today.sec.done">Feito hoje</h2><span class="count" id="c-done"></span></div>
       <ul class="tasks" id="list-done"></ul>
     </section>
+
+    <section id="sec-routines" aria-labelledby="h-routines">
+      <details id="routines-box">
+        <summary><span class="sec-head"><span class="eyebrow" id="h-routines" data-i18n="today.sec.routines">Rotinas</span><span class="count" id="c-routines"></span></span></summary>
+        <p class="sec-hint" data-i18n="today.routines.hint">O que se repete vira tarefa sozinho, no dia certo. A de horas confere no OptTime se o dia fechou.</p>
+        <ul class="tasks" id="list-routines"></ul>
+        <form class="rform" id="rform" autocomplete="off">
+          <label class="sr-only" for="r-title" data-i18n="today.routines.title-label">Nome da rotina</label>
+          <input class="field" id="r-title" maxlength="500" placeholder="Nova rotina… (ex.: revisar os PRs abertos)" data-i18n-attr="placeholder:today.routines.placeholder">
+          <div class="when" role="radiogroup" aria-labelledby="r-freq-lbl" id="r-freq">
+            <span class="lbl" id="r-freq-lbl" data-i18n="today.routines.freq">Repete</span>
+            <button class="pick" type="button" role="radio" data-freq="workdays" aria-checked="true" data-i18n="today.freq.workdays">Dias úteis</button>
+            <button class="pick" type="button" role="radio" data-freq="daily" aria-checked="false" data-i18n="today.freq.daily">Todo dia</button>
+            <button class="pick" type="button" role="radio" data-freq="weekly" aria-checked="false" data-i18n="today.freq.weekly">Dias da semana</button>
+            <button class="pick" type="button" role="radio" data-freq="monthly" aria-checked="false" data-i18n="today.freq.monthly">Todo mês</button>
+          </div>
+          <div class="when" id="r-days" role="group" aria-label="Dias da semana" data-i18n-attr="aria-label:today.routines.days-aria" hidden></div>
+          <div class="when" id="r-month" hidden>
+            <label class="lbl" for="r-mday" data-i18n="today.routines.mday">No dia</label>
+            <select id="r-mday" class="field field-sm"></select>
+          </div>
+          <div class="when">
+            <label class="lbl" for="r-time" data-i18n="today.routines.time">Às</label>
+            <input type="time" id="r-time" class="field field-sm">
+            <span class="lbl" data-i18n="today.routines.time-hint">(opcional)</span>
+          </div>
+          <div class="rform-acts">
+            <button class="btn btn-primary" type="submit" id="r-submit" data-i18n="today.routines.create">Criar rotina</button>
+            <button class="btn btn-ghost" type="button" id="r-cancel" hidden data-i18n="today.routines.cancel">Cancelar</button>
+            <button class="btn" type="button" id="r-opttime" hidden data-i18n="today.routines.opttime">Registrar 8h no OptTime</button>
+          </div>
+        </form>
+      </details>
+    </section>
   </div>
 </main>
+
+<dialog class="review" id="review" aria-labelledby="rv-title">
+  <div class="rv-head">
+    <div>
+      <h2 id="rv-title" data-i18n="today.rv.heading">Preencher o dia</h2>
+      <p class="rv-sub" id="rv-sub"></p>
+    </div>
+    <button class="btn btn-ghost btn-icon" type="button" id="rv-close" aria-label="Fechar" data-i18n-attr="aria-label:today.rv.close"></button>
+  </div>
+  <div class="rv-body" id="rv-body" aria-live="polite"></div>
+  <div class="rv-foot">
+    <span class="rv-note" id="rv-note" role="status"></span>
+    <button class="btn btn-ghost" type="button" id="rv-cancel" data-i18n="today.rv.cancel">Cancelar</button>
+    <button class="btn btn-primary" type="button" id="rv-apply" disabled data-i18n="today.rv.apply-none">Lançar no OptTime</button>
+  </div>
+</dialog>
 
 <script src="assets/ui.js"></script>
 <script>
@@ -317,6 +419,8 @@
     if (!done) title.addEventListener('dblclick', () => startEdit(task, title));
     body.appendChild(title);
     body.appendChild(chips(task, section));
+    const verify = routineLine(task);
+    if (verify) body.appendChild(verify);
 
     const acts = el('div', 'acts');
     if (section === 'inbox') {
@@ -385,6 +489,8 @@
     $('sec-done').hidden = !done.length;
     $('c-done').textContent = String(done.length);
     fill('list-done', done, 'done', fresh);
+
+    renderRoutines();
   }
 
   let seq = 0;
@@ -407,13 +513,13 @@
   // ---------------------------------------------------------- nova tarefa
   function pickWhen(value) {
     when = value;
-    document.querySelectorAll('.pick').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.when === value)));
+    $('add').querySelectorAll('.pick').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.when === value)));
   }
-  document.querySelectorAll('.pick').forEach((b) => b.addEventListener('click', () => pickWhen(b.dataset.when)));
+  $('add').querySelectorAll('.pick').forEach((b) => b.addEventListener('click', () => pickWhen(b.dataset.when)));
   // Setas dentro do grupo, como num grupo de rádio de verdade.
   $('add').querySelector('.when').addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-    const picks = [...document.querySelectorAll('.pick')];
+    const picks = [...$('add').querySelectorAll('.pick')];
     const i = picks.findIndex((b) => b.dataset.when === when);
     const next = picks[(i + (e.key === 'ArrowRight' ? 1 : picks.length - 1)) % picks.length];
     pickWhen(next.dataset.when);
@@ -467,10 +573,460 @@
     await refresh();
   });
 
+
+  // ------------------------------------------------------------- rotinas
+  // A tarefa de uma rotina com verificador mostra a última conferência no
+  // OptTime e o próximo passo: concluir, revisar as sugestões, conectar.
+  const VERIFY_OPTTIME = 'opttime.day_complete';
+  const WEEK = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+  const WORKDAYS = 'MO,TU,WE,TH,FR';
+  const hm = (min) => {
+    const h = Math.floor(min / 60), m = min % 60;
+    if (!h) return m + 'min';
+    return m ? h + 'h' + pad(m) : h + 'h';
+  };
+  // Erro de comando: texto, ou o objeto do conector com código e dica.
+  const errText = (e) => (e && typeof e === 'object' && e.message) ? e.message + (e.hint ? ' — ' + e.hint : '') : String(e);
+  const routineOf = (task) => (data && data.routines || []).find((r) => r.id === task.routine_id) || null;
+  // Nome curto do dia da semana no idioma da tela (2026-10-05 é segunda).
+  const weekdayName = (code, style = 'short') => new Date(2026, 9, 5 + WEEK.indexOf(code)).toLocaleDateString(lang(), { weekday: style });
+
+  function smallButton(label, cls, run) {
+    const b = el('button', 'btn btn-sm ' + cls, label);
+    b.type = 'button';
+    b.addEventListener('click', () => run(b));
+    return b;
+  }
+
+  async function checkNow(task, b) {
+    UI.busy(b, true, t('today.rt.checking'));
+    try { await invoke('routine_check', { taskId: task.id }); }
+    catch (e) { toast(t('common.error', { e: errText(e) }), 'err'); }
+    UI.busy(b, false);
+    await refresh();
+  }
+
+  const openConnector = () => invoke('open_settings_window', { section: 'conectores' }).catch((e) => toast(t('common.error', { e }), 'err'));
+
+  function routineLine(task) {
+    const r = routineOf(task);
+    if (!r || r.verifier !== VERIFY_OPTTIME || task.status !== 'open') return null;
+    const saved = task.source_ref && task.source_ref.check;
+    // "Sem token" de antes de guardar o token não vale mais: a próxima volta confere.
+    const check = saved && saved.status === 'no_connector' && data.opttime ? null : saved;
+    const box = el('div', 'rline');
+    const text = el('span', 'rline-text');
+    const acts = el('span', 'rline-acts');
+    const again = (label) => smallButton(label, 'btn-ghost', (b) => checkNow(task, b));
+    let line;
+    if (!data.opttime) {
+      line = t('today.rt.no-connector');
+      acts.append(smallButton(t('today.rt.connect'), '', openConnector));
+    } else if (!check) {
+      line = task.planned_time ? t('today.rt.waits', { time: task.planned_time }) : t('today.rt.waits-now');
+      acts.append(again(t('today.rt.check-now')));
+    } else if (check.status === 'complete') {
+      box.classList.add('ok');
+      line = t('today.rt.complete', { total: hm(check.total_minutes), target: hm(check.target_minutes) });
+      if (r.mode === 'ask') acts.append(smallButton(t('today.rt.conclude'), 'btn-primary', () => setStatus(task, 'done', t('today.toast.done'))));
+    } else if (check.status === 'missing') {
+      box.classList.add('warn');
+      line = t('today.rt.missing', { total: hm(check.total_minutes), target: hm(check.target_minutes), missing: hm(check.missing_minutes) });
+      acts.append(smallButton(t('today.rt.review'), 'btn-primary', () => openReview(task)), again(t('today.rt.check-again')));
+    } else if (check.status === 'not_workday') {
+      line = t('today.rt.not-workday');
+      acts.append(smallButton(t('today.rt.drop'), '', () => setStatus(task, 'dropped', t('today.toast.dropped'))));
+    } else {
+      box.classList.add('bad');
+      line = errText(check);
+      acts.append(again(t('today.rt.retry')));
+    }
+    text.append(document.createTextNode(line));
+    if (check && check.at && check.status !== 'no_connector') {
+      const at = new Date(check.at).toLocaleTimeString(lang(), { hour: '2-digit', minute: '2-digit' });
+      text.append(el('small', null, t('today.rt.checked-at', { time: at })));
+    }
+    box.append(text, acts);
+    return box;
+  }
+
+  // Como a rotina se repete, em palavras.
+  function scheduleText(r) {
+    const rule = r.rule || {};
+    const days = rule.by_day || [];
+    let s;
+    if (rule.freq === 'daily' && !days.length) {
+      s = rule.interval > 1 ? t('today.sched.every-n-days', { n: rule.interval }) : t('today.freq.daily');
+    } else if (rule.freq === 'weekly' && days.join(',') === WORKDAYS && rule.interval === 1) {
+      s = t('today.freq.workdays');
+    } else if (rule.freq === 'weekly' || rule.freq === 'daily') {
+      const names = days.map((d) => weekdayName(d)).join(', ');
+      s = rule.interval > 1 ? t('today.sched.weeks', { n: rule.interval, days: names }) : t('today.sched.week', { days: names });
+    } else if (rule.freq === 'monthly' && (rule.by_month_day || []).length) {
+      const md = rule.by_month_day[0];
+      s = md === -1 ? t('today.sched.month-last') : t('today.sched.month-day', { d: md });
+    } else if (rule.freq === 'monthly' && days.length) {
+      const m = /^(-?\d)?([A-Z]{2})$/.exec(days[0]) || [];
+      const nth = Number(m[1] || 0);
+      const nthLabel = { 1: 'today.sched.nth.1', 2: 'today.sched.nth.2', 3: 'today.sched.nth.3', 4: 'today.sched.nth.4', 5: 'today.sched.nth.5', '-1': 'today.sched.nth.last' }[nth];
+      s = nthLabel ? t('today.sched.month-weekday', { nth: t(nthLabel), day: weekdayName(m[2], 'long') }) : r.rrule;
+    } else {
+      s = r.rrule;
+    }
+    return rule.time ? t('today.sched.at', { when: s, time: rule.time }) : s;
+  }
+
+  function routineRow(r) {
+    const li = el('li', 'task routine' + (r.active ? '' : ' paused'));
+    li.dataset.id = r.id;
+    const body = el('div', 'body');
+    body.appendChild(el('span', 'title', r.title));
+    const meta = el('span', 'meta');
+    meta.appendChild(el('span', 'chip chip-accent', scheduleText(r)));
+    if (r.verifier === VERIFY_OPTTIME) {
+      meta.appendChild(el('span', 'chip chip-info', t('today.routines.checked-opttime')));
+      meta.appendChild(el('span', 'chip', t(r.mode === 'auto' ? 'today.routines.mode-auto' : 'today.routines.mode-ask')));
+    }
+    if (!r.active) meta.appendChild(el('span', 'chip chip-warn', t('today.routines.paused')));
+    body.appendChild(meta);
+
+    const acts = el('div', 'acts');
+    if (r.verifier === VERIFY_OPTTIME) {
+      const next = r.mode === 'auto' ? 'ask' : 'auto';
+      acts.appendChild(actButton(t(next === 'auto' ? 'today.routines.make-auto' : 'today.routines.make-ask'),
+        t(next === 'auto' ? 'today.routines.make-auto-aria' : 'today.routines.make-ask-aria', { t: r.title }),
+        () => routineChange('routine_update', { id: r.id, patch: { mode: next } }, t(next === 'auto' ? 'today.toast.routine-auto' : 'today.toast.routine-ask'))));
+    }
+    acts.appendChild(iconButton(I_EDIT, t('today.routines.edit-aria', { t: r.title }), () => editRoutine(r)));
+    const sw = el('label', 'switch');
+    const input = el('input');
+    input.type = 'checkbox';
+    input.checked = r.active;
+    input.setAttribute('aria-label', t('today.routines.active-aria', { t: r.title }));
+    input.addEventListener('change', () => routineChange('routine_set_active', { id: r.id, active: input.checked },
+      t(input.checked ? 'today.toast.routine-resumed' : 'today.toast.routine-paused')));
+    const track = el('span', 'track');
+    track.appendChild(el('span', 'thumb'));
+    sw.append(input, track);
+    acts.appendChild(sw);
+    li.append(body, acts);
+    return li;
+  }
+
+  async function routineChange(cmd, args, msg) {
+    try {
+      await invoke(cmd, args);
+      if (msg) toast(msg, 'ok');
+    } catch (e) { toast(t('common.error', { e: errText(e) }), 'err'); }
+    await refresh();
+  }
+
+  function renderRoutines() {
+    const routines = data.routines || [];
+    $('c-routines').textContent = routines.length ? String(routines.length) : '';
+    $('list-routines').replaceChildren(...routines.map(routineRow));
+    $('r-opttime').hidden = routines.some((r) => r.verifier === VERIFY_OPTTIME) || editing !== null;
+  }
+
+  // ---- o formulário: nova rotina ou edição
+  let freq = 'workdays';
+  let editing = null;
+  const pickedDays = new Set();
+  function pickFreq(value) {
+    freq = value;
+    $('r-freq').querySelectorAll('.pick').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.freq === value)));
+    $('r-days').hidden = value !== 'weekly';
+    $('r-month').hidden = value !== 'monthly';
+  }
+  $('r-freq').querySelectorAll('.pick').forEach((b) => b.addEventListener('click', () => pickFreq(b.dataset.freq)));
+  function paintDays() {
+    $('r-days').replaceChildren(...WEEK.map((code) => {
+      const b = el('button', 'pick day-pick', weekdayName(code));
+      b.type = 'button';
+      b.setAttribute('role', 'checkbox');
+      b.setAttribute('aria-checked', String(pickedDays.has(code)));
+      b.setAttribute('aria-label', weekdayName(code, 'long'));
+      b.addEventListener('click', () => {
+        if (pickedDays.has(code)) pickedDays.delete(code); else pickedDays.add(code);
+        b.setAttribute('aria-checked', String(pickedDays.has(code)));
+      });
+      return b;
+    }));
+  }
+  function paintMonthDays() {
+    const sel = $('r-mday');
+    const keep = sel.value;
+    const opts = [];
+    for (let d = 1; d <= 28; d++) { const o = el('option', null, String(d)); o.value = String(d); opts.push(o); }
+    const last = el('option', null, t('today.routines.mday-last'));
+    last.value = '-1';
+    opts.push(last);
+    sel.replaceChildren(...opts);
+    sel.value = keep || '1';
+  }
+
+  // A regra que o formulário descreve; `null` quando falta escolher o dia.
+  function formRule() {
+    let rule;
+    if (freq === 'daily') rule = 'FREQ=DAILY';
+    else if (freq === 'workdays') rule = 'FREQ=WEEKLY;BYDAY=' + WORKDAYS;
+    else if (freq === 'weekly') {
+      if (!pickedDays.size) return null;
+      rule = 'FREQ=WEEKLY;BYDAY=' + WEEK.filter((d) => pickedDays.has(d)).join(',');
+    } else rule = 'FREQ=MONTHLY;BYMONTHDAY=' + $('r-mday').value;
+    const time = $('r-time').value;
+    if (time) {
+      const [h, m] = time.split(':').map(Number);
+      rule += ';BYHOUR=' + h + ';BYMINUTE=' + m;
+    }
+    return rule;
+  }
+
+  function resetForm() {
+    editing = null;
+    $('r-title').value = '';
+    $('r-time').value = '';
+    pickedDays.clear();
+    paintDays();
+    pickFreq('workdays');
+    $('r-submit').textContent = t('today.routines.create');
+    $('r-cancel').hidden = true;
+    if (data) renderRoutines();
+  }
+
+  // Editar: o formulário volta com o que a rotina tem. Regra que ele não
+  // sabe montar (última sexta do mês, a cada duas semanas…) fica como está.
+  let keepRule = null;
+  function editRoutine(r) {
+    editing = r.id;
+    keepRule = null;
+    const rule = r.rule || {};
+    const days = rule.by_day || [];
+    $('r-title').value = r.title;
+    $('r-time').value = rule.time || '';
+    pickedDays.clear();
+    if (rule.interval > 1 || days.some((d) => !/^[A-Z]{2}$/.test(d))) {
+      keepRule = r.rrule;
+    } else if (rule.freq === 'daily' && !days.length) pickFreq('daily');
+    else if (rule.freq === 'weekly' && days.join(',') === WORKDAYS) pickFreq('workdays');
+    else if (rule.freq === 'weekly' || rule.freq === 'daily') { days.forEach((d) => pickedDays.add(d)); pickFreq('weekly'); }
+    else if (rule.freq === 'monthly' && (rule.by_month_day || []).length === 1) { $('r-mday').value = String(rule.by_month_day[0]); pickFreq('monthly'); }
+    else keepRule = r.rrule;
+    paintDays();
+    $('r-submit').textContent = t('today.routines.save');
+    $('r-cancel').hidden = false;
+    renderRoutines();
+    $('routines-box').open = true;
+    $('r-title').focus();
+  }
+  $('r-cancel').addEventListener('click', resetForm);
+  // Mexeu na recorrência: a regra que não cabia no formulário dá lugar à nova.
+  $('rform').addEventListener('click', (e) => { if (e.target.closest('.pick')) keepRule = null; });
+  $('r-time').addEventListener('change', () => { keepRule = null; });
+
+  $('rform').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = $('r-title').value.trim();
+    if (!title) { $('r-title').focus(); return; }
+    const rrule = keepRule || formRule();
+    if (!rrule) { toast(t('today.routines.pick-days'), 'err'); return; }
+    try {
+      if (editing) {
+        await invoke('routine_update', { id: editing, patch: { title, rrule } });
+        toast(t('today.toast.routine-saved'), 'ok');
+      } else {
+        await invoke('routine_create', { routine: { title, rrule } });
+        toast(t('today.toast.routine-created'), 'ok');
+      }
+      resetForm();
+    } catch (err) { toast(t('common.error', { e: errText(err) }), 'err'); }
+    await refresh();
+  });
+
+  // "Registrar 8h no OptTime": dias úteis às 17:00, conferida no OptTime.
+  $('r-opttime').addEventListener('click', async () => {
+    try {
+      await invoke('routine_create', { routine: {
+        title: t('today.routines.opttime-title'),
+        rrule: 'FREQ=WEEKLY;BYDAY=' + WORKDAYS + ';BYHOUR=17;BYMINUTE=0',
+        verifier: VERIFY_OPTTIME,
+        action: 'opttime.fill_day',
+        mode: 'ask',
+      } });
+      if (data && !data.opttime) toast(t('today.toast.opttime-created-connect'), 'ok', 7000, { action: { label: t('today.rt.connect'), run: openConnector } });
+      else toast(t('today.toast.opttime-created'), 'ok', 5000);
+    } catch (e) { toast(t('common.error', { e: errText(e) }), 'err'); }
+    await refresh();
+  });
+
+  // ---------------------------------------------- revisar as sugestões
+  // As sugestões do "Preencher meu dia" do OptTime para o dia da tarefa.
+  // Nada é lançado sem o toque em "Lançar" (ADR 0023).
+  const RV_SOURCES = {
+    calendar: 'today.rv.src.calendar', teams_call: 'today.rv.src.teams', commits: 'today.rv.src.commits',
+    work_item: 'today.rv.src.work-item', pattern: 'today.rv.src.pattern', document: 'today.rv.src.document',
+  };
+  const RV_CONF = { high: 'today.rv.conf.high', medium: 'today.rv.conf.medium', low: 'today.rv.conf.low' };
+  const MAX_APPLY = 12;
+  let review = null;
+
+  // "1h30", "1:30", "90" e "45min" viram minutos; o resto, nada.
+  function parseDuration(text) {
+    const s = String(text).trim().toLowerCase().replace(/\s+/g, '');
+    let m;
+    let min = null;
+    if ((m = /^(\d{1,2})h(\d{1,2})?(min)?$/.exec(s))) min = Number(m[1]) * 60 + Number(m[2] || 0);
+    else if ((m = /^(\d{1,2}):(\d{2})$/.exec(s))) min = Number(m[1]) * 60 + Number(m[2]);
+    else if ((m = /^(\d{1,4})(min|m)?$/.exec(s))) min = Number(m[1]);
+    return min && min >= 1 && min <= 1440 ? min : null;
+  }
+
+  function reviewTotals() {
+    if (!review || !review.rows) return;
+    const on = review.rows.filter((r) => r.on);
+    const minutes = on.reduce((acc, r) => acc + r.minutes, 0);
+    const b = $('rv-apply');
+    b.textContent = on.length ? t('today.rv.apply', { n: on.length, total: hm(minutes) }) : t('today.rv.apply-none');
+    b.disabled = !on.length || on.length > MAX_APPLY;
+    const note = $('rv-note');
+    note.className = 'rv-note';
+    note.textContent = on.length > MAX_APPLY ? t('today.rv.too-many', { max: MAX_APPLY }) : '';
+  }
+
+  function reviewRow(row, i) {
+    const s = row.sug;
+    const li = el('li', 'rv-item' + (s.projectId ? '' : ' no-project'));
+    const cb = el('input');
+    cb.type = 'checkbox';
+    cb.id = 'rv-' + i;
+    cb.checked = row.on;
+    cb.disabled = !s.projectId;
+    cb.addEventListener('change', () => { row.on = cb.checked; reviewTotals(); });
+    const main = el('div');
+    const line = el('label', 'rv-line');
+    line.htmlFor = cb.id;
+    line.appendChild(el('b', null, s.projectName || t('today.rv.no-project')));
+    line.appendChild(el('span', 'chip chip-info', RV_SOURCES[s.source] ? t(RV_SOURCES[s.source]) : s.source));
+    if (RV_CONF[s.confidence]) line.appendChild(el('span', 'chip' + (s.confidence === 'low' ? ' chip-warn' : ''), t(RV_CONF[s.confidence])));
+    const edit = el('div', 'rv-edit');
+    const desc = el('input', 'field');
+    desc.value = row.desc;
+    desc.maxLength = 500;
+    desc.setAttribute('aria-label', t('today.rv.desc-aria', { n: i + 1 }));
+    desc.addEventListener('input', () => { row.desc = desc.value; });
+    const dur = el('input', 'field');
+    dur.value = hm(row.minutes);
+    dur.setAttribute('aria-label', t('today.rv.dur-aria', { n: i + 1 }));
+    dur.addEventListener('change', () => {
+      const min = parseDuration(dur.value);
+      if (min) row.minutes = min;
+      dur.value = hm(row.minutes);
+      reviewTotals();
+    });
+    // Sem projeto não vai: os campos ficam travados como a caixa.
+    desc.disabled = dur.disabled = !s.projectId;
+    edit.append(desc, dur);
+    main.append(line, edit, el('p', 'rv-ev', s.projectId ? s.evidence : t('today.rv.no-project-hint', { why: s.evidence })));
+    li.append(cb, main);
+    return li;
+  }
+
+  function reviewError(e) {
+    const note = $('rv-note');
+    note.className = 'rv-note err';
+    note.textContent = errText(e);
+  }
+
+  async function openReview(task) {
+    const d = $('review');
+    const day = (task.source_ref && task.source_ref.day) || task.planned_on;
+    review = { task, day, rows: null };
+    $('rv-title').textContent = t('today.rv.title', { d: dayLabel(day) });
+    $('rv-sub').textContent = t('today.rv.loading-sub');
+    const wait = el('div', 'rv-wait');
+    wait.append(el('span', null, t('today.rv.loading')), el('div', 'skeleton'), el('div', 'skeleton'), el('div', 'skeleton'));
+    $('rv-body').replaceChildren(wait);
+    $('rv-note').textContent = '';
+    $('rv-apply').disabled = true;
+    $('rv-apply').textContent = t('today.rv.apply-none');
+    if (!d.open) d.showModal();
+    const mine = review;
+    let s;
+    try { s = await invoke('opttime_day_suggestions', { taskId: task.id }); }
+    catch (e) {
+      if (review !== mine) return;
+      $('rv-body').replaceChildren();
+      $('rv-sub').textContent = '';
+      reviewError(e);
+      return;
+    }
+    if (review !== mine || !d.open) return;
+    $('rv-sub').textContent = t('today.rv.sub', { logged: hm(s.alreadyLoggedMinutes), target: hm(s.targetMinutes), gap: hm(s.gapMinutes) });
+    review.rows = s.suggestions.map((sug) => {
+      const on = !!sug.projectId && sug.confidence !== 'low';
+      return { sug, on, wasOn: on, minutes: sug.durationMinutes, desc: sug.description };
+    });
+    const body = [];
+    if (!review.rows.length) body.push(emptyState(t(s.gapMinutes > 0 ? 'today.rv.empty' : 'today.rv.empty-full')));
+    else {
+      const list = el('ul', 'rv-list');
+      list.append(...review.rows.map(reviewRow));
+      body.push(list);
+    }
+    const src = s.sources;
+    const read = [src.outlook && t('today.rv.src.calendar'), src.teamsCalls && t('today.rv.src.teams'), src.azureDevOps && t('today.rv.src.devops'), src.history && t('today.rv.src.history')].filter(Boolean);
+    body.push(el('p', 'rv-meta', read.length ? t('today.rv.read', { list: read.join(', ') }) : t('today.rv.read-none')));
+    for (const w of s.warnings || []) body.push(el('p', 'rv-meta', '⚠ ' + w));
+    $('rv-body').replaceChildren(...body);
+    reviewTotals();
+    const first = $('rv-body').querySelector('input:not([disabled])');
+    if (first) first.focus();
+  }
+
+  function closeReview() {
+    review = null;
+    if ($('review').open) $('review').close();
+  }
+  $('rv-cancel').addEventListener('click', closeReview);
+  $('rv-close').addEventListener('click', closeReview);
+  $('rv-close').appendChild(svg(I_DROP));
+  $('review').addEventListener('close', () => { review = null; });
+
+  $('rv-apply').addEventListener('click', async () => {
+    if (!review || !review.rows) return;
+    const mine = review;
+    const items = mine.rows.filter((r) => r.on).map((r) => {
+      const item = { suggestionId: r.sug.id };
+      if (r.minutes !== r.sug.durationMinutes) item.durationMinutes = r.minutes;
+      const desc = r.desc.trim();
+      if (desc && desc !== r.sug.description) item.description = desc;
+      return item;
+    });
+    const rejected = mine.rows.filter((r) => r.wasOn && !r.on).map((r) => r.sug.id);
+    const b = $('rv-apply');
+    UI.busy(b, true, t('today.rv.applying'));
+    try {
+      const out = await invoke('opttime_day_apply', { taskId: mine.task.id, items, rejected });
+      UI.busy(b, false);
+      closeReview();
+      const n = out.applied.createdEntryIds.length;
+      const total = hm(out.applied.dayTotalMinutes);
+      const msg = out.applied.replayed ? t('today.rv.replayed', { total })
+        : out.completed ? t('today.rv.done-complete', { n, total })
+        : t('today.rv.done', { n, total, missing: hm(out.applied.remainingMinutes) });
+      toast(msg, 'ok', 5000);
+    } catch (e) {
+      UI.busy(b, false);
+      if (review === mine) reviewError(e);
+      else toast(t('common.error', { e: errText(e) }), 'err');
+    }
+    await refresh();
+  });
+
   // ------------------------------------------------------------ eventos
   listen('isper-tasks', () => refresh());
   document.addEventListener('isper-view', (e) => { if (e.detail && e.detail.active) refresh(); });
-  document.addEventListener('isper-i18n', () => { sig = ''; render(null); });
+  document.addEventListener('isper-i18n', () => { sig = ''; paintDays(); paintMonthDays(); if (!editing) $('r-submit').textContent = t('today.routines.create'); render(null); });
   // Virou o dia com a tela aberta: o "hoje" muda.
   let lastDay = todayIso();
   setInterval(() => { if (todayIso() !== lastDay) { lastDay = todayIso(); sig = ''; refresh(); } }, 60_000);
@@ -498,6 +1054,8 @@
   document.addEventListener('isper-view', (e) => { if (e.detail && e.detail.active) voiceHint(); });
   voiceHint();
 
+  paintDays();
+  paintMonthDays();
   refresh();
 </script>
 </body>

@@ -209,6 +209,15 @@ jobs:
           ISPER_E2E_CDP_REGISTRY: '1'
         run: .\tools\e2e\capture.ps1 -Exe .\target\release\isper-app.exe
 
+      # Rotinas (Fase 10.2) contra um OptTime de mentira em 127.0.0.1: o conector
+      # nas Configurações, a rotina de horas, a conferência e o lançamento depois
+      # do toque.
+      - name: E2E rotinas e conector do OptTime
+        shell: pwsh
+        env:
+          ISPER_E2E_CDP_REGISTRY: '1'
+        run: .\tools\e2e\routines.ps1 -Exe .\target\release\isper-app.exe
+
       # Idioma da interface: inglês e de volta, ao vivo, sem chave faltando.
       - name: E2E idioma (pt-BR · en)
         shell: pwsh

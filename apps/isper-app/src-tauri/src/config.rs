@@ -157,6 +157,10 @@ pub struct AppConfig {
     /// Barra lateral da janela principal recolhida (só os ícones).
     #[serde(default)]
     pub sidebar_collapsed: bool,
+    /// Endereço do MCP do OptTime (Fase 10.2). `None` = o de produção; o
+    /// token fica no Credential Manager, nunca aqui.
+    #[serde(default)]
+    pub opttime_url: Option<String>,
     /// Versão do formato deste arquivo — ver [`CONFIG_VERSION`].
     #[serde(default)]
     pub config_version: u32,
@@ -214,6 +218,7 @@ impl Default for AppConfig {
             onboarding_done: false,
             main_window: None,
             sidebar_collapsed: false,
+            opttime_url: None,
             config_version: CONFIG_VERSION,
         }
     }
@@ -350,6 +355,7 @@ impl AppConfig {
         clean(&mut self.model);
         clean(&mut self.input_device);
         clean(&mut self.phone_relay);
+        clean(&mut self.opttime_url);
         lowered_or(&mut self.lang, default_lang());
         lowered_or(&mut self.meeting_source, default_source());
         let mut dictionary: Vec<String> = Vec::with_capacity(self.dictionary.len());
