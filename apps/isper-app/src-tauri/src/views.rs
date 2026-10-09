@@ -597,6 +597,7 @@ pub(crate) struct ShellStatus {
     meeting_shortcut: String,
     mark_shortcut: String,
     copilot_shortcut: String,
+    capture_shortcut: String,
 }
 
 #[tauri::command]
@@ -624,6 +625,7 @@ pub(crate) fn shell_status(app: AppHandle) -> ShellStatus {
         meeting_shortcut: key(&state.active_meeting_shortcut),
         mark_shortcut: key(&state.active_mark_shortcut),
         copilot_shortcut: key(&state.active_copilot_shortcut),
+        capture_shortcut: key(&state.active_capture_shortcut),
     }
 }
 

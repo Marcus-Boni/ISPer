@@ -72,7 +72,7 @@
   <nav class="toc" id="toc" aria-label="Seções" data-i18n-attr="aria-label:shell.settings.sections"></nav>
   <div class="content">
 <h1 class="reveal" data-i="0" data-i18n="settings.top.configuracoes">Configurações</h1>
-<p class="sub reveal" data-i="0"><span data-i18n="settings.active.lead">Atalhos ativos agora: ditado</span> <b id="active">…</b> <span data-i18n="settings.active.meeting">· reunião</span> <b id="mactive">…</b> <span data-i18n="settings.active.mark">· marcar momento</span> <b id="kactive">…</b> <span data-i18n="settings.active.copilot">· Copilot</span> <b id="cactive">…</b></p>
+<p class="sub reveal" data-i="0"><span data-i18n="settings.active.lead">Atalhos ativos agora: ditado</span> <b id="active">…</b> <span data-i18n="settings.active.meeting">· reunião</span> <b id="mactive">…</b> <span data-i18n="settings.active.mark">· marcar momento</span> <b id="kactive">…</b> <span data-i18n="settings.active.copilot">· Copilot</span> <b id="cactive">…</b> <span data-i18n="settings.active.capture">· anotar tarefas</span> <b id="aactive">…</b></p>
 
 <section class="card reveal" id="aparencia" data-i="1" aria-labelledby="h-aparencia">
   <h2 id="h-aparencia" data-i18n="settings.aparencia.titulo">Aparência e idioma</h2>
@@ -106,6 +106,17 @@
     </select>
     <button class="btn" id="cap-shortcut" title="pressione a combinação que quiser" data-i18n="settings.ditado.cap-shortcut" data-i18n-attr="title:settings.ditado.pressione-combinacao-quiser.title">Gravar atalho</button>
   </div>
+  <label class="lbl" for="captureshortcut" data-i18n="settings.ditado.atalho-anotar">Atalho de anotar tarefas por voz</label>
+  <div class="row">
+    <select id="captureshortcut" class="field">
+      <option value="" data-i18n="settings.ditado.automatico-ctrl-alt-a-ou">(automático — Ctrl+Alt+A ou o próximo livre)</option>
+      <option value="ctrl+alt+a">Ctrl+Alt+A</option>
+      <option value="ctrl+alt+n">Ctrl+Alt+N</option>
+      <option value="ctrl+alt+t">Ctrl+Alt+T</option>
+    </select>
+    <button class="btn" id="cap-captureshortcut" title="pressione a combinação que quiser" data-i18n="settings.ditado.cap-captureshortcut" data-i18n-attr="title:settings.ditado.pressione-combinacao-quiser.title">Gravar atalho</button>
+  </div>
+  <p class="hint" data-i18n="settings.ditado.anotar-hint">Como o ditado: segure e fale, ou toque e fale. As tarefas que você disser aparecem numa janela pequena para revisar; Enter salva na tela Hoje.</p>
   <p class="hint" data-i18n="settings.ditado.gravar-atalho-clique-pressione-combinacao">"Gravar atalho": clique e pressione a combinação (ex.: Ctrl+Shift+K). Letras, números, F1–F12 e Espaço, com pelo menos um modificador; F-keys podem ir sozinhas. Se a combinação estiver ocupada por outro programa, o ISPer avisa e usa a próxima livre.</p>
   <label class="lbl" for="mic" data-i18n="settings.ditado.microfone">Microfone</label>
   <select id="mic" class="field"><option value="" data-i18n="settings.ditado.padrao-sistema">(padrão do sistema)</option></select>
@@ -478,6 +489,7 @@
   $('cap-mshortcut').addEventListener('click', () => captureInto($('mshortcut'), $('cap-mshortcut')));
   $('cap-markshortcut').addEventListener('click', () => captureInto($('markshortcut'), $('cap-markshortcut')));
   $('cap-copilotshortcut').addEventListener('click', () => captureInto($('copilotshortcut'), $('cap-copilotshortcut')));
+  $('cap-captureshortcut').addEventListener('click', () => captureInto($('captureshortcut'), $('cap-captureshortcut')));
 
   async function loadMics(selected) {
     const sel = $('mic');
@@ -497,10 +509,12 @@
       $('mactive').textContent = keyLabel(s.active_meeting_shortcut) || t('common.none');
       $('kactive').textContent = keyLabel(s.active_mark_shortcut) || t('common.none');
       $('cactive').textContent = keyLabel(s.active_copilot_shortcut) || t('common.none');
+      $('aactive').textContent = keyLabel(s.active_capture_shortcut) || t('common.none');
       setCombo($('shortcut'), s.shortcut || '');
       setCombo($('mshortcut'), s.meeting_shortcut || '');
       setCombo($('markshortcut'), s.mark_shortcut || '');
       setCombo($('copilotshortcut'), s.copilot_shortcut || '');
+      setCombo($('captureshortcut'), s.capture_shortcut || '');
       await loadMics(s.input_device || '');
       $('polish').checked = !!s.polish;
       $('pstyle').value = s.polish_style || 'clean';
@@ -750,7 +764,7 @@
   // lateral e lembra de salvar ao trocar de tela. Só conta o que vai pelo
   // Salvar (tema, idioma, chaves e o celular valem na hora, por conta própria).
   const SAVED_BY_BUTTON = new Set(['shortcut', 'lang', 'dict', 'source', 'provider', 'model', 'autostart', 'showhome', 'mic',
-    'mshortcut', 'markshortcut', 'copilotshortcut', 'polish', 'pstyle', 'after', 'voicecmd', 'autoupdate', 'retention',
+    'mshortcut', 'markshortcut', 'copilotshortcut', 'captureshortcut', 'polish', 'pstyle', 'after', 'voicecmd', 'autoupdate', 'retention',
     'speakers', 'finalpass', 'importwatch', 'diarthr', 'calldetect', 'insights', 'insint', 'copfilter', 'embprovider',
     'embmodel', 'embbase']);
   let isDirty = false;
@@ -790,6 +804,7 @@
         meeting_shortcut: $('mshortcut').value || null,
         mark_shortcut: $('markshortcut').value || null,
         copilot_shortcut: $('copilotshortcut').value || null,
+        capture_shortcut: $('captureshortcut').value || null,
         polish: $('polish').checked,
         polish_style: $('pstyle').value,
         after_meeting: $('after').value,

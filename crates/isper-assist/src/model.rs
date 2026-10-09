@@ -175,7 +175,7 @@ pub struct Task {
 }
 
 /// Uma tarefa nova.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NewTask {
     /// O que fazer.
     pub title: String,

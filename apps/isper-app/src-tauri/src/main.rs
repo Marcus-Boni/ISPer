@@ -14,6 +14,7 @@
 
 mod audio_import;
 mod calls;
+mod capture;
 mod config;
 mod copilot;
 mod copilot_filter;
@@ -163,15 +164,24 @@ fn main() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
-                    let (is_meeting, is_mark, is_copilot) = {
+                    let (is_meeting, is_mark, is_copilot, is_capture) = {
                         let st = app.state::<AppState>();
                         let is_meeting =
                             st.meeting_shortcut.lock_or_recover().as_ref() == Some(shortcut);
                         let is_mark = st.mark_shortcut.lock_or_recover().as_ref() == Some(shortcut);
                         let is_copilot =
                             st.copilot_shortcut.lock_or_recover().as_ref() == Some(shortcut);
-                        (is_meeting, is_mark, is_copilot)
+                        let is_capture =
+                            st.capture_shortcut.lock_or_recover().as_ref() == Some(shortcut);
+                        (is_meeting, is_mark, is_copilot, is_capture)
                     };
+                    if is_capture {
+                        match event.state {
+                            ShortcutState::Pressed => capture::on_pressed(app),
+                            ShortcutState::Released => capture::on_released(app),
+                        }
+                        return;
+                    }
                     if is_copilot {
                         if event.state == ShortcutState::Pressed {
                             toggle_copilot(app);
@@ -247,6 +257,10 @@ fn main() {
             open_settings_window,
             open_home_window,
             today::open_today_window,
+            capture::capture_state,
+            capture::capture_save,
+            capture::capture_discard,
+            capture::capture_text,
             today::today_load,
             today::today_badge,
             today::task_add,
@@ -327,6 +341,10 @@ fn main() {
                 active_mark_shortcut: Mutex::new(String::new()),
                 copilot_shortcut: Mutex::new(None),
                 active_copilot_shortcut: Mutex::new(String::new()),
+                capture_shortcut: Mutex::new(None),
+                active_capture_shortcut: Mutex::new(String::new()),
+                capturing: Mutex::new(false),
+                capture_view: Mutex::new(capture::CaptureView::default()),
                 moments: Mutex::new(Vec::new()),
                 live: Mutex::new(Vec::new()),
                 diarizing: Mutex::new(None),
@@ -497,6 +515,20 @@ fn main() {
                 for RecorderEvent::Finished(result) in events.iter() {
                     *handle.state::<AppState>().phase.lock_or_recover() = Phase::Processing;
 
+                    // Gravação do atalho de anotar: vira cartões, não é colada.
+                    let capturing = std::mem::take(
+                        &mut *handle.state::<AppState>().capturing.lock_or_recover(),
+                    );
+                    if capturing {
+                        capture::process(&handle, result);
+                        let state = handle.state::<AppState>();
+                        let mut phase = state.phase.lock_or_recover();
+                        if matches!(*phase, Phase::Processing) {
+                            *phase = Phase::Idle;
+                        }
+                        continue;
+                    }
+
                     let outcome = result
                         .map_err(anyhow::Error::from)
                         .and_then(|raw| dictate(&handle, raw));
@@ -536,6 +568,7 @@ fn main() {
             std::thread::spawn(move || {
                 for level in levels.iter() {
                     let _ = handle.emit_to("overlay", "isper-level", level);
+                    let _ = handle.emit_to(capture::LABEL, "isper-level", level);
                 }
             });
 

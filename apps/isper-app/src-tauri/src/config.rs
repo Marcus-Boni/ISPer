@@ -72,6 +72,10 @@ pub struct AppConfig {
     /// Atalho global que abre/fecha o Copilot (`None` = o primeiro livre).
     #[serde(default = "default_copilot_shortcut")]
     pub copilot_shortcut: Option<String>,
+    /// Atalho global de anotar tarefas por voz (Fase 10.1; `None` = o
+    /// primeiro livre).
+    #[serde(default = "default_capture_shortcut")]
+    pub capture_shortcut: Option<String>,
     /// Indicador no modo "legendas ao vivo" (barra larga com as últimas falas).
     #[serde(default)]
     pub overlay_captions: bool,
@@ -190,6 +194,7 @@ impl Default for AppConfig {
             voice_commands: true,
             mark_shortcut: default_mark_shortcut(),
             copilot_shortcut: default_copilot_shortcut(),
+            capture_shortcut: default_capture_shortcut(),
             overlay_captions: false,
             auto_update_check: true,
             call_detect: default_call_detect(),
@@ -240,6 +245,10 @@ fn default_meeting_shortcut() -> Option<String> {
 
 fn default_copilot_shortcut() -> Option<String> {
     Some("ctrl+alt+c".into())
+}
+
+fn default_capture_shortcut() -> Option<String> {
+    Some("ctrl+alt+a".into())
 }
 
 fn default_mark_shortcut() -> Option<String> {
@@ -337,6 +346,7 @@ impl AppConfig {
         clean(&mut self.meeting_shortcut);
         clean(&mut self.mark_shortcut);
         clean(&mut self.copilot_shortcut);
+        clean(&mut self.capture_shortcut);
         clean(&mut self.model);
         clean(&mut self.input_device);
         clean(&mut self.phone_relay);

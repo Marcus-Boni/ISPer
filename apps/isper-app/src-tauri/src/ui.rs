@@ -89,6 +89,7 @@ pub(crate) fn apply(app: &AppHandle, prefs: &UiPrefs) {
     let titled = [
         (MAIN, title_key(current_view())),
         ("copilot", title_key("copilot")),
+        (crate::capture::LABEL, "window.capture"),
     ];
     for (label, key) in titled {
         if let Some(w) = app.get_webview_window(label) {

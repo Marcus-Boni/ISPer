@@ -32,6 +32,11 @@ pub(crate) const MARK_SHORTCUT_CANDIDATES: [&str; 3] = ["ctrl+alt+k", "ctrl+shif
 pub(crate) const COPILOT_SHORTCUT_CANDIDATES: [&str; 3] =
     ["ctrl+alt+c", "ctrl+shift+c", "ctrl+alt+p"];
 
+/// Candidatos ao atalho de anotar tarefas por voz (Fase 10.1). Ctrl+Alt é
+/// AltGr nos teclados ABNT2, mas A, N e T não têm caractere com AltGr.
+pub(crate) const CAPTURE_SHORTCUT_CANDIDATES: [&str; 3] =
+    ["ctrl+alt+a", "ctrl+alt+n", "ctrl+alt+t"];
+
 /// Dois toques de "marcar momento" mais próximos que isso contam como um.
 pub(crate) const MARK_DEBOUNCE: Duration = Duration::from_millis(1500);
 
@@ -116,6 +121,15 @@ pub(crate) struct AppState {
     /// Atalho que alterna a janela do Copilot.
     pub(crate) copilot_shortcut: Mutex<Option<Shortcut>>,
     pub(crate) active_copilot_shortcut: Mutex<String>,
+    /// Atalho de anotar tarefas por voz (Fase 10.1).
+    pub(crate) capture_shortcut: Mutex<Option<Shortcut>>,
+    pub(crate) active_capture_shortcut: Mutex<String>,
+    /// A gravação em curso é uma captura de tarefas, não um ditado: quando
+    /// ela termina, o texto vira cartões em vez de ser colado.
+    pub(crate) capturing: Mutex<bool>,
+    /// O que a janela de captura mostra (ela relê ao abrir: eventos mandados
+    /// antes de a página carregar se perderiam).
+    pub(crate) capture_view: Mutex<crate::capture::CaptureView>,
     /// Momentos marcados na reunião em andamento (segundos desde o início).
     pub(crate) moments: Mutex<Vec<f32>>,
     /// Falas da reunião em andamento, na ordem em que foram transcritas.

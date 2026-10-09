@@ -269,6 +269,7 @@ mod tests {
         let pages = [
             ("home.html", include_str!("../../ui/home.html")),
             ("today.html", include_str!("../../ui/today.html")),
+            ("capture.html", include_str!("../../ui/capture.html")),
             ("library.html", include_str!("../../ui/library.html")),
             ("settings.html", include_str!("../../ui/settings.html")),
             ("index.html", include_str!("../../ui/index.html")),
