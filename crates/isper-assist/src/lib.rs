@@ -3,9 +3,11 @@
 //!
 //! Este crate guarda o domínio local do assistente sobre o `isper.db`:
 //!
-//! - [`model`]: tarefa, origem, estado e o pedido de mudança;
+//! - [`model`]: tarefa, rotina, origem, estado e o pedido de mudança;
 //! - [`store`]: o [`AssistStore`], que cria, muda, conclui e desfaz tarefas,
-//!   monta o dia ([`Today`]) e escreve tudo no diário;
+//!   cuida das rotinas e do checklist do dia, monta o dia ([`Today`]) e
+//!   escreve tudo no diário;
+//! - [`recur`]: a recorrência das rotinas, um pedaço do RRULE;
 //! - [`clock`]: o relógio, injetável nos testes, que diz que dia é "hoje".
 //!
 //! O schema é a v7 do banco, migrada pelo `isper-core` (uma cadeia de
@@ -16,11 +18,16 @@
 pub mod capture;
 pub mod clock;
 pub mod model;
+pub mod recur;
 pub mod store;
 pub mod when;
 
 pub use clock::{Clock, FixedClock, SystemClock};
-pub use model::{Actor, JournalEntry, NewTask, SourceKind, Task, TaskPatch, TaskStatus, Today};
+pub use model::{
+    ACTION_OPTTIME_FILL, Actor, JournalEntry, NewRoutine, NewTask, Occurrence, Routine,
+    RoutineMode, RoutinePatch, SourceKind, Task, TaskPatch, TaskStatus, Today, VERIFY_OPTTIME_DAY,
+};
+pub use recur::Rule;
 pub use store::{AssistStore, ImportOutcome, SCHEMA_VERSION_REQUIRED};
 
 /// Erros do assistente.
@@ -31,7 +38,7 @@ pub enum AssistError {
         "o banco está na versão {0} do schema; o assistente precisa da {SCHEMA_VERSION_REQUIRED}"
     )]
     NotMigrated(i64),
-    /// Tarefa (ou entrada do diário) que não existe.
+    /// Tarefa, rotina ou entrada do diário que não existe.
     #[error("não encontrei {0}")]
     NotFound(String),
     /// Entrada que não passa na validação (título vazio, hora inválida…).
