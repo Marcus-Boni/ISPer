@@ -22,6 +22,7 @@ use clap::{Parser, Subcommand};
 
 mod bench;
 mod sync;
+mod tarefas;
 use isper_core::loopback::LoopbackSource;
 use isper_core::meeting::{self, MeetingOptions};
 use isper_core::{WhisperEngine, audio, store::MeetingStore};
@@ -205,6 +206,56 @@ enum Cmd {
     /// Configura a inteligência de nuvem (Fase 5)
     #[command(subcommand)]
     Llm(LlmCmd),
+    /// Tarefas da fala: extrair, montar e medir o corpus (Fase 10.1)
+    #[command(subcommand)]
+    Tarefas(TarefasCmd),
+}
+
+#[derive(Subcommand)]
+enum TarefasCmd {
+    /// Separa as tarefas de uma fala e mostra as datas resolvidas
+    Extrair {
+        /// A fala, entre aspas
+        fala: String,
+        /// Provider (claude, groq, gemini); padrão: o do llm.toml
+        #[arg(long)]
+        provider: Option<String>,
+        /// Modelo; padrão: o do provider
+        #[arg(long)]
+        model: Option<String>,
+        /// Dia de referência para "amanhã", "sexta"… (AAAA-MM-DD; padrão: hoje)
+        #[arg(long)]
+        hoje: Option<String>,
+    },
+    /// Tira do banco os ditados desde um dia, sem rótulo, para o corpus
+    CorpusDitados {
+        /// Primeiro dia (AAAA-MM-DD)
+        #[arg(long)]
+        desde: String,
+        /// Arquivo .jsonl novo (fora do repositório: tem fala de verdade)
+        #[arg(long)]
+        saida: PathBuf,
+        /// Banco (padrão: o do app, %APPDATA%\ISPer\isper.db)
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
+    /// Mede a extração num corpus rotulado (precisão, recall, datas, latência)
+    Avaliar {
+        /// O corpus .jsonl
+        corpus: PathBuf,
+        /// Provider (claude, groq, gemini); padrão: o do llm.toml
+        #[arg(long)]
+        provider: Option<String>,
+        /// Modelo; padrão: o do provider
+        #[arg(long)]
+        model: Option<String>,
+        /// Relatório JSON fala a fala
+        #[arg(long)]
+        saida: Option<PathBuf>,
+        /// Só as N primeiras falas
+        #[arg(long)]
+        limite: Option<usize>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -326,6 +377,7 @@ fn main() -> anyhow::Result<()> {
         } => bench::score(reference, hypothesis, *strip_accents),
         Cmd::Models(cmd) => run_models(cmd),
         Cmd::Llm(cmd) => run_llm(cmd),
+        Cmd::Tarefas(cmd) => run_tarefas(cmd),
         _ => run_dictation(&cli),
     }
 }
@@ -848,6 +900,37 @@ fn run_models(cmd: &ModelsCmd) -> anyhow::Result<()> {
             println!("\nok — reuniões passam a identificar 'Participante 1, 2, 3…'");
             Ok(())
         }
+    }
+}
+
+fn run_tarefas(cmd: &TarefasCmd) -> anyhow::Result<()> {
+    match cmd {
+        TarefasCmd::Extrair {
+            fala,
+            provider,
+            model,
+            hoje,
+        } => tarefas::extrair(fala, provider.as_deref(), model.as_deref(), hoje.as_deref()),
+        TarefasCmd::CorpusDitados { desde, saida, db } => {
+            let db = match db {
+                Some(p) => p.clone(),
+                None => default_db().context("pasta de dados do usuário indisponível")?,
+            };
+            tarefas::corpus_ditados(&db, desde, saida)
+        }
+        TarefasCmd::Avaliar {
+            corpus,
+            provider,
+            model,
+            saida,
+            limite,
+        } => tarefas::avaliar(
+            corpus,
+            provider.as_deref(),
+            model.as_deref(),
+            saida.as_deref(),
+            *limite,
+        ),
     }
 }
 

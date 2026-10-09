@@ -21,6 +21,7 @@ mod providers;
 mod settings;
 mod summary;
 pub mod systemone;
+pub mod tasks;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
@@ -39,6 +40,7 @@ pub use settings::{
 };
 pub use summary::{MeetingSummary, summarize_meeting, summarize_meeting_titled};
 pub use systemone::{Answer, Classifier, Decision, JEV_MODEL, Jev, Question, TYPESAFE_KEY};
+pub use tasks::{ExtractedTask, extract_tasks};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LlmError {

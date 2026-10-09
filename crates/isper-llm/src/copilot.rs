@@ -751,7 +751,7 @@ pub fn enrich_notes_stream(
 
 /// Remove cercas Markdown de blocos JSON (` ```json ... ``` `) e sobras de
 /// conversa em volta ("Claro! Aqui está: {…}").
-fn sanitize_json(raw: &str) -> String {
+pub(crate) fn sanitize_json(raw: &str) -> String {
     let mut s = raw.trim();
     if s.starts_with("```")
         && let Some(pos) = s.find('\n')

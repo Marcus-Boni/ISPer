@@ -13,6 +13,7 @@
 //! no diário com o "antes", que é o que o desfazer usa
 //! ([ADR 0009](../../../docs/adr/0009-nada-some-sem-o-usuario-pedir.md)).
 
+pub mod capture;
 pub mod clock;
 pub mod model;
 pub mod store;
