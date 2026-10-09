@@ -1,0 +1,10 @@
+{"pergunta": "O que eu tenho para hoje?", "deve_conter": ["contrato"], "deve_citar": ["tarefa"]}
+{"pergunta": "Tem alguma tarefa atrasada?", "deve_conter": ["README"], "deve_citar": ["tarefa"]}
+{"pergunta": "O que a Ana me pediu na daily de ontem?", "deve_conter": ["planilha"], "deve_citar": ["reuniao"]}
+{"pergunta": "Quando ficou o deploy do portal?", "deve_conter": ["quinta"], "deve_citar": ["reuniao"]}
+{"pergunta": "O que ficou combinado sobre o item 4512?", "deve_conter": ["crit"], "deve_citar": ["reuniao"]}
+{"pergunta": "O que eu já concluí hoje?", "deve_conter": ["cliente"], "deve_citar": ["tarefa"]}
+{"pergunta": "O que tem na minha caixa de entrada?", "deve_conter": ["planilha"], "deve_citar": ["tarefa"]}
+{"pergunta": "Quais são as minhas rotinas?", "deve_conter": ["Registrar"], "deve_citar": ["rotina"]}
+{"pergunta": "O que eu ditei sobre o Azure?", "deve_conter": ["Joana"], "deve_citar": ["ditado"]}
+{"pergunta": "De quais reuniões eu participei nesta semana?", "deve_conter": ["Daily", "Refinamento"], "deve_citar": ["reuniao"]}

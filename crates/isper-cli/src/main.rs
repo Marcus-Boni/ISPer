@@ -20,6 +20,7 @@ use std::time::Duration;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 
+mod agente;
 mod bench;
 mod opttime;
 mod reunioes;
@@ -218,6 +219,69 @@ enum Cmd {
     /// Reuniões gravadas: as ações de "Eu", sem gravar nada (Fase 10.3)
     #[command(subcommand)]
     Reunioes(ReunioesCmd),
+    /// O agente: perguntas livres sobre o dia, resumo da manhã e fechamento
+    /// (Fase 10.4)
+    #[command(subcommand)]
+    Agente(AgenteCmd),
+}
+
+#[derive(Subcommand)]
+enum AgenteCmd {
+    /// Monta um banco sintético (tarefas, rotina, reuniões e ditado
+    /// inventados) para testar o agente sem dado real
+    Semear {
+        /// O banco novo (não pode existir)
+        #[arg(long)]
+        db: PathBuf,
+    },
+    /// Uma pergunta ao agente ("manha" e "fechamento" pedem o resumo da
+    /// manhã e o fechamento do dia)
+    Perguntar {
+        /// A pergunta, entre aspas
+        pergunta: String,
+        /// Banco (padrão: o do app, %APPDATA%\ISPer\isper.db)
+        #[arg(long)]
+        db: Option<PathBuf>,
+        /// Provider (claude, groq, gemini); padrão: o do llm.toml
+        #[arg(long)]
+        provider: Option<String>,
+        /// Modelo; padrão: o do provider
+        #[arg(long)]
+        model: Option<String>,
+        /// Aprova sozinho as ações que pedem o toque (só num banco de teste)
+        #[arg(long)]
+        aprovar: bool,
+        /// Sem as ferramentas do OptTime, mesmo com token
+        #[arg(long)]
+        sem_opttime: bool,
+        /// O nome de quem usa (o agente chama a pessoa por ele)
+        #[arg(long)]
+        eu: Option<String>,
+    },
+    /// Mede o agente num conjunto de perguntas (.jsonl com pergunta,
+    /// deve_conter e deve_citar)
+    Avaliar {
+        /// O arquivo de perguntas
+        arquivo: PathBuf,
+        /// Banco (padrão: o do app)
+        #[arg(long)]
+        db: Option<PathBuf>,
+        /// Provider; padrão: o do llm.toml
+        #[arg(long)]
+        provider: Option<String>,
+        /// Modelo; padrão: o do provider
+        #[arg(long)]
+        model: Option<String>,
+        /// Sem as ferramentas do OptTime
+        #[arg(long)]
+        sem_opttime: bool,
+        /// O nome de quem usa
+        #[arg(long)]
+        eu: Option<String>,
+        /// Relatório JSON pergunta a pergunta
+        #[arg(long)]
+        saida: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -459,6 +523,7 @@ fn main() -> anyhow::Result<()> {
         Cmd::Llm(cmd) => run_llm(cmd),
         Cmd::Tarefas(cmd) => run_tarefas(cmd),
         Cmd::Opttime(cmd) => run_opttime(cmd),
+        Cmd::Agente(cmd) => run_agente(cmd),
         Cmd::Reunioes(ReunioesCmd::Acoes {
             id,
             provider,
@@ -1030,6 +1095,50 @@ fn run_tarefas(cmd: &TarefasCmd) -> anyhow::Result<()> {
             model.as_deref(),
             saida.as_deref(),
             *limite,
+        ),
+    }
+}
+
+fn run_agente(cmd: &AgenteCmd) -> anyhow::Result<()> {
+    let db_or_default = |db: &Option<PathBuf>| match db {
+        Some(p) => Ok(p.clone()),
+        None => default_db().context("pasta de dados do usuário indisponível"),
+    };
+    match cmd {
+        AgenteCmd::Semear { db } => agente::semear(db),
+        AgenteCmd::Perguntar {
+            pergunta,
+            db,
+            provider,
+            model,
+            aprovar,
+            sem_opttime,
+            eu,
+        } => agente::perguntar(
+            &db_or_default(db)?,
+            pergunta,
+            provider.as_deref(),
+            model.as_deref(),
+            *aprovar,
+            !*sem_opttime,
+            eu.as_deref(),
+        ),
+        AgenteCmd::Avaliar {
+            arquivo,
+            db,
+            provider,
+            model,
+            sem_opttime,
+            eu,
+            saida,
+        } => agente::avaliar(
+            &db_or_default(db)?,
+            arquivo,
+            provider.as_deref(),
+            model.as_deref(),
+            !*sem_opttime,
+            eu.as_deref(),
+            saida.as_deref(),
         ),
     }
 }
