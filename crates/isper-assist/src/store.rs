@@ -1,4 +1,4 @@
-//! O [`AssistStore`]: tarefas, rotinas e diário sobre o `isper.db`.
+//! O [`AssistStore`]: tarefas, rotinas, memória e diário sobre o `isper.db`.
 //!
 //! Cada mudança numa tarefa acontece numa transação junto com a linha do
 //! diário que a descreve, com o "antes" e o "depois". O desfazer
@@ -17,7 +17,11 @@ use crate::clock::{Clock, SystemClock};
 use crate::model::{Actor, JournalEntry, NewTask, SourceKind, Task, TaskPatch, TaskStatus, Today};
 use crate::{AssistError, Result};
 
+mod memories;
 mod routines;
+mod suggestions;
+
+pub use memories::PROMPT_MEMORIES;
 
 /// Versão do schema do `isper.db` que trouxe as tabelas do assistente.
 pub const SCHEMA_VERSION_REQUIRED: i64 = 7;

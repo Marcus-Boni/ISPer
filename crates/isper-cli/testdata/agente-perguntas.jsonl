@@ -8,3 +8,5 @@
 {"pergunta": "Quais são as minhas rotinas?", "deve_conter": ["Registrar"], "deve_citar": ["rotina"]}
 {"pergunta": "O que eu ditei sobre o Azure?", "deve_conter": ["Joana"], "deve_citar": ["ditado"]}
 {"pergunta": "De quais reuniões eu participei nesta semana?", "deve_conter": ["Daily", "Refinamento"], "deve_citar": ["reuniao"]}
+{"pergunta": "Quem é o meu gestor?", "deve_conter": ["Carlos"], "deve_citar": []}
+{"pergunta": "Tem alguma rotina que eu deveria criar?", "deve_conter": ["PRs"], "deve_citar": []}

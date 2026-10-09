@@ -1,6 +1,8 @@
-//! As ferramentas do próprio ISPer: tarefas, diário, reuniões, ditados e
-//! rotinas, sobre o `isper.db`. Ler é livre; criar, mover e concluir tarefa
-//! pedem um toque ([ADR 0023]).
+//! As ferramentas do próprio ISPer: tarefas, diário, reuniões, ditados,
+//! rotinas (com as sugestões) e a memória, sobre o `isper.db`. Ler é livre;
+//! criar, mover e concluir tarefa pedem um toque, e guardar na memória pede
+//! sempre ([ADR 0023]).
+
 //!
 //! Cada item do resultado leva a sua referência (`tarefa:…`,
 //! `reuniao:42@754`), que o modelo cita e a tela transforma em selo.
@@ -10,7 +12,10 @@
 use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
-use isper_assist::{Actor, AssistStore, Clock, NewTask, SystemClock, Task, TaskPatch, TaskStatus};
+use isper_assist::{
+    Actor, AssistStore, Clock, MemoryKind, NewMemory, NewTask, SystemClock, Task, TaskPatch,
+    TaskStatus,
+};
 use isper_core::store::MeetingStore;
 use isper_llm::ToolSpec;
 use isper_llm::agent::{Permission, Source, ToolOutcome};
@@ -34,6 +39,7 @@ pub(crate) const ROUTINES: &str = "rotinas";
 pub(crate) const CREATE: &str = "criar_tarefa";
 pub(crate) const MOVE: &str = "mover_tarefa";
 pub(crate) const COMPLETE: &str = "concluir_tarefa";
+pub(crate) const REMEMBER: &str = "lembrar";
 
 /// As ferramentas locais sobre um banco.
 pub(crate) struct LocalTools {
@@ -198,7 +204,7 @@ impl LocalTools {
             ),
             tool(
                 ROUTINES,
-                "As rotinas (o que se repete) e como está a de hoje de cada uma, inclusive a conferência das horas no OptTime.",
+                "As rotinas (o que se repete) e como está a de hoje de cada uma, inclusive a conferência das horas no OptTime; e as sugeridas, tarefas que se repetem no mesmo dia da semana e ainda não são rotina (a pessoa aceita ou recusa na tela Hoje).",
                 object(json!({}), &[]),
             ),
             tool(
@@ -233,6 +239,17 @@ impl LocalTools {
                     &["ref"],
                 ),
             ),
+            tool(
+                REMEMBER,
+                "Guarda na memória do ISPer um fato curto e duradouro sobre a pessoa (quem é o gestor, em que projeto trabalha, um jeito de preferir), que ela vê e edita nas Configurações. Só quando ela pedir para lembrar, ou disser algo que vale para os próximos dias; nunca senha, segredo ou o que outra pessoa disse numa reunião. O ISPer pede a confirmação antes.",
+                object(
+                    json!({
+                        "texto": {"type": "string", "description": "O fato numa frase curta, na voz da pessoa (\"Meu gestor é o Carlos\")."},
+                        "tipo": {"type": "string", "enum": ["fato", "preferencia"], "description": "fato (sobre a pessoa) ou preferencia (um jeito de preferir)."},
+                    }),
+                    &["texto", "tipo"],
+                ),
+            ),
         ]
     }
 
@@ -242,9 +259,16 @@ impl LocalTools {
 
     pub(crate) fn permission(name: &str) -> Permission {
         match name {
-            CREATE | MOVE | COMPLETE => Permission::Ask,
+            CREATE | MOVE | COMPLETE | REMEMBER => Permission::Ask,
             _ => Permission::Allow,
         }
+    }
+
+    /// Pede o toque sempre: guardar na memória nunca fica livre ([ADR 0023]).
+    ///
+    /// [ADR 0023]: ../../../docs/adr/0023-escada-de-confianca.md
+    pub(crate) fn ask_only(name: &str) -> bool {
+        name == REMEMBER
     }
 
     pub(crate) fn call(&self, name: &str, args: &Value) -> ToolOutcome {
@@ -258,6 +282,7 @@ impl LocalTools {
             CREATE => self.create(args),
             MOVE => self.move_task(args),
             COMPLETE => self.complete(args),
+            REMEMBER => self.remember(args),
             other => Err(format!("ferramenta desconhecida: {other}")),
         };
         result.unwrap_or_else(ToolOutcome::error)
@@ -553,7 +578,48 @@ impl LocalTools {
                 })
             })
             .collect();
-        Self::ok(json!({"rotinas": items}), sources)
+        let suggested: Vec<Value> = store
+            .routine_suggestions()
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|s| {
+                json!({
+                    "titulo": s.title,
+                    "recorrencia": s.rrule,
+                    "vezes": format!("{} de {}", s.hits, s.of),
+                    "dias": s.days,
+                })
+            })
+            .collect();
+        Self::ok(json!({"rotinas": items, "sugeridas": suggested}), sources)
+    }
+
+    fn remember(&self, args: &Value) -> Result<ToolOutcome, String> {
+        let store = self.assist()?;
+        let text = text_arg(args, "texto").ok_or("'texto' vazio")?;
+        let kind = match text_arg(args, "tipo") {
+            Some("preferencia") => MemoryKind::Preference,
+            _ => MemoryKind::Fact,
+        };
+        let m = store
+            .create_memory(
+                NewMemory {
+                    text: text.to_string(),
+                    kind,
+                    evidence: Some(json!({"via": "assistente"})),
+                },
+                Actor::Assistant,
+            )
+            .map_err(|e| e.to_string())?;
+        let reference = format!("memoria:{}", m.id);
+        Self::ok(
+            json!({"guardada": {"ref": reference, "texto": m.text, "tipo": m.kind.as_str()}}),
+            vec![Source {
+                reference,
+                kind: "memoria".into(),
+                label: m.text,
+            }],
+        )
     }
 
     fn task_by_ref(store: &AssistStore, args: &Value) -> Result<Task, String> {
@@ -648,6 +714,13 @@ impl LocalTools {
                 None => format!("Mover “{}” para algum dia", title_of(args)),
             },
             COMPLETE => format!("Concluir “{}”", title_of(args)),
+            REMEMBER => {
+                let text = text_arg(args, "texto").unwrap_or("?");
+                match text_arg(args, "tipo") {
+                    Some("preferencia") => format!("Guardar na memória a preferência “{text}”"),
+                    _ => format!("Guardar na memória “{text}”"),
+                }
+            }
             other => format!("Rodar {other}"),
         }
     }

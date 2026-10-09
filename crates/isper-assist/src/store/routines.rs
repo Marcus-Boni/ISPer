@@ -48,6 +48,21 @@ impl AssistStore {
 
     /// Cria uma rotina (ligada).
     pub fn create_routine(&self, new: NewRoutine, actor: Actor) -> Result<Routine> {
+        let tx = self.conn.unchecked_transaction()?;
+        let routine = self.insert_routine(&tx, new, None, actor)?;
+        tx.commit()?;
+        Ok(routine)
+    }
+
+    /// Grava a rotina nova e a linha do diário na conexão (ou transação)
+    /// `conn`; `learned_from` é a evidência, quando nasce de uma sugestão.
+    pub(super) fn insert_routine(
+        &self,
+        conn: &rusqlite::Connection,
+        new: NewRoutine,
+        learned_from: Option<Value>,
+        actor: Actor,
+    ) -> Result<Routine> {
         let (new, rule) = new.normalized()?;
         let now = self.clock.now_ms();
         let routine = Routine {
@@ -59,12 +74,11 @@ impl AssistStore {
             action: new.action,
             mode: new.mode,
             active: true,
-            learned_from: None,
+            learned_from,
             created_at: now,
             updated_at: now,
         };
-        let tx = self.conn.unchecked_transaction()?;
-        tx.execute(
+        conn.execute(
             &format!("INSERT INTO routines ({ROUTINE_COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"),
             params![
                 routine.id,
@@ -80,7 +94,7 @@ impl AssistStore {
             ],
         )?;
         self.journal_row(
-            &tx,
+            conn,
             now,
             actor,
             "routine.created",
@@ -89,7 +103,6 @@ impl AssistStore {
             &routine.title,
             &json!({ "before": null, "after": routine }),
         )?;
-        tx.commit()?;
         Ok(routine)
     }
 

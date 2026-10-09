@@ -158,8 +158,33 @@ pub fn semear(db: &Path) -> anyhow::Result<()> {
         Actor::User,
     )?;
     assist.materialize_routines(today)?;
+    // Um padrão (3 das últimas 4 semanas, no dia da semana de hoje) e uma
+    // memória, para a 10.5.
+    for weeks in 1..=3 {
+        let t = assist.create_task(
+            NewTask {
+                planned_on: Some(today - Duration::weeks(weeks)),
+                planned_time: Some("09:00".into()),
+                ..NewTask::titled("Revisar os PRs abertos")
+            },
+            Actor::User,
+        )?;
+        assist.set_status(&t.id, TaskStatus::Done, Actor::User)?;
+    }
+    assist.create_memory(
+        isper_assist::NewMemory::fact("Meu gestor é o Carlos Lima"),
+        Actor::User,
+    )?;
     println!("banco sintético em {}", db.display());
     Ok(())
+}
+
+/// A memória que vai para as instruções (vazia se o banco não abre).
+fn memory_lines(db: &Path) -> Vec<String> {
+    AssistStore::open(db)
+        .and_then(|s| s.memories_for_prompt())
+        .map(|m| m.into_iter().map(|m| m.text).collect())
+        .unwrap_or_default()
 }
 
 /// Um anfitrião que mostra cada ferramenta chamada.
@@ -287,7 +312,12 @@ pub fn perguntar(
         inner: &inner,
         verbose: true,
     };
-    let system = system_prompt(me, Local::now(), inner.opttime().is_some());
+    let system = system_prompt(
+        me,
+        Local::now(),
+        inner.opttime().is_some(),
+        &memory_lines(db),
+    );
     eprintln!("via {} ({})", provider.name(), provider.model());
     let a = run(provider.as_ref(), &traced, &system, question, approve)?;
     println!("{}", a.text.trim());
@@ -330,7 +360,12 @@ pub fn avaliar(
         inner: &inner,
         verbose: false,
     };
-    let system = system_prompt(me, Local::now(), inner.opttime().is_some());
+    let system = system_prompt(
+        me,
+        Local::now(),
+        inner.opttime().is_some(),
+        &memory_lines(db),
+    );
     let file = std::fs::File::open(cases).with_context(|| cases.display().to_string())?;
     let mut report = Vec::new();
     let (mut ok, mut total) = (0, 0);

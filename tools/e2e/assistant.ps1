@@ -155,7 +155,7 @@ try {
     if ($p -and @($p.opttime).Count -ge 4) { break }
     Start-Sleep -Milliseconds 300
   }
-  Check (@($p.isper).Count -eq 9) "Configuracoes: as 9 ferramentas do ISPer ($(@($p.isper).Count))"
+  Check (@($p.isper).Count -eq 10) "Configuracoes: as 10 ferramentas do ISPer ($(@($p.isper).Count))"
   $create = @($p.isper) | Where-Object { $_.name -eq 'criar_tarefa' }
   $tasks = @($p.isper) | Where-Object { $_.name -eq 'tarefas_do_dia' }
   Check ($create.on -eq 'ask' -and $tasks.on -eq 'allow' -and $create.title -eq 'Criar tarefa') "criar pergunta, ler e livre, com nome traduzido"

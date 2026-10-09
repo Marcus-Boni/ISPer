@@ -49,37 +49,8 @@ pub fn external_prefix(meeting_id: i64) -> String {
     format!("meeting:{meeting_id}:")
 }
 
-/// Minúsculas e sem acento, para comparar títulos.
-fn fold(text: &str) -> String {
-    text.to_lowercase()
-        .chars()
-        .map(|c| match c {
-            'á' | 'à' | 'â' | 'ã' => 'a',
-            'é' | 'ê' => 'e',
-            'í' => 'i',
-            'ó' | 'ô' | 'õ' => 'o',
-            'ú' | 'ü' => 'u',
-            'ç' => 'c',
-            c => c,
-        })
-        .collect()
-}
-
-fn words(title: &str) -> std::collections::BTreeSet<String> {
-    fold(title)
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|w| w.len() > 2)
-        .map(String::from)
-        .collect()
-}
-
 fn similar(a: &str, b: &str) -> bool {
-    let (a, b) = (words(a), words(b));
-    if a.is_empty() || b.is_empty() {
-        return false;
-    }
-    let inter = a.intersection(&b).count() as f32;
-    inter / ((a.len() + b.len()) as f32 - inter) >= SAME_TITLE
+    crate::text::similarity(a, b) >= SAME_TITLE
 }
 
 fn same(a: &MeetingAction, b: &MeetingAction) -> bool {
