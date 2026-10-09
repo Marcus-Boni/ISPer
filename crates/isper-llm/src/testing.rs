@@ -166,6 +166,78 @@ pub fn filter_decision(p_card: f32, kind: &str) -> Decision {
     }
 }
 
+/// Um [`LlmProvider`] de mentira para o laço do agente (Fase 10.4): responde
+/// as rodadas de [`chat`](LlmProvider::chat) na ordem de um roteiro e guarda
+/// as mensagens e as ferramentas que recebeu em cada uma.
+pub struct FakeChat {
+    script: Mutex<std::collections::VecDeque<crate::chat::ChatReply>>,
+    seen: Mutex<Vec<(Vec<crate::chat::ChatMessage>, Vec<crate::chat::ToolSpec>)>>,
+}
+
+impl FakeChat {
+    /// Responde as rodadas nesta ordem; depois do fim, erro.
+    pub fn new(script: Vec<crate::chat::ChatReply>) -> Self {
+        Self {
+            script: Mutex::new(script.into()),
+            seen: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Quantas rodadas foram pedidas.
+    pub fn rounds(&self) -> usize {
+        self.seen.lock().expect("registro do provider falso").len()
+    }
+
+    /// As mensagens recebidas na rodada `i` (contando de 0).
+    pub fn messages(&self, i: usize) -> Vec<crate::chat::ChatMessage> {
+        self.seen.lock().expect("registro do provider falso")[i]
+            .0
+            .clone()
+    }
+
+    /// As ferramentas oferecidas na rodada `i`.
+    pub fn tools(&self, i: usize) -> Vec<crate::chat::ToolSpec> {
+        self.seen.lock().expect("registro do provider falso")[i]
+            .1
+            .clone()
+    }
+}
+
+impl LlmProvider for FakeChat {
+    fn name(&self) -> &'static str {
+        "fake-chat"
+    }
+
+    fn model(&self) -> &str {
+        "fake-chat-1"
+    }
+
+    fn complete(&self, _system: &str, _user: &str) -> Result<String> {
+        Err(LlmError::Unsupported("o FakeChat só conversa".into()))
+    }
+
+    fn list_models(&self) -> Result<Vec<String>> {
+        Ok(vec![self.model().to_string()])
+    }
+
+    fn chat(
+        &self,
+        _system: &str,
+        messages: &[crate::chat::ChatMessage],
+        tools: &[crate::chat::ToolSpec],
+    ) -> Result<crate::chat::ChatReply> {
+        self.seen
+            .lock()
+            .expect("registro do provider falso")
+            .push((messages.to_vec(), tools.to_vec()));
+        self.script
+            .lock()
+            .expect("roteiro do provider falso")
+            .pop_front()
+            .ok_or_else(|| LlmError::BadResponse("o roteiro do FakeChat acabou".into()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
