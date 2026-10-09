@@ -36,6 +36,21 @@ bata com ela.
   atalho de novo acrescenta mais. Sem IA, ou se ela demorar mais de 8 s, a fala
   vira uma tarefa só, com as datas que o ISPer entendeu. O atalho muda nas
   Configurações, em Ditado.
+- **Rotinas na tela Hoje.** O que se repete vira tarefa sozinho, no dia
+  certo: todo dia, dias úteis, alguns dias da semana ou todo mês, com hora se
+  quiser. Pausar não apaga nada, e a tarefa de cada dia nasce uma vez só.
+- **"Registrar 8h no OptTime", conferida pelo próprio OptTime.** Às 17:00 de
+  cada dia útil, o ISPer olha no OptTime quanto você registrou. Fechou o dia:
+  um toque conclui (ou ela se conclui sozinha, se você deixar). Falta: um
+  aviso do Windows e as sugestões do "Preencher meu dia" (reuniões do Outlook,
+  chamadas do Teams, work items do DevOps) para revisar. Nada é lançado sem o
+  toque em "Lançar", e repetir depois de uma queda de rede não duplica
+  lançamento. Fim de semana, folga e ausência não contam.
+- **Conectores nas Configurações.** O OptTime entra com um token pessoal
+  (preset "Assistente pessoal (ISPer)"), guardado no Credential Manager do
+  Windows. "Testar conexão" mostra a conta, os escopos, se a Microsoft e o
+  Azure DevOps estão conectados e avisa quando o resumo das 17:30 do OptTime
+  duplicaria o lembrete da rotina.
 - O banco passa para a versão 7 do schema, com as tabelas do assistente.
   Antes de migrar, o ISPer guarda uma cópia do banco como estava
   (`isper.db.v6.bak`), que abre na versão anterior do app.
