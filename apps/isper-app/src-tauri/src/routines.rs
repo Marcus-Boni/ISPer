@@ -310,6 +310,31 @@ pub(crate) fn routine_create(app: AppHandle, routine: NewRoutine) -> Result<Rout
     Ok(created)
 }
 
+/// Aceita uma rotina sugerida (Fase 10.5): cria a rotina com a evidência e,
+/// se ela cai hoje, a tarefa de hoje já aparece.
+#[tauri::command]
+pub(crate) fn routine_suggestion_accept(app: AppHandle, key: String) -> Result<Routine, String> {
+    let store = store()?;
+    let created = store
+        .accept_suggestion(&key, Actor::User)
+        .map_err(|e| e.to_string())?;
+    store
+        .materialize_routines(store.clock().today())
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit(TASKS_EVENT, ());
+    Ok(created)
+}
+
+/// Recusa uma rotina sugerida: some da tela Hoje e fica calada por 8 semanas.
+#[tauri::command]
+pub(crate) fn routine_suggestion_decline(app: AppHandle, key: String) -> Result<(), String> {
+    store()?
+        .decline_suggestion(&key, Actor::User)
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit(TASKS_EVENT, ());
+    Ok(())
+}
+
 /// Muda título, recorrência, verificador, ação ou modo. A tarefa de hoje,
 /// se ainda aberta, acompanha o título e a hora novos; se a rotina passou a
 /// cair hoje, a tarefa aparece.

@@ -30,6 +30,7 @@ mod insights;
 mod library;
 mod meeting_inbox;
 mod meetings;
+mod memory;
 mod notify;
 mod onboarding;
 mod overlay;
@@ -279,6 +280,13 @@ fn main() {
             routines::routine_check,
             routines::opttime_day_suggestions,
             routines::opttime_day_apply,
+            routines::routine_suggestion_accept,
+            routines::routine_suggestion_decline,
+            memory::memory_list,
+            memory::memory_add,
+            memory::memory_update,
+            memory::memory_archive,
+            memory::memory_restore,
             agenda::agenda_today,
             agenda::agenda_prep,
             agenda::open_link,
