@@ -23,7 +23,7 @@
 | F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (~15 MB/h no celular, a mesma transcrição do WAV; já gravou num Galaxy Tab A9), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. O teste de 2 h e o do Motorola/Xiaomi ficaram para depois. **9.3 em 25/09**: o celular manda as gravações para o PC, pareado por QR (iroh, com a chave de cada lado e sem servidor de fora), e a ata volta com "Ata pronta". A volta completa rodou num Galaxy S21 FE em 26/09; falta gravar longe do PC. **9.4 em 26/09**: o celular transcreve sozinho, com o mesmo passe final do PC, por padrão ao carregar e continuando de onde parou; a ata do PC substitui a do celular. 9.5 a 9.7 ainda são proposta |
 | F10 Assistente | 🟡 | **Aprovada em 07/10** ([ADRs 0021–0023](docs/adr/README.md)): tarefas, rotinas, memória e diário no ISPer; agenda, DevOps e horas pelo MCP do OptTime. Pré-requisito do OptTime no ar e conferido em 08/10. **10.0 (08/10)**: tarefas locais e a tela Hoje; a importação do Notion saiu do escopo. **10.1 (08/10)**: datas em português no texto, fala solta vira tarefas e o atalho de anotar com cartões de revisão; falta o corpus de 150 ditados para escolher o modelo |
 
-**151 itens entregues · 34 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**154 itens entregues · 31 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -442,9 +442,9 @@ começam do zero na tela Hoje ([revisão do ADR 0021](docs/adr/0021-assistente-p
 
 ### 10.2 Rotinas
 
-- [ ] Recorrência em RRULE, checklist do dia, verificador e ação por rotina
-- [ ] Cliente MCP (`rmcp`) com o OptTime e tela do conector pelo `opt_time_whoami` (Microsoft conectada, DevOps configurado, aviso das 17:30 ligado)
-- [ ] Rotina "Registrar 8h": `get_today_summary` às 17:00 de dia útil; se faltar, `suggest_daily_entries` e `apply_suggestions` depois do toque
+- [x] Recorrência em RRULE (diária, semanal e mensal, com `INTERVAL`, ordinal no mensal e `UNTIL`; o resto é recusado), checklist do dia (a tarefa de cada rotina nasce uma vez só, criada pela rotina no diário), verificador e ação por rotina, modo "pede um toque" ou "conclui sozinha" (este só com verificador); seção Rotinas na tela Hoje, com formulário, edição e pausa (`isper_assist::recur`, 08/10)
+- [x] Cliente MCP (crate `isper-mcp`, sobre o `rmcp` 3.5) com o OptTime e a seção Conectores nas Configurações pelo `opt_time_whoami`: conta, escopos do preset, Microsoft, DevOps, e o aviso quando o resumo das 17:30 duplicaria o lembrete. Token no Credential Manager, só `https` fora do PC; erro de ferramenta com o código e a dica do `_meta`. `isper-cli opttime` para conferir a produção só lendo (08/10)
+- [x] Rotina "Registrar 8h": às 17:00 de dia útil (e de meia em meia hora depois, enquanto aberta) o `get_today_summary` confere o dia; fechou, um toque conclui (ou conclui sozinha); falta, um aviso do Windows por tarefa e a revisão das sugestões do `suggest_daily_entries`, lançadas pelo `apply_suggestions` só depois do toque, com chave de idempotência que sobrevive a uma queda de rede e uma linha no diário. e2e `tools/e2e/routines.ps1` contra um OptTime de mentira (08/10)
 - [ ] Pronto quando 10 dias úteis seguidos fecham com 8h, cada um com no máximo um toque — é à mão
 
 ### 10.3 Agenda e reuniões
