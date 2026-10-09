@@ -46,6 +46,20 @@ bata com ela.
   chamadas do Teams, work items do DevOps) para revisar. Nada é lançado sem o
   toque em "Lançar", e repetir depois de uma queda de rede não duplica
   lançamento. Fim de semana, folga e ausência não contam.
+- **Agenda na tela Hoje.** Com o OptTime conectado, os eventos do dia
+  aparecem em cima das tarefas: o que está acontecendo agora, quanto falta
+  para o próximo, Entrar na reunião online e o selo de "gravada" quando o
+  ISPer gravou aquele evento.
+- **Preparo 10 minutos antes.** Um aviso do Windows antes de cada reunião
+  leva ao preparo: quem organiza, o resumo da última reunião da mesma série e
+  o que ficou pendente dela.
+- **As suas ações de cada reunião vão para a caixa de entrada.** Quando a
+  reunião acaba, o que você ficou de fazer (o que você assumiu e o que te
+  pediram) entra na caixa de entrada da tela Hoje, com o minuto em que foi
+  dito: um clique abre a reunião na Biblioteca naquele ponto. O aviso de
+  "reunião salva" já diz quantas. Vale também para gravações importadas.
+- **A reunião gravada ganha o nome do convite.** Gravando durante um evento da
+  agenda, a reunião fica com o assunto do evento e ligada a ele.
 - **Conectores nas Configurações.** O OptTime entra com um token pessoal
   (preset "Assistente pessoal (ISPer)"), guardado no Credential Manager do
   Windows. "Testar conexão" mostra a conta, os escopos, se a Microsoft e o

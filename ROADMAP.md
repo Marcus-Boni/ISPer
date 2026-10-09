@@ -23,7 +23,7 @@
 | F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (~15 MB/h no celular, a mesma transcrição do WAV; já gravou num Galaxy Tab A9), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. O teste de 2 h e o do Motorola/Xiaomi ficaram para depois. **9.3 em 25/09**: o celular manda as gravações para o PC, pareado por QR (iroh, com a chave de cada lado e sem servidor de fora), e a ata volta com "Ata pronta". A volta completa rodou num Galaxy S21 FE em 26/09; falta gravar longe do PC. **9.4 em 26/09**: o celular transcreve sozinho, com o mesmo passe final do PC, por padrão ao carregar e continuando de onde parou; a ata do PC substitui a do celular. 9.5 a 9.7 ainda são proposta |
 | F10 Assistente | 🟡 | **Aprovada em 07/10** ([ADRs 0021–0023](docs/adr/README.md)): tarefas, rotinas, memória e diário no ISPer; agenda, DevOps e horas pelo MCP do OptTime. Pré-requisito do OptTime no ar e conferido em 08/10. **10.0 (08/10)**: tarefas locais e a tela Hoje; a importação do Notion saiu do escopo. **10.1 (08/10)**: datas em português no texto, fala solta vira tarefas e o atalho de anotar com cartões de revisão; falta o corpus de 150 ditados para escolher o modelo |
 
-**154 itens entregues · 31 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
+**155 itens entregues · 30 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
 ---
 
@@ -449,7 +449,7 @@ começam do zero na tela Hoje ([revisão do ADR 0021](docs/adr/0021-assistente-p
 
 ### 10.3 Agenda e reuniões
 
-- [ ] Agenda no Hoje, reunião gravada casada com o evento, ações com dono "Eu" na caixa de entrada com o minuto exato, preparo 10 min antes
+- [x] Agenda no Hoje pelo `opt_time_get_my_agenda` (o que está acontecendo, Entrar só em `https`, selo de "gravada"), reunião gravada casada com o evento que mais se sobrepõe a ela (o assunto vira o nome, schema v8 `meeting_events`), ações de "Eu" na caixa de entrada com o minuto exato (validadas no Copilot e achadas pela IA na transcrição, sem repetir, uma vez só por reunião, também nas importadas) e o preparo 10 min antes (aviso do Windows e, no Hoje, quem organiza, o resumo e as pendências da reunião anterior da mesma série). e2e `tools/e2e/agenda.ps1` (09/10)
 - [ ] Pronto quando toda ação sua dita numa reunião gravada está na caixa quando a reunião acaba
 
 ### 10.4 Agente
