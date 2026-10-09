@@ -7,6 +7,7 @@
 // O roteiro é fixo e só usa as ferramentas que o ISPer ofereceu na chamada:
 //
 // - "hoje" / "tenho" / "resumo da minha manhã" → tarefas_do_dia;
+// - "lembr" → lembrar (a preferência por reuniões depois das 10h);
 // - "cria" → criar_tarefa ("Ligar pro João", hoje às 15:00);
 // - "horas" / "Feche o meu dia" → opt_time_get_today_summary;
 // - com os resultados na mão, responde em tópicos citando cada [[ref]] que
@@ -42,6 +43,9 @@ function refsIn(value, out = []) {
 
 function plan(text) {
   const t = text.toLowerCase();
+  if (t.includes('lembr')) {
+    return [['lembrar', { texto: 'Prefiro reuniões depois das 10h', tipo: 'preferencia' }]];
+  }
   if (t.includes('cria')) {
     return [['criar_tarefa', { titulo: 'Ligar pro João', dia: today(), hora: '15:00', prazo: null }]];
   }
@@ -91,7 +95,8 @@ function reply(body) {
   }
   if (!found.length) return { content: 'Não achei nada.' };
   const created = results.some((m) => String(m.content).includes('"criada"'));
-  const head = created ? 'Criei a tarefa:' : 'Encontrei:';
+  const saved = results.some((m) => String(m.content).includes('"guardada"'));
+  const head = saved ? 'Guardei na memória:' : created ? 'Criei a tarefa:' : 'Encontrei:';
   return { content: [head, ...found.map((f) => `- **${f.title}** [[${f.ref}]]`)].join('\n') };
 }
 
