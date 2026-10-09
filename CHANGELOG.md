@@ -51,7 +51,8 @@ bata com ela.
   Windows. "Testar conexão" mostra a conta, os escopos, se a Microsoft e o
   Azure DevOps estão conectados e avisa quando o resumo das 17:30 do OptTime
   duplicaria o lembrete da rotina.
-- O banco passa para a versão 7 do schema, com as tabelas do assistente.
+- O banco passa para a versão 8 do schema, com as tabelas do assistente e o
+  evento da agenda com que cada reunião gravada foi casada.
   Antes de migrar, o ISPer guarda uma cópia do banco como estava
   (`isper.db.v6.bak`), que abre na versão anterior do app.
 

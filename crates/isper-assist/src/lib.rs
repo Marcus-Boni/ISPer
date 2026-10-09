@@ -8,6 +8,8 @@
 //!   cuida das rotinas e do checklist do dia, monta o dia ([`Today`]) e
 //!   escreve tudo no diário;
 //! - [`recur`]: a recorrência das rotinas, um pedaço do RRULE;
+//! - [`meeting`]: as ações de uma reunião gravada viram tarefas na caixa de
+//!   entrada, com o minuto em que foram ditas;
 //! - [`clock`]: o relógio, injetável nos testes, que diz que dia é "hoje".
 //!
 //! O schema é a v7 do banco, migrada pelo `isper-core` (uma cadeia de
@@ -17,6 +19,7 @@
 
 pub mod capture;
 pub mod clock;
+pub mod meeting;
 pub mod model;
 pub mod recur;
 pub mod store;

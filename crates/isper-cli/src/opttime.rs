@@ -144,6 +144,55 @@ pub fn sugestoes(data: Option<&str>, url: Option<&str>) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// A agenda do Outlook pelo OptTime.
+pub fn agenda(data: Option<&str>, dias: u8, url: Option<&str>) -> anyhow::Result<()> {
+    let ot = OptTime::new(endpoint(url)?);
+    let a = runtime()?.block_on(ot.agenda(data, dias))?;
+    if a.events.is_empty() {
+        println!("nenhum evento");
+    }
+    for e in &a.events {
+        let hora = |s: &str| s.get(11..16).unwrap_or("--:--").to_string();
+        let quando = if e.is_all_day {
+            format!("{} dia inteiro", e.start.get(..10).unwrap_or(""))
+        } else {
+            format!(
+                "{} {}–{}",
+                e.start.get(..10).unwrap_or(""),
+                hora(&e.start),
+                hora(&e.end)
+            )
+        };
+        let mut marcas = Vec::new();
+        if e.is_online {
+            marcas.push("online".to_string());
+        }
+        if !e.is_meeting() {
+            marcas.push(format!("não conta ({}, {})", e.response_status, e.show_as));
+        }
+        if e.series().is_some() {
+            marcas.push("série".into());
+        }
+        if e.logged_minutes > 0 {
+            marcas.push(format!("{} lançado", hours(e.logged_minutes)));
+        }
+        println!(
+            "{quando}  {}  [{} pessoas{}]",
+            e.subject,
+            e.attendee_count,
+            if marcas.is_empty() {
+                String::new()
+            } else {
+                format!(" · {}", marcas.join(" · "))
+            }
+        );
+    }
+    for w in &a.warnings {
+        println!("aviso: {w}");
+    }
+    Ok(())
+}
+
 /// O catálogo de ferramentas, com as marcações de leitura e escrita.
 pub fn ferramentas(url: Option<&str>) -> anyhow::Result<()> {
     let endpoint = endpoint(url)?;

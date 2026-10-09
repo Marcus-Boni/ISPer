@@ -127,6 +127,41 @@ pub struct MeetingDetail {
     pub decisions: Vec<StoredDecision>,
     /// As notas que você escreveu no Copilot, como você as deixou.
     pub notes: Option<String>,
+    /// O evento da agenda com que a reunião foi casada (Fase 10.3).
+    pub event: Option<MeetingEvent>,
+}
+
+/// O evento da agenda com que uma reunião gravada foi casada (Fase 10.3).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MeetingEvent {
+    /// Identificador estável do evento entre série e ocorrências.
+    pub ical_uid: String,
+    /// A série, quando o evento é recorrente.
+    pub series_id: Option<String>,
+    /// Assunto do evento.
+    pub subject: String,
+    /// Início, ISO 8601 com offset.
+    pub starts_at: String,
+    /// Fim, ISO 8601 com offset.
+    pub ends_at: String,
+    /// O evento como veio da agenda (organizador, convidados, link).
+    pub data: serde_json::Value,
+}
+
+/// Uma reunião anterior da mesma série ou do mesmo evento (o preparo mostra
+/// "da última vez").
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct EventMeeting {
+    /// Id da reunião.
+    pub meeting_id: i64,
+    /// Título da reunião.
+    pub title: String,
+    /// Quando começou, como exibido.
+    pub started_at: String,
+    /// Instante do começo (segundos Unix), quando conhecido.
+    pub started_ts: Option<i64>,
+    /// O resumo, quando houve.
+    pub summary: Option<String>,
 }
 
 /// Um card que o usuário confirmou no Copilot durante a reunião.
@@ -258,7 +293,7 @@ fn like_pattern(q: &str) -> String {
 /// de versão maior (criado por um ISPer mais novo) é recusado em vez de
 /// alterado às cegas. Bancos anteriores a esta numeração chegam como 0 e
 /// passam pelo passo 1, que é idempotente sobre o que eles já têm.
-pub const SCHEMA_VERSION: i64 = 7;
+pub const SCHEMA_VERSION: i64 = 8;
 
 /// Eventos de métrica mais antigos que isto (90 dias) saem do banco.
 pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
@@ -381,6 +416,7 @@ fn migrate(conn: &Connection) -> Result<()> {
             4 => migrate_to_v5(&tx)?,
             5 => migrate_to_v6(&tx)?,
             6 => migrate_to_v7(&tx)?,
+            7 => migrate_to_v8(&tx)?,
             other => {
                 return Err(IsperError::Schema(format!(
                     "sem migração a partir da versão {other}"
@@ -667,6 +703,28 @@ fn migrate_to_v7(conn: &Connection) -> Result<()> {
          );
          CREATE INDEX IF NOT EXISTS idx_journal_day ON journal(day);
          CREATE INDEX IF NOT EXISTS idx_journal_object ON journal(object_kind, object_id);",
+    )?;
+    Ok(())
+}
+
+/// Passo 8 (Fase 10.3) — o evento da agenda com que a reunião gravada foi
+/// casada. Tabela à parte, e não colunas em `meetings`: o preparo de uma
+/// reunião procura as anteriores da mesma série, e isso pede índice no
+/// `ical_uid` e na série. `data` guarda o evento como o OptTime mandou, para
+/// a tela mostrar sem consultar de novo.
+fn migrate_to_v8(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS meeting_events (
+             meeting_id  INTEGER PRIMARY KEY REFERENCES meetings(id),
+             ical_uid    TEXT NOT NULL,
+             series_id   TEXT,
+             subject     TEXT NOT NULL,
+             starts_at   TEXT NOT NULL,
+             ends_at     TEXT NOT NULL,
+             data        TEXT NOT NULL
+         );
+         CREATE INDEX IF NOT EXISTS idx_meeting_events_uid ON meeting_events(ical_uid);
+         CREATE INDEX IF NOT EXISTS idx_meeting_events_series ON meeting_events(series_id);",
     )?;
     Ok(())
 }
@@ -1227,6 +1285,10 @@ impl MeetingStore {
             params![meeting_id],
         )?;
         self.conn.execute(
+            "DELETE FROM meeting_events WHERE meeting_id = ?1",
+            params![meeting_id],
+        )?;
+        self.conn.execute(
             "DELETE FROM segments WHERE meeting_id = ?1",
             params![meeting_id],
         )?;
@@ -1299,6 +1361,10 @@ impl MeetingStore {
             )?;
             tx.execute("DELETE FROM moments WHERE meeting_id = ?1", params![m.id])?;
             tx.execute("DELETE FROM decisions WHERE meeting_id = ?1", params![m.id])?;
+            tx.execute(
+                "DELETE FROM meeting_events WHERE meeting_id = ?1",
+                params![m.id],
+            )?;
             tx.execute("DELETE FROM segments WHERE meeting_id = ?1", params![m.id])?;
             tx.execute("DELETE FROM meetings WHERE id = ?1", params![m.id])?;
         }
@@ -1715,6 +1781,7 @@ impl MeetingStore {
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         let decisions = self.decisions(meeting_id)?;
+        let event = self.meeting_event(meeting_id)?;
         Ok(Some(MeetingDetail {
             meeting,
             summary,
@@ -1722,7 +1789,93 @@ impl MeetingStore {
             moments,
             decisions,
             notes,
+            event,
         }))
+    }
+
+    /// Casa a reunião com um evento da agenda (troca o anterior, se havia).
+    pub fn set_meeting_event(&self, meeting_id: i64, event: &MeetingEvent) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO meeting_events
+                 (meeting_id, ical_uid, series_id, subject, starts_at, ends_at, data)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(meeting_id) DO UPDATE SET
+                 ical_uid = excluded.ical_uid, series_id = excluded.series_id,
+                 subject = excluded.subject, starts_at = excluded.starts_at,
+                 ends_at = excluded.ends_at, data = excluded.data",
+            params![
+                meeting_id,
+                event.ical_uid,
+                event.series_id,
+                event.subject,
+                event.starts_at,
+                event.ends_at,
+                event.data.to_string(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// O evento da agenda de uma reunião, se ela foi casada com um.
+    pub fn meeting_event(&self, meeting_id: i64) -> Result<Option<MeetingEvent>> {
+        let row = self
+            .conn
+            .query_row(
+                "SELECT ical_uid, series_id, subject, starts_at, ends_at, data
+                   FROM meeting_events WHERE meeting_id = ?1",
+                params![meeting_id],
+                |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        r.get::<_, Option<String>>(1)?,
+                        r.get::<_, String>(2)?,
+                        r.get::<_, String>(3)?,
+                        r.get::<_, String>(4)?,
+                        r.get::<_, String>(5)?,
+                    ))
+                },
+            )
+            .optional()?;
+        Ok(row.map(
+            |(ical_uid, series_id, subject, starts_at, ends_at, data)| MeetingEvent {
+                ical_uid,
+                series_id,
+                subject,
+                starts_at,
+                ends_at,
+                // Um `data` que não abre não esconde a ligação: fica vazio.
+                data: serde_json::from_str(&data).unwrap_or(serde_json::Value::Null),
+            },
+        ))
+    }
+
+    /// As reuniões gravadas do mesmo evento ou da mesma série, da mais
+    /// recente para a mais antiga.
+    pub fn meetings_for_event(
+        &self,
+        ical_uid: &str,
+        series_id: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<EventMeeting>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT m.id, m.title, m.started_at, m.started_ts, m.summary
+               FROM meeting_events e JOIN meetings m ON m.id = e.meeting_id
+              WHERE e.ical_uid = ?1 OR (?2 IS NOT NULL AND e.series_id = ?2)
+              ORDER BY m.started_ts IS NULL, m.started_ts DESC, m.id DESC
+              LIMIT ?3",
+        )?;
+        let rows = stmt
+            .query_map(params![ical_uid, series_id, limit], |r| {
+                Ok(EventMeeting {
+                    meeting_id: r.get(0)?,
+                    title: r.get(1)?,
+                    started_at: r.get(2)?,
+                    started_ts: r.get(3)?,
+                    summary: r.get(4)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 
     /// Distintos falantes de uma reunião, na ordem de aparição.
@@ -1836,6 +1989,75 @@ mod tests {
     }
 
     #[test]
+    fn a_v8_casa_reuniao_e_evento_e_acha_as_da_mesma_serie() {
+        let path = temp_path("v8-eventos");
+        {
+            let store = MeetingStore::open(&path).unwrap();
+            store
+                .save("Daily", "07/10/2026 09:15", &sample_result(), None)
+                .unwrap();
+            store
+                .conn
+                .execute_batch("DROP TABLE meeting_events; PRAGMA user_version = 7;")
+                .unwrap();
+        }
+        let store = MeetingStore::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+        let antiga = store.list_meetings().unwrap()[0].id;
+        let nova = store
+            .save("Daily", "08/10/2026 09:15", &sample_result(), None)
+            .unwrap();
+        let avulsa = store
+            .save("Outra", "08/10/2026 11:00", &sample_result(), None)
+            .unwrap();
+        let evento = |uid: &str, dia: &str| MeetingEvent {
+            ical_uid: uid.into(),
+            series_id: Some("serie-daily".into()),
+            subject: "Daily do Portal".into(),
+            starts_at: format!("{dia}T09:15:00-03:00"),
+            ends_at: format!("{dia}T09:30:00-03:00"),
+            data: serde_json::json!({ "organizer": { "name": "Ana" } }),
+        };
+        store
+            .set_meeting_event(antiga, &evento("uid-07", "2026-10-07"))
+            .unwrap();
+        store
+            .set_meeting_event(nova, &evento("uid-08", "2026-10-08"))
+            .unwrap();
+        let mut errado = evento("uid-errado", "2026-10-08");
+        errado.series_id = None;
+        store.set_meeting_event(nova, &errado).unwrap();
+        store
+            .set_meeting_event(nova, &evento("uid-08", "2026-10-08"))
+            .unwrap();
+        assert_eq!(
+            store.meeting_event(nova).unwrap().unwrap().ical_uid,
+            "uid-08",
+            "casar de novo troca o evento"
+        );
+        assert_eq!(store.meeting_event(avulsa).unwrap(), None);
+
+        let da_serie = store
+            .meetings_for_event("uid-09", Some("serie-daily"), 5)
+            .unwrap();
+        let ids: Vec<i64> = da_serie.iter().map(|m| m.meeting_id).collect();
+        assert_eq!(ids, [nova, antiga], "a mais recente primeiro");
+        assert!(
+            store
+                .meetings_for_event("uid-07", None, 5)
+                .unwrap()
+                .iter()
+                .any(|m| m.meeting_id == antiga),
+            "sem série, acha pelo próprio evento"
+        );
+        let detalhe = store.get_meeting(antiga).unwrap().unwrap();
+        assert_eq!(detalhe.event.unwrap().data["organizer"]["name"], "Ana");
+
+        store.delete_meeting(nova).unwrap();
+        assert_eq!(store.meeting_event(nova).unwrap(), None, "sai junto");
+    }
+
+    #[test]
     fn a_v7_cria_as_tabelas_do_assistente_sem_mexer_no_que_havia() {
         let path = temp_path("v7-assistente");
         {
@@ -1852,7 +2074,7 @@ mod tests {
                 .unwrap();
         }
         let store = MeetingStore::open(&path).unwrap();
-        assert_eq!(store.schema_version().unwrap(), 7);
+        assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
         for tabela in ["tasks", "routines", "memories", "journal"] {
             let existe: bool = store
                 .conn

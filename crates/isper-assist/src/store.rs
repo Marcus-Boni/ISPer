@@ -249,6 +249,29 @@ impl AssistStore {
             .map(|task| ImportOutcome::Created(Box::new(task)))
     }
 
+    /// As tarefas de uma reunião (ver [`crate::meeting`]), uma vez só: se a
+    /// reunião já mandou tarefas para a caixa de entrada (o passe final, uma
+    /// importação repetida), nada entra de novo e a lista volta vazia.
+    pub fn import_meeting_actions(
+        &self,
+        meeting_id: i64,
+        drafts: Vec<NewTask>,
+    ) -> Result<Vec<Task>> {
+        let prefix = crate::meeting::external_prefix(meeting_id);
+        let already: bool = self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM tasks WHERE substr(external_ref, 1, length(?1)) = ?1)",
+            params![prefix],
+            |r| r.get(0),
+        )?;
+        if already {
+            return Ok(Vec::new());
+        }
+        drafts
+            .into_iter()
+            .map(|d| self.create_task(d, Actor::Assistant))
+            .collect()
+    }
+
     /// Muda título, notas, dia, hora, prazo, prioridade ou área.
     pub fn update_task(&self, id: &str, patch: TaskPatch, actor: Actor) -> Result<Task> {
         let before = self.task(id)?;
@@ -913,6 +936,47 @@ mod tests {
             store.import_task(NewTask::titled("sem id")).is_err(),
             "importação precisa do id de origem"
         );
+    }
+
+    #[test]
+    fn acoes_da_reuniao_entram_uma_vez_so() {
+        use crate::meeting::{MeetingAction, MeetingRef, drafts};
+        let (store, _) = store_at(quarta());
+        let meeting = MeetingRef {
+            id: 7,
+            title: "Daily".into(),
+            day: day("2026-10-07"),
+        };
+        let acoes = vec![MeetingAction {
+            title: "Mandar a planilha".into(),
+            at_secs: Some(754.0),
+            due: Some("até sexta".into()),
+            quote: None,
+            from_copilot: false,
+        }];
+        let criadas = store
+            .import_meeting_actions(7, drafts(&meeting, &acoes))
+            .unwrap();
+        assert_eq!(criadas.len(), 1);
+        assert_eq!(store.today().unwrap().inbox.len(), 1);
+        assert!(
+            store
+                .import_meeting_actions(7, drafts(&meeting, &acoes))
+                .unwrap()
+                .is_empty(),
+            "a mesma reunião não manda de novo"
+        );
+        // A reunião 70 não se confunde com a 7.
+        let outra = MeetingRef { id: 70, ..meeting };
+        assert_eq!(
+            store
+                .import_meeting_actions(70, drafts(&outra, &acoes))
+                .unwrap()
+                .len(),
+            1
+        );
+        let diario = store.journal_for_day(day("2026-10-07")).unwrap();
+        assert!(diario.iter().all(|e| e.actor == "assistant"));
     }
 
     #[test]
