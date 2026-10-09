@@ -1,0 +1,26 @@
+[package]
+name = "isper-agent"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "O agente do ISPer (Fase 10.4): as ferramentas locais e do OptTime para o laço do isper-llm"
+publish = false
+
+[dependencies]
+isper-assist = { version = "0.1.0", path = "../isper-assist" }
+isper-core = { version = "0.1.0", path = "../isper-core" }
+isper-llm = { version = "0.1.0", path = "../isper-llm" }
+isper-mcp = { version = "0.1.0", path = "../isper-mcp" }
+chrono = { version = "0.4.45", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# O conector do OptTime é assíncrono; o laço do agente roda numa thread
+# comum e espera cada chamada pelo runtime de quem chama.
+tokio = { version = "1", features = ["rt"] }
+tracing = "0.1"
+
+[dev-dependencies]
+isper-llm = { version = "0.1.0", path = "../isper-llm", features = ["testing"] }
+
+[lints]
+workspace = true
