@@ -169,8 +169,27 @@ pub fn provider_from_settings(settings: &LlmSettings) -> Result<Box<dyn LlmProvi
     if name.is_empty() || name == "none" {
         return Err(LlmError::NotConfigured);
     }
-    let key = get_api_key(&name)?.ok_or_else(|| LlmError::NoApiKey(name.clone()))?;
     let model = settings.model.clone();
+    // Compatível com OpenAI (Ollama, LM Studio, um servidor da empresa): o
+    // endereço vem das configurações e a chave é opcional (o Ollama local não
+    // usa).
+    if name == "openai" {
+        let base = settings
+            .base_url
+            .as_deref()
+            .map(|u| u.trim().trim_end_matches('/'))
+            .filter(|u| !u.is_empty())
+            .ok_or_else(|| {
+                LlmError::BadResponse("falta o endereço da API compatível com OpenAI".into())
+            })?;
+        return Ok(Box::new(Groq {
+            api_key: get_api_key("openai")?.unwrap_or_default(),
+            model: model.unwrap_or_else(|| "llama3.1".into()),
+            base: base.to_string(),
+            label: "openai",
+        }));
+    }
+    let key = get_api_key(&name)?.ok_or_else(|| LlmError::NoApiKey(name.clone()))?;
     Ok(match name.as_str() {
         "claude" | "anthropic" => Box::new(Claude {
             api_key: key,
@@ -179,6 +198,8 @@ pub fn provider_from_settings(settings: &LlmSettings) -> Result<Box<dyn LlmProvi
         "groq" => Box::new(Groq {
             api_key: key,
             model: model.unwrap_or_else(|| "openai/gpt-oss-120b".into()),
+            base: GROQ_BASE.into(),
+            label: "groq",
         }),
         "gemini" | "google" => Box::new(Gemini {
             api_key: key,
@@ -617,15 +638,34 @@ impl LlmProvider for Claude {
 
 // ------------------------------------------------------------------ Groq
 
-/// Groq (free tier generoso) — API compatível com OpenAI chat/completions.
+/// O endereço da API da Groq.
+const GROQ_BASE: &str = "https://api.groq.com/openai/v1";
+
+/// Groq (free tier generoso) e qualquer API compatível com OpenAI
+/// chat/completions (Ollama, LM Studio): muda só o endereço e a chave.
 pub struct Groq {
     pub api_key: String,
     pub model: String,
+    /// A base da API, sem a barra do fim (`…/v1`).
+    pub base: String,
+    /// `groq` ou `openai`, o nome que aparece para a pessoa.
+    pub label: &'static str,
+}
+
+impl Groq {
+    /// O cabeçalho de autorização, quando há chave.
+    fn auth<'a>(&self, bearer: &'a str) -> Vec<(&'static str, &'a str)> {
+        if self.api_key.is_empty() {
+            Vec::new()
+        } else {
+            vec![("authorization", bearer)]
+        }
+    }
 }
 
 impl LlmProvider for Groq {
     fn name(&self) -> &'static str {
-        "groq"
+        self.label
     }
     fn model(&self) -> &str {
         &self.model
@@ -642,8 +682,8 @@ impl LlmProvider for Groq {
         });
         let auth = format!("Bearer {}", self.api_key);
         let resp = post_json(
-            "https://api.groq.com/openai/v1/chat/completions",
-            &[("authorization", auth.as_str())],
+            &format!("{}/chat/completions", self.base),
+            &self.auth(&auth),
             body,
         )
         .map_err(|e| map_model_error(e, &self.model))?;
@@ -669,8 +709,8 @@ impl LlmProvider for Groq {
         });
         let auth = format!("Bearer {}", self.api_key);
         match post_json(
-            "https://api.groq.com/openai/v1/chat/completions",
-            &[("authorization", auth.as_str())],
+            &format!("{}/chat/completions", self.base),
+            &self.auth(&auth),
             body,
         ) {
             Ok(resp) => parse_json_text(
@@ -691,10 +731,7 @@ impl LlmProvider for Groq {
 
     fn list_models(&self) -> Result<Vec<String>> {
         let auth = format!("Bearer {}", self.api_key);
-        let resp = get_json(
-            "https://api.groq.com/openai/v1/models",
-            &[("authorization", auth.as_str())],
-        )?;
+        let resp = get_json(&format!("{}/models", self.base), &self.auth(&auth))?;
         Ok(ids_from_data(&resp))
     }
 
@@ -706,8 +743,8 @@ impl LlmProvider for Groq {
     ) -> Result<ChatReply> {
         let auth = format!("Bearer {}", self.api_key);
         let resp = post_json(
-            "https://api.groq.com/openai/v1/chat/completions",
-            &[("authorization", auth.as_str())],
+            &format!("{}/chat/completions", self.base),
+            &self.auth(&auth),
             crate::chat::openai_body(&self.model, system, messages, tools),
         )
         .map_err(|e| map_model_error(e, &self.model))?;
@@ -733,8 +770,8 @@ impl LlmProvider for Groq {
 
         let mut text = String::new();
         post_sse(
-            "https://api.groq.com/openai/v1/chat/completions",
-            &[("authorization", auth.as_str())],
+            &format!("{}/chat/completions", self.base),
+            &self.auth(&auth),
             body,
             &mut |_event, val| {
                 if let Some(chunk) = openai_delta(val) {
@@ -934,6 +971,39 @@ impl LlmProvider for Gemini {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compativel_com_openai_sem_chave_nao_manda_autorizacao() {
+        let local = Groq {
+            api_key: String::new(),
+            model: "llama3.1".into(),
+            base: "http://localhost:11434/v1".into(),
+            label: "openai",
+        };
+        assert!(local.auth("Bearer ").is_empty());
+        assert_eq!(local.name(), "openai");
+        let groq = Groq {
+            api_key: "k".into(),
+            base: GROQ_BASE.into(),
+            label: "groq",
+            ..local
+        };
+        assert_eq!(groq.auth("Bearer k"), [("authorization", "Bearer k")]);
+    }
+
+    #[test]
+    fn compativel_com_openai_precisa_do_endereco() {
+        let settings = LlmSettings {
+            provider: "openai".into(),
+            model: None,
+            base_url: Some("  ".into()),
+            embeddings: Default::default(),
+        };
+        let Err(e) = provider_from_settings(&settings) else {
+            panic!("sem endereço não há provider");
+        };
+        assert!(e.to_string().contains("endereço"));
+    }
 
     /// Junta o texto de um fluxo SSE do jeito que cada provider o produz.
     fn collect(body: &str, mut pick: impl FnMut(&str, &Value) -> Vec<String>) -> Vec<String> {

@@ -16,6 +16,10 @@ pub struct LlmSettings {
     /// Modelo específico; `None` usa o padrão do provider.
     #[serde(default)]
     pub model: Option<String>,
+    /// A base de uma API compatível com OpenAI (`provider = "openai"`):
+    /// `http://localhost:11434/v1` no Ollama.
+    #[serde(default)]
+    pub base_url: Option<String>,
     /// Busca semântica (seção `[embeddings]`); ausente = desligada.
     #[serde(default)]
     pub embeddings: EmbeddingSettings,

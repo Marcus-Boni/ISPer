@@ -17,6 +17,7 @@ use serde_json::Value;
 use tokio::runtime::Handle;
 
 /// O conector do OptTime com o catálogo já lido.
+#[derive(Clone)]
 pub struct OptTimeTools {
     endpoint: Endpoint,
     handle: Handle,

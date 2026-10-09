@@ -201,12 +201,44 @@ impl Conversation {
         c
     }
 
-    /// Mais uma pergunta na mesma conversa.
+    /// Mais uma pergunta na mesma conversa. Se havia ações esperando o toque,
+    /// a pessoa seguiu sem confirmar: voltam ao modelo como recusadas, sem
+    /// rodar.
     pub fn ask(&mut self, question: &str) {
+        if !self.pending.is_empty() {
+            let pending = std::mem::take(&mut self.pending);
+            let mut results = std::mem::take(&mut self.ready);
+            results.extend(pending.iter().map(|call| {
+                refused(
+                    call,
+                    "o usuário seguiu com outra pergunta sem confirmar; não rode isto sem perguntar de novo",
+                )
+            }));
+            self.close_round(results);
+        }
         self.messages.push(ChatMessage::User {
             text: question.trim().to_string(),
         });
         self.steps = 0;
+    }
+
+    /// Fecha a rodada de ferramentas com os resultados na ordem das chamadas
+    /// da última resposta: o Gemini confere a contagem e o Claude, os ids.
+    fn close_round(&mut self, mut by_id: Vec<ToolResult>) {
+        let order: Vec<String> = match self.messages.last() {
+            Some(ChatMessage::Assistant { turn }) => {
+                turn.tool_calls.iter().map(|c| c.id.clone()).collect()
+            }
+            _ => Vec::new(),
+        };
+        let mut results = Vec::with_capacity(by_id.len());
+        for id in &order {
+            if let Some(pos) = by_id.iter().position(|r| &r.call_id == id) {
+                results.push(by_id.remove(pos));
+            }
+        }
+        results.extend(by_id);
+        self.messages.push(ChatMessage::Tools { results });
     }
 
     fn add_sources(&mut self, sources: Vec<Source>) {
@@ -395,22 +427,7 @@ pub fn resume(
         };
         by_id.push(result);
     }
-    // Na ordem das chamadas da última resposta: o Gemini confere a contagem
-    // e o Claude, os ids.
-    let order: Vec<String> = match conv.messages.last() {
-        Some(ChatMessage::Assistant { turn }) => {
-            turn.tool_calls.iter().map(|c| c.id.clone()).collect()
-        }
-        _ => Vec::new(),
-    };
-    let mut results = Vec::with_capacity(by_id.len());
-    for id in &order {
-        if let Some(pos) = by_id.iter().position(|r| &r.call_id == id) {
-            results.push(by_id.remove(pos));
-        }
-    }
-    results.extend(by_id);
-    conv.messages.push(ChatMessage::Tools { results });
+    conv.close_round(by_id);
     advance(provider, host, system, conv)
 }
 
@@ -566,6 +583,31 @@ mod tests {
             panic!("esperava a recusa");
         };
         assert!(results[0].is_error && results[0].content.contains("não autorizou"));
+    }
+
+    #[test]
+    fn outra_pergunta_com_o_cartao_aberto_recusa_sem_rodar() {
+        let fake = FakeChat::new(vec![
+            calls(&[("c1", "hoje"), ("c2", "lancar_horas")]),
+            says("Certo, não lancei."),
+        ]);
+        let host = Host::new();
+        let mut conv = Conversation::new("lança 1h");
+        let Step::Confirm { .. } = advance(&fake, &host, "sys", &mut conv).unwrap() else {
+            panic!("esperava confirmação");
+        };
+        conv.ask("deixa, o que tenho amanhã?");
+        assert!(conv.pending.is_empty() && conv.ready.is_empty());
+        advance(&fake, &host, "sys", &mut conv).unwrap();
+        assert_eq!(*host.ran.borrow(), ["hoje"], "a escrita não rodou");
+        let sent = fake.messages(1);
+        let ChatMessage::Tools { results } = &sent[2] else {
+            panic!("esperava os resultados da rodada aberta");
+        };
+        let ids: Vec<&str> = results.iter().map(|r| r.call_id.as_str()).collect();
+        assert_eq!(ids, ["c1", "c2"]);
+        assert!(!results[0].is_error && results[1].is_error);
+        assert!(matches!(&sent[3], ChatMessage::User { text } if text.contains("amanhã")));
     }
 
     #[test]
