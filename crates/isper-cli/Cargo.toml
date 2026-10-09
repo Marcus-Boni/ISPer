@@ -23,6 +23,7 @@ hound = "3.5.1"
 isper-core = { version = "0.1.0", path = "../isper-core" }
 isper-assist = { version = "0.1.0", path = "../isper-assist" }
 isper-llm = { version = "0.1.0", path = "../isper-llm" }
+isper-mcp = { version = "0.1.0", path = "../isper-mcp" }
 isper-models = { version = "0.1.0", path = "../isper-models" }
 isper-diarize = { version = "0.1.0", path = "../isper-diarize" }
 isper-sync = { version = "0.1.0", path = "../isper-sync" }

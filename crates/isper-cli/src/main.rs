@@ -21,6 +21,7 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 
 mod bench;
+mod opttime;
 mod sync;
 mod tarefas;
 use isper_core::loopback::LoopbackSource;
@@ -209,6 +210,44 @@ enum Cmd {
     /// Tarefas da fala: extrair, montar e medir o corpus (Fase 10.1)
     #[command(subcommand)]
     Tarefas(TarefasCmd),
+    /// O conector do OptTime, só leitura (Fase 10.2); o token vem do
+    /// Credential Manager (`isper-cli llm set-key opttime`)
+    #[command(subcommand)]
+    Opttime(OpttimeCmd),
+}
+
+#[derive(Subcommand)]
+enum OpttimeCmd {
+    /// Quem é o dono do token, os escopos e o que está conectado
+    QuemSou {
+        /// Outro servidor (padrão: o OptTime de produção)
+        #[arg(long)]
+        url: Option<String>,
+    },
+    /// O resumo de horas de um dia e quanto falta para a meta
+    Dia {
+        /// Dia (AAAA-MM-DD; padrão: hoje)
+        #[arg(long)]
+        data: Option<String>,
+        /// Outro servidor (padrão: o OptTime de produção)
+        #[arg(long)]
+        url: Option<String>,
+    },
+    /// As sugestões do "Preencher meu dia", sem aplicar nada
+    Sugestoes {
+        /// Dia (AAAA-MM-DD; padrão: hoje)
+        #[arg(long)]
+        data: Option<String>,
+        /// Outro servidor (padrão: o OptTime de produção)
+        #[arg(long)]
+        url: Option<String>,
+    },
+    /// O catálogo de ferramentas, marcando o que lê, escreve ou apaga
+    Ferramentas {
+        /// Outro servidor (padrão: o OptTime de produção)
+        #[arg(long)]
+        url: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -299,7 +338,10 @@ fn main() -> anyhow::Result<()> {
         .compact()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,whisper_rs=warn")),
+                // O rmcp descreve o servidor inteiro a cada conexão, em INFO.
+                .unwrap_or_else(|_| {
+                    tracing_subscriber::EnvFilter::new("info,whisper_rs=warn,rmcp=warn")
+                }),
         )
         .init();
     let cli = Cli::parse();
@@ -378,6 +420,7 @@ fn main() -> anyhow::Result<()> {
         Cmd::Models(cmd) => run_models(cmd),
         Cmd::Llm(cmd) => run_llm(cmd),
         Cmd::Tarefas(cmd) => run_tarefas(cmd),
+        Cmd::Opttime(cmd) => run_opttime(cmd),
         _ => run_dictation(&cli),
     }
 }
@@ -931,6 +974,15 @@ fn run_tarefas(cmd: &TarefasCmd) -> anyhow::Result<()> {
             saida.as_deref(),
             *limite,
         ),
+    }
+}
+
+fn run_opttime(cmd: &OpttimeCmd) -> anyhow::Result<()> {
+    match cmd {
+        OpttimeCmd::QuemSou { url } => opttime::quem_sou(url.as_deref()),
+        OpttimeCmd::Dia { data, url } => opttime::dia(data.as_deref(), url.as_deref()),
+        OpttimeCmd::Sugestoes { data, url } => opttime::sugestoes(data.as_deref(), url.as_deref()),
+        OpttimeCmd::Ferramentas { url } => opttime::ferramentas(url.as_deref()),
     }
 }
 
