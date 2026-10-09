@@ -1849,6 +1849,26 @@ impl MeetingStore {
         ))
     }
 
+    /// As reuniões casadas com eventos que começaram no dia `day`
+    /// (`AAAA-MM-DD`, como no começo do ISO do evento): o selo "gravada" da
+    /// agenda.
+    pub fn meeting_events_on(&self, day: &str) -> Result<Vec<(i64, MeetingEvent)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT meeting_id FROM meeting_events
+              WHERE substr(starts_at, 1, 10) = ?1 ORDER BY starts_at",
+        )?;
+        let ids = stmt
+            .query_map(params![day], |r| r.get::<_, i64>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            if let Some(e) = self.meeting_event(id)? {
+                out.push((id, e));
+            }
+        }
+        Ok(out)
+    }
+
     /// As reuniões gravadas do mesmo evento ou da mesma série, da mais
     /// recente para a mais antiga.
     pub fn meetings_for_event(
@@ -2050,6 +2070,10 @@ mod tests {
                 .any(|m| m.meeting_id == antiga),
             "sem série, acha pelo próprio evento"
         );
+        let hoje = store.meeting_events_on("2026-10-08").unwrap();
+        assert_eq!(hoje.len(), 1);
+        assert_eq!(hoje[0].0, nova);
+        assert!(store.meeting_events_on("2026-10-09").unwrap().is_empty());
         let detalhe = store.get_meeting(antiga).unwrap().unwrap();
         assert_eq!(detalhe.event.unwrap().data["organizer"]["name"], "Ana");
 
