@@ -118,6 +118,18 @@ pub(crate) fn register_shortcuts(
         Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
         None => (None, "(nenhum)".to_string()),
     };
+    taken.extend(copilot_sc);
+
+    let capture = candidates(
+        cfg.capture_shortcut.as_deref(),
+        &CAPTURE_SHORTCUT_CANDIDATES,
+    );
+    let (capture_sc, capture_label) = match register_first_free(shortcuts, &capture, &taken) {
+        Some((sc, combo)) => (Some(sc), pretty_label(&combo)),
+        None => (None, "(nenhum)".to_string()),
+    };
+    *state.capture_shortcut.lock_or_recover() = capture_sc;
+    *state.active_capture_shortcut.lock_or_recover() = capture_label;
 
     *state.dictation_shortcut.lock_or_recover() = dict_sc;
     *state.meeting_shortcut.lock_or_recover() = meet_sc;
@@ -169,6 +181,7 @@ mod tests {
             .chain(MEETING_SHORTCUT_CANDIDATES)
             .chain(MARK_SHORTCUT_CANDIDATES)
             .chain(COPILOT_SHORTCUT_CANDIDATES)
+            .chain(CAPTURE_SHORTCUT_CANDIDATES)
             .collect();
         for combo in &all {
             assert!(Shortcut::from_str(combo).is_ok(), "combo inválido: {combo}");

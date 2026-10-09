@@ -36,6 +36,9 @@ $d = Get-Date -Format 'yyyy-MM-dd'
 Invoke-Isper 'task_add' "{ task: { title: 'Revisar o PR 482', planned_on: '$d', planned_time: '15:00' } }" 'today.html' | Out-Null
 Invoke-Isper 'task_add' "{ task: { title: 'Mandar o link da gravacao', status: 'inbox', source_kind: 'meeting' } }" 'today.html' | Out-Null
 Invoke-Isper 'task_add' "{ task: { title: 'Ler o ADR 0021' } }" 'today.html' | Out-Null
+# Janela dos cartoes da captura de tarefas, com um cartao (recuo local).
+Invoke-Isper 'capture_text' "{ text: 'amanha as 15h ligar pro contador' }" 'today.html' | Out-Null
+Wait-IsperWindow 'capture.html' | Out-Null
 Invoke-Isper 'open_settings_window' | Out-Null
 Wait-IsperWindow 'settings.html' | Out-Null
 Invoke-Isper 'open_onboarding_window' | Out-Null
@@ -65,6 +68,7 @@ foreach ($theme in 'dark', 'light') {
   Test-Page 'home.html' "Inicio ($theme)"
   Test-Page 'library.html' "Biblioteca$(if ($hasMeeting) { ' com reuniao aberta' }) ($theme)"
   Test-Page 'today.html' "Hoje ($theme)"
+  Test-Page 'capture.html' "Captura de tarefas ($theme)"
   Test-Page 'settings.html' "Configuracoes ($theme)"
   Test-Page 'onboarding.html' "Primeira configuracao ($theme)"
 }

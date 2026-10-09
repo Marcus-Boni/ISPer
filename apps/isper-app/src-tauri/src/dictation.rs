@@ -55,14 +55,27 @@ pub(crate) fn on_released(app: &AppHandle) {
     }
 }
 
-/// Transcreve, pós-processa e cola o ditado. `Ok(None)` = descartado por
-/// comando de voz ("apagar isso"), sem colar nada.
-pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<String>> {
+/// O que o Whisper ouviu, já com o dicionário pessoal e os comandos de voz.
+pub(crate) struct Heard {
+    /// O texto final (corrigido).
+    pub(crate) text: String,
+    /// Como saiu do Whisper.
+    pub(crate) raw_text: String,
+    pub(crate) audio_secs: f32,
+    pub(crate) infer_secs: f32,
+}
+
+/// Transcreve e aplica o dicionário e os comandos de voz — a parte comum do
+/// ditado e da captura de tarefas. `Ok(None)` = descartado por comando de voz
+/// ("apagar isso"). `event` é o tipo da métrica local (ditado ou captura).
+pub(crate) fn transcribe(
+    app: &AppHandle,
+    raw: RawAudio,
+    event: &str,
+) -> anyhow::Result<Option<Heard>> {
     if raw.duration_secs() < 0.4 {
         anyhow::bail!(crate::i18n::tr(app, "errors.hold-shortcut"));
     }
-    let _ = app.emit("isper-state", json!({"state": "transcribing"}));
-
     let state = app.state::<AppState>();
     let engine = {
         let guard = state.engine.lock_or_recover();
@@ -81,11 +94,11 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<S
     let t = match engine.transcribe(&samples, &lang, prompt.as_deref()) {
         Ok(t) => t,
         Err(e) => {
-            record_event(EVENT_DICTATION, false, None, Some(audio_secs));
+            record_event(event, false, None, Some(audio_secs));
             return Err(e.into());
         }
     };
-    record_event(EVENT_DICTATION, true, Some(t.infer_secs), Some(audio_secs));
+    record_event(event, true, Some(t.infer_secs), Some(audio_secs));
     let raw_text = t.text.trim().to_string();
     if raw_text.is_empty() {
         anyhow::bail!(crate::i18n::tr(app, "errors.not-understood"));
@@ -112,27 +125,48 @@ pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<S
         }
     };
     if cmd.discard {
-        tracing::info!("ditado descartado por comando de voz");
+        tracing::info!("fala descartada por comando de voz");
         return Ok(None);
     }
     if cmd.text.trim().is_empty() {
         anyhow::bail!(crate::i18n::tr(app, "errors.not-understood"));
     }
+    Ok(Some(Heard {
+        text: cmd.text,
+        raw_text,
+        audio_secs,
+        infer_secs: t.infer_secs,
+    }))
+}
 
-    // Polimento opcional por IA (só o texto viaja). Qualquer falha cola o original.
-    let text = polish_if_enabled(app, &cmd.text);
-    paste_text(&text)?;
-
-    // Histórico de ditados (Fase 3) — falha aqui não pode travar o fluxo.
+/// Guarda a fala no histórico de ditados (Fase 3) e a indexa para a busca
+/// semântica. Falha aqui não pode travar o fluxo.
+pub(crate) fn save_to_history(app: &AppHandle, text: &str, heard: &Heard) {
     if let Ok(store) = open_store() {
         let at = chrono::Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
-        let raw = (text != raw_text).then_some(raw_text.as_str());
-        match store.save_dictation(&at, &text, raw, audio_secs, t.infer_secs) {
-            // Busca semântica: o ditado vira vetor em segundo plano (se configurada).
-            Ok(id) => index_dictation_background(app, id, text.clone()),
+        let raw = (text != heard.raw_text).then_some(heard.raw_text.as_str());
+        match store.save_dictation(&at, text, raw, heard.audio_secs, heard.infer_secs) {
+            Ok(id) => index_dictation_background(app, id, text.to_string()),
             Err(e) => tracing::warn!("não consegui guardar o ditado no histórico: {e}"),
         }
     }
+}
+
+/// Transcreve, pós-processa e cola o ditado. `Ok(None)` = descartado por
+/// comando de voz ("apagar isso"), sem colar nada.
+pub(crate) fn dictate(app: &AppHandle, raw: RawAudio) -> anyhow::Result<Option<String>> {
+    let _ = app.emit("isper-state", json!({"state": "transcribing"}));
+    let Some(heard) = transcribe(app, raw, EVENT_DICTATION)? else {
+        tracing::info!("ditado descartado por comando de voz");
+        return Ok(None);
+    };
+
+    // Polimento opcional por IA (só o texto viaja). Qualquer falha cola o original.
+    let text = polish_if_enabled(app, &heard.text);
+    paste_text(&text)?;
+
+    // Histórico de ditados (Fase 3) — falha aqui não pode travar o fluxo.
+    save_to_history(app, &text, &heard);
     Ok(Some(text))
 }
 

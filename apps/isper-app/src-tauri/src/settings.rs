@@ -26,6 +26,8 @@ pub(crate) struct SettingsDto {
     active_mark_shortcut: String,
     copilot_shortcut: Option<String>,
     active_copilot_shortcut: String,
+    capture_shortcut: Option<String>,
+    active_capture_shortcut: String,
     polish: bool,
     polish_style: String,
     after_meeting: String,
@@ -82,6 +84,8 @@ pub(crate) struct SettingsPatch {
     mark_shortcut: Option<String>,
     #[serde(default)]
     copilot_shortcut: Option<String>,
+    #[serde(default)]
+    capture_shortcut: Option<String>,
     #[serde(default)]
     polish: bool,
     #[serde(default)]
@@ -308,6 +312,7 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
     let active_meeting_shortcut = state.active_meeting_shortcut.lock_or_recover().clone();
     let active_mark_shortcut = state.active_mark_shortcut.lock_or_recover().clone();
     let active_copilot_shortcut = state.active_copilot_shortcut.lock_or_recover().clone();
+    let active_capture_shortcut = state.active_capture_shortcut.lock_or_recover().clone();
     let llm = isper_llm::load_settings();
     let llm_key_present = if llm.provider.is_empty() {
         false
@@ -350,6 +355,8 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         active_mark_shortcut,
         copilot_shortcut: cfg.copilot_shortcut,
         active_copilot_shortcut,
+        capture_shortcut: cfg.capture_shortcut,
+        active_capture_shortcut,
         polish: cfg.polish,
         polish_style: cfg.polish_style,
         after_meeting: cfg.after_meeting,
@@ -413,6 +420,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         meeting_shortcut: patch.meeting_shortcut,
         mark_shortcut: patch.mark_shortcut,
         copilot_shortcut: patch.copilot_shortcut,
+        capture_shortcut: patch.capture_shortcut,
         polish: patch.polish,
         polish_style: patch.polish_style.unwrap_or_default(),
         after_meeting: patch.after_meeting.unwrap_or_default(),

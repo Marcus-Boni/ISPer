@@ -28,6 +28,14 @@ bata com ela.
   "semana que vem", "fim do mês", horas ("15h", "15:30", "às 3 e meia",
   "meio-dia") e prazos ("até sexta"). É código no próprio ISPer, sem IA e
   sem rede.
+- **Anotar tarefas falando (Ctrl+Alt+A).** Como o ditado: segure e fale, ou
+  toque e fale. Pode dizer várias de uma vez, do jeito que pensa ("amanhã cedo
+  revisar o contrato e às 3 ligar pro João, e pagar o boleto até sexta"): a IA
+  configurada separa as tarefas, o ISPer resolve as datas e uma janela pequena
+  mostra os cartões para revisar. Enter salva na tela Hoje, Esc descarta, o
+  atalho de novo acrescenta mais. Sem IA, ou se ela demorar mais de 8 s, a fala
+  vira uma tarefa só, com as datas que o ISPer entendeu. O atalho muda nas
+  Configurações, em Ditado.
 - O banco passa para a versão 7 do schema, com as tabelas do assistente.
   Antes de migrar, o ISPer guarda uma cópia do banco como estava
   (`isper.db.v6.bak`), que abre na versão anterior do app.

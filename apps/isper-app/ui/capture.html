@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ISPer</title>
+<script src="assets/boot.js"></script>
+<script src="assets/i18n.js"></script>
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  html, body { height: 100%; }
+  body {
+    display: grid; grid-template-rows: auto auto 1fr auto; overflow: hidden;
+    border: 1px solid var(--line-2); background: var(--bg);
+  }
+
+  /* ---- cabeçalho (arrasta a janela) ---- */
+  .head { display: flex; align-items: center; gap: 12px; padding: 14px 14px 10px 18px; cursor: default; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--line-2); flex: none; }
+  body[data-stage="listening"] .dot, body[data-stage="handsfree"] .dot { background: var(--accent); box-shadow: 0 0 0 5px var(--accent-soft); }
+  body[data-stage="understanding"] .dot { background: var(--warn); }
+  body[data-stage="review"] .dot { background: var(--good); }
+  body[data-stage="error"] .dot { background: var(--accent); }
+  .titles { flex: 1; min-width: 0; display: grid; gap: 2px; }
+  h1 { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 19px; letter-spacing: -.012em; }
+  .sub { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .head .btn-icon { flex: none; }
+
+  /* Nível do microfone, enquanto grava. */
+  .meter { height: 3px; margin: 0 18px; border-radius: 999px; background: var(--panel-3); overflow: hidden; opacity: 0; transition: opacity var(--dur-2); }
+  body[data-stage="listening"] .meter, body[data-stage="handsfree"] .meter { opacity: 1; }
+  .meter i { display: block; height: 100%; width: 100%; background: var(--accent); transform-origin: left; transform: scaleX(0); transition: transform 90ms linear; }
+
+  /* ---- corpo ---- */
+  main { overflow-y: auto; padding: 12px 18px 8px; display: grid; gap: 10px; align-content: start; }
+  .said { margin: 0; font-size: 12.5px; color: var(--muted); font-style: italic; line-height: 1.45; overflow-wrap: anywhere; }
+  .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line-2); border-top-color: var(--accent); animation: spin .8s linear infinite; display: inline-block; vertical-align: -2px; margin-right: 8px; }
+  .cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .card-task {
+    display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start;
+    padding: 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel);
+  }
+  .card-task.reveal { animation: rise var(--dur-3) var(--ease-out) both; }
+  .card-task .title { font-size: 14px; padding: 6px 8px; }
+  .when { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .when .field { width: auto; padding: 4px 6px; font-size: 12.5px; }
+  .day-word { font-size: 12px; color: var(--muted); min-width: 0; }
+  .chip .x { border: 0; background: none; color: inherit; padding: 0 0 0 4px; cursor: pointer; font: inherit; }
+  .msg { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .msg.err { color: var(--accent); }
+  .empty-box { display: grid; gap: 10px; justify-items: start; color: var(--muted); font-size: 13px; }
+
+  /* ---- rodapé ---- */
+  .foot { display: flex; align-items: center; gap: 8px; padding: 10px 14px 14px 18px; border-top: 1px solid var(--line); }
+  .via { font-size: 11.5px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .foot .spacer { flex: 1; }
+  .foot kbd { margin-left: 4px; }
+</style>
+</head>
+<body class="atmos" data-stage="idle">
+
+<header class="head" data-tauri-drag-region>
+  <span class="dot" aria-hidden="true" data-tauri-drag-region></span>
+  <div class="titles" data-tauri-drag-region>
+    <h1 id="title" data-tauri-drag-region>ISPer</h1>
+    <p class="sub" id="sub" data-tauri-drag-region></p>
+  </div>
+  <button class="btn btn-ghost btn-icon" id="close" type="button" title="Descartar e fechar (Esc)" aria-label="Descartar e fechar (Esc)" data-i18n-attr="title:capture.close,aria-label:capture.close">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+  </button>
+</header>
+<div class="meter" aria-hidden="true"><i id="level"></i></div>
+
+<main>
+  <p class="said" id="said" hidden></p>
+  <ol class="cards" id="cards"></ol>
+  <div class="empty-box" id="empty" hidden>
+    <span data-i18n="capture.empty-lead">Não achei tarefa nessa fala.</span>
+    <button class="btn" id="as-one" type="button" data-i18n="capture.as-one">Criar uma tarefa com o texto</button>
+  </div>
+  <p class="msg" id="msg" role="status" hidden></p>
+</main>
+
+<footer class="foot">
+  <span class="via" id="via"></span>
+  <span class="spacer"></span>
+  <button class="btn btn-ghost" id="discard" type="button"><span data-i18n="capture.discard">Descartar</span><kbd>Esc</kbd></button>
+  <button class="btn btn-primary" id="save" type="button"><span id="save-label">Salvar</span><kbd>Enter</kbd></button>
+</footer>
+
+<script src="assets/ui.js"></script>
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
+  const $ = (id) => document.getElementById(id);
+  const { el, toast } = UI;
+
+  const lang = () => (window.I18N && window.I18N.lang) || 'pt-BR';
+  const pad = (n) => String(n).padStart(2, '0');
+  const iso = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const fromIso = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  function dayWord(s) {
+    if (!s) return t('today.when.someday');
+    const today = new Date();
+    const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    if (s === iso(today)) return t('today.when.today');
+    if (s === iso(tomorrow)) return t('today.when.tomorrow');
+    return fromIso(s).toLocaleDateString(lang(), { weekday: 'long' });
+  }
+  const shortDay = (s) => fromIso(s).toLocaleDateString(lang(), { weekday: 'short', day: '2-digit', month: '2-digit' });
+
+  // Os cartões que a pessoa vê e edita. O app só acrescenta (uma captura
+  // nova) ou zera (salvou ou descartou); `seen` é quantos do app já estão
+  // aqui, para acrescentar só os novos sem desfazer o que foi editado.
+  let cards = [];
+  let seen = 0;
+  let view = { stage: 'idle', cards: [], text: '', via: '', message: null };
+  let key = '';
+
+  // --------------------------------------------------------------- cartões
+  function cardNode(card, i, fresh) {
+    const li = el('li', 'card-task' + (fresh ? ' reveal' : ''));
+    const title = el('input', 'field title');
+    title.value = card.title;
+    title.maxLength = 500;
+    title.setAttribute('aria-label', t('capture.task-aria', { n: i + 1 }));
+    title.addEventListener('input', () => { card.title = title.value; });
+
+    const remove = el('button', 'btn btn-ghost btn-icon');
+    remove.type = 'button';
+    const removeLabel = t('capture.remove', { t: card.title });
+    remove.title = removeLabel;
+    remove.setAttribute('aria-label', removeLabel);
+    const NS = 'http://www.w3.org/2000/svg';
+    const s = document.createElementNS(NS, 'svg');
+    s.setAttribute('viewBox', '0 0 16 16'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor');
+    s.setAttribute('stroke-width', '1.6'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('aria-hidden', 'true');
+    const p = document.createElementNS(NS, 'path'); p.setAttribute('d', 'M4 4l8 8M12 4l-8 8'); s.appendChild(p);
+    remove.appendChild(s);
+    remove.addEventListener('click', () => { cards.splice(cards.indexOf(card), 1); paint(); });
+
+    const when = el('div', 'when');
+    const date = el('input', 'field');
+    date.type = 'date';
+    date.value = card.planned_on || '';
+    date.setAttribute('aria-label', t('capture.day', { n: i + 1 }));
+    const time = el('input', 'field');
+    time.type = 'time';
+    time.value = card.planned_time || '';
+    time.setAttribute('aria-label', t('capture.time', { n: i + 1 }));
+    const word = el('span', 'day-word', dayWord(card.planned_on));
+    date.addEventListener('input', () => {
+      card.planned_on = date.value || null;
+      if (!card.planned_on) { card.planned_time = null; time.value = ''; }
+      word.textContent = dayWord(card.planned_on);
+    });
+    time.addEventListener('input', () => {
+      card.planned_time = time.value || null;
+      // Hora sem dia é hoje (o mesmo que o app faz com a fala).
+      if (card.planned_time && !card.planned_on) { card.planned_on = iso(new Date()); date.value = card.planned_on; word.textContent = dayWord(card.planned_on); }
+    });
+    when.append(date, time, word);
+    if (card.due_on) {
+      const chip = el('span', 'chip chip-warn', t('capture.due', { d: shortDay(card.due_on) }));
+      const x = el('button', 'x', '×');
+      x.type = 'button';
+      x.setAttribute('aria-label', t('capture.due-clear'));
+      x.addEventListener('click', () => { card.due_on = null; chip.remove(); });
+      chip.appendChild(x);
+      when.appendChild(chip);
+    }
+    li.append(title, remove, when);
+    return li;
+  }
+
+  // ---------------------------------------------------------------- tela
+  function paint(freshFrom) {
+    const stage = view.stage;
+    document.body.dataset.stage = stage;
+    const n = cards.length;
+    const titles = {
+      listening: t('capture.listening'), handsfree: t('capture.listening'),
+      understanding: t('capture.understanding'), review: t('capture.review', { n }),
+      empty: t('capture.empty-title'), error: t('capture.error-title'), idle: t('capture.listening'),
+    };
+    $('title').textContent = titles[stage] || '';
+    const subs = {
+      listening: t('capture.hold-hint', { key }), handsfree: t('capture.tap-hint', { key }),
+      review: t('capture.review-hint', { key }),
+    };
+    $('sub').textContent = subs[stage] || '';
+    $('sub').hidden = !subs[stage];
+
+    const said = $('said');
+    if (view.text && stage !== 'listening' && stage !== 'handsfree') {
+      said.replaceChildren();
+      if (stage === 'understanding') { const sp = el('span', 'spinner'); sp.setAttribute('aria-hidden', 'true'); said.appendChild(sp); }
+      said.appendChild(document.createTextNode('“' + view.text + '”'));
+      said.hidden = false;
+    } else said.hidden = true;
+
+    $('cards').replaceChildren(...cards.map((c, i) => cardNode(c, i, freshFrom != null && i >= freshFrom)));
+    $('empty').hidden = !(stage === 'empty' && n === 0);
+
+    const msg = $('msg');
+    msg.classList.toggle('err', stage === 'error');
+    if (stage === 'error') { msg.textContent = view.message || ''; msg.hidden = !view.message; }
+    else if (stage === 'review' && view.via === 'local') {
+      msg.textContent = view.message ? t('capture.fallback', { why: view.message }) : t('capture.local');
+      msg.hidden = false;
+    } else msg.hidden = true;
+
+    $('via').textContent = stage === 'review' && view.via && view.via !== 'local' ? t('capture.via', { via: view.via }) : '';
+    $('save-label').textContent = t('capture.save', { n });
+    $('save').disabled = n === 0;
+    $('save').hidden = stage === 'error';
+  }
+
+  function apply(next) {
+    view = next || view;
+    let freshFrom = null;
+    if (!view.cards.length) { cards = []; seen = 0; }
+    else if (view.cards.length > seen) {
+      freshFrom = cards.length;
+      cards = cards.concat(view.cards.slice(seen).map((c) => ({ ...c })));
+      seen = view.cards.length;
+    }
+    paint(freshFrom);
+    if (freshFrom != null) {
+      const first = $('cards').children[freshFrom];
+      const input = first && first.querySelector('.title');
+      if (input) input.focus();
+    }
+  }
+
+  async function refresh() {
+    try {
+      apply(await invoke('capture_state'));
+      const s = await invoke('shell_status');
+      key = s.capture_shortcut || 'Ctrl+Alt+A';
+      paint(null);
+    } catch (e) { toast(t('common.error', { e }), 'err'); }
+  }
+
+  // ------------------------------------------------------------- ações
+  async function save() {
+    const toSave = cards.filter((c) => c.title.trim());
+    if (!toSave.length) return;
+    try {
+      await invoke('capture_save', { cards: toSave });
+      cards = []; seen = 0;
+    } catch (e) { toast(t('common.error', { e }), 'err'); }
+  }
+  async function discard() {
+    try { await invoke('capture_discard'); cards = []; seen = 0; } catch (e) { toast(t('common.error', { e }), 'err'); }
+  }
+
+  $('save').addEventListener('click', save);
+  $('discard').addEventListener('click', discard);
+  $('close').addEventListener('click', discard);
+  $('as-one').addEventListener('click', () => {
+    cards = [{ title: view.text, notes: '', planned_on: null, planned_time: null, due_on: null }];
+    view = { ...view, stage: 'review' };
+    paint(0);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); discard(); return; }
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'BUTTON') return; // Enter num botão é o clique dele
+      if (view.stage === 'review' || view.stage === 'listening' || view.stage === 'handsfree') { e.preventDefault(); save(); }
+    }
+  });
+
+  listen('isper-capture', (e) => apply(e.payload));
+  listen('isper-level', (e) => {
+    const v = Math.max(0, Math.min(1, (Number(e.payload) || 0) * 14));
+    $('level').style.setProperty('transform', 'scaleX(' + v.toFixed(3) + ')');
+  });
+  document.addEventListener('isper-i18n', () => paint(null));
+  addEventListener('focus', refresh);
+
+  refresh();
+</script>
+</body>
+</html>
