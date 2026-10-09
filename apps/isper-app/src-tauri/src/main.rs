@@ -12,6 +12,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod agenda;
 mod audio_import;
 mod calls;
 mod capture;
@@ -26,6 +27,7 @@ mod home;
 mod i18n;
 mod insights;
 mod library;
+mod meeting_inbox;
 mod meetings;
 mod notify;
 mod onboarding;
@@ -276,6 +278,10 @@ fn main() {
             routines::routine_check,
             routines::opttime_day_suggestions,
             routines::opttime_day_apply,
+            agenda::agenda_today,
+            agenda::agenda_prep,
+            agenda::open_link,
+            open_meeting_at,
             today::today_load,
             today::today_badge,
             today::task_add,
@@ -345,6 +351,7 @@ fn main() {
                 meeting: Mutex::new(None),
                 meeting_started: Mutex::new(None),
                 pending_meeting: Mutex::new(None),
+                pending_at: Mutex::new(None),
                 meeting_item: Mutex::new(None),
                 hint_item: Mutex::new(None),
                 overlay_hwnd: overlay_hwnd(&overlay),
@@ -501,6 +508,8 @@ fn main() {
 
             // Rotinas (Fase 10.2): o checklist do dia e o verificador do OptTime.
             routines::start(app.handle().clone());
+            // Agenda (Fase 10.3): o aviso de preparo antes de cada reunião.
+            agenda::start_prep_watch(app.handle().clone());
 
             // Indicador fixo: quem o deixou visível em repouso o encontra onde estava.
             if cfg.overlay_pinned {

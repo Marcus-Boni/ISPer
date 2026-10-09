@@ -96,12 +96,13 @@ fn options(app: &AppHandle) -> Options {
 /// ([`refresh_derived`]). Avisa as janelas nas duas pontas.
 ///
 /// `app_title` é o título que o app deu à reunião — o padrão, com a data, ou
-/// o do resumo provisório. Só ele pode dar lugar ao título do resumo final.
+/// o do resumo provisório. Só ele pode dar lugar ao título do resumo final;
+/// `None` (o assunto da agenda) não é trocado.
 pub(crate) fn run_in_background(
     app: AppHandle,
     meeting_id: i64,
     result: MeetingResult,
-    app_title: String,
+    app_title: Option<String>,
 ) {
     {
         let state = app.state::<AppState>();
@@ -148,7 +149,7 @@ pub(crate) fn run_in_background(
         // em diante é só rede. Sem evento para o indicador: ele já disse
         // "pronto" e pode estar mostrando outra reunião.
         if published {
-            refresh_derived(&app, meeting_id, &app_title);
+            refresh_derived(&app, meeting_id, app_title.as_deref());
             notify_status(&app);
         }
     });
@@ -163,7 +164,7 @@ pub(crate) fn run_in_background(
 ///   reunião nesse meio-tempo. Se a IA falhar, o provisório fica.
 /// - **Busca semântica**: `replace_segments` já descartou os vetores do ao
 ///   vivo; a reunião é indexada de novo, agora com o resumo final.
-fn refresh_derived(app: &AppHandle, meeting_id: i64, app_title: &str) {
+fn refresh_derived(app: &AppHandle, meeting_id: i64, app_title: Option<&str>) {
     // Excluída há instantes (janela do Desfazer aberta): não vale mandar o
     // texto para a IA de uma reunião que está saindo.
     if crate::undo::hidden_meetings().contains(&meeting_id) {
@@ -179,7 +180,7 @@ fn refresh_derived(app: &AppHandle, meeting_id: i64, app_title: &str) {
     match store.get_meeting(meeting_id) {
         Ok(Some(detail)) => {
             let text = summary_input(&detail);
-            summarize_saved(&store, meeting_id, &text, Some(app_title), || {
+            summarize_saved(&store, meeting_id, &text, app_title, || {
                 tracing::info!(meeting_id, "refazendo o resumo sobre a transcrição final");
             });
         }

@@ -86,6 +86,39 @@
 
   .empty { padding: 10px 0 4px; }
 
+  /* ---- agenda do dia (Fase 10.3) ---- */
+  .agenda { list-style: none; margin: 0; padding: 0; }
+  .ev {
+    display: grid; grid-template-columns: 92px 1fr auto; gap: 4px 12px; align-items: start;
+    padding: 8px 8px; margin: 0 -8px; border-top: 1px solid var(--line); border-radius: var(--r-sm);
+    transition: background var(--dur-2);
+  }
+  .ev:first-child { border-top: none; }
+  .ev:hover, .ev:focus-within { background: var(--panel-2); }
+  .ev-time { font: 500 12.5px var(--font-mono); color: var(--ink-2); padding-top: 2px; white-space: nowrap; }
+  .ev-body { min-width: 0; display: grid; gap: 3px; }
+  .ev-title { overflow-wrap: anywhere; line-height: 1.4; }
+  .ev.past .ev-title, .ev.past .ev-time { color: var(--muted); }
+  .ev.now { box-shadow: inset 2px 0 0 var(--accent); }
+  .ev.free .ev-title { color: var(--muted); font-style: italic; }
+  .ev-acts { display: flex; gap: 4px; align-items: center; }
+  .ev-acts .btn { padding: 3px 9px; font-size: 12px; }
+  .chip.as-link { cursor: pointer; font: inherit; font-size: 11px; }
+  .chip.as-link:hover { filter: brightness(1.1); }
+  .prep {
+    grid-column: 2 / -1; margin-top: 6px; padding: 10px 12px; display: grid; gap: 6px;
+    border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--panel-2); font-size: 12.5px;
+  }
+  .prep h3 { margin: 0; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  .prep p { margin: 0; color: var(--ink-2); line-height: 1.5; }
+  .prep ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+  .prep li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .allday { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 6px; }
+  #agenda-refresh { margin-left: auto; }
+  .ev-past-toggle { list-style: none; padding: 4px 0; }
+  .ev-past-toggle .btn { font-size: 12px; padding: 3px 9px; }
+  .allday .chip { animation: none; }
+
   /* ---- rotinas: a linha do verificador na tarefa do dia ---- */
   .rline {
     display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; margin-top: 4px;
@@ -165,6 +198,17 @@
         <button class="pick" type="button" role="radio" data-when="someday" aria-checked="false" data-i18n="today.when.someday">Algum dia</button>
       </div>
     </form>
+
+    <section id="sec-agenda" aria-labelledby="h-agenda" hidden>
+      <div class="sec-head">
+        <h2 class="eyebrow" id="h-agenda" data-i18n="today.sec.agenda">Agenda</h2>
+        <span class="count" id="c-agenda"></span>
+        <button class="btn btn-ghost btn-sm" type="button" id="agenda-refresh" data-i18n="today.agenda.refresh">Atualizar</button>
+      </div>
+      <p class="sec-hint" id="agenda-note" role="status" hidden></p>
+      <div class="allday" id="agenda-allday" hidden></div>
+      <ol class="agenda" id="list-agenda"></ol>
+    </section>
 
     <section id="sec-planned" aria-labelledby="h-planned">
       <div class="sec-head"><h2 class="eyebrow" id="h-planned" data-i18n="today.sec.planned">Para hoje</h2><span class="count" id="c-planned"></span></div>
@@ -349,9 +393,24 @@
       box.appendChild(el('span', 'chip ' + (task.due_on <= today ? 'chip-warn' : ''), label));
     }
     if (section === 'later' && task.planned_on) box.appendChild(el('span', 'chip', shortDay(task.planned_on)));
-    if (SOURCES[task.source_kind]) box.appendChild(el('span', 'chip chip-info', t(SOURCES[task.source_kind])));
+    const fromMeeting = meetingChip(task);
+    if (fromMeeting) box.appendChild(fromMeeting);
+    else if (SOURCES[task.source_kind]) box.appendChild(el('span', 'chip chip-info', t(SOURCES[task.source_kind])));
     if (task.area) box.appendChild(el('span', 'chip', task.area));
     return box;
+  }
+
+  // A tarefa que saiu de uma reunião leva a ela, no minuto em que foi dita.
+  function meetingChip(task) {
+    const src = task.source_ref;
+    if (!src || src.meeting_id == null) return null;
+    const label = src.at_secs != null ? t('today.chip.meeting-at', { at: secsLabel(src.at_secs) }) : t('today.src.meeting');
+    const b = el('button', 'chip chip-info as-link', label);
+    b.type = 'button';
+    b.title = src.meeting_title || '';
+    b.setAttribute('aria-label', t('today.chip.meeting-aria', { m: src.meeting_title || '', at: src.at_secs != null ? secsLabel(src.at_secs) : '' }));
+    b.addEventListener('click', () => invoke('open_meeting_at', { meetingId: src.meeting_id, at: src.at_secs == null ? null : src.at_secs }).catch((e) => toast(t('common.error', { e }), 'err')));
+    return b;
   }
 
   function actButton(label, aria, run, cls = 'btn btn-ghost') {
@@ -1023,10 +1082,177 @@
     await refresh();
   });
 
+
+  // -------------------------------------------------------------- agenda
+  // Os eventos do dia, do Outlook pelo OptTime (Fase 10.3). Sem o conector, a
+  // seção nem aparece: quem não usa o OptTime não vê convite nenhum.
+  let agenda = null;
+  let showPast = false;
+  const prepOpen = new Set();
+  const evKey = (e) => e.iCalUId + '|' + e.start;
+  const clockOf = (iso) => (iso || '').slice(11, 16);
+  const secsLabel = (secs) => {
+    const s = Math.max(0, Math.floor(secs || 0));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+    return h ? h + ':' + pad(m) + ':' + pad(r) : pad(m) + ':' + pad(r);
+  };
+  const openMeetingAt = (id, at) => invoke('open_meeting_at', { meetingId: id, at: at == null ? null : at }).catch((e) => toast(t('common.error', { e }), 'err'));
+
+  async function loadAgenda(force) {
+    let next;
+    try { next = await invoke('agenda_today', { force: !!force }); } catch (e) { return; }
+    agenda = next;
+    renderAgenda();
+  }
+
+  function renderAgenda() {
+    const sec = $('sec-agenda');
+    if (!agenda || !agenda.connected) { sec.hidden = true; return; }
+    sec.hidden = false;
+    const note = $('agenda-note');
+    const list = $('list-agenda');
+    const allday = $('agenda-allday');
+    if (agenda.error) {
+      note.textContent = errText(agenda.error);
+      note.hidden = false;
+      list.replaceChildren();
+      allday.hidden = true;
+      $('c-agenda').textContent = '';
+      return;
+    }
+    const events = agenda.events || [];
+    const timed = events.filter((e) => !e.isAllDay);
+    const days = events.filter((e) => e.isAllDay);
+    allday.replaceChildren(...days.map((e) => el('span', 'chip', t('today.agenda.allday', { s: e.subject }))));
+    allday.hidden = !days.length;
+    $('c-agenda').textContent = timed.length ? String(timed.length) : '';
+    note.hidden = !!timed.length;
+    if (!timed.length) note.textContent = t('today.agenda.empty');
+    // O que já passou fica recolhido: à tarde, a agenda não empurra as tarefas.
+    const now = Date.now();
+    const past = timed.filter((e) => Date.parse(e.end) <= now);
+    const ahead = timed.filter((e) => Date.parse(e.end) > now);
+    const rows = [];
+    if (past.length) {
+      const li = el('li', 'ev-past-toggle');
+      const b = actButton(showPast ? t('today.agenda.hide-past') : t('today.agenda.show-past', { n: past.length }), null,
+        () => { showPast = !showPast; renderAgenda(); });
+      b.setAttribute('aria-expanded', String(showPast));
+      li.appendChild(b);
+      if (showPast) rows.push(...past.map(eventRow));
+      rows.push(li);
+    }
+    rows.push(...ahead.map(eventRow));
+    list.replaceChildren(...rows);
+  }
+
+  function eventRow(e) {
+    const now = Date.now();
+    const start = Date.parse(e.start), end = Date.parse(e.end);
+    const past = end <= now, current = start <= now && now < end;
+    const li = el('li', 'ev' + (past ? ' past' : '') + (current ? ' now' : '') + (e.meeting ? '' : ' free'));
+    li.dataset.key = evKey(e);
+    li.appendChild(el('span', 'ev-time', clockOf(e.start) + '–' + clockOf(e.end)));
+    const body = el('div', 'ev-body');
+    body.appendChild(el('span', 'ev-title', e.subject));
+    const meta = el('span', 'meta');
+    if (current) meta.appendChild(el('span', 'chip chip-accent', t('today.agenda.now')));
+    else if (!past && start - now <= 60 * 60 * 1000) meta.appendChild(el('span', 'chip chip-warn', t('today.agenda.in', { n: Math.max(1, Math.round((start - now) / 60000)) })));
+    if (!e.meeting) meta.appendChild(el('span', 'chip', t('today.agenda.not-meeting')));
+    if (e.recorded != null) {
+      const rec = el('button', 'chip chip-ok as-link', t('today.agenda.recorded'));
+      rec.type = 'button';
+      rec.setAttribute('aria-label', t('today.agenda.recorded-aria', { s: e.subject }));
+      rec.addEventListener('click', () => openMeetingAt(e.recorded, null));
+      meta.appendChild(rec);
+    }
+    if (e.attendeeCount > 1) meta.appendChild(el('span', 'chip', t('today.agenda.people', { n: e.attendeeCount })));
+    body.appendChild(meta);
+    const acts = el('div', 'ev-acts');
+    if (e.joinUrl && !past) {
+      acts.appendChild(actButton(t('today.agenda.join'), t('today.agenda.join-aria', { s: e.subject }),
+        () => invoke('open_link', { url: e.joinUrl }).catch((err) => toast(t('common.error', { e: err }), 'err')), 'btn' + (current ? ' btn-primary' : '')));
+    }
+    if (e.meeting && !past) {
+      const b = actButton(t('today.agenda.prep'), t('today.agenda.prep-aria', { s: e.subject }), () => togglePrep(e, li));
+      b.setAttribute('aria-expanded', String(prepOpen.has(evKey(e))));
+      acts.appendChild(b);
+    }
+    li.append(body, acts);
+    if (prepOpen.has(evKey(e))) fillPrep(e, li);
+    return li;
+  }
+
+  function togglePrep(e, li) {
+    const key = evKey(e);
+    if (prepOpen.has(key)) { prepOpen.delete(key); } else { prepOpen.add(key); }
+    renderAgenda();
+  }
+
+  // O preparo: quem organiza e o que ficou da última vez (o resumo e as
+  // tarefas abertas da reunião anterior da mesma série).
+  async function fillPrep(e, li) {
+    const box = el('div', 'prep');
+    box.appendChild(el('span', 'hint m0', t('today.agenda.prep-loading')));
+    li.appendChild(box);
+    let p;
+    try { p = await invoke('agenda_prep', { icalUid: e.iCalUId, seriesId: e.seriesMasterId || null, start: e.start }); }
+    catch (err) { box.replaceChildren(el('span', 'hint m0', t('common.error', { e: err }))); return; }
+    const parts = [];
+    const who = e.organizer && (e.organizer.name || e.organizer.email);
+    if (who) parts.push(el('p', null, t('today.agenda.organizer', { who })));
+    if (p.last) {
+      parts.push(el('h3', null, t('today.agenda.last-time')));
+      const line = el('p');
+      const open = el('button', 'chip chip-info as-link', p.last.started_at.slice(0, 5));
+      open.type = 'button';
+      open.setAttribute('aria-label', t('today.agenda.open-last', { s: p.last.title }));
+      open.addEventListener('click', () => openMeetingAt(p.last.meeting_id, null));
+      line.append(open, document.createTextNode(' ' + p.last.title));
+      parts.push(line);
+      if (p.lead) parts.push(el('p', null, p.lead));
+    } else {
+      parts.push(el('p', null, t('today.agenda.first-time')));
+    }
+    if (p.open_tasks.length) {
+      parts.push(el('h3', null, t('today.agenda.pending', { n: p.open_tasks.length })));
+      const ul = el('ul');
+      for (const task of p.open_tasks) {
+        const item = el('li');
+        item.appendChild(el('span', null, task.title));
+        const chip = meetingChip(task);
+        if (chip) item.appendChild(chip);
+        ul.appendChild(item);
+      }
+      parts.push(ul);
+    }
+    box.replaceChildren(...parts);
+  }
+
+  // Vindo do aviso de preparo: a agenda abre no evento, com o preparo aberto.
+  async function openPrep(icalUid, start) {
+    prepOpen.add(icalUid + '|' + start);
+    await loadAgenda(false);
+    const li = [...document.querySelectorAll('#list-agenda .ev')].find((x) => x.dataset.key === icalUid + '|' + start);
+    if (li) li.scrollIntoView({ block: 'center', behavior: UI.reduce() ? 'auto' : 'smooth' });
+  }
+
+  $('agenda-refresh').addEventListener('click', async () => {
+    const b = $('agenda-refresh');
+    UI.busy(b, true);
+    await loadAgenda(true);
+    UI.busy(b, false);
+  });
+  listen('isper-agenda-prep', (ev) => { if (ev.payload) openPrep(ev.payload.ical_uid, ev.payload.start); });
+  listen('isper-connector', () => loadAgenda(true));
+  // O "agora" e o "em N min" andam sozinhos; a agenda é relida a cada 5 min.
+  setInterval(renderAgenda, 60_000);
+  setInterval(() => loadAgenda(false), 5 * 60_000);
+
   // ------------------------------------------------------------ eventos
   listen('isper-tasks', () => refresh());
-  document.addEventListener('isper-view', (e) => { if (e.detail && e.detail.active) refresh(); });
-  document.addEventListener('isper-i18n', () => { sig = ''; paintDays(); paintMonthDays(); if (!editing) $('r-submit').textContent = t('today.routines.create'); render(null); });
+  document.addEventListener('isper-view', (e) => { if (e.detail && e.detail.active) { refresh(); loadAgenda(false); } });
+  document.addEventListener('isper-i18n', () => { sig = ''; renderAgenda(); paintDays(); paintMonthDays(); if (!editing) $('r-submit').textContent = t('today.routines.create'); render(null); });
   // Virou o dia com a tela aberta: o "hoje" muda.
   let lastDay = todayIso();
   setInterval(() => { if (todayIso() !== lastDay) { lastDay = todayIso(); sig = ''; refresh(); } }, 60_000);
@@ -1057,6 +1283,7 @@
   paintDays();
   paintMonthDays();
   refresh();
+  loadAgenda(false);
 </script>
 </body>
 </html>

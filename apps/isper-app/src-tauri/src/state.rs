@@ -106,6 +106,9 @@ pub(crate) struct AppState {
     pub(crate) meeting_started: Mutex<Option<Instant>>,
     /// Reunião que a Biblioteca deve abrir já selecionada.
     pub(crate) pending_meeting: Mutex<Option<i64>>,
+    /// O instante da reunião pendente em que a Biblioteca deve abrir (a
+    /// tarefa da caixa de entrada leva ao minuto em que foi dita).
+    pub(crate) pending_at: Mutex<Option<f32>>,
     /// Itens do menu da bandeja cujo texto muda em tempo de execução.
     pub(crate) meeting_item: Mutex<Option<MenuItem<tauri::Wry>>>,
     pub(crate) hint_item: Mutex<Option<MenuItem<tauri::Wry>>>,

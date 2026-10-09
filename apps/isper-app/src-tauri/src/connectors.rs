@@ -84,7 +84,18 @@ pub(crate) fn opttime(app: &AppHandle) -> Result<OptTime, McpError> {
     Ok(OptTime::new(Endpoint::new(&opttime_url(app), &token)?))
 }
 
+/// O primeiro nome de quem é dono do token, da última conferência (é por ele
+/// que os outros pedem coisas numa reunião).
+pub(crate) fn me_first_name() -> Option<String> {
+    let last = LAST.lock_or_recover();
+    let name = last.as_ref()?.whoami.as_ref()?.name.clone();
+    name.split(|c: char| c.is_whitespace() || c == '|')
+        .find(|w| !w.is_empty())
+        .map(String::from)
+}
+
 fn changed(app: &AppHandle) {
+    crate::agenda::forget();
     let _ = app.emit(CONNECTOR_EVENT, ());
     // A tela Hoje mostra "conecte o OptTime" nas rotinas que dependem dele.
     let _ = app.emit(crate::today::TASKS_EVENT, ());

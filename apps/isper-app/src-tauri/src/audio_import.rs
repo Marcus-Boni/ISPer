@@ -391,6 +391,16 @@ fn process(app: &AppHandle, job: &Job) -> Result<Done, Failure> {
     }) {
         title = t;
     }
+    // Fase 10.3: as ações de "Eu" da gravação importada também vão para a
+    // caixa de entrada (uma vez só, mesmo que o arquivo volte).
+    crate::meeting_inbox::collect(
+        app,
+        id,
+        &title,
+        crate::meeting_inbox::meeting_day(&started_at),
+        &crate::meeting_inbox::lines_from_rows(&rows),
+        &[],
+    );
     let has_summary = store
         .get_meeting(id)
         .ok()

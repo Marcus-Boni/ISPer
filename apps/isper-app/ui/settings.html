@@ -227,6 +227,13 @@
   </select>
   <p class="hint" data-i18n="settings.reunioes.informar-numero-mais-ajuda-sem">Informar o número é o que mais ajuda: sem ele, o agrupamento decide por distância entre vozes, e numa reunião longa acaba criando gente demais. Com o número, ele corta em exatamente essa quantidade.</p>
 
+  <span class="lbl mt8" data-i18n="settings.reunioes.agenda">Agenda e caixa de entrada</span>
+  <div class="stack mt4">
+    <label class="switch"><input type="checkbox" id="meetinginbox" aria-describedby="meetinghint"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.reunioes.inbox">Mandar o que eu fiquei de fazer nas reuniões para a caixa de entrada da tela Hoje</span></label>
+    <label class="switch"><input type="checkbox" id="meetingprep" aria-describedby="meetinghint"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.reunioes.prep">Avisar 10 minutos antes das reuniões da agenda, com o que ficou da última vez</span></label>
+  </div>
+  <p class="hint" id="meetinghint" data-i18n="settings.reunioes.agenda-hint">Quando a reunião acaba, a IA acima lê a transcrição (só o texto) e as ações com o seu nome vão para a caixa de entrada com o minuto em que foram ditas; as que você validou no Copilot vão sempre, mesmo sem IA. A agenda vem do OptTime (Conectores) e dá o nome da reunião gravada.</p>
+
   <span class="lbl mt8" id="lbl-import" data-i18n="settings.reunioes.import">Gravações de fora</span>
   <label class="switch"><input type="checkbox" id="importwatch" aria-describedby="importhint"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.reunioes.import-watch">Transcrever o que eu puser na pasta Importar</span></label>
   <div class="row">
@@ -575,6 +582,8 @@
       $('speakers').value = String(s.meeting_speakers || 0);
       $('finalpass').checked = s.final_pass !== false;
       $('importwatch').checked = s.import_watch !== false;
+      $('meetinginbox').checked = s.meeting_inbox !== false;
+      $('meetingprep').checked = s.meeting_prep !== false;
       $('importdir').textContent = s.import_dir || '';
       $('diarthr').value = String(s.diarize_threshold || 0);
       $('retention').value = String(s.retention_days || 0);
@@ -799,7 +808,7 @@
   // Salvar (tema, idioma, chaves e o celular valem na hora, por conta própria).
   const SAVED_BY_BUTTON = new Set(['shortcut', 'lang', 'dict', 'source', 'provider', 'model', 'autostart', 'showhome', 'mic',
     'mshortcut', 'markshortcut', 'copilotshortcut', 'captureshortcut', 'polish', 'pstyle', 'after', 'voicecmd', 'autoupdate', 'retention',
-    'speakers', 'finalpass', 'importwatch', 'diarthr', 'calldetect', 'insights', 'insint', 'copfilter', 'embprovider',
+    'speakers', 'finalpass', 'importwatch', 'meetinginbox', 'meetingprep', 'diarthr', 'calldetect', 'insights', 'insint', 'copfilter', 'embprovider',
     'embmodel', 'embbase']);
   let isDirty = false;
   function setDirty(on) {
@@ -849,6 +858,8 @@
         meeting_speakers: Number($('speakers').value) || 0,
         final_pass: $('finalpass').checked,
         import_watch: $('importwatch').checked,
+        meeting_inbox: $('meetinginbox').checked,
+        meeting_prep: $('meetingprep').checked,
         diarize_threshold: Number($('diarthr').value) || 0,
         call_detect: $('calldetect').value,
         live_insights: $('insights').checked,
