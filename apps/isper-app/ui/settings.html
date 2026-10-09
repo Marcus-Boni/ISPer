@@ -65,6 +65,12 @@
   .dev:first-child { border-top: none; }
   .dev .dname { font-size: 13px; }
   .dev .dnote { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .conn { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel-2); }
+  .conn-head { display: flex; gap: 8px; align-items: center; font-size: 13.5px; }
+  .conn .diag { margin-top: 10px; }
+  .conn-warn { color: var(--warn); }
+  .conn-adv { margin-top: 12px; }
+  .conn-adv > summary { cursor: pointer; display: inline-block; }
 </style>
 </head>
 <body class="atmos">
@@ -376,6 +382,34 @@
     </select>
   </div>
   <p class="hint" data-i18n="settings.inteligencia.usa-provider-acima-so-texto">Usa o provider acima; só o texto do ditado é enviado. Acrescenta cerca de um segundo antes de colar. Se a API falhar ou não houver chave, o texto original é colado normalmente — o histórico guarda os dois.</p>
+</section>
+
+<section class="card reveal" id="conectores" data-i="5" aria-labelledby="h-conectores">
+  <h2 id="h-conectores" data-i18n="settings.conectores.titulo">Conectores</h2>
+  <p class="hint mt0" data-i18n="settings.conectores.lead">O OptTime é a porta para a agenda do Outlook, o Azure DevOps e as horas. Ler é livre; lançar horas sempre pede um toque seu.</p>
+  <div class="conn">
+    <div class="conn-head"><b>OptTime</b> <span id="otstate" class="chip" role="status">…</span></div>
+    <dl class="diag" id="otdiag" hidden></dl>
+    <p class="hint conn-warn" id="otwarn" hidden></p>
+  </div>
+  <label class="lbl" for="ottoken"><span data-i18n="settings.conectores.token">Token pessoal</span> <span id="ottokenstate" class="chip chip-ok" hidden data-i18n="settings.conectores.tokenstate">guardado ✓</span></label>
+  <div class="row">
+    <input type="password" id="ottoken" class="field" placeholder="cole o token (opt_tok_…) e clique em Guardar" autocomplete="off" data-i18n-attr="placeholder:settings.conectores.token-ph">
+    <button class="btn" id="otsave" data-i18n="settings.conectores.save">Guardar token</button>
+  </div>
+  <p class="hint" data-i18n="settings.conectores.token-hint">Gere no OptTime em Configurações → Integrações, com o preset "Assistente pessoal (ISPer)". O token vai para o Credential Manager do Windows, nunca para arquivo, e só sai do PC para o OptTime.</p>
+  <div class="row mt10">
+    <button class="btn btn-sm flex-none" id="ottest" data-i18n="settings.inteligencia.test">Testar conexão</button>
+    <button class="btn btn-sm btn-ghost flex-none" id="otclear" hidden data-i18n="settings.conectores.clear">Remover token</button>
+  </div>
+  <details class="conn-adv">
+    <summary class="hint" data-i18n="settings.conectores.url">Endereço do servidor</summary>
+    <div class="row mt4">
+      <input type="text" id="oturl" class="field" spellcheck="false" aria-label="Endereço do servidor do OptTime" data-i18n-attr="aria-label:settings.conectores.url-aria">
+      <button class="btn" id="otseturl" data-i18n="settings.conectores.url-use">Usar este endereço</button>
+    </div>
+    <p class="hint" data-i18n="settings.conectores.url-hint">Vazio usa o OptTime de produção. Só https (http só no próprio PC).</p>
+  </details>
 </section>
 
 <section class="card reveal" id="sistema" data-i="5" aria-labelledby="h-sistema">
@@ -926,6 +960,114 @@
   document.addEventListener('keydown', (ev) => {
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); $('save').click(); }
   });
+
+  // ---- conectores (OptTime): token no cofre e o retrato do whoami
+  const hm = (min) => { const h = Math.floor(min / 60), m = min % 60; return h ? (m ? h + 'h' + String(m).padStart(2, '0') : h + 'h') : m + 'min'; };
+  const connErr = (e) => (e && typeof e === 'object' && e.message) ? e.message + (e.hint ? ' — ' + e.hint : '') : String(e);
+  let hoursRoutineOn = false;
+  function paintConnector(st) {
+    const chip = $('otstate');
+    const diag = $('otdiag');
+    const warn = $('otwarn');
+    diag.replaceChildren();
+    diag.hidden = true;
+    warn.hidden = true;
+    const set = (cls, key) => { chip.className = 'chip ' + cls; chip.textContent = t(key); };
+    if (!st.token_present) { set('', 'settings.conectores.state.no-token'); return; }
+    const last = st.last;
+    if (!last) { set('', 'settings.conectores.state.unchecked'); return; }
+    if (!last.ok) {
+      set('chip-warn', 'settings.conectores.state.error');
+      warn.textContent = connErr(last.error);
+      warn.hidden = false;
+      return;
+    }
+    set('chip-ok', 'settings.conectores.state.ok');
+    const w = last.whoami;
+    const row = (key, value, cls) => { diag.append(el('dt', null, t(key)), el('dd', cls || null, value)); };
+    row('settings.conectores.row.account', w.name + ' · ' + w.email);
+    const missing = last.missing_scopes || [];
+    row('settings.conectores.row.scopes', missing.length ? t('settings.conectores.scopes-missing', { s: missing.join(', ') }) : w.scopes.join(', '), missing.length ? 'bad' : 'ok');
+    const ms = w.microsoft;
+    const msKey = !ms.connected ? 'settings.conectores.ms.off' : ms.needsReconnect ? 'settings.conectores.ms.reconnect' : !ms.tokenUsable ? 'settings.conectores.ms.stale' : 'settings.conectores.ms.ok';
+    row('settings.conectores.row.microsoft', t(msKey), msKey === 'settings.conectores.ms.ok' ? 'ok' : 'bad');
+    row('settings.conectores.row.devops', t(w.azureDevOps.configured ? 'settings.conectores.devops.ok' : 'settings.conectores.devops.off'), w.azureDevOps.configured ? 'ok' : null);
+    row('settings.conectores.row.digest', t(w.eveningDigestEnabled ? 'settings.conectores.digest.on' : 'settings.conectores.digest.off'));
+    row('settings.conectores.row.today', t('settings.conectores.today-val', { total: hm(w.today.totalMinutes), cap: hm(w.today.dailyCapacityMinutes) }));
+    diag.hidden = false;
+    // Cada lembrete tem um dono só (ADR 0023).
+    if (w.eveningDigestEnabled && hoursRoutineOn) {
+      warn.textContent = t('settings.conectores.digest-dup');
+      warn.hidden = false;
+    }
+  }
+  async function loadConnector(autoCheck) {
+    let st;
+    try { st = await invoke('opttime_status'); } catch (_) { return; }
+    try {
+      const routines = await invoke('routines_list');
+      hoursRoutineOn = routines.some((r) => r.active && r.verifier === 'opttime.day_complete');
+    } catch (_) {}
+    $('ottokenstate').hidden = !st.token_present;
+    $('otclear').hidden = !st.token_present;
+    $('ottest').disabled = !st.token_present;
+    $('oturl').placeholder = st.default_url;
+    if (document.activeElement !== $('oturl')) $('oturl').value = st.url === st.default_url ? '' : st.url;
+    paintConnector(st);
+    if (autoCheck && st.token_present && !st.last) runConnectorCheck(null);
+  }
+  async function runConnectorCheck(b) {
+    if (b) UI.busy(b, true, t('common.testing'));
+    else { $('otstate').className = 'chip'; $('otstate').textContent = t('settings.conectores.state.checking'); }
+    let c;
+    try { c = await invoke('opttime_check'); } catch (e) { c = { ok: false, error: { message: String(e) } }; }
+    if (b) {
+      UI.busy(b, false);
+      if (c.ok) { UI.flash(b, t('settings.msg.connected')); status(t('settings.conectores.msg.ok', { name: c.whoami.name }), 'ok'); }
+      else { UI.flash(b, t('common.failed'), 'err'); status(t('settings.msg.test-failed', { e: connErr(c.error) }), 'err'); }
+    }
+    await loadConnector(false);
+  }
+  $('otsave').addEventListener('click', async () => {
+    const b = $('otsave');
+    UI.busy(b, true);
+    try {
+      await invoke('opttime_set_token', { token: $('ottoken').value });
+      $('ottoken').value = '';
+      UI.busy(b, false);
+      UI.flash(b, t('common.key-saved'));
+      status(t('settings.conectores.msg.saved'), 'ok');
+      await runConnectorCheck(null);
+    } catch (e) {
+      UI.busy(b, false);
+      status(t('settings.msg.key-save-failed', { e }), 'err');
+    }
+  });
+  $('ottest').addEventListener('click', () => runConnectorCheck($('ottest')));
+  $('otclear').addEventListener('click', async () => {
+    try {
+      await invoke('opttime_clear_token');
+      status(t('settings.conectores.msg.cleared'), 'ok');
+    } catch (e) { status(t('common.error', { e }), 'err'); }
+    await loadConnector(false);
+  });
+  $('otseturl').addEventListener('click', async () => {
+    const b = $('otseturl');
+    UI.busy(b, true);
+    try {
+      const url = await invoke('opttime_set_url', { url: $('oturl').value.trim() || null });
+      UI.busy(b, false);
+      UI.flash(b, t('common.saved'));
+      status(t('settings.conectores.msg.url-saved', { url }), 'ok');
+    } catch (e) {
+      UI.busy(b, false);
+      status(t('common.error', { e }), 'err');
+    }
+    await loadConnector(false);
+  });
+  listen('isper-connector', () => loadConnector(false));
+  document.addEventListener('isper-i18n', () => loadConnector(false));
+  loadConnector(true);
 
   // ---- diagnóstico (Sistema)
   let diagText = '';

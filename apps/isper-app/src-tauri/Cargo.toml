@@ -29,6 +29,7 @@ toml = "1"
 isper-core = { path = "../../../crates/isper-core" }
 isper-assist = { path = "../../../crates/isper-assist" }
 isper-llm = { path = "../../../crates/isper-llm" }
+isper-mcp = { path = "../../../crates/isper-mcp" }
 isper-models = { path = "../../../crates/isper-models" }
 isper-diarize = { path = "../../../crates/isper-diarize" }
 # Fase 9.3: receber as gravações do celular (ADR 0017).

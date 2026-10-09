@@ -3147,6 +3147,7 @@ dependencies = [
  "isper-core",
  "isper-diarize",
  "isper-llm",
+ "isper-mcp",
  "isper-models",
  "isper-sync",
  "qrcode",
