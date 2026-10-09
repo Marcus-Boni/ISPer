@@ -13,6 +13,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod agenda;
+mod assistant;
 mod audio_import;
 mod calls;
 mod capture;
@@ -281,6 +282,12 @@ fn main() {
             agenda::agenda_today,
             agenda::agenda_prep,
             agenda::open_link,
+            assistant::assistant_ask,
+            assistant::assistant_brief,
+            assistant::assistant_confirm,
+            assistant::assistant_reset,
+            assistant::assistant_tools,
+            assistant::assistant_set_permission,
             open_meeting_at,
             today::today_load,
             today::today_badge,

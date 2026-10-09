@@ -170,6 +170,50 @@
   .rv-note.err { color: var(--accent); }
   .rv-wait { display: grid; gap: 10px; padding: 14px 0; color: var(--muted); font-size: 13px; }
   .rv-wait .skeleton { height: 46px; }
+
+  /* ---- assistente (Fase 10.4) ---- */
+  .assist { display: grid; gap: 8px; }
+  .assist .sec-head { align-items: center; margin: 0; flex-wrap: wrap; }
+  .assist-quick { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .ask { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .ask .field { padding: 9px 12px; }
+  .thread { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .thread:empty { display: none; }
+  .turn-q {
+    justify-self: end; max-width: 85%; padding: 7px 12px; border-radius: 14px 14px 4px 14px;
+    background: var(--panel-2); border: 1px solid var(--line); font-size: 13px; color: var(--ink-2); overflow-wrap: anywhere;
+  }
+  .turn-a {
+    display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-sm);
+    background: var(--panel); font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere;
+    animation: rise var(--dur-3) var(--ease-out) both;
+  }
+  .turn-a p { margin: 0; }
+  .turn-a ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+  .turn-a h4 { margin: 4px 0 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  .turn-a.wait { color: var(--muted); font-size: 12.5px; }
+  .turn-a.wait .skeleton { height: 10px; border-radius: 5px; }
+  .turn-a.wait .skeleton:last-child { width: 62%; }
+  .turn-a.err { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); }
+  .turn-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .turn-note { font-size: 11.5px; color: var(--muted); }
+  .cite {
+    display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; margin: 0 2px; vertical-align: 1px;
+    border: none; border-radius: 9px; font: 600 10.5px var(--font-mono); color: var(--accent); background: var(--accent-soft); cursor: pointer;
+  }
+  .cite:hover { filter: brightness(1.12); }
+  .cite:disabled { cursor: default; filter: none; }
+  .sources { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding-top: 8px; border-top: 1px dashed var(--line); }
+  .sources .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-right: 2px; }
+  .sources .chip { animation: none; font-size: 11px; }
+  .sources .chip b { font: 600 10.5px var(--font-mono); color: var(--accent); margin-right: 5px; }
+  .confirm { border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: var(--warn-soft); }
+  .confirm h3 { margin: 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); font-weight: 600; }
+  .confirm label { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; cursor: pointer; }
+  .confirm input[type=checkbox] { width: 15px; height: 15px; margin: 3px 0 0; accent-color: var(--accent); }
+  .confirm.decided { opacity: .72; }
+  .task.ping, .task.routine.ping { animation: ping 1.8s var(--ease-out); }
+  @keyframes ping { 0%, 45% { background: var(--accent-soft); } 100% { background: transparent; } }
 </style>
 </head>
 <body class="atmos">
@@ -198,6 +242,24 @@
         <button class="pick" type="button" role="radio" data-when="someday" aria-checked="false" data-i18n="today.when.someday">Algum dia</button>
       </div>
     </form>
+
+    <section id="sec-assist" class="assist" aria-labelledby="h-assist">
+      <div class="sec-head">
+        <h2 class="eyebrow" id="h-assist" data-i18n="today.sec.assist">Assistente</h2>
+        <div class="assist-quick">
+          <button class="btn btn-ghost btn-sm" type="button" id="assist-morning" data-i18n="today.assist.morning">Resumo da manhã</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="assist-closing" data-i18n="today.assist.closing">Fechar o dia</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="assist-new" hidden data-i18n="today.assist.new">Nova conversa</button>
+        </div>
+      </div>
+      <form class="ask" id="ask" autocomplete="off">
+        <label class="sr-only" for="ask-q" data-i18n="today.assist.label">Pergunta ao assistente</label>
+        <input class="field" id="ask-q" maxlength="2000" placeholder="Pergunte sobre o seu dia… (ex.: o que a Ana me pediu na daily?)" data-i18n-attr="placeholder:today.assist.placeholder">
+        <button class="btn" type="submit" id="ask-go" data-i18n="today.assist.ask">Perguntar</button>
+      </form>
+      <p class="sec-hint m0" id="assist-hint" data-i18n="today.assist.hint">Responde com o que está no ISPer e no OptTime, dizendo de onde veio. Antes de criar, mover ou lançar algo, pede o seu toque.</p>
+      <ol class="thread" id="thread" aria-live="polite"></ol>
+    </section>
 
     <section id="sec-agenda" aria-labelledby="h-agenda" hidden>
       <div class="sec-head">
@@ -1249,6 +1311,253 @@
   setInterval(renderAgenda, 60_000);
   setInterval(() => loadAgenda(false), 5 * 60_000);
 
+  // ---------------------------------------------------------- assistente
+  // A barra pergunta ao agente (Fase 10.4). A resposta cita as fontes com
+  // [[ref]]: viram números clicáveis no texto e a fileira de fontes embaixo.
+  // O que escreve (criar, mover, concluir, lançar horas) espera o cartão de
+  // confirmação; uma pergunta nova com o cartão aberto conta como "agora não".
+  let convId = null;
+  let asking = false;
+  let openCard = null;
+
+  function paintAsk() {
+    for (const id of ['ask-q', 'ask-go', 'assist-morning', 'assist-closing']) $(id).disabled = asking;
+    $('assist-new').hidden = asking || !$('thread').children.length;
+    $('assist-hint').hidden = !!$('thread').children.length;
+  }
+
+  function addTurn(node) {
+    $('thread').appendChild(node);
+    node.scrollIntoView({ block: 'nearest', behavior: UI.reduce() ? 'auto' : 'smooth' });
+    paintAsk();
+    return node;
+  }
+
+  function waitTurn() {
+    const li = el('li', 'turn-a wait');
+    li.setAttribute('aria-busy', 'true');
+    li.append(el('span', null, t('today.assist.thinking')), el('div', 'skeleton'), el('div', 'skeleton'));
+    return addTurn(li);
+  }
+
+  // Onde cada fonte leva: a reunião no minuto, a tarefa ou a rotina na tela.
+  function pingRow(li) {
+    li.scrollIntoView({ block: 'center', behavior: UI.reduce() ? 'auto' : 'smooth' });
+    li.classList.remove('ping');
+    void li.offsetWidth;
+    li.classList.add('ping');
+  }
+  function openerOf(src) {
+    const rest = src.ref.slice(src.ref.indexOf(':') + 1);
+    if (src.kind === 'reuniao') {
+      const [id, at] = rest.split('@');
+      return () => openMeetingAt(Number(id), at == null ? null : Number(at));
+    }
+    if (src.kind === 'tarefa') {
+      return () => {
+        const li = [...document.querySelectorAll('.tasks > li[data-id]')].find((x) => x.dataset.id === rest && !$('list-routines').contains(x));
+        if (!li) { toast(t('today.assist.task-gone'), 'info'); return; }
+        if ($('later').contains(li)) $('later').open = true;
+        pingRow(li);
+      };
+    }
+    if (src.kind === 'rotina') {
+      return () => {
+        $('routines-box').open = true;
+        const li = [...$('list-routines').children].find((x) => x.dataset.id === rest);
+        if (li) pingRow(li);
+      };
+    }
+    return null;
+  }
+
+  // **negrito** vira <b>; [[ref]] vira o número da fonte (referência que não
+  // veio das ferramentas some, em vez de virar um selo inventado).
+  function inlineRich(text, node, cite) {
+    const re = /\[\[([^\]]+)\]\]|\*\*([^*]+)\*\*/g;
+    let last = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > last) node.append(text.slice(last, m.index));
+      if (m[1] != null) {
+        for (const ref of m[1].split(/[,;]\s*/)) { const c = cite(ref.trim()); if (c) node.appendChild(c); }
+      } else {
+        node.appendChild(el('b', null, m[2]));
+      }
+      last = re.lastIndex;
+    }
+    if (last < text.length) node.append(text.slice(last));
+  }
+
+  function answerBody(text, sources) {
+    const nodes = [];
+    const cite = (ref) => {
+      const i = sources.findIndex((s) => s.ref === ref);
+      if (i < 0) return null;
+      const b = el('button', 'cite', String(i + 1));
+      b.type = 'button';
+      b.title = sources[i].label;
+      b.setAttribute('aria-label', t('today.assist.cite-aria', { n: i + 1, s: sources[i].label }));
+      const open = openerOf(sources[i]);
+      if (open) b.addEventListener('click', open); else b.disabled = true;
+      return b;
+    };
+    let ul = null;
+    for (const raw of String(text || '').split('\n')) {
+      const line = raw.trim();
+      if (!line) { ul = null; continue; }
+      const h = line.match(/^#{1,4}\s+(.*)$/);
+      if (h) { ul = null; const n = el('h4'); inlineRich(h[1].replace(/\*\*/g, ''), n, cite); nodes.push(n); continue; }
+      const b = line.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
+      if (b) {
+        if (!ul) { ul = el('ul'); nodes.push(ul); }
+        const li = el('li'); inlineRich(b[1], li, cite); ul.appendChild(li);
+        continue;
+      }
+      ul = null;
+      const p = el('p'); inlineRich(line, p, cite); nodes.push(p);
+    }
+    return nodes;
+  }
+
+  function sourcesRow(sources) {
+    const row = el('div', 'sources');
+    row.appendChild(el('span', 'lbl', t('today.assist.sources')));
+    sources.forEach((s, i) => {
+      const open = openerOf(s);
+      const chip = el(open ? 'button' : 'span', 'chip' + (open ? ' as-link' : ''));
+      chip.append(el('b', null, String(i + 1)), document.createTextNode(s.label));
+      if (open) { chip.type = 'button'; chip.addEventListener('click', open); }
+      row.appendChild(chip);
+    });
+    return row;
+  }
+
+  function showReply(li, reply) {
+    li.removeAttribute('aria-busy');
+    li.replaceChildren();
+    if (reply.step.kind === 'confirm') confirmCard(li, reply);
+    else {
+      li.className = 'turn-a';
+      const sources = reply.step.sources || [];
+      li.append(...answerBody(reply.step.text, sources));
+      if (sources.length) li.appendChild(sourcesRow(sources));
+    }
+    if (reply.opttime_error) li.appendChild(el('span', 'turn-note', t('today.assist.no-opttime', { e: reply.opttime_error.message })));
+  }
+
+  function confirmCard(li, reply) {
+    li.className = 'turn-a confirm';
+    li.appendChild(el('h3', null, t('today.assist.confirm-title')));
+    const boxes = reply.step.actions.map((a) => {
+      const label = el('label');
+      const cb = el('input');
+      cb.type = 'checkbox';
+      cb.checked = true;
+      cb.value = a.call.id;
+      label.append(cb, el('span', null, a.description));
+      li.appendChild(label);
+      return cb;
+    });
+    const acts = el('div', 'turn-acts');
+    const go = el('button', 'btn btn-primary btn-sm', t('today.assist.do'));
+    const skip = el('button', 'btn btn-ghost btn-sm', t('today.assist.skip'));
+    go.type = skip.type = 'button';
+    acts.append(go, skip);
+    li.appendChild(acts);
+    const note = el('span', 'turn-note');
+    const settle = (text) => {
+      boxes.forEach((b) => { b.disabled = true; });
+      acts.remove();
+      li.classList.add('decided');
+      note.textContent = text;
+      li.appendChild(note);
+      if (openCard === settle) openCard = null;
+    };
+    openCard = settle;
+    boxes.forEach((b) => b.addEventListener('change', () => { go.disabled = !boxes.some((x) => x.checked); }));
+    const decide = async (approve) => {
+      const ids = approve ? boxes.filter((b) => b.checked).map((b) => b.value) : [];
+      settle(ids.length ? t('today.assist.approved', { n: ids.length }) : t('today.assist.declined'));
+      asking = true;
+      const next = waitTurn();
+      try { showReply(next, await invoke('assistant_confirm', { id: reply.id, approved: ids })); }
+      catch (e) { errorTurn(next, e, null); }
+      asking = false;
+      paintAsk();
+      $('ask-q').focus();
+    };
+    go.addEventListener('click', () => decide(true));
+    skip.addEventListener('click', () => decide(false));
+    requestAnimationFrame(() => go.focus());
+  }
+
+  function errorTurn(li, e, retry) {
+    li.className = 'turn-a err';
+    li.removeAttribute('aria-busy');
+    const code = e && e.code;
+    const msg = (e && e.message) || String(e);
+    const text = {
+      no_provider: () => t('today.assist.no-provider'),
+      no_key: () => t('today.assist.no-key'),
+      stale: () => t('today.assist.stale'),
+      busy: () => t('today.assist.busy'),
+      failed_after_action: () => t('today.assist.after-action', { e: msg }),
+    }[code];
+    li.replaceChildren(el('p', null, text ? text() : t('today.assist.failed', { e: msg })));
+    if (code === 'stale') convId = null;
+    const acts = el('div', 'turn-acts');
+    if (code === 'no_provider' || code === 'no_key') {
+      acts.appendChild(actButton(t('today.assist.open-settings'), null,
+        () => invoke('open_settings_window', { section: 'inteligencia' }).catch((err) => toast(t('common.error', { e: err }), 'err')), 'btn btn-sm'));
+    } else if (retry && code !== 'stale' && code !== 'busy') {
+      acts.appendChild(actButton(t('today.assist.retry'), null, retry, 'btn btn-sm'));
+    }
+    if (acts.children.length) li.appendChild(acts);
+  }
+
+  // `brief` pede o resumo da manhã ou o fechamento (sempre numa conversa nova).
+  async function ask(question, brief) {
+    if (asking) return;
+    if (openCard) openCard(t('today.assist.ignored'));
+    const fresh = !!brief || convId == null;
+    if (brief) { $('thread').replaceChildren(); convId = null; }
+    asking = true;
+    const label = brief === 'morning' ? t('today.assist.morning') : brief === 'closing' ? t('today.assist.closing') : question;
+    const q = addTurn(el('li', 'turn-q', label));
+    const li = waitTurn();
+    try {
+      const reply = brief
+        ? await invoke('assistant_brief', { kind: brief })
+        : await invoke('assistant_ask', { question, fresh });
+      convId = reply.id;
+      showReply(li, reply);
+    } catch (e) {
+      errorTurn(li, e, () => { q.remove(); li.remove(); ask(question, brief); });
+    }
+    asking = false;
+    paintAsk();
+    if (document.activeElement === document.body) $('ask-q').focus();
+  }
+
+  $('ask').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const q = $('ask-q').value.trim();
+    if (!q) return;
+    $('ask-q').value = '';
+    ask(q, null);
+  });
+  $('assist-morning').addEventListener('click', () => ask(null, 'morning'));
+  $('assist-closing').addEventListener('click', () => ask(null, 'closing'));
+  $('assist-new').addEventListener('click', () => {
+    invoke('assistant_reset').catch(() => {});
+    convId = null;
+    openCard = null;
+    $('thread').replaceChildren();
+    paintAsk();
+    $('ask-q').focus();
+  });
+  paintAsk();
+
   // ------------------------------------------------------------ eventos
   listen('isper-tasks', () => refresh());
   document.addEventListener('isper-view', (e) => { if (e.detail && e.detail.active) { refresh(); loadAgenda(false); } });
@@ -1261,6 +1570,7 @@
   window.ISPER_VIEW = {
     open(p) {
       if (p.focusAdd) { const i = $('add-title'); i.focus(); i.select(); }
+      if (p.focusAsk) { const i = $('ask-q'); i.focus(); i.select(); }
     },
   };
 
