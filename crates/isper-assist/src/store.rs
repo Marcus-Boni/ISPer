@@ -137,6 +137,24 @@ impl AssistStore {
         Ok(out)
     }
 
+    /// As tarefas ainda por fazer (na caixa ou abertas) que saíram das
+    /// reuniões `meeting_ids`: o "ficou da última vez" do preparo.
+    pub fn open_tasks_from_meetings(&self, meeting_ids: &[i64]) -> Result<Vec<Task>> {
+        if meeting_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let ids: Vec<String> = meeting_ids.iter().map(i64::to_string).collect();
+        self.tasks_where(
+            &format!(
+                "status IN ('inbox', 'open') AND source_ref IS NOT NULL
+                   AND CAST(json_extract(source_ref, '$.meeting_id') AS INTEGER) IN ({})
+                 ORDER BY position",
+                ids.join(", ")
+            ),
+            params![],
+        )
+    }
+
     /// O diário de um dia, do mais antigo para o mais recente.
     pub fn journal_for_day(&self, day: NaiveDate) -> Result<Vec<JournalEntry>> {
         let mut stmt = self.conn.prepare(
@@ -977,6 +995,15 @@ mod tests {
         );
         let diario = store.journal_for_day(day("2026-10-07")).unwrap();
         assert!(diario.iter().all(|e| e.actor == "assistant"));
+
+        // O preparo da próxima: o que ficou aberto da reunião 7.
+        let abertas = store.open_tasks_from_meetings(&[7, 99]).unwrap();
+        assert_eq!(abertas.len(), 1);
+        store
+            .set_status(&abertas[0].id, TaskStatus::Done, Actor::User)
+            .unwrap();
+        assert!(store.open_tasks_from_meetings(&[7]).unwrap().is_empty());
+        assert!(store.open_tasks_from_meetings(&[]).unwrap().is_empty());
     }
 
     #[test]
