@@ -18,9 +18,12 @@ chrono = { version = "0.4.45", features = ["serde"] }
 # Ids que nascem em qualquer aparelho sem colidir (a sincronia da 10.6) e
 # que ordenam pelo instante em que foram criados.
 uuid = { version = "1.25", features = ["v7"] }
+# Datas e horas em português no texto das tarefas (when.rs).
+regex = "1.13"
 
 [dev-dependencies]
 isper-core = { version = "0.1.0", path = "../isper-core" }
+proptest = "1.11"
 
 [lints]
 workspace = true

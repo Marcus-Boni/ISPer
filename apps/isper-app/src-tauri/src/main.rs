@@ -250,6 +250,8 @@ fn main() {
             today::today_load,
             today::today_badge,
             today::task_add,
+            today::task_add_text,
+            today::task_parse,
             today::task_update,
             today::task_set_status,
             today::task_accept,

@@ -21,6 +21,13 @@ bata com ela.
   entrada; toda mudança tem Desfazer no aviso e no Ctrl+Z, e nada é apagado.
   A lista mostra a hora, o atraso, o prazo e a origem de cada tarefa, e
   "Feito hoje" guarda o que você concluiu no dia.
+- **Datas no texto da tarefa.** "amanhã às 3 ligar pro João" vira a tarefa
+  "Ligar pro João" para amanhã às 15:00, na tela Hoje e no Ctrl+K, com uma
+  prévia antes de salvar. Entende hoje, amanhã, os dias da semana ("sexta",
+  "sexta que vem"), "dia 12", "12/10", "15 de novembro", "daqui a 3 dias",
+  "semana que vem", "fim do mês", horas ("15h", "15:30", "às 3 e meia",
+  "meio-dia") e prazos ("até sexta"). É código no próprio ISPer, sem IA e
+  sem rede.
 - O banco passa para a versão 7 do schema, com as tabelas do assistente.
   Antes de migrar, o ISPer guarda uma cópia do banco como estava
   (`isper.db.v6.bak`), que abre na versão anterior do app.

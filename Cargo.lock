@@ -3176,6 +3176,8 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "isper-core",
+ "proptest",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",
