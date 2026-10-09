@@ -1,5 +1,5 @@
-// Um OptTime de mentira para os e2e das rotinas e da agenda (Fases 10.2 e
-// 10.3): o MCP hospedado
+// Um OptTime de mentira para os e2e das rotinas, da agenda e do assistente
+// (Fases 10.2 a 10.4): o MCP hospedado
 // sem sessão, como o de produção (POST com JSON-RPC, GET recusado com 405,
 // erro de ferramenta com o código em _meta["opt-time/error"]), com um dia que
 // começa em 4h40 de 8h e as sugestões que fecham o dia.
@@ -68,6 +68,23 @@ function agendaEvents() {
   ];
 }
 
+// O catálogo que o assistente vê (Fase 10.4): duas de leitura, uma que lança
+// e uma que apaga (essa nunca fica livre nas permissões).
+const TOOLS = [
+  { name: 'opt_time_get_today_summary', title: 'Resumo do dia', description: 'Horas lançadas num dia e quanto falta.',
+    inputSchema: { type: 'object', properties: { date: { type: 'string', description: 'AAAA-MM-DD' } } },
+    annotations: { readOnlyHint: true, destructiveHint: false } },
+  { name: 'opt_time_get_my_agenda', title: 'Minha agenda', description: 'Os eventos do Outlook de um dia.',
+    inputSchema: { type: 'object', properties: { date: { type: 'string' }, days: { type: 'integer' } } },
+    annotations: { readOnlyHint: true, destructiveHint: false } },
+  { name: 'opt_time_log_time', title: 'Lançar horas', description: 'Lança um apontamento no dia.',
+    inputSchema: { type: 'object', properties: { projectId: { type: 'string' }, durationMinutes: { type: 'integer' }, description: { type: 'string' } }, required: ['durationMinutes'] },
+    annotations: { readOnlyHint: false, destructiveHint: false } },
+  { name: 'opt_time_delete_entry', title: 'Apagar lançamento', description: 'Apaga um apontamento.',
+    inputSchema: { type: 'object', properties: { entryId: { type: 'string' } }, required: ['entryId'] },
+    annotations: { readOnlyHint: false, destructiveHint: true } },
+];
+
 const ok = (data) => ({ content: [{ type: 'text', text: 'ok' }], structuredContent: data });
 const fail = (code, message, hint) => ({
   content: [{ type: 'text', text: `❌ ${message}` }],
@@ -134,7 +151,7 @@ function answer(msg) {
     case 'initialize':
       return { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'opt-time', version: 'e2e' } };
     case 'tools/list':
-      return { tools: [] };
+      return { tools: TOOLS };
     case 'tools/call': {
       const { name, arguments: args = {} } = msg.params || {};
       calls.push({ name, args });

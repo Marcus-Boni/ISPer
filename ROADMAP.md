@@ -454,8 +454,8 @@ começam do zero na tela Hoje ([revisão do ADR 0021](docs/adr/0021-assistente-p
 
 ### 10.4 Agente
 
-- [ ] `LlmProvider` com chamada de ferramentas no Claude, no Groq e no Gemini, limpando os esquemas que o Gemini recusa (tipo em lista como `["integer","string"]` no `log_time`, `additionalProperties`)
-- [ ] Perguntas livres, resumo da manhã e fechamento do dia; tela de permissões e cartão de confirmação ([0023](docs/adr/0023-escada-de-confianca.md))
+- [x] `LlmProvider` com chamada de ferramentas no Claude, no Groq e no Gemini, limpando os esquemas que o Gemini recusa (tipo em lista como `["integer","string"]` no `log_time`, `additionalProperties`); o laço do agente (`isper_llm::agent`: ler roda, escrever para no toque, bloqueada não roda, até 8 rodadas, nova tentativa no erro passageiro, citação `[[ref]]`), as ferramentas do ISPer e do OptTime (`isper-agent`) e o `isper-cli agente` para medir num banco sintético: Gemini 3.5 Flash-Lite 10/10 (09/10)
+- [x] Perguntas livres, resumo da manhã e fechamento do dia na tela Hoje, com a fonte citada e clicável; seção Assistente nas Configurações (livre, pergunta ou bloqueada por ferramenta; o que apaga nunca fica livre) e o cartão de confirmação ([0023](docs/adr/0023-escada-de-confianca.md)); o provedor "Compatível com OpenAI" (Ollama, LM Studio). e2e `tools/e2e/assistant.ps1` contra uma IA de mentira (`fake-llm.mjs`) (09/10)
 - [ ] Pronto quando acerta 20 perguntas de teste sobre dias reais, citando a origem
 
 ### 10.5 Aprendizado
