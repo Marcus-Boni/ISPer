@@ -253,15 +253,63 @@ pub(crate) fn finish_meeting(
     // nesta reunião, se o usuário continuar escrevendo.
     attach_saved_meeting(app, &copilot, &store, meeting_id);
 
+    // Fase 10.3: o evento da agenda em que a gravação aconteceu dá o nome da
+    // reunião (o assunto do convite é o nome que ela tem) e fica ligado a
+    // ela. Com o assunto, a IA não troca o título, nem agora nem no passe
+    // final.
+    let ended = now.fixed_offset();
+    let started = ended - chrono::Duration::milliseconds((result.duration_secs * 1000.0) as i64);
+    let mut app_title = Some(title.clone());
+    if let Some(event) = crate::agenda::event_for_recording(app, started, ended) {
+        match store
+            .set_meeting_event(meeting_id, &crate::agenda::stored_event(&event))
+            .and_then(|()| store.rename_meeting(meeting_id, &event.subject))
+        {
+            Ok(()) => {
+                tracing::info!(meeting_id, "reunião casada com o evento da agenda");
+                title = event.subject.clone();
+                app_title = None;
+            }
+            Err(e) => tracing::warn!(meeting_id, "não consegui casar a reunião com a agenda: {e}"),
+        }
+    }
+
     // Fase 5: título + resumo por IA de nuvem, numa chamada — só o TEXTO do
     // transcript (com as decisões validadas) sai da máquina. É o resumo
     // provisório, do texto ao vivo, para haver um na hora: o passe final o
     // refaz sobre a transcrição oficial (ver `final_pass::refresh_derived`).
-    let rename_from = Some(title.as_str());
-    if let Some(t) = summarize_saved(&store, meeting_id, &para_resumo, rename_from, || {
-        let _ = app.emit("isper-state", json!({"state": "meeting-summary"}));
-    }) {
-        title = t;
+    //
+    // Ao mesmo tempo (Fase 10.3), as ações de "Eu" vão para a caixa de
+    // entrada: o aviso de "reunião salva" já diz quantas.
+    let lines = crate::meeting_inbox::lines_of(&result);
+    let decision_rows = stored_decisions(&copilot.decisions);
+    let day = now.date_naive();
+    let actions_title = title.clone();
+    let (summary_title, actions) = std::thread::scope(|scope| {
+        let collecting = scope.spawn(|| {
+            crate::meeting_inbox::collect(
+                app,
+                meeting_id,
+                &actions_title,
+                day,
+                &lines,
+                &decision_rows,
+            )
+        });
+        let t = summarize_saved(
+            &store,
+            meeting_id,
+            &para_resumo,
+            app_title.as_deref(),
+            || {
+                let _ = app.emit("isper-state", json!({"state": "meeting-summary"}));
+            },
+        );
+        (t, collecting.join().unwrap_or(0))
+    });
+    if let Some(t) = summary_title {
+        title = t.clone();
+        app_title = Some(t);
     }
 
     // Busca semântica: transcript + resumo viram vetores em segundo plano
@@ -291,6 +339,7 @@ pub(crate) fn finish_meeting(
             &title,
             result.duration_secs,
             has_summary,
+            actions,
             &md_path,
         ),
     }
@@ -300,7 +349,7 @@ pub(crate) fn finish_meeting(
     // substitui a transcrição ao vivo no banco, regrava o `.md` e refaz o
     // resumo e a busca. O título vai junto: é o que o app pôs, e só ele pode
     // dar lugar ao título da IA.
-    final_pass::run_in_background(app.clone(), meeting_id, result, title);
+    final_pass::run_in_background(app.clone(), meeting_id, result, app_title);
 
     Ok(md_path.display().to_string())
 }
@@ -391,16 +440,23 @@ pub(crate) fn open_file(path: &Path) {
 
 /// Toast "Reunião salva" — clicar abre a Biblioteca já naquela reunião. Se o
 /// Windows recusar a notificação, abre o arquivo (o usuário não fica sem nada).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn notify_meeting_saved(
     app: &AppHandle,
     meeting_id: i64,
     title: &str,
     duration_secs: f32,
     has_summary: bool,
+    actions: usize,
     md_path: &Path,
 ) {
     let summary = if has_summary {
         crate::i18n::tr(app, "notify.summary-ready")
+    } else {
+        String::new()
+    };
+    let actions = if actions > 0 {
+        crate::i18n::trv(app, "notify.actions-inbox", &[("n", actions.to_string())])
     } else {
         String::new()
     };
@@ -410,6 +466,7 @@ pub(crate) fn notify_meeting_saved(
         &[
             ("duration", meeting::fmt_ts(duration_secs)),
             ("summary", summary),
+            ("actions", actions),
         ],
     );
     let heading = crate::i18n::tr(app, "notify.meeting-saved");

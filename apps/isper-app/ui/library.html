@@ -803,15 +803,17 @@
 
   // Aberta pelo Início com uma reunião escolhida: seleciona ao carregar e
   // sempre que o Início pedir de novo com esta janela já aberta.
+  // A tarefa da caixa de entrada (Fase 10.3) pede também o minuto em que foi dita.
   async function selectPending() {
-    let id = null;
-    try { id = await invoke('take_pending_meeting'); } catch (_) { return; }
-    if (id == null) return;
+    let pending = null;
+    try { pending = await invoke('take_pending_meeting'); } catch (_) { return; }
+    if (pending == null) return;
+    const id = pending.id;
     if (tab !== 'meetings') tabsCtl.select('meetings');
     selected = id;
     $('list').dataset.sig = '';
     await loadMeetings(true);
-    showMeeting(id);
+    showMeeting(id, pending.at != null ? { at: pending.at } : {});
   }
   listen('isper-library-select', selectPending);
 

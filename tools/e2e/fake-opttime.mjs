@@ -1,4 +1,5 @@
-// Um OptTime de mentira para os e2e das rotinas (Fase 10.2): o MCP hospedado
+// Um OptTime de mentira para os e2e das rotinas e da agenda (Fases 10.2 e
+// 10.3): o MCP hospedado
 // sem sessão, como o de produção (POST com JSON-RPC, GET recusado com 405,
 // erro de ferramenta com o código em _meta["opt-time/error"]), com um dia que
 // começa em 4h40 de 8h e as sugestões que fecham o dia.
@@ -35,6 +36,38 @@ const SUGGESTIONS = [
     evidence: 'Fonte nova' },
 ];
 
+// Um instante daqui a `min` minutos, em ISO com o offset local (como o OptTime manda).
+function isoIn(min) {
+  const d = new Date(Date.now() + min * 60_000);
+  d.setSeconds(0, 0);
+  const p = (n) => String(Math.abs(n)).padStart(2, '0');
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00${sign}${p(Math.trunc(off / 60))}:${p(off % 60)}`;
+}
+
+// A agenda do dia, relativa à hora do teste: uma que já passou, uma reunião acontecendo, uma
+// daqui a 30 min (fora da janela do aviso de preparo), uma presencial mais
+// tarde, um bloqueio livre e um feriado de dia inteiro.
+function agendaEvents() {
+  const ev = (uid, subject, from, to, extra = {}) => ({
+    id: `id-${uid}`, iCalUId: uid, seriesMasterId: null, type: 'singleInstance', subject,
+    start: isoIn(from), end: isoIn(to), durationMinutes: to - from, isAllDay: false, isOnline: true,
+    joinUrl: `https://teams.microsoft.com/l/meetup-join/${uid}`,
+    organizer: { name: 'Ana Souza', email: 'ana@example.com' }, isOrganizer: false,
+    responseStatus: 'accepted', attendeeCount: 4, attendees: [], location: null, showAs: 'busy',
+    sensitivity: 'normal', webLink: null, loggedMinutes: 0, attendance: null, ...extra,
+  });
+  return [
+    ev('ev-feriado', 'Feriado municipal', -600, 840, { isAllDay: true, isOnline: false, joinUrl: null, showAs: 'oof' }),
+    ev('ev-cedo', 'Alinhamento da manhã', -120, -60),
+    ev('ev-daily', 'Daily do Portal', -20, 40, { seriesMasterId: 'serie-daily', type: 'occurrence' }),
+    ev('ev-refino', 'Refinamento do backlog', 30, 90),
+    ev('ev-foco', 'Bloqueio de foco', 100, 160, { showAs: 'free', isOnline: false, joinUrl: null, attendeeCount: 1 }),
+    ev('ev-visita', 'Visita ao cliente', 180, 240, { isOnline: false, joinUrl: null, location: 'Salvador' }),
+  ];
+}
+
 const ok = (data) => ({ content: [{ type: 'text', text: 'ok' }], structuredContent: data });
 const fail = (code, message, hint) => ({
   content: [{ type: 'text', text: `❌ ${message}` }],
@@ -69,6 +102,11 @@ function tool(name, args) {
         gapMinutes: Math.max(0, TARGET - total),
         sources: { outlook: true, teamsCalls: true, azureDevOps: true, history: false, commits: 0 },
         warnings: [], notes: [],
+      });
+    case 'opt_time_get_my_agenda':
+      return ok({
+        timezone: 'America/Sao_Paulo', range: { start: isoIn(-720), end: isoIn(720) },
+        sources: { outlook: true }, warnings: [], events: agendaEvents(),
       });
     case 'opt_time_apply_suggestions': {
       if (applied.has(args.idempotencyKey)) return ok({ ...applied.get(args.idempotencyKey), replayed: true });

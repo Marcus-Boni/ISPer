@@ -417,9 +417,23 @@ pub(crate) fn open_onboarding(app: &AppHandle) {
 /// Abre a Biblioteca já com a reunião selecionada. A página pede a reunião
 /// por `take_pending_meeting` ao carregar e a cada `isper-library-select`.
 pub(crate) fn open_library_at(app: &AppHandle, meeting_id: i64) {
-    *app.state::<AppState>().pending_meeting.lock_or_recover() = Some(meeting_id);
+    open_library_at_time(app, meeting_id, None);
+}
+
+/// A Biblioteca na reunião, já no instante `at` (segundos), quando dado.
+pub(crate) fn open_library_at_time(app: &AppHandle, meeting_id: i64, at: Option<f32>) {
+    let state = app.state::<AppState>();
+    *state.pending_meeting.lock_or_recover() = Some(meeting_id);
+    *state.pending_at.lock_or_recover() = at;
     open_library(app);
     let _ = app.emit_to(MAIN, "isper-library-select", ());
+}
+
+/// Abre a reunião na Biblioteca no minuto em que algo foi dito (a origem de
+/// uma tarefa da caixa de entrada).
+#[tauri::command]
+pub(crate) fn open_meeting_at(app: AppHandle, meeting_id: i64, at: Option<f32>) {
+    open_library_at_time(&app, meeting_id, at);
 }
 
 /// Janela do ISPer Copilot: HUD de decisões e notetaker em tempo real durante
@@ -517,13 +531,20 @@ pub(crate) async fn open_home_window(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// A reunião que a Biblioteca deve abrir, e o instante, se houver.
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct PendingMeeting {
+    id: i64,
+    at: Option<f32>,
+}
+
 /// A Biblioteca chama ao carregar e ao receber `isper-library-select`.
 #[tauri::command]
-pub(crate) fn take_pending_meeting(app: AppHandle) -> Option<i64> {
-    app.state::<AppState>()
-        .pending_meeting
-        .lock_or_recover()
-        .take()
+pub(crate) fn take_pending_meeting(app: AppHandle) -> Option<PendingMeeting> {
+    let state = app.state::<AppState>();
+    let id = state.pending_meeting.lock_or_recover().take()?;
+    let at = state.pending_at.lock_or_recover().take();
+    Some(PendingMeeting { id, at })
 }
 
 /// A página da janela principal pintou: a janela aparece, e a página recebe a

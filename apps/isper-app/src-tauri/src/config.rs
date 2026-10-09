@@ -161,6 +161,13 @@ pub struct AppConfig {
     /// token fica no Credential Manager, nunca aqui.
     #[serde(default)]
     pub opttime_url: Option<String>,
+    /// Aviso de preparo 10 minutos antes das reuniões da agenda (Fase 10.3).
+    #[serde(default = "default_true")]
+    pub meeting_prep: bool,
+    /// Ações de "Eu" de cada reunião gravada para a caixa de entrada da tela
+    /// Hoje quando ela acaba (Fase 10.3).
+    #[serde(default = "default_true")]
+    pub meeting_inbox: bool,
     /// Versão do formato deste arquivo — ver [`CONFIG_VERSION`].
     #[serde(default)]
     pub config_version: u32,
@@ -219,6 +226,8 @@ impl Default for AppConfig {
             main_window: None,
             sidebar_collapsed: false,
             opttime_url: None,
+            meeting_prep: true,
+            meeting_inbox: true,
             config_version: CONFIG_VERSION,
         }
     }

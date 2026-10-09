@@ -52,6 +52,10 @@ pub(crate) struct SettingsDto {
     final_pass: bool,
     /// Transcrever o que cair na pasta Importar (Fase 9.0).
     import_watch: bool,
+    /// Aviso de preparo antes das reuniões da agenda (Fase 10.3).
+    meeting_prep: bool,
+    /// Ações de "Eu" das reuniões para a caixa de entrada (Fase 10.3).
+    meeting_inbox: bool,
     /// A pasta Importar, para a tela mostrar o caminho.
     import_dir: String,
     /// Participantes conhecidos da reunião (0 = descobrir pelo agrupamento).
@@ -119,6 +123,12 @@ pub(crate) struct SettingsPatch {
     /// Vigiar a pasta Importar (ausente = mantém).
     #[serde(default)]
     import_watch: Option<bool>,
+    /// Preparo antes das reuniões da agenda (ausente = mantém).
+    #[serde(default)]
+    meeting_prep: Option<bool>,
+    /// Ações das reuniões para a caixa de entrada (ausente = mantém).
+    #[serde(default)]
+    meeting_inbox: Option<bool>,
     /// Avançado — quantos participantes a reunião tem (0 = descobrir).
     #[serde(default)]
     meeting_speakers: Option<u32>,
@@ -382,6 +392,8 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         retention_days: cfg.retention_days,
         final_pass: cfg.final_pass,
         import_watch: cfg.import_watch,
+        meeting_prep: cfg.meeting_prep,
+        meeting_inbox: cfg.meeting_inbox,
         import_dir: crate::audio_import::import_dir()
             .map(|d| d.display().to_string())
             .unwrap_or_default(),
@@ -436,6 +448,8 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         // Avançado: o que a tela não mandar mantém o valor atual.
         final_pass: patch.final_pass.unwrap_or(previous.final_pass),
         import_watch: patch.import_watch.unwrap_or(previous.import_watch),
+        meeting_prep: patch.meeting_prep.unwrap_or(previous.meeting_prep),
+        meeting_inbox: patch.meeting_inbox.unwrap_or(previous.meeting_inbox),
         // A sincronia com o celular muda na hora pelos comandos dela.
         phone_sync: previous.phone_sync,
         phone_relay: previous.phone_relay.clone(),
