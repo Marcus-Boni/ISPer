@@ -40,6 +40,84 @@ pub trait LlmProvider: Send + Sync {
         on_token(&text);
         Ok(text)
     }
+
+    /// Como [`complete`](Self::complete), mas a resposta é um JSON que segue
+    /// `schema` (JSON Schema simples: `object` com `additionalProperties:
+    /// false`, `array`, `string`, `integer`, `boolean`, `enum`, `required`,
+    /// `description` e campo anulável como `"type": ["string", "null"]`).
+    ///
+    /// Cada provider usa o modo nativo de saída estruturada da API (Claude
+    /// `output_config.format`, Gemini `responseSchema`, Groq `json_schema`).
+    /// O padrão, para quem não tem, pede o JSON no texto e o extrai — quem
+    /// chama valida o formato do mesmo jeito.
+    fn complete_json(&self, system: &str, user: &str, schema: &Value) -> Result<Value> {
+        let system = format!(
+            "{system}\n\nResponda só com um objeto JSON, sem texto em volta, que siga este JSON Schema:\n{schema}"
+        );
+        parse_json_text(&self.complete(&system, user)?)
+    }
+}
+
+/// O JSON de uma resposta em texto: sem cercas Markdown e sem conversa em
+/// volta ("Claro! Aqui está: {…}").
+pub(crate) fn parse_json_text(raw: &str) -> Result<Value> {
+    let text = crate::copilot::sanitize_json(raw);
+    serde_json::from_str(&text)
+        .map_err(|e| LlmError::BadResponse(format!("JSON inválido na resposta: {e}")))
+}
+
+/// O esquema no dialeto do `responseSchema` do Gemini (subconjunto OpenAPI):
+/// tipos em maiúsculas, `["x", "null"]` vira `nullable`, e sem
+/// `additionalProperties`, que ele não aceita.
+pub(crate) fn gemini_schema(schema: &Value) -> Value {
+    match schema {
+        Value::Object(map) => {
+            let mut out = serde_json::Map::new();
+            for (k, v) in map {
+                match k.as_str() {
+                    "additionalProperties" | "$schema" | "title" => {}
+                    "type" => match v {
+                        Value::Array(types) => {
+                            let main = types
+                                .iter()
+                                .filter_map(Value::as_str)
+                                .find(|t| *t != "null")
+                                .unwrap_or("string");
+                            out.insert("type".into(), json!(main.to_uppercase()));
+                            if types.iter().any(|t| t.as_str() == Some("null")) {
+                                out.insert("nullable".into(), json!(true));
+                            }
+                        }
+                        Value::String(t) => {
+                            out.insert("type".into(), json!(t.to_uppercase()));
+                        }
+                        other => {
+                            out.insert("type".into(), other.clone());
+                        }
+                    },
+                    "properties" => {
+                        let props = v
+                            .as_object()
+                            .map(|p| {
+                                p.iter()
+                                    .map(|(name, s)| (name.clone(), gemini_schema(s)))
+                                    .collect::<serde_json::Map<_, _>>()
+                            })
+                            .unwrap_or_default();
+                        out.insert("properties".into(), Value::Object(props));
+                    }
+                    "items" => {
+                        out.insert("items".into(), gemini_schema(v));
+                    }
+                    _ => {
+                        out.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+            Value::Object(out)
+        }
+        other => other.clone(),
+    }
 }
 
 /// Constrói o provider a partir das configurações salvas + chave do
@@ -371,6 +449,48 @@ impl LlmProvider for Claude {
         Ok(text)
     }
 
+    fn complete_json(&self, system: &str, user: &str, schema: &Value) -> Result<Value> {
+        // Saída estruturada nativa: a API garante um JSON que segue o esquema.
+        let body = json!({
+            "model": self.model,
+            "max_tokens": MAX_TOKENS,
+            "system": system,
+            "messages": [{"role": "user", "content": user}],
+            "output_config": {"format": {"type": "json_schema", "schema": schema}},
+            "fallbacks": "default",
+        });
+        let resp = post_json(
+            "https://api.anthropic.com/v1/messages",
+            &self.headers(),
+            body,
+        )
+        .map_err(|e| map_model_error(e, &self.model))?;
+        match resp["stop_reason"].as_str() {
+            Some("refusal") => {
+                let cat = resp["stop_details"]["category"]
+                    .as_str()
+                    .unwrap_or("sem categoria");
+                return Err(LlmError::Refused(cat.to_string()));
+            }
+            Some("max_tokens") => {
+                return Err(LlmError::BadResponse(
+                    "a resposta estourou o limite de tokens".into(),
+                ));
+            }
+            _ => {}
+        }
+        let text = resp["content"]
+            .as_array()
+            .and_then(|blocks| {
+                blocks
+                    .iter()
+                    .find(|b| b["type"].as_str() == Some("text"))
+                    .and_then(|b| b["text"].as_str())
+            })
+            .ok_or_else(|| LlmError::BadResponse("resposta sem texto".into()))?;
+        parse_json_text(text)
+    }
+
     fn list_models(&self) -> Result<Vec<String>> {
         let resp = get_json(
             "https://api.anthropic.com/v1/models?limit=100",
@@ -471,6 +591,41 @@ impl LlmProvider for Groq {
             .ok_or_else(|| LlmError::BadResponse("resposta sem texto".into()))
     }
 
+    fn complete_json(&self, system: &str, user: &str, schema: &Value) -> Result<Value> {
+        let body = json!({
+            "model": self.model,
+            "max_tokens": MAX_TOKENS,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "resposta", "strict": true, "schema": schema},
+            },
+        });
+        let auth = format!("Bearer {}", self.api_key);
+        match post_json(
+            "https://api.groq.com/openai/v1/chat/completions",
+            &[("authorization", auth.as_str())],
+            body,
+        ) {
+            Ok(resp) => parse_json_text(
+                resp["choices"][0]["message"]["content"]
+                    .as_str()
+                    .unwrap_or_default(),
+            ),
+            // Nem todo modelo da Groq aceita json_schema: cai no modo de texto.
+            Err(LlmError::Http(msg)) if msg.contains("status 400") => {
+                let system = format!(
+                    "{system}\n\nResponda só com um objeto JSON, sem texto em volta, que siga este JSON Schema:\n{schema}"
+                );
+                parse_json_text(&self.complete(&system, user)?)
+            }
+            Err(e) => Err(map_model_error(e, &self.model)),
+        }
+    }
+
     fn list_models(&self) -> Result<Vec<String>> {
         let auth = format!("Bearer {}", self.api_key);
         let resp = get_json(
@@ -553,6 +708,53 @@ impl LlmProvider for Gemini {
             .map(str::to_string)
             .filter(|s| !s.is_empty())
             .ok_or_else(|| LlmError::BadResponse("resposta sem texto".into()))
+    }
+
+    fn complete_json(&self, system: &str, user: &str, schema: &Value) -> Result<Value> {
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
+            self.model
+        );
+        let mut config = json!({
+            "maxOutputTokens": MAX_TOKENS,
+            "responseMimeType": "application/json",
+            "responseSchema": gemini_schema(schema),
+        });
+        // Extração curta: os Gemini 3 pensam o mínimo e respondem mais rápido.
+        if self.model.starts_with("gemini-3") {
+            config["thinkingConfig"] = json!({"thinkingLevel": "minimal"});
+        }
+        let body = |config: &Value| {
+            json!({
+                "system_instruction": {"parts": [{"text": system}]},
+                "contents": [{"role": "user", "parts": [{"text": user}]}],
+                "generationConfig": config,
+            })
+        };
+        let key = [("x-goog-api-key", self.api_key.as_str())];
+        let resp = match post_json(&url, &key, body(&config)) {
+            // Um modelo que não aceite o nível de raciocínio não trava a
+            // captura: tenta de novo sem ele.
+            Err(LlmError::Http(msg)) if msg.contains("status 400") && msg.contains("hinking") => {
+                if let Some(c) = config.as_object_mut() {
+                    c.remove("thinkingConfig");
+                }
+                post_json(&url, &key, body(&config))
+            }
+            other => other,
+        }
+        .map_err(|e| map_model_error(e, &self.model))?;
+        // Com raciocínio, pode haver mais de uma parte: vale a de texto final.
+        let text = resp["candidates"][0]["content"]["parts"]
+            .as_array()
+            .and_then(|parts| {
+                parts
+                    .iter()
+                    .filter(|p| p["thought"].as_bool() != Some(true))
+                    .find_map(|p| p["text"].as_str())
+            })
+            .ok_or_else(|| LlmError::BadResponse("resposta sem texto".into()))?;
+        parse_json_text(text)
     }
 
     fn list_models(&self) -> Result<Vec<String>> {
