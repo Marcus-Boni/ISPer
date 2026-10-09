@@ -62,11 +62,21 @@ jobs:
           cache-directories: target/sherpa-onnx-prebuilt
           cache-on-failure: true
 
-      # Ver o comentário equivalente em ci.yml.
+      # Ver o comentário equivalente em ci.yml. Aqui a conferência é por ABI:
+      # um run cancelado no meio (outro push no mesmo PR) salva o cache com
+      # uma ABI baixada e a outra vazia, e o build script do sherpa-onnx-sys
+      # não baixa de novo se a pasta existe ("No shared runtime libraries
+      # found in .../jniLibs/arm64-v8a"). Faltando qualquer uma, sai tudo.
       - name: sherpa-onnx pré-compilado presente
         run: |
-          if [ -z "$(find target/sherpa-onnx-prebuilt -type f -name 'libsherpa-onnx-c-api*' -print -quit 2>/dev/null)" ]; then
-            echo "pré-compilado do sherpa-onnx ausente: o build script vai rodar e baixar de novo"
+          missing=""
+          for abi in arm64-v8a x86_64; do
+            if [ -z "$(find "target/sherpa-onnx-prebuilt/jniLibs/$abi" -maxdepth 1 -type f -name '*.so' -print -quit 2>/dev/null)" ]; then
+              missing="$missing $abi"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "pré-compilado do sherpa-onnx incompleto (falta:$missing): o build script vai rodar e baixar de novo"
             rm -rf target/sherpa-onnx-prebuilt
             find target -type d -name 'sherpa-onnx-sys-*' -prune -exec rm -rf {} + 2>/dev/null || true
           fi
