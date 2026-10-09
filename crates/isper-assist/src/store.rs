@@ -1,4 +1,4 @@
-//! O [`AssistStore`]: tarefas e diário sobre o `isper.db`.
+//! O [`AssistStore`]: tarefas, rotinas e diário sobre o `isper.db`.
 //!
 //! Cada mudança numa tarefa acontece numa transação junto com a linha do
 //! diário que a descreve, com o "antes" e o "depois". O desfazer
@@ -16,6 +16,8 @@ use serde_json::json;
 use crate::clock::{Clock, SystemClock};
 use crate::model::{Actor, JournalEntry, NewTask, SourceKind, Task, TaskPatch, TaskStatus, Today};
 use crate::{AssistError, Result};
+
+mod routines;
 
 /// Versão do schema do `isper.db` que trouxe as tabelas do assistente.
 pub const SCHEMA_VERSION_REQUIRED: i64 = 7;
@@ -153,6 +155,11 @@ impl AssistStore {
 
     /// Cria uma tarefa.
     pub fn create_task(&self, new: NewTask, actor: Actor) -> Result<Task> {
+        self.insert_task(new, None, actor)
+    }
+
+    /// Cria uma tarefa, ligada ou não a uma rotina.
+    fn insert_task(&self, new: NewTask, routine_id: Option<String>, actor: Actor) -> Result<Task> {
         let new = new.normalized()?;
         let now = self.clock.now_ms();
         // A ordem manual nasce com o instante: as novas vão para o fim, e
@@ -178,7 +185,7 @@ impl AssistStore {
             source_kind: new.source_kind,
             source_ref: new.source_ref,
             external_ref: new.external_ref,
-            routine_id: None,
+            routine_id,
             position,
             created_at: now,
             updated_at: now,
@@ -411,16 +418,42 @@ impl AssistStore {
         if let Some(id) = undoes {
             data["undoes"] = json!(id);
         }
+        self.journal_row(
+            conn,
+            at,
+            actor,
+            action,
+            "task",
+            &after.id,
+            &after.title,
+            &data,
+        )
+    }
+
+    /// Uma linha do diário, de qualquer objeto.
+    #[allow(clippy::too_many_arguments)]
+    fn journal_row(
+        &self,
+        conn: &Connection,
+        at: i64,
+        actor: Actor,
+        action: &str,
+        object_kind: &str,
+        object_id: &str,
+        summary: &str,
+        data: &serde_json::Value,
+    ) -> Result<()> {
         conn.execute(
             "INSERT INTO journal (at, day, actor, action, object_kind, object_id, summary, data)
-             VALUES (?1, ?2, ?3, ?4, 'task', ?5, ?6, ?7)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 at,
                 self.clock.day_of(at).to_string(),
                 actor.as_str(),
                 action,
-                after.id,
-                after.title,
+                object_kind,
+                object_id,
+                summary,
                 data.to_string(),
             ],
         )?;
@@ -541,7 +574,7 @@ mod tests {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
 
     /// Um `isper.db` novo, migrado pelo `isper-core` como no app.
-    fn store_at(clock: FixedClock) -> (AssistStore, std::path::PathBuf) {
+    pub(crate) fn store_at(clock: FixedClock) -> (AssistStore, std::path::PathBuf) {
         let n = NEXT.fetch_add(1, Ordering::SeqCst);
         let path =
             std::env::temp_dir().join(format!("isper-assist-test-{}-{n}.db", std::process::id()));

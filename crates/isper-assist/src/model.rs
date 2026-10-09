@@ -6,6 +6,7 @@
 use chrono::NaiveDate;
 use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::recur::Rule;
 use crate::{AssistError, Result};
 
 /// Título mais longo aceito (caracteres).
@@ -393,6 +394,203 @@ pub struct Today {
     pub done_today: Vec<Task>,
 }
 
+/// Verificador que confere no OptTime se o dia fechou a meta de horas
+/// (`opt_time_get_today_summary`).
+pub const VERIFY_OPTTIME_DAY: &str = "opttime.day_complete";
+/// Ação que preenche o dia no OptTime com as sugestões, depois do toque
+/// (`opt_time_suggest_daily_entries` e `opt_time_apply_suggestions`).
+pub const ACTION_OPTTIME_FILL: &str = "opttime.fill_day";
+
+const VERIFIERS: [&str; 1] = [VERIFY_OPTTIME_DAY];
+const ACTIONS: [&str; 1] = [ACTION_OPTTIME_FILL];
+
+/// Quanto a rotina pode fazer sozinha ([ADR 0023]).
+///
+/// [ADR 0023]: ../../../docs/adr/0023-escada-de-confianca.md
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutineMode {
+    /// Quando o verificador confirma, pede um toque para concluir.
+    Ask,
+    /// Quando o verificador confirma, conclui sem avisar. Só existe em rotina
+    /// com verificador; escrever fora do ISPer continua pedindo o toque.
+    Auto,
+}
+
+impl RoutineMode {
+    /// O nome no banco.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ask => "ask",
+            Self::Auto => "auto",
+        }
+    }
+
+    /// Lê o nome do banco.
+    pub fn parse(s: &str) -> Result<Self> {
+        Ok(match s {
+            "ask" => Self::Ask,
+            "auto" => Self::Auto,
+            other => return Err(AssistError::Invalid(format!("modo desconhecido: {other}"))),
+        })
+    }
+}
+
+/// Uma rotina: o que se repete, quando, e como conferir que foi feito.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Routine {
+    /// UUID v7.
+    pub id: String,
+    /// O que fazer; vira o título da tarefa de cada dia.
+    pub title: String,
+    /// A recorrência, na forma canônica do RRULE.
+    pub rrule: String,
+    /// A mesma recorrência, aberta para a interface.
+    pub rule: Rule,
+    /// Como conferir que foi feito ([`VERIFY_OPTTIME_DAY`]).
+    pub verifier: Option<String>,
+    /// O que fazer quando falta ([`ACTION_OPTTIME_FILL`]).
+    pub action: Option<String>,
+    /// Quanto pode fazer sozinha.
+    pub mode: RoutineMode,
+    /// Pausada fica `false`: não cria mais tarefas, mas não some.
+    pub active: bool,
+    /// A evidência, quando nasceu de uma sugestão (10.5).
+    pub learned_from: Option<serde_json::Value>,
+    /// Criada em (ms UTC). O dia local conta o `INTERVAL`.
+    pub created_at: i64,
+    /// Última mudança (ms UTC).
+    pub updated_at: i64,
+}
+
+/// Uma rotina nova.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct NewRoutine {
+    /// O que fazer.
+    pub title: String,
+    /// A recorrência (RRULE).
+    pub rrule: String,
+    /// Verificador.
+    #[serde(default)]
+    pub verifier: Option<String>,
+    /// Ação.
+    #[serde(default)]
+    pub action: Option<String>,
+    /// `ask` (padrão) ou `auto`.
+    #[serde(default = "default_mode")]
+    pub mode: RoutineMode,
+}
+
+fn default_mode() -> RoutineMode {
+    RoutineMode::Ask
+}
+
+impl NewRoutine {
+    /// "Registrar 8h": dias úteis às 17:00, conferida e preenchida pelo
+    /// OptTime ([ADR 0023]).
+    ///
+    /// [ADR 0023]: ../../../docs/adr/0023-escada-de-confianca.md
+    pub fn opttime_hours(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            rrule: Rule::workdays_at(17, 0).to_string(),
+            verifier: Some(VERIFY_OPTTIME_DAY.into()),
+            action: Some(ACTION_OPTTIME_FILL.into()),
+            mode: RoutineMode::Ask,
+        }
+    }
+
+    /// Valida: título, regra (vai para o banco na forma canônica), verificador
+    /// e ação conhecidos, e automático só com verificador.
+    pub(crate) fn normalized(self) -> Result<(Self, Rule)> {
+        let rule = Rule::parse(&self.rrule)?;
+        let out = Self {
+            title: clean_title(&self.title)?,
+            rrule: rule.to_string(),
+            verifier: known(clean_optional(self.verifier), &VERIFIERS, "verificador")?,
+            action: known(clean_optional(self.action), &ACTIONS, "ação")?,
+            mode: self.mode,
+        };
+        check_mode(out.mode, out.verifier.as_deref())?;
+        Ok((out, rule))
+    }
+}
+
+/// Mudança numa rotina. Campo ausente fica como está; `null` tira o
+/// verificador ou a ação.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+pub struct RoutinePatch {
+    /// Novo título.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// Nova recorrência.
+    #[serde(default)]
+    pub rrule: Option<String>,
+    /// Novo verificador (`null` tira).
+    #[serde(default, deserialize_with = "double_option")]
+    pub verifier: Option<Option<String>>,
+    /// Nova ação (`null` tira).
+    #[serde(default, deserialize_with = "double_option")]
+    pub action: Option<Option<String>>,
+    /// Novo modo.
+    #[serde(default)]
+    pub mode: Option<RoutineMode>,
+}
+
+impl RoutinePatch {
+    /// Aplica sobre uma cópia da rotina, validando.
+    pub(crate) fn apply(self, routine: &Routine) -> Result<Routine> {
+        let mut out = routine.clone();
+        if let Some(title) = self.title {
+            out.title = clean_title(&title)?;
+        }
+        if let Some(rrule) = self.rrule {
+            out.rule = Rule::parse(&rrule)?;
+            out.rrule = out.rule.to_string();
+        }
+        if let Some(verifier) = self.verifier {
+            out.verifier = known(clean_optional(verifier), &VERIFIERS, "verificador")?;
+        }
+        if let Some(action) = self.action {
+            out.action = known(clean_optional(action), &ACTIONS, "ação")?;
+        }
+        if let Some(mode) = self.mode {
+            out.mode = mode;
+        }
+        check_mode(out.mode, out.verifier.as_deref())?;
+        Ok(out)
+    }
+}
+
+fn known(value: Option<String>, list: &[&str], what: &str) -> Result<Option<String>> {
+    match value {
+        Some(v) if !list.contains(&v.as_str()) => {
+            Err(AssistError::Invalid(format!("{what} desconhecido: {v}")))
+        }
+        other => Ok(other),
+    }
+}
+
+fn check_mode(mode: RoutineMode, verifier: Option<&str>) -> Result<()> {
+    if mode == RoutineMode::Auto && verifier.is_none() {
+        return Err(AssistError::Invalid(
+            "rotina automática precisa de um verificador".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Uma tarefa de rotina ainda aberta, com a rotina que a criou.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Occurrence {
+    /// A tarefa do dia.
+    pub task: Task,
+    /// A rotina.
+    pub routine: Routine,
+    /// O dia a que a tarefa se refere (o `planned_on` com que nasceu).
+    pub day: NaiveDate,
+}
+
 /// Uma linha do diário.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JournalEntry {
@@ -496,6 +694,51 @@ mod tests {
     }
 
     #[test]
+    fn rotina_nova_e_validada_e_canonica() {
+        let (r, rule) = NewRoutine {
+            rrule: "freq=weekly;byday=fr,mo".into(),
+            ..NewRoutine::opttime_hours("  Registrar   8h ")
+        }
+        .normalized()
+        .unwrap();
+        assert_eq!(r.title, "Registrar 8h");
+        assert_eq!(r.rrule, "FREQ=WEEKLY;BYDAY=MO,FR");
+        assert_eq!(rule.by_day.len(), 2);
+
+        let sem_verificador = NewRoutine {
+            title: "Tomar água".into(),
+            rrule: "FREQ=DAILY".into(),
+            verifier: None,
+            action: None,
+            mode: RoutineMode::Auto,
+        };
+        assert!(
+            sem_verificador.normalized().is_err(),
+            "automática só com verificador"
+        );
+        let estranho = NewRoutine {
+            verifier: Some("jira.done".into()),
+            ..NewRoutine::opttime_hours("x")
+        };
+        assert!(estranho.normalized().is_err());
+    }
+
+    #[test]
+    fn padrao_registrar_8h() {
+        let (r, rule) = NewRoutine::opttime_hours("Registrar 8h no OptTime")
+            .normalized()
+            .unwrap();
+        assert_eq!(
+            r.rrule,
+            "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=17;BYMINUTE=0"
+        );
+        assert_eq!(rule.time_hhmm().as_deref(), Some("17:00"));
+        assert_eq!(r.verifier.as_deref(), Some(VERIFY_OPTTIME_DAY));
+        assert_eq!(r.action.as_deref(), Some(ACTION_OPTTIME_FILL));
+        assert_eq!(r.mode, RoutineMode::Ask);
+    }
+
+    #[test]
     fn nomes_do_banco_vao_e_voltam() {
         for s in [
             TaskStatus::Inbox,
@@ -515,6 +758,9 @@ mod tests {
             SourceKind::Routine,
         ] {
             assert_eq!(SourceKind::parse(k.as_str()).unwrap(), k);
+        }
+        for m in [RoutineMode::Ask, RoutineMode::Auto] {
+            assert_eq!(RoutineMode::parse(m.as_str()).unwrap(), m);
         }
     }
 }
