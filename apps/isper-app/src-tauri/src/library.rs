@@ -293,6 +293,7 @@ mod tests {
                 at_secs: 4.0,
             }],
             notes: notes.map(Into::into),
+            event: None,
         }
     }
 

@@ -22,6 +22,7 @@ use clap::{Parser, Subcommand};
 
 mod bench;
 mod opttime;
+mod reunioes;
 mod sync;
 mod tarefas;
 use isper_core::loopback::LoopbackSource;
@@ -214,6 +215,31 @@ enum Cmd {
     /// Credential Manager (`isper-cli llm set-key opttime`)
     #[command(subcommand)]
     Opttime(OpttimeCmd),
+    /// Reuniões gravadas: as ações de "Eu", sem gravar nada (Fase 10.3)
+    #[command(subcommand)]
+    Reunioes(ReunioesCmd),
+}
+
+#[derive(Subcommand)]
+enum ReunioesCmd {
+    /// As ações de "Eu" numa reunião do banco, como a caixa de entrada as
+    /// receberia (só leitura; o texto vai ao provider configurado)
+    Acoes {
+        /// Id da reunião (a Biblioteca mostra; `isper-cli` lista no banco)
+        id: i64,
+        /// Provider (claude, groq, gemini); padrão: o do llm.toml
+        #[arg(long)]
+        provider: Option<String>,
+        /// Modelo; padrão: o do provider
+        #[arg(long)]
+        model: Option<String>,
+        /// O nome de quem gravou, como os outros o chamam
+        #[arg(long)]
+        eu: Option<String>,
+        /// Banco (padrão: o do app, %APPDATA%\ISPer\isper.db)
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -238,6 +264,18 @@ enum OpttimeCmd {
         /// Dia (AAAA-MM-DD; padrão: hoje)
         #[arg(long)]
         data: Option<String>,
+        /// Outro servidor (padrão: o OptTime de produção)
+        #[arg(long)]
+        url: Option<String>,
+    },
+    /// A agenda do Outlook, pelo OptTime
+    Agenda {
+        /// Primeiro dia (AAAA-MM-DD; padrão: hoje)
+        #[arg(long)]
+        data: Option<String>,
+        /// Quantos dias (1 a 7)
+        #[arg(long, default_value_t = 1)]
+        dias: u8,
         /// Outro servidor (padrão: o OptTime de produção)
         #[arg(long)]
         url: Option<String>,
@@ -421,6 +459,25 @@ fn main() -> anyhow::Result<()> {
         Cmd::Llm(cmd) => run_llm(cmd),
         Cmd::Tarefas(cmd) => run_tarefas(cmd),
         Cmd::Opttime(cmd) => run_opttime(cmd),
+        Cmd::Reunioes(ReunioesCmd::Acoes {
+            id,
+            provider,
+            model,
+            eu,
+            db,
+        }) => {
+            let db = match db {
+                Some(p) => p.clone(),
+                None => default_db().context("pasta de dados do usuário indisponível")?,
+            };
+            reunioes::acoes(
+                &db,
+                *id,
+                provider.as_deref(),
+                model.as_deref(),
+                eu.as_deref(),
+            )
+        }
         _ => run_dictation(&cli),
     }
 }
@@ -982,6 +1039,9 @@ fn run_opttime(cmd: &OpttimeCmd) -> anyhow::Result<()> {
         OpttimeCmd::QuemSou { url } => opttime::quem_sou(url.as_deref()),
         OpttimeCmd::Dia { data, url } => opttime::dia(data.as_deref(), url.as_deref()),
         OpttimeCmd::Sugestoes { data, url } => opttime::sugestoes(data.as_deref(), url.as_deref()),
+        OpttimeCmd::Agenda { data, dias, url } => {
+            opttime::agenda(data.as_deref(), *dias, url.as_deref())
+        }
         OpttimeCmd::Ferramentas { url } => opttime::ferramentas(url.as_deref()),
     }
 }

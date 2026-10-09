@@ -4,6 +4,7 @@
 //! Campos que o OptTime ainda pode acrescentar são ignorados, e listas que
 //! ele declara abertas (a `source` de uma sugestão) ficam como texto.
 
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -23,6 +24,7 @@ const WHOAMI: &str = "opt_time_whoami";
 const DAY_SUMMARY: &str = "opt_time_get_today_summary";
 const SUGGEST: &str = "opt_time_suggest_daily_entries";
 const APPLY: &str = "opt_time_apply_suggestions";
+const AGENDA: &str = "opt_time_get_my_agenda";
 
 /// Quem é o dono do token e o que está conectado (`opt_time_whoami`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -317,6 +319,151 @@ pub struct Applied {
     pub replayed: bool,
 }
 
+/// A agenda do Outlook de um ou mais dias (`opt_time_get_my_agenda`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Agenda {
+    /// Fuso das datas.
+    pub timezone: String,
+    /// Avisos sobre a leitura.
+    #[serde(default)]
+    pub warnings: Vec<String>,
+    /// Os eventos, em ordem de início (cancelados de fora).
+    pub events: Vec<AgendaEvent>,
+}
+
+/// Uma pessoa num evento.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventPerson {
+    /// Nome.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// E-mail.
+    #[serde(default)]
+    pub email: Option<String>,
+}
+
+/// A presença medida pelo Teams.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Attendance {
+    /// Entrou na reunião.
+    pub joined: bool,
+    /// Minutos medidos.
+    pub minutes: i64,
+}
+
+/// Um evento da agenda.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgendaEvent {
+    /// Id no Graph.
+    pub id: String,
+    /// Estável entre série e ocorrências.
+    #[serde(rename = "iCalUId")]
+    pub ical_uid: String,
+    /// A série, se recorrente.
+    #[serde(default)]
+    pub series_master_id: Option<String>,
+    /// Assunto.
+    pub subject: String,
+    /// Início, ISO 8601 com offset.
+    pub start: String,
+    /// Fim, ISO 8601 com offset.
+    pub end: String,
+    /// Duração em minutos.
+    pub duration_minutes: i64,
+    /// Dia inteiro (férias, feriado).
+    pub is_all_day: bool,
+    /// Reunião online.
+    pub is_online: bool,
+    /// Link para entrar.
+    #[serde(default)]
+    pub join_url: Option<String>,
+    /// Quem organiza.
+    pub organizer: EventPerson,
+    /// O usuário organiza.
+    pub is_organizer: bool,
+    /// Resposta ao convite (`accepted`, `declined`, `organizer`…).
+    pub response_status: String,
+    /// Total de convidados.
+    pub attendee_count: i64,
+    /// Até 20 convidados.
+    #[serde(default)]
+    pub attendees: Vec<EventPerson>,
+    /// Local.
+    #[serde(default)]
+    pub location: Option<String>,
+    /// Como aparece na disponibilidade (`busy`, `free`, `oof`…).
+    pub show_as: String,
+    /// Link para abrir no Outlook.
+    #[serde(default)]
+    pub web_link: Option<String>,
+    /// Minutos já lançados no OptTime para o evento.
+    #[serde(default)]
+    pub logged_minutes: i64,
+    /// Presença no Teams, quando já medida.
+    #[serde(default)]
+    pub attendance: Option<Attendance>,
+}
+
+impl AgendaEvent {
+    /// Início como instante.
+    pub fn starts(&self) -> Option<DateTime<FixedOffset>> {
+        DateTime::parse_from_rfc3339(&self.start).ok()
+    }
+
+    /// Fim como instante.
+    pub fn ends(&self) -> Option<DateTime<FixedOffset>> {
+        DateTime::parse_from_rfc3339(&self.end).ok()
+    }
+
+    /// Conta como reunião de que a pessoa participa: não é de dia inteiro,
+    /// não foi recusado e não está marcado como livre.
+    pub fn is_meeting(&self) -> bool {
+        !self.is_all_day && self.response_status != "declined" && self.show_as != "free"
+    }
+
+    /// A identidade que casa ocorrências da mesma série.
+    pub fn series(&self) -> Option<&str> {
+        self.series_master_id.as_deref().filter(|s| !s.is_empty())
+    }
+}
+
+/// Folga antes e depois do evento ao casar uma gravação: quem começa a
+/// gravar cinco minutos antes, ou passa do horário, ainda está nele.
+pub const MATCH_SLACK_SECS: i64 = 5 * 60;
+/// Menos que isso de sobreposição não casa.
+const MIN_OVERLAP_SECS: i64 = 60;
+
+/// O evento da agenda em que uma gravação aconteceu: o que mais se sobrepõe
+/// ao intervalo gravado (com [`MATCH_SLACK_SECS`] de folga), contando só as
+/// reuniões de que a pessoa participa. Empate fica com o online, depois com o
+/// que começou mais perto do começo da gravação.
+pub fn match_event(
+    events: &[AgendaEvent],
+    started: DateTime<FixedOffset>,
+    ended: DateTime<FixedOffset>,
+) -> Option<&AgendaEvent> {
+    let slack = chrono::Duration::seconds(MATCH_SLACK_SECS);
+    events
+        .iter()
+        .filter(|e| e.is_meeting())
+        .filter_map(|e| {
+            let (s, f) = (e.starts()?, e.ends()?);
+            let from = started.max(s - slack);
+            let to = ended.min(f + slack);
+            let overlap = (to - from).num_seconds();
+            (overlap >= MIN_OVERLAP_SECS).then(|| {
+                let distance = (s - started).num_seconds().abs();
+                (e, overlap, e.is_online, distance)
+            })
+        })
+        .max_by(|a, b| a.1.cmp(&b.1).then(a.2.cmp(&b.2)).then(b.3.cmp(&a.3)))
+        .map(|(e, ..)| e)
+}
+
 /// O OptTime por MCP.
 #[derive(Debug, Clone)]
 pub struct OptTime {
@@ -347,6 +494,14 @@ impl OptTime {
     /// As sugestões para um dia (hoje ou até 30 dias para trás).
     pub async fn suggest(&self, date: Option<&str>) -> Result<Suggestions> {
         self.endpoint.call_typed(SUGGEST, date_args(date)).await
+    }
+
+    /// A agenda do Outlook a partir de `date` (`None` = hoje), por `days`
+    /// dias (1 a 7), sem os eventos recusados.
+    pub async fn agenda(&self, date: Option<&str>, days: u8) -> Result<Agenda> {
+        let mut args = date_args(date);
+        args["days"] = json!(days.clamp(1, 7));
+        self.endpoint.call_typed(AGENDA, args).await
     }
 
     /// Grava as sugestões aprovadas, numa transação do OptTime. Só depois do
@@ -408,6 +563,116 @@ mod tests {
         d.total_minutes = 0;
         assert_eq!(d.missing_minutes(), 0);
         assert!(!d.reached_target(), "fim de semana não é meta batida");
+    }
+
+    fn evento(uid: &str, start: &str, end: &str, online: bool) -> AgendaEvent {
+        serde_json::from_value(json!({
+            "id": format!("id-{uid}"), "iCalUId": uid, "seriesMasterId": null, "type": "singleInstance",
+            "subject": format!("Reunião {uid}"), "start": start, "end": end, "durationMinutes": 30,
+            "isAllDay": false, "isOnline": online, "joinUrl": null,
+            "organizer": { "name": "Ana", "email": "ana@example.com" }, "isOrganizer": false,
+            "responseStatus": "accepted", "attendeeCount": 3, "attendees": [], "showAs": "busy",
+            "sensitivity": "normal", "loggedMinutes": 0, "attendance": null
+        }))
+        .unwrap()
+    }
+
+    fn at(s: &str) -> DateTime<FixedOffset> {
+        DateTime::parse_from_rfc3339(s).unwrap()
+    }
+
+    #[test]
+    fn a_gravacao_casa_com_o_evento_que_mais_se_sobrepoe() {
+        let eventos = vec![
+            evento(
+                "daily",
+                "2026-10-08T09:00:00-03:00",
+                "2026-10-08T09:30:00-03:00",
+                true,
+            ),
+            evento(
+                "refino",
+                "2026-10-08T09:30:00-03:00",
+                "2026-10-08T10:30:00-03:00",
+                true,
+            ),
+            evento(
+                "almoco",
+                "2026-10-08T12:00:00-03:00",
+                "2026-10-08T13:00:00-03:00",
+                false,
+            ),
+        ];
+        // Começou a gravar 3 min antes da daily e passou 5 min do horário.
+        let m = match_event(
+            &eventos,
+            at("2026-10-08T08:57:00-03:00"),
+            at("2026-10-08T09:35:00-03:00"),
+        );
+        assert_eq!(m.unwrap().ical_uid, "daily");
+        // Gravou o refinamento inteiro.
+        let m = match_event(
+            &eventos,
+            at("2026-10-08T09:31:00-03:00"),
+            at("2026-10-08T10:25:00-03:00"),
+        );
+        assert_eq!(m.unwrap().ical_uid, "refino");
+        // Fora de qualquer evento.
+        assert!(
+            match_event(
+                &eventos,
+                at("2026-10-08T15:00:00-03:00"),
+                at("2026-10-08T15:40:00-03:00")
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn recusado_livre_e_dia_inteiro_nao_casam() {
+        let mut recusado = evento(
+            "x",
+            "2026-10-08T14:00:00-03:00",
+            "2026-10-08T15:00:00-03:00",
+            true,
+        );
+        recusado.response_status = "declined".into();
+        let mut livre = recusado.clone();
+        livre.response_status = "accepted".into();
+        livre.show_as = "free".into();
+        let mut dia = livre.clone();
+        dia.show_as = "busy".into();
+        dia.is_all_day = true;
+        let gravou = (
+            at("2026-10-08T14:05:00-03:00"),
+            at("2026-10-08T14:50:00-03:00"),
+        );
+        for e in [recusado, livre, dia] {
+            assert!(match_event(std::slice::from_ref(&e), gravou.0, gravou.1).is_none());
+        }
+    }
+
+    #[test]
+    fn empate_fica_com_o_online() {
+        let presencial = evento(
+            "sala",
+            "2026-10-08T16:00:00-03:00",
+            "2026-10-08T17:00:00-03:00",
+            false,
+        );
+        let online = evento(
+            "teams",
+            "2026-10-08T16:00:00-03:00",
+            "2026-10-08T17:00:00-03:00",
+            true,
+        );
+        let ambos = [presencial, online];
+        let m = match_event(
+            &ambos,
+            at("2026-10-08T16:00:00-03:00"),
+            at("2026-10-08T16:40:00-03:00"),
+        );
+        assert_eq!(m.unwrap().ical_uid, "teams");
     }
 
     #[test]

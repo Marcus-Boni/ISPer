@@ -91,7 +91,7 @@ pub fn extract_tasks(provider: &dyn LlmProvider, speech: &str) -> Result<Vec<Ext
 }
 
 /// Esperas antes de cada nova tentativa num erro passageiro da API.
-const RETRY_WAITS: [std::time::Duration; 2] = [
+pub(crate) const RETRY_WAITS: [std::time::Duration; 2] = [
     std::time::Duration::from_millis(400),
     std::time::Duration::from_millis(1200),
 ];
@@ -106,7 +106,7 @@ fn is_transient(err: &LlmError) -> bool {
 }
 
 /// Tenta de novo, depois de cada espera, enquanto o erro for passageiro.
-fn with_retries<T>(
+pub(crate) fn with_retries<T>(
     waits: &[std::time::Duration],
     mut call: impl FnMut() -> Result<T>,
 ) -> Result<T> {

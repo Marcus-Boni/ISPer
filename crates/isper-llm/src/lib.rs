@@ -16,6 +16,7 @@
 pub mod copilot;
 pub mod embeddings;
 mod insights;
+pub mod meeting_actions;
 mod polish;
 mod providers;
 mod settings;
@@ -33,6 +34,7 @@ pub use copilot::{
 };
 pub use embeddings::{Embedder, EmbeddingSettings, embedder_from_settings};
 pub use insights::{InsightsInput, live_insights};
+pub use meeting_actions::{MyAction, TimedLine, extract_my_actions};
 pub use polish::{POLISH_STYLES, polish_dictation};
 pub use providers::{LlmProvider, provider_from_settings};
 pub use settings::{

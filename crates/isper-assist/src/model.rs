@@ -116,7 +116,8 @@ impl SourceKind {
 pub enum Actor {
     /// A pessoa, pela interface.
     User,
-    /// O agente (10.4), sempre depois de um toque de confirmação.
+    /// O assistente: o que ele acha (as ações de uma reunião) vai para a
+    /// caixa de entrada; o que muda fora do ISPer, só depois de um toque.
     Assistant,
     /// Uma rotina (10.2).
     Routine,
