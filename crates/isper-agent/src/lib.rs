@@ -26,6 +26,18 @@ use serde_json::Value;
 
 pub use opttime::{OptTimeTools, default_or_chosen};
 
+/// As ferramentas do ISPer com a permissão padrão de cada uma (a tela de
+/// permissões lista estas e as do OptTime).
+pub fn local_catalog() -> Vec<(ToolSpec, Permission)> {
+    LocalTools::specs()
+        .into_iter()
+        .map(|t| {
+            let p = LocalTools::permission(&t.name);
+            (t, p)
+        })
+        .collect()
+}
+
 /// As ferramentas do agente: as do ISPer e, se houver, as do OptTime.
 pub struct IsperHost {
     local: LocalTools,

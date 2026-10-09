@@ -53,7 +53,7 @@ pub enum LlmError {
     NotConfigured,
     #[error("chave de API não encontrada para '{0}' — rode `isper-cli llm set-key {0}`")]
     NoApiKey(String),
-    #[error("provider desconhecido: '{0}' (opções: claude, groq, gemini)")]
+    #[error("provider desconhecido: '{0}' (opções: claude, groq, gemini, openai)")]
     UnknownProvider(String),
     #[error(
         "o modelo '{0}' não existe ou sua conta não tem acesso a ele — liste os disponíveis (`isper-cli llm models` ou o botão 'Listar modelos' nas Configurações) e escolha outro"
