@@ -16,6 +16,7 @@
 pub mod clock;
 pub mod model;
 pub mod store;
+pub mod when;
 
 pub use clock::{Clock, FixedClock, SystemClock};
 pub use model::{Actor, JournalEntry, NewTask, SourceKind, Task, TaskPatch, TaskStatus, Today};

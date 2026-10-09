@@ -21,6 +21,9 @@
   /* Nova tarefa: o campo é a primeira coisa da tela. */
   .add { display: grid; grid-template-columns: 1fr auto; gap: 10px 10px; align-items: center; }
   .add .field { font-size: 15px; padding: 11px 13px; }
+  .preview { grid-column: 1 / -1; margin: -4px 0 0; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--muted); }
+  .preview b { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+  .preview .chip { animation: none; }
   .when { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .when .lbl { font-size: 12px; color: var(--muted); margin-right: 4px; }
   .pick {
@@ -100,6 +103,7 @@
       <label class="sr-only" for="add-title" data-i18n="today.add.label">Nova tarefa</label>
       <input class="field" id="add-title" maxlength="500" placeholder="Nova tarefa… (Enter adiciona)" data-i18n-attr="placeholder:today.add.placeholder">
       <button class="btn btn-primary" type="submit" data-i18n="today.add.submit">Adicionar</button>
+      <p class="preview" id="add-preview" aria-live="polite" hidden></p>
       <div class="when" role="radiogroup" aria-labelledby="when-lbl">
         <span class="lbl" id="when-lbl" data-i18n="today.add.when">Para quando</span>
         <button class="pick" type="button" role="radio" data-when="today" aria-checked="true" data-i18n="today.when.today">Hoje</button>
@@ -415,15 +419,45 @@
     e.preventDefault();
   });
 
+  // Prévia: as datas que o texto traz ("amanhã às 3 …") saem do título e
+  // aparecem como selos antes de salvar. Quem entende o texto é o Rust
+  // (task_parse); a tela só mostra.
+  function dayLabel(iso) {
+    if (iso === todayIso()) return t('today.when.today');
+    if (iso === tomorrowIso()) return t('today.when.tomorrow');
+    return shortDay(iso);
+  }
+  let parseSeq = 0;
+  let parseTimer = null;
+  async function preview() {
+    const text = $('add-title').value.trim();
+    const box = $('add-preview');
+    const mine = ++parseSeq;
+    if (!text) { box.hidden = true; return; }
+    let p;
+    try { p = await invoke('task_parse', { text }); } catch (_) { return; }
+    if (mine !== parseSeq) return;
+    if (!p.planned_on && !p.planned_time && !p.due_on) { box.hidden = true; return; }
+    const parts = [el('span', null, t('today.preview.label')), el('b', null, p.title)];
+    if (p.planned_on) parts.push(el('span', 'chip chip-accent', dayLabel(p.planned_on)));
+    if (p.planned_time) parts.push(el('span', 'chip chip-accent time', p.planned_time));
+    if (p.due_on) parts.push(el('span', 'chip chip-warn', t('today.chip.due', { d: shortDay(p.due_on) })));
+    box.replaceChildren(...parts);
+    box.hidden = false;
+  }
+  $('add-title').addEventListener('input', () => { clearTimeout(parseTimer); parseTimer = setTimeout(preview, 120); });
+
   $('add').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = $('add-title');
-    const title = input.value.trim();
-    if (!title) { input.focus(); return; }
-    const planned_on = when === 'today' ? todayIso() : when === 'tomorrow' ? tomorrowIso() : null;
+    const text = input.value.trim();
+    if (!text) { input.focus(); return; }
+    const fallback = when === 'today' ? todayIso() : when === 'tomorrow' ? tomorrowIso() : null;
     try {
-      await invoke('task_add', { task: { title, planned_on } });
+      await invoke('task_add_text', { text, fallback });
       input.value = '';
+      parseSeq++;
+      $('add-preview').hidden = true;
     } catch (err) {
       toast(t('common.error', { e: err }), 'err');
     }

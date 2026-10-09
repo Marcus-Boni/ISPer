@@ -100,6 +100,15 @@ Check ($null -ne $pal -and $pal.k -ge 0) "a paleta oferece criar a tarefa ('$(@(
 $s10 = Wait-Today { param($s) @($s.planned).Count -eq 3 }
 Check (@($s10.planned) -contains 'Ligar pro contador') "a tarefa da paleta aparece em Para hoje"
 
+# 6b) Data no texto: a previa mostra o titulo limpo, e a tarefa vai para o dia dito.
+$pv = EvJson 'today.html' '(async () => { const i = document.getElementById("add-title"); i.value = "sexta as 10h revisar o contrato"; i.dispatchEvent(new Event("input")); await new Promise(r => setTimeout(r, 700)); const b = document.getElementById("add-preview"); return JSON.stringify({ hidden: b.hidden, text: b.textContent }); })()'
+Check ($null -ne $pv -and -not $pv.hidden -and $pv.text -like '*Revisar o contrato*') "a previa tira a data do titulo ('$($pv.text)')"
+EvJson 'today.html' 'JSON.stringify((() => { document.getElementById("add").requestSubmit(); return true; })())' | Out-Null
+$s10b = Wait-Today { param($s) $s.later -eq 1 }
+Check ($s10b.later -eq 1 -and -not (@($s10b.planned) -contains 'Revisar o contrato')) "a tarefa com data vai para Depois, no dia dito"
+$lt = EvJson 'today.html' 'JSON.stringify([...document.querySelectorAll("#list-later .task")].map(li => ({ title: li.querySelector(".title").textContent, chips: [...li.querySelectorAll(".chip")].map(c => c.textContent) })))'
+Check ((@($lt)[0].title -eq 'Revisar o contrato') -and (@(@($lt)[0].chips) -contains '10:00')) "titulo sem a data e a hora no selo ($(@(@($lt)[0].chips) -join ', '))"
+
 # 7) Editar o titulo (duplo clique, Enter grava).
 EvJson 'today.html' 'JSON.stringify((() => { const n = [...document.querySelectorAll("#list-planned .task .title")].find(e => e.textContent === "Ligar pro contador"); n.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })); const i = document.querySelector("#list-planned .edit"); i.value = "Ligar pro contador sobre o IR"; i.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); return true; })())' | Out-Null
 $s11 = Wait-Today { param($s) @($s.planned) -contains 'Ligar pro contador sobre o IR' }

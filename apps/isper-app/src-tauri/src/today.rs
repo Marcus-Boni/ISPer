@@ -8,7 +8,10 @@
 //! [ADR 0021]: ../../../../docs/adr/0021-assistente-pessoal-no-isper.md
 
 use crate::prelude::*;
-use isper_assist::{Actor, AssistStore, NewTask, Task, TaskPatch, TaskStatus, Today};
+use isper_assist::when::{ParsedTask, parse_task};
+use isper_assist::{
+    Actor, AssistStore, Clock, NewTask, SystemClock, Task, TaskPatch, TaskStatus, Today,
+};
 
 /// Evento que avisa as janelas de que as tarefas mudaram.
 pub(crate) const TASKS_EVENT: &str = "isper-tasks";
@@ -54,6 +57,36 @@ pub(crate) fn today_badge() -> Result<usize, String> {
 /// Cria uma tarefa digitada.
 #[tauri::command]
 pub(crate) fn task_add(app: AppHandle, task: NewTask) -> Result<TaskChange, String> {
+    let store = open_assist().map_err(|e| e.to_string())?;
+    let created = store
+        .create_task(task, Actor::User)
+        .map_err(|e| e.to_string())?;
+    changed(&app, &store, created)
+}
+
+/// Como o texto digitado vai virar tarefa: título sem as datas, dia, hora e
+/// prazo (a prévia da tela Hoje e o item "Criar tarefa" do Ctrl+K).
+#[tauri::command]
+pub(crate) fn task_parse(text: String) -> ParsedTask {
+    parse_task(&text, SystemClock.today())
+}
+
+/// Cria uma tarefa a partir do texto digitado, com as datas tiradas dele
+/// ("amanhã às 3 ligar pro João"). Sem dia no texto, vale `fallback` (o
+/// "para quando" escolhido na tela, ou hoje pelo Ctrl+K).
+#[tauri::command]
+pub(crate) fn task_add_text(
+    app: AppHandle,
+    text: String,
+    fallback: Option<chrono::NaiveDate>,
+) -> Result<TaskChange, String> {
+    let parsed = parse_task(&text, SystemClock.today());
+    let task = NewTask {
+        planned_on: parsed.planned_on.or(fallback),
+        planned_time: parsed.planned_time,
+        due_on: parsed.due_on,
+        ..NewTask::titled(parsed.title)
+    };
     let store = open_assist().map_err(|e| e.to_string())?;
     let created = store
         .create_task(task, Actor::User)

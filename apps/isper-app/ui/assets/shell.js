@@ -549,19 +549,47 @@
     paintSel();
   }
 
-  // O texto digitado vira tarefa para hoje, sem sair da tela em que se está.
+  // O texto digitado vira tarefa, sem sair da tela em que se está. As datas
+  // do texto ("sexta às 10 …") valem; sem elas, é para hoje. O rótulo mostra
+  // o título e o dia que o Rust entendeu (task_parse).
+  let quick = null;
+  let quickSeq = 0;
+  function parseQuick() {
+    const q = input.value.trim();
+    const seq = ++quickSeq;
+    if (q.length < 2) { quick = null; return; }
+    invoke('task_parse', { text: q }).then((p) => {
+      if (seq !== quickSeq || !pal.open) return;
+      quick = { q, p };
+      render();
+    }).catch(() => {});
+  }
+  const isoDay = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  function whenMeta(p) {
+    if (!p) return null;
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const day = p.planned_on || isoDay(now);
+    let label;
+    if (day === isoDay(now)) label = t('today.when.today');
+    else if (day === isoDay(tomorrow)) label = t('today.when.tomorrow');
+    else {
+      const [y, m, d] = day.split('-').map(Number);
+      label = new Date(y, m - 1, d).toLocaleDateString((window.I18N && window.I18N.lang) || 'pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    }
+    return p.planned_time ? label + ' ' + p.planned_time : label;
+  }
   function quickTask(q) {
     if (q.length < 2) return [];
+    const p = quick && quick.q === q ? quick.p : null;
     return [{
-      group: 'shell.palette.group.actions', icon: 'plus', label: t('shell.cmd.task-create', { q }),
+      group: 'shell.palette.group.actions', icon: 'plus',
+      label: t('shell.cmd.task-create', { q: p ? p.title : q }), meta: whenMeta(p),
       run: () => addTask(q),
     }];
   }
-  async function addTask(title) {
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const today = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-    await invoke('task_add', { task: { title, planned_on: today } });
+  async function addTask(text) {
+    await invoke('task_add_text', { text, fallback: isoDay(new Date()) });
     if (current !== 'today') toast(t('shell.task.created'), 'ok', 4000, { action: { label: t('shell.task.open'), run: () => show('today') } });
   }
 
@@ -606,7 +634,7 @@
     pal.showModal();
     input.focus();
   }
-  input.addEventListener('input', () => { sel = 0; meetings = []; render(); searchMeetings(); });
+  input.addEventListener('input', () => { sel = 0; meetings = []; render(); searchMeetings(); parseQuick(); });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); sel = (sel + 1) % Math.max(1, shown.length); paintSel(); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); sel = (sel - 1 + shown.length) % Math.max(1, shown.length); paintSel(); }
