@@ -26,7 +26,7 @@ pub use memories::PROMPT_MEMORIES;
 /// Versão do schema do `isper.db` que trouxe as tabelas do assistente.
 pub const SCHEMA_VERSION_REQUIRED: i64 = 7;
 
-const TASK_COLUMNS: &str = "id, title, notes, status, planned_on, planned_time, due_on, priority, \
+pub(crate) const TASK_COLUMNS: &str = "id, title, notes, status, planned_on, planned_time, due_on, priority, \
      area, source_kind, source_ref, external_ref, routine_id, position, created_at, updated_at, \
      completed_at";
 
@@ -41,8 +41,8 @@ pub enum ImportOutcome {
 
 /// O domínio do assistente sobre uma conexão própria ao `isper.db`.
 pub struct AssistStore {
-    conn: Connection,
-    clock: Box<dyn Clock>,
+    pub(crate) conn: Connection,
+    pub(crate) clock: Box<dyn Clock>,
 }
 
 impl std::fmt::Debug for AssistStore {
@@ -177,11 +177,23 @@ impl AssistStore {
 
     /// Cria uma tarefa.
     pub fn create_task(&self, new: NewTask, actor: Actor) -> Result<Task> {
-        self.insert_task(new, None, actor)
+        self.insert_task(new, None, actor, None)
+    }
+
+    /// Cria uma tarefa feita em outro aparelho, com a hora em que foi criada
+    /// lá (`op_at`, ms UTC; ver [`crate::phone`]).
+    pub(crate) fn create_task_at(&self, new: NewTask, actor: Actor, op_at: i64) -> Result<Task> {
+        self.insert_task(new, None, actor, Some(op_at))
     }
 
     /// Cria uma tarefa, ligada ou não a uma rotina.
-    fn insert_task(&self, new: NewTask, routine_id: Option<String>, actor: Actor) -> Result<Task> {
+    fn insert_task(
+        &self,
+        new: NewTask,
+        routine_id: Option<String>,
+        actor: Actor,
+        op_at: Option<i64>,
+    ) -> Result<Task> {
         let new = new.normalized()?;
         let now = self.clock.now_ms();
         // A ordem manual nasce com o instante: as novas vão para o fim, e
@@ -239,7 +251,7 @@ impl AssistStore {
                 task.completed_at,
             ],
         )?;
-        self.journal(&tx, now, actor, "task.created", None, &task, None)?;
+        self.journal(&tx, now, actor, "task.created", None, &task, None, op_at)?;
         tx.commit()?;
         Ok(task)
     }
@@ -414,6 +426,21 @@ impl AssistStore {
         action: &str,
         undoes: Option<i64>,
     ) -> Result<()> {
+        self.write_at(before, after, actor, action, undoes, None)
+    }
+
+    /// Como [`Self::write`], com a hora em que a mudança foi feita de fato
+    /// (`op_at`, ms UTC), quando foi em outro aparelho e chegou depois: é ela
+    /// que decide quem vence campo a campo ([`crate::phone`]).
+    pub(crate) fn write_at(
+        &self,
+        before: &Task,
+        after: &Task,
+        actor: Actor,
+        action: &str,
+        undoes: Option<i64>,
+        op_at: Option<i64>,
+    ) -> Result<()> {
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
             "UPDATE tasks SET title = ?2, notes = ?3, status = ?4, planned_on = ?5,
@@ -443,6 +470,7 @@ impl AssistStore {
             Some(before),
             after,
             undoes,
+            op_at,
         )?;
         tx.commit()?;
         Ok(())
@@ -458,10 +486,14 @@ impl AssistStore {
         before: Option<&Task>,
         after: &Task,
         undoes: Option<i64>,
+        op_at: Option<i64>,
     ) -> Result<()> {
         let mut data = json!({ "before": before, "after": after });
         if let Some(id) = undoes {
             data["undoes"] = json!(id);
+        }
+        if let Some(at) = op_at {
+            data["op_at"] = json!(at);
         }
         self.journal_row(
             conn,
@@ -525,7 +557,7 @@ fn parse_day(value: Option<String>) -> Result<Option<NaiveDate>> {
         .transpose()
 }
 
-fn task_from_row(r: &Row<'_>) -> rusqlite::Result<Result<Task>> {
+pub(crate) fn task_from_row(r: &Row<'_>) -> rusqlite::Result<Result<Task>> {
     let status: String = r.get(3)?;
     let planned_on: Option<String> = r.get(4)?;
     let due_on: Option<String> = r.get(6)?;
@@ -611,7 +643,7 @@ fn journal_from_row(r: &Row<'_>) -> rusqlite::Result<Result<JournalEntry>> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::clock::FixedClock;
     use std::sync::atomic::{AtomicUsize, Ordering};

@@ -21,12 +21,24 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use isper_core::capture::{self, CaptureManifest, CaptureState};
 use isper_sync::client::{Client, PairedPc, Session};
 use isper_sync::code::PairingCode;
-use isper_sync::proto::{RecordingOffer, RemoteState};
+use isper_sync::proto::{RecordingOffer, RemoteState, TasksRequest};
 use isper_sync::{SecretKey, SyncError};
 use serde::{Deserialize, Serialize};
 
 use crate::MobileError;
 use crate::local::{self, MinutesOrigin};
+use crate::tasks::TaskBook;
+
+/// De quanto em quanto o retrato das tarefas é renovado, mesmo sem nada na
+/// fila (10.6).
+const TASKS_MAX_AGE_MS: i64 = 5 * 60_000;
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or_default()
+}
 
 const KEY_FILE: &str = "chave-sincronia.txt";
 const PC_FILE: &str = "pc.json";
@@ -181,6 +193,10 @@ pub struct SyncSummary {
     pub unsent: u32,
     /// Por que a rodada parou antes do fim (o PC fora de alcance), se parou.
     pub error: Option<String>,
+    /// Mudanças nas tarefas que o PC recebeu nesta rodada (10.6).
+    pub tasks_sent: u32,
+    /// Delas, campos em que o PC venceu (mudaram lá depois).
+    pub tasks_kept_pc: u32,
 }
 
 /// Quem acompanha o envio (a notificação do app).
@@ -263,7 +279,11 @@ impl PcLink {
                 _ => {}
             }
         }
-        if to_send.is_empty() && to_ask.is_empty() && to_fetch.is_empty() {
+        // As tarefas: com mudança na fila, ou com o retrato velho.
+        let book = TaskBook::new(self.state_dir.display().to_string());
+        let tasks_pending = !book.pending_ops().is_empty();
+        let tasks_due = tasks_pending || book.stale(now_ms(), TASKS_MAX_AGE_MS);
+        if to_send.is_empty() && to_ask.is_empty() && to_fetch.is_empty() && !tasks_due {
             return Ok(summary);
         }
 
@@ -271,27 +291,44 @@ impl PcLink {
         let session = match client.connect(&pc).await {
             Ok(s) => s,
             Err(e) => {
-                summary.error = Some(e.to_string());
+                // Sem nada a mandar, o PC fora de alcance não é um erro.
+                if !to_send.is_empty()
+                    || !to_ask.is_empty()
+                    || !to_fetch.is_empty()
+                    || tasks_pending
+                {
+                    summary.error = Some(e.to_string());
+                }
                 summary.unsent = to_send.len() as u32;
                 summary.waiting = to_ask.len() as u32;
                 client.close().await;
                 return Ok(summary);
             }
         };
-        let result = self
-            .with_session(
-                &session,
-                dir,
-                &pc,
-                device_name,
-                app_version,
-                listener,
-                to_send,
-                to_ask,
-                to_fetch,
-                &mut summary,
-            )
-            .await;
+        // Primeiro as tarefas: são rápidas, e a pessoa está olhando para elas.
+        let tasks = if tasks_due {
+            self.sync_tasks(&session, &book, &mut summary).await
+        } else {
+            Ok(())
+        };
+        let result = match tasks {
+            Err(e) => Err(e),
+            Ok(()) => {
+                self.with_session(
+                    &session,
+                    dir,
+                    &pc,
+                    device_name,
+                    app_version,
+                    listener,
+                    to_send,
+                    to_ask,
+                    to_fetch,
+                    &mut summary,
+                )
+                .await
+            }
+        };
         session.close();
         client.close().await;
         match result {
@@ -302,6 +339,35 @@ impl PcLink {
             }
             Err(e) => Err(e),
             Ok(()) => Ok(summary),
+        }
+    }
+
+    /// As tarefas (10.6): manda a fila e guarda o retrato. Um PC antigo (sem
+    /// tarefas) ou um erro dele ficam anotados para a tela e não param as
+    /// gravações; só o "não pareado" para tudo.
+    async fn sync_tasks(
+        &self,
+        session: &Session,
+        book: &TaskBook,
+        summary: &mut SyncSummary,
+    ) -> Result<(), MobileError> {
+        let sent = book.pending_ops();
+        let req = TasksRequest {
+            now_ms: now_ms(),
+            ops: sent.clone(),
+        };
+        match session.tasks(req).await {
+            Ok(resp) => {
+                summary.tasks_sent = sent.len() as u32;
+                summary.tasks_kept_pc = book.applied(&sent, resp, now_ms())?;
+                Ok(())
+            }
+            Err(SyncError::NotPaired) => Err(MobileError::NotPaired),
+            Err(e) => {
+                tracing::warn!("tarefas: {e}");
+                book.failed(&e.to_string(), now_ms());
+                Ok(())
+            }
         }
     }
 
@@ -615,6 +681,8 @@ mod tests {
         devices: Mutex<HashMap<EndpointId, String>>,
         done: Mutex<HashMap<String, String>>,
         received: Mutex<Vec<RecordingOffer>>,
+        /// Com banco, o PC guarda tarefas (o app desktop); sem, não (10.6).
+        db: Option<PathBuf>,
     }
 
     impl Host for TestHost {
@@ -650,6 +718,18 @@ mod tests {
             } else {
                 RemoteState::Unknown
             }
+        }
+        fn tasks(
+            &self,
+            _: &EndpointId,
+            req: TasksRequest,
+        ) -> Option<Result<isper_sync::proto::TasksResponse, String>> {
+            let db = self.db.as_ref()?;
+            Some(
+                isper_assist::AssistStore::open(db)
+                    .and_then(|s| s.handle_phone(&req))
+                    .map_err(|e| e.to_string()),
+            )
         }
         fn minutes(&self, _: &EndpointId, id: &str) -> Option<Minutes> {
             let title = self.done.lock().unwrap().get(id)?.clone();
@@ -718,7 +798,8 @@ mod tests {
         assert_eq!(pc.name, "PC-DE-TESTE");
         assert_eq!(link.paired_pc(), Some(pc));
 
-        // Nada gravado: a rodada nem conecta.
+        // Nada gravado: a rodada só conecta para as tarefas (este PC não as
+        // guarda, e isso fica anotado sem virar erro da rodada).
         let quiet = link
             .sync(
                 rec_dir_s.clone(),
@@ -729,6 +810,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(quiet, SyncSummary::default());
+        let day = TaskBook::new(tmp.join("estado").display().to_string())
+            .day("2026-10-10".into(), -180)
+            .unwrap();
+        assert!(day.sync_error.unwrap().contains("não sincroniza tarefas"));
 
         record(&rec_dir_s, "20260925-100000");
         let progress = Count(Mutex::new(0));
@@ -810,6 +895,128 @@ mod tests {
         crate::recording::delete_recording(rec_dir_s.clone(), "20260925-100000".into()).unwrap();
         assert!(!minutes_path(&rec_dir, "20260925-100000").exists());
         assert!(!record_path(&rec_dir, "20260925-100000").exists());
+
+        rt.block_on(server.shutdown());
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// O critério da 10.6: a tarefa ditada no celular, offline, aparece no
+    /// PC na próxima sincronia; a mudança feita no PC volta ao celular.
+    #[test]
+    fn tarefa_ditada_no_celular_aparece_no_pc_na_proxima_sincronia() {
+        let tmp =
+            std::env::temp_dir().join(format!("isper-mobile-tasks-sync-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("Gravacoes")).unwrap();
+        let rec_dir = tmp.join("Gravacoes").display().to_string();
+        let db = tmp.join("isper.db");
+        drop(isper_core::store::MeetingStore::open(&db).unwrap());
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let host = Arc::new(TestHost {
+            inbox: tmp.join("pc"),
+            db: Some(db.clone()),
+            ..TestHost::default()
+        });
+        let server = rt
+            .block_on(Server::start(
+                ServerConfig {
+                    secret_key: SecretKey::generate(),
+                    port: 0,
+                    relay: None,
+                    mdns: false,
+                },
+                host.clone(),
+            ))
+            .unwrap();
+        let mut code = server.start_pairing().unwrap();
+        code.addrs = vec![([127, 0, 0, 1], server.port().unwrap()).into()];
+        let state = tmp.join("estado").display().to_string();
+        let link = PcLink::new(state.clone()).unwrap();
+        link.pair(code.to_uri(), "Galaxy Tab A9".into(), "t".into())
+            .unwrap();
+
+        // No celular, sem o PC: "amanhã às 15h ligar pro contador", ditado.
+        let book = TaskBook::new(state.clone());
+        let today = chrono::Local::now().date_naive().to_string();
+        let p = book
+            .parse("amanhã às 15h ligar pro contador".into(), today.clone())
+            .unwrap();
+        book.add(
+            p.title,
+            p.planned_on.clone(),
+            p.planned_time,
+            None,
+            true,
+            today.clone(),
+            now_ms(),
+        )
+        .unwrap();
+        let sync = || {
+            link.sync(
+                rec_dir.clone(),
+                "Galaxy Tab A9".into(),
+                "t".into(),
+                None,
+                Arc::new(Count(Mutex::new(0))),
+            )
+            .unwrap()
+        };
+        let s = sync();
+        assert_eq!((s.tasks_sent, s.error.as_deref()), (1, None));
+
+        // No PC, a tarefa está lá, com a origem "voz" e a data entendida.
+        let pc = isper_assist::AssistStore::open(&db).unwrap();
+        let d = pc
+            .today_for(p.planned_on.as_deref().unwrap().parse().unwrap())
+            .unwrap();
+        let t = d
+            .planned
+            .iter()
+            .find(|t| t.title == "Ligar pro contador")
+            .expect("a tarefa chegou ao PC");
+        assert_eq!(t.source_kind, isper_assist::SourceKind::Voice);
+        assert_eq!(t.planned_time.as_deref(), Some("15:00"));
+
+        // No celular, a fila esvaziou e a tarefa tem o id do PC.
+        let offset = chrono::Local::now().offset().local_minus_utc() / 60;
+        let day = book.day(today.clone(), offset).unwrap();
+        assert_eq!(day.pending, 0);
+        let mine = day
+            .later
+            .iter()
+            .find(|m| m.title == "Ligar pro contador")
+            .unwrap();
+        assert_eq!(mine.id, t.id);
+
+        // O PC conclui; a próxima sincronia leva a mudança ao celular.
+        pc.set_status(
+            &t.id,
+            isper_assist::TaskStatus::Done,
+            isper_assist::Actor::User,
+        )
+        .unwrap();
+        // O retrato ainda é novo: sem fila, a rodada nem conecta…
+        assert_eq!(sync().tasks_sent, 0);
+        // …mas uma mudança aqui leva junto o retrato novo.
+        book.add(
+            "Pagar o boleto".into(),
+            None,
+            None,
+            None,
+            false,
+            today.clone(),
+            now_ms(),
+        )
+        .unwrap();
+        assert_eq!(sync().tasks_sent, 1);
+        let day = book.day(today, offset).unwrap();
+        assert!(
+            day.done_today
+                .iter()
+                .any(|m| m.title == "Ligar pro contador")
+        );
+        assert!(day.later.iter().any(|m| m.title == "Pagar o boleto"));
 
         rt.block_on(server.shutdown());
         let _ = std::fs::remove_dir_all(&tmp);

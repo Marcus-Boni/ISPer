@@ -95,6 +95,10 @@ enum Cmd {
         /// Quanto o código de pareamento vale, em segundos
         #[arg(long, default_value_t = 120)]
         validade: u64,
+        /// Um isper.db para o celular sincronizar as tarefas (Fase 10.6);
+        /// sem ele, este "PC" não guarda tarefas
+        #[arg(long)]
+        banco: Option<PathBuf>,
     },
     /// Faz de celular: pareia com um PC (pelo código do QR) e manda um áudio
     Enviar {
@@ -510,6 +514,7 @@ fn main() -> anyhow::Result<()> {
             aprovar,
             relay,
             validade,
+            banco,
         } => sync::receive(
             pasta,
             *porta,
@@ -517,6 +522,7 @@ fn main() -> anyhow::Result<()> {
             *aprovar,
             relay.as_deref(),
             *validade,
+            banco.as_deref(),
         ),
         Cmd::Enviar {
             arquivo,

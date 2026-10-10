@@ -11,6 +11,8 @@
 //!  Upload { id, offset N } + bytes ──────────► .part → confere o SHA-256 → fila
 //!  Status { ids } ───────────────────────────► na fila, processando, pronta
 //!  Minutes { id } ───────────────────────────► a ata em Markdown
+//!  Tasks { agora, mudanças } ────────────────► aplica (o último a escrever
+//!           ◄──────────────── Tasks { retrato }  vence, por campo; 10.6)
 //! ```
 //!
 //! O transporte é o [iroh](https://www.iroh.computer): QUIC em que cada lado

@@ -123,6 +123,8 @@ pub enum Actor {
     Routine,
     /// Uma importação (Notion).
     Import,
+    /// O celular, pela sincronia (10.6): a mudança foi feita lá e chegou depois.
+    Phone,
 }
 
 impl Actor {
@@ -133,6 +135,7 @@ impl Actor {
             Self::Assistant => "assistant",
             Self::Routine => "routine",
             Self::Import => "import",
+            Self::Phone => "phone",
         }
     }
 }

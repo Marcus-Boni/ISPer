@@ -5,6 +5,7 @@
 //! com outro. Num [`Request::Upload`], os bytes do áudio vêm logo depois do
 //! quadro, até o celular fechar o lado dele do stream.
 
+pub use isper_assist::phone::{TasksRequest, TasksResponse};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -41,6 +42,9 @@ pub enum Request {
     Minutes { id: String },
     /// O celular se despede: o PC esquece o aparelho.
     Forget,
+    /// As tarefas (10.6): as mudanças feitas no celular, com a hora; o PC
+    /// aplica e devolve o retrato ([`isper_assist::phone`]).
+    Tasks(TasksRequest),
 }
 
 /// Uma gravação que o celular quer mandar.
@@ -94,6 +98,7 @@ pub enum Response {
     Minutes(Minutes),
     NoMinutes,
     Forgotten,
+    Tasks(TasksResponse),
     Error {
         code: ErrorCode,
         message: String,
@@ -154,6 +159,8 @@ pub enum ErrorCode {
     /// O arquivo chegou, mas o SHA-256 não bate: o PC descarta e o celular
     /// manda de novo.
     HashMismatch,
+    /// O PC não guarda tarefas (o `isper-cli receber` sem banco, por exemplo).
+    Unsupported,
     Internal,
 }
 

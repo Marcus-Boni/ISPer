@@ -203,7 +203,7 @@ impl AssistStore {
                 external_ref: Some(external),
                 ..NewTask::titled(routine.title.clone())
             };
-            created.push(self.insert_task(new, Some(routine.id.clone()), Actor::Routine)?);
+            created.push(self.insert_task(new, Some(routine.id.clone()), Actor::Routine, None)?);
         }
         Ok(created)
     }

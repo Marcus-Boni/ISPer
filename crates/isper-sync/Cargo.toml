@@ -20,9 +20,13 @@ sha2 = "0.11"
 getrandom = "0.3"
 thiserror = "2"
 tracing = "0.1"
+# As tarefas no bolso (10.6): o que viaja é o tipo do próprio domínio, sem
+# cópia (leve: SQLite e datas, sem o Whisper).
+isper-assist = { version = "0.1.0", path = "../isper-assist" }
 
 [dev-dependencies]
 tempfile = "3.27"
+chrono = "0.4.45"
 
 [lints]
 workspace = true

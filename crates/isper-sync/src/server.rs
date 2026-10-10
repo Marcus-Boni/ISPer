@@ -27,8 +27,8 @@ use tokio::io::AsyncWriteExt;
 
 use crate::code::{PairingCode, preferred_addrs};
 use crate::proto::{
-    ErrorCode, ItemStatus, Minutes, RecordingOffer, RemoteState, Request, Response, read_frame,
-    write_frame,
+    ErrorCode, ItemStatus, Minutes, RecordingOffer, RemoteState, Request, Response, TasksRequest,
+    TasksResponse, read_frame, write_frame,
 };
 use crate::util::{check_id, ct_eq, random_16, sha256_file, unhex};
 use crate::{
@@ -69,6 +69,15 @@ pub trait Host: Send + Sync + 'static {
     fn state(&self, device: &EndpointId, id: &str) -> RemoteState;
     /// A ata de uma gravação processada.
     fn minutes(&self, device: &EndpointId, id: &str) -> Option<Minutes>;
+    /// As tarefas do aparelho (10.6): aplica as mudanças e devolve o
+    /// retrato. `None` quando este PC não guarda tarefas; `Err` com o motivo.
+    fn tasks(
+        &self,
+        _device: &EndpointId,
+        _req: TasksRequest,
+    ) -> Option<std::result::Result<TasksResponse, String>> {
+        None
+    }
 }
 
 /// Como o servidor se apresenta na rede.
@@ -323,6 +332,14 @@ async fn serve<H: Host>(
             ctx.host.forget_device(&device);
             Response::Forgotten
         }
+        Request::Tasks(req) => match ctx.host.tasks(&device, req) {
+            Some(Ok(resp)) => Response::Tasks(resp),
+            Some(Err(message)) => error(ErrorCode::Internal, message),
+            None => error(
+                ErrorCode::Unsupported,
+                "este PC não sincroniza tarefas (atualize o ISPer do PC)",
+            ),
+        },
     };
     write_frame(&mut send, &resp).await?;
     send.finish()

@@ -309,6 +309,29 @@ impl Host for AppHost {
         }
     }
 
+    /// As tarefas do celular (10.6): aplica o que mudou lá (o último a
+    /// escrever vence, por campo) e devolve o retrato; a tela Hoje relê.
+    fn tasks(
+        &self,
+        device: &EndpointId,
+        req: isper_sync::proto::TasksRequest,
+    ) -> Option<Result<isper_sync::proto::TasksResponse, String>> {
+        let result = crate::today::open_assist()
+            .and_then(|s| Ok(s.handle_phone(&req)?))
+            .map_err(|e| e.to_string());
+        match &result {
+            Ok(resp) => {
+                let applied = resp.results.iter().filter(|r| r.error.is_none()).count();
+                if applied > 0 {
+                    tracing::info!(device = %device.fmt_short(), applied, "tarefas do celular");
+                    let _ = self.app.emit(crate::today::TASKS_EVENT, ());
+                }
+            }
+            Err(e) => tracing::warn!(device = %device.fmt_short(), "tarefas do celular: {e}"),
+        }
+        Some(result)
+    }
+
     fn minutes(&self, device: &EndpointId, id: &str) -> Option<Minutes> {
         let store = open_store().ok()?;
         let item = store.sync_item(&device.to_string(), id).ok().flatten()?;
