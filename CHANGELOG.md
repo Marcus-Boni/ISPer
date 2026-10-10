@@ -98,6 +98,12 @@ bata com ela.
   Antes de migrar, o ISPer guarda uma cópia do banco como estava
   (`isper.db.v6.bak`), que abre na versão anterior do app.
 
+### Corrigido
+- **A janela de anotar tarefas (Ctrl+Alt+A) não corta mais à direita.** Com
+  uma IA de nome comprido no rodapé ("Separado por gemini ·
+  gemini-flash-lite-latest"), o conteúdo ficava mais largo que a janela e o
+  botão Salvar e os cartões saíam da tela. Agora o nome encolhe com "…".
+
 ### Segurança
 - **A captura do áudio da reunião usa o `wasapi` 0.25**, que corrige uma
   leitura além do fim de um formato de áudio (RUSTSEC-2026-0332). O ISPer não

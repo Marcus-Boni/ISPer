@@ -44,6 +44,10 @@ Check (@($s1.cards)[0].title -eq 'Ligar pro contador sobre o IR') "o titulo sai 
 Check ((@($s1.cards)[0].day -eq $tomorrow) -and (@($s1.cards)[0].time -eq '15:00')) "dia e hora entendidos ($(@($s1.cards)[0].day) $(@($s1.cards)[0].time))"
 Check ($s1.msg -like '*IA*') "o aviso diz que a IA ficou de fora ('$($s1.msg)')"
 Check ($s1.save -like 'Salvar 1*') "o botao diz quantas salva ('$($s1.save)')"
+# O nome do modelo no rodape nao pode alargar a janela: "Separado por gemini -
+# gemini-flash-lite-latest" empurrava o Salvar e o cartao para fora (09/10).
+$fit = EvJson 'capture.html' 'JSON.stringify((() => { document.getElementById("via").textContent = "Separado por gemini - gemini-flash-lite-latest-com-um-nome-bem-comprido-mesmo"; const s = document.getElementById("save").getBoundingClientRect(); const c = document.querySelector("#cards .card-task").getBoundingClientRect(); return { save: Math.round(s.right), card: Math.round(c.right), width: window.innerWidth, scroll: document.documentElement.scrollWidth }; })())'
+Check ($fit.save -le $fit.width -and $fit.card -le $fit.width -and $fit.scroll -le $fit.width) "um modelo de nome longo no rodape nao corta o Salvar nem o cartao (Salvar ate $($fit.save), cartao ate $($fit.card), janela $($fit.width))"
 
 # 2) Editar o titulo e salvar com Enter.
 EvJson 'capture.html' 'JSON.stringify((() => { const i = document.querySelector("#cards .title"); i.value = "Ligar pro contador sobre o IR 2026"; i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); return true; })())' | Out-Null
