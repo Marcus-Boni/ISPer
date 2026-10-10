@@ -1177,7 +1177,8 @@
           status(t('settings.memoria.msg.edited'), 'ok');
         } catch (e) { status(t('common.error', { e }), 'err'); }
       }
-      loadMemory();
+      // O campo ainda tem o foco: redesenha mesmo assim (a edição acabou).
+      loadMemory(true);
     };
     input.addEventListener('keydown', (ev) => {
       if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
@@ -1235,13 +1236,13 @@
     row.append(main, acts);
     return row;
   }
-  async function loadMemory() {
+  async function loadMemory(force) {
     let active, archived;
     try {
       [active, archived] = await Promise.all([invoke('memory_list', { archived: false }), invoke('memory_list', { archived: true })]);
     } catch (e) { status(t('common.error', { e }), 'err'); return; }
-    // Editando uma linha, a lista espera.
-    if (document.activeElement && document.activeElement.classList.contains('mem-edit')) return;
+    // Editando uma linha, a lista espera (o fim da edição força).
+    if (!force && document.activeElement && document.activeElement.classList.contains('mem-edit')) return;
     $('memlist').replaceChildren(...active.map((m) => memRow(m, false)));
     $('memempty').hidden = !!active.length;
     $('memarchbox').hidden = !archived.length;
