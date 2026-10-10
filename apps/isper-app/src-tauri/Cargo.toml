@@ -24,7 +24,7 @@ tauri-plugin-updater = "2"
 # página não chama o plugin, então nenhuma permissão nova na ACL.
 tauri-plugin-dialog = "2"
 # Pastas conhecidas do Windows (ver paths.rs).
-dirs = "6"
+dirs = "7"
 toml = "1"
 isper-core = { path = "../../../crates/isper-core" }
 isper-agent = { path = "../../../crates/isper-agent" }
