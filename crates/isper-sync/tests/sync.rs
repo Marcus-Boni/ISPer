@@ -413,7 +413,10 @@ async fn tarefas_vao_e_o_retrato_volta() {
     assert_eq!(resp.results[0].op_id, op.op_id);
     assert_eq!(resp.results[0].task_id.as_deref(), Some("pc-1"));
     assert_eq!(resp.now_ms, 6_000);
-    assert_eq!(*host.task_ops.lock().unwrap(), std::slice::from_ref(&op.op_id));
+    assert_eq!(
+        *host.task_ops.lock().unwrap(),
+        std::slice::from_ref(&op.op_id)
+    );
 
     // Um PC que não guarda tarefas diz isso, sem derrubar a conexão.
     host.tasks.store(false, Ordering::Relaxed);
