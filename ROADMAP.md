@@ -465,7 +465,7 @@ começam do zero na tela Hoje ([revisão do ADR 0021](docs/adr/0021-assistente-p
 
 ### 10.6 No bolso
 
-- [ ] Tarefas e rotinas no `isper/sync` (o último a escrever vence, por campo); captura por voz e avisos no Android
+- [x] Tarefas e rotinas no `isper/sync` (o último a escrever vence, por campo, pela hora de cada campo no diário; o relógio do celular corrigido; criar não duplica; [0024](docs/adr/0024-tarefas-no-bolso.md)); aba Hoje no Android com criar, concluir, mudar de dia e aceitar da caixa, ditado no aparelho (Whisper local) e lembretes na hora com "Concluir". Teste de ponta a ponta do critério no núcleo (iroh + `isper.db`) e e2e `tools/e2e/android-tasks.ps1` no emulador (10/10)
 - [ ] Pronto quando uma tarefa ditada no celular aparece no PC na próxima sincronia
 
 ## Boas práticas transversais

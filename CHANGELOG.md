@@ -85,6 +85,19 @@ bata com ela.
   "prefiro reuniões depois das 10h"): escreva, corrija com um clique, fixe no
   topo ou arquive (com Desfazer). Peça na tela Hoje, "lembra que…", e ele
   propõe guardar num cartão; sem o seu toque, nada é guardado.
+- **As tarefas no celular.** O app Android ganha a aba Hoje, com o mesmo
+  dia da tela Hoje do PC: escreva "amanhã às 15h ligar pro contador" e a
+  tarefa aparece com o dia e a hora entendidos; conclua, mude de dia, aceite
+  o que chegou das reuniões e veja as rotinas. Funciona sem o PC por perto:
+  o que muda no celular vai na próxima sincronia, e o que muda no PC volta.
+  Quando os dois mudam a mesma tarefa, vale a mudança mais recente, campo a
+  campo, e o celular avisa quando a do PC ganhou.
+- **Ditar uma tarefa no celular.** O microfone da aba Hoje transcreve no
+  próprio aparelho, com o mesmo Whisper da transcrição local; o áudio não
+  sai do celular.
+- **Lembretes no celular.** Na hora de uma tarefa (e da tarefa do dia de
+  uma rotina), uma notificação com "Concluir". Voltam sozinhos depois de
+  religar o aparelho.
 - **IA compatível com OpenAI.** Nas Configurações, em Inteligência, o ISPer
   passa a falar com um modelo no seu PC (Ollama, LM Studio) ou com outro
   serviço compatível com a API da OpenAI, pelo endereço, com chave opcional.
