@@ -31,8 +31,11 @@ $db = Join-Path $work 'isper.db'
 New-Item -ItemType Directory -Force $pcDir | Out-Null
 
 function Set-UiText([string]$Tag, [string]$Text) {
-  for ($try = 1; $try -le 3; $try++) {
+  # Num emulador recem-ligado, o teclado ainda se configura na primeira vez e
+  # engole o que chega: mais tentativas, com uma pausa depois do toque.
+  for ($try = 1; $try -le 5; $try++) {
     if (-not (Invoke-UiTap -Tag $Tag)) { return $false }
+    Start-Sleep -Milliseconds (500 * $try)
     Adb shell input keycombination 113 29 | Out-Null   # Ctrl+A
     Adb shell input keyevent 67 | Out-Null             # apagar
     for ($i = 0; $i -lt $Text.Length; $i += 24) {
@@ -93,6 +96,8 @@ try {
   Check (Set-UiText -Tag 'hoje-campo' -Text 'amanha as 15h ligar pro contador') "escreveu a tarefa"
   Check ($null -ne (Get-UiNode -Tag 'hoje-adicionar')) "a previa oferece Adicionar"
   Check (Invoke-UiTap -Tag 'hoje-adicionar') "Adicionar"
+  # A de amanha fica em "Depois", recolhido.
+  Check (Invoke-UiTap -Tag 'hoje-depois') "abriu o Depois"
   Check ($null -ne (Get-UiNode -Tag 'tarefa:Ligar pro contador')) "a tarefa aparece na hora, com o titulo sem a data"
   $line = Wait-ReceiverLine '*"Ligar pro contador"*'
   Check ($null -ne $line) "a tarefa chegou ao PC ($line)"
@@ -112,8 +117,9 @@ try {
   Check ($null -ne $done) "a conclusao chegou ao PC ($done)"
 
   "== 4. o lembrete na hora"
-  $at = (Get-Date).AddMinutes(2)
-  $hhmm = $at.ToString('HH:mm')
+  # A hora do proprio emulador (ele costuma estar em UTC, nao no fuso da maquina).
+  $emuNow = [datetime]::ParseExact(((Adb shell "date +%H:%M") -join '').Trim(), 'HH:mm', $null)
+  $hhmm = $emuNow.AddMinutes(2).ToString('HH:mm')
   Check (Set-UiText -Tag 'hoje-campo' -Text "hoje as $hhmm ligar pro banco") "uma tarefa para as $hhmm"
   Check (Invoke-UiTap -Tag 'hoje-adicionar') "Adicionar"
   $shown = $false

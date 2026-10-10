@@ -240,7 +240,7 @@ fun TodayScreen(vm: TodayViewModel, modifier: Modifier = Modifier) {
 
         if (d.later.isNotEmpty()) {
             item {
-                TextButton(onClick = { showLater = !showLater }) {
+                TextButton(onClick = { showLater = !showLater }, modifier = Modifier.testTag("hoje-depois")) {
                     Text(
                         stringResource(if (showLater) R.string.today_hide_later else R.string.today_show_later, d.later.size),
                     )
