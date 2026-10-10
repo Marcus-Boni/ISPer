@@ -13,10 +13,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import com.isper.mobile.library.LibraryViewModel
 import com.isper.mobile.sync.PcSync
+import com.isper.mobile.today.Tasks
+import com.isper.mobile.today.TodayViewModel
 import com.isper.mobile.transcribe.LocalTranscribe
 
 /**
- * A casa do app: três destinos (Gravar, Biblioteca, Laboratório).
+ * A casa do app: quatro destinos (Gravar, Biblioteca, Hoje, Laboratório).
  *
  * Esta Activity é exportada (é a do ícone), então não aceita nenhuma intent
  * que comece uma gravação — isso só acontece por um toque na tela ou pelos
@@ -27,6 +29,7 @@ import com.isper.mobile.transcribe.LocalTranscribe
 class MainActivity : ComponentActivity() {
     private val lab: SpikeViewModel by viewModels()
     private val library: LibraryViewModel by viewModels()
+    private val today: TodayViewModel by viewModels()
     private val tab = mutableIntStateOf(TAB_RECORD)
     /** A ata aberta na Biblioteca (id da gravação). */
     private val minutes = mutableStateOf<String?>(null)
@@ -48,6 +51,7 @@ class MainActivity : ComponentActivity() {
                     tab = tab.intValue,
                     onTab = { tab.intValue = it; minutes.value = null },
                     library = library,
+                    today = today,
                     lab = lab,
                     minutesId = minutes.value,
                     onMinutes = { minutes.value = it },
@@ -65,6 +69,8 @@ class MainActivity : ComponentActivity() {
         // E para agendar a transcrição no celular do que ainda não tem ata
         // (Fase 9.4); o que já está na fila fica como está.
         LocalTranscribe.schedule(this)
+        // As tarefas (Fase 10.6): o dia pode ter virado com o app fechado.
+        Tasks.refreshed(this)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -117,7 +123,9 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_MINUTES = "com.isper.mobile.ATA"
         const val TAB_RECORD = 0
         const val TAB_LIBRARY = 1
-        const val TAB_LAB = 2
+        /** As tarefas no bolso (Fase 10.6). */
+        const val TAB_TODAY = 2
+        const val TAB_LAB = 3
         private const val STATE_TAB = "aba"
         private const val STATE_MINUTES = "ata"
     }

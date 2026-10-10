@@ -29,14 +29,17 @@ import com.isper.mobile.library.LibraryViewModel
 import com.isper.mobile.library.MinutesScreen
 import com.isper.mobile.recording.RecordScreen
 import com.isper.mobile.recording.RecorderBus
+import com.isper.mobile.today.TodayScreen
+import com.isper.mobile.today.TodayViewModel
 import com.isper.mobile.transcribe.SettingsScreen
 
-/** Os três destinos do app, na ordem da barra de baixo. */
+/** Os destinos do app, na ordem da barra de baixo (o índice é a aba). */
 private data class Destination(val label: Int, val icon: Int)
 
 private val destinations = listOf(
     Destination(R.string.tab_record, R.drawable.ic_mic),
     Destination(R.string.tab_library, R.drawable.ic_library),
+    Destination(R.string.tab_today, R.drawable.ic_today),
     Destination(R.string.tab_lab, R.drawable.ic_lab),
 )
 
@@ -46,6 +49,7 @@ fun IsperApp(
     tab: Int,
     onTab: (Int) -> Unit,
     library: LibraryViewModel,
+    today: TodayViewModel,
     lab: SpikeViewModel,
     minutesId: String?,
     onMinutes: (String?) -> Unit,
@@ -111,6 +115,7 @@ fun IsperApp(
                     )
                 }
             }
+            MainActivity.TAB_TODAY -> TodayScreen(vm = today, modifier = modifier)
             else -> {
                 val state by lab.state.collectAsStateWithLifecycle()
                 SpikeScreen(state = state, actions = lab, modifier = modifier)

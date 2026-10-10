@@ -21,6 +21,7 @@ import com.isper.mobile.core.SyncListener
 import com.isper.mobile.core.SyncSummary
 import com.isper.mobile.recording.RecorderBus
 import com.isper.mobile.recording.Storage
+import com.isper.mobile.today.Tasks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -67,8 +68,11 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 summary.ready.forEach { notifyReady(ctx, it) }
                 Log.i(TAG, "rodada: ${summary.sent} enviada(s), ${summary.ready.size} ata(s), ${summary.waiting} no PC, ${summary.unsent} pendente(s)" +
                     (summary.error?.let { " — $it" } ?: ""))
+                if (summary.tasksSent > 0u) Log.i(TAG, "tarefas: ${summary.tasksSent} mudança(s) levada(s), ${summary.tasksKeptPc} campo(s) ficaram com o PC")
+                // Mudança nas tarefas esperando o PC também tenta de novo logo.
+                val tasksWaiting = runCatching { Tasks.day(ctx).pending > 0u }.getOrDefault(false)
                 when {
-                    summary.error != null && summary.unsent > 0u -> PcSync.retryLater(ctx)
+                    summary.error != null && (summary.unsent > 0u || tasksWaiting) -> PcSync.retryLater(ctx)
                     summary.waiting > 0u -> { PcSync.reached(); PcSync.syncLater(ctx, 90) }
                     else -> PcSync.reached()
                 }
@@ -84,6 +88,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             } finally {
                 runCatching { multicast?.release() }
                 PcSync.roundFinished(ctx, summary)
+                // O retrato das tarefas pode ter mudado: a tela relê e os lembretes se refazem.
+                Tasks.refreshed(ctx)
             }
         }
     }

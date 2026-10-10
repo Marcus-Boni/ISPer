@@ -143,7 +143,7 @@ function Wait-UiText([string]$Tag, [scriptblock]$Cond = { param($t) $t }, [int]$
   return $t
 }
 
-# Abre o app numa aba (0 Gravar, 1 Biblioteca, 2 Laboratorio).
+# Abre o app numa aba (0 Gravar, 1 Biblioteca, 2 Hoje, 3 Laboratorio).
 function Open-Tab([int]$Tab) {
   Adb shell am start -n "$script:Pkg/.MainActivity" --ei com.isper.mobile.ABA $Tab 2>$null | Out-Null
   Start-Sleep -Seconds 2
