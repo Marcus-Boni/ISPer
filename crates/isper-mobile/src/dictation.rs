@@ -39,8 +39,10 @@ fn engine(model_path: &str) -> Result<Arc<WhisperEngine>, MobileError> {
 /// PCM 16 bits little-endian em amostras de -1 a 1.
 fn samples(pcm16_le: &[u8]) -> Vec<f32> {
     pcm16_le
-        .chunks_exact(2)
-        .map(|b| f32::from(i16::from_le_bytes([b[0], b[1]])) / 32_768.0)
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|b| f32::from(i16::from_le_bytes(*b)) / 32_768.0)
         .collect()
 }
 
