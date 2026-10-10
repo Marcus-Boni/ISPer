@@ -19,6 +19,8 @@
          locais". -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
+    <!-- Fase 10.6: os lembretes das tarefas com hora voltam depois de religar. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- hasFragileUserData: ao desinstalar, o Android oferece manter os dados,
          e as gravações (Android/data/.../Gravacoes) ficam para a próxima
@@ -61,6 +63,21 @@
             android:noHistory="true"
             android:taskAffinity=""
             android:theme="@style/Theme.ISPer.Translucent" />
+
+        <!-- Fase 10.6: o alarme de uma tarefa e o "Concluir" da notificação. Não
+             exportado: só os alarmes e as notificações do próprio ISPer chegam. -->
+        <receiver
+            android:name=".today.ReminderReceiver"
+            android:exported="false" />
+        <!-- Religar o aparelho apaga os alarmes; só o sistema manda estes dois. -->
+        <receiver
+            android:name=".today.RemindersBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".recording.RecordingService"

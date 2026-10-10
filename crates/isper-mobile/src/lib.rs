@@ -52,6 +52,8 @@ pub use sync::{
 };
 pub mod tasks;
 pub use tasks::{MobileDay, MobileRoutine, MobileTask, ParsedTask, TaskBook};
+pub mod dictation;
+pub use dictation::transcribe_dictation;
 
 /// Erro que chega ao app como exceção. A mensagem já vem em português e é
 /// para mostrar como está.

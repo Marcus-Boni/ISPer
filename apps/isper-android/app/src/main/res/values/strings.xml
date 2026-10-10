@@ -58,6 +58,50 @@
     <string name="tab_record">Gravar</string>
     <string name="tab_library">Biblioteca</string>
     <string name="tab_lab">Laboratório</string>
+    <string name="tab_today">Hoje</string>
+
+    <!-- Fase 10.6: as tarefas no bolso. -->
+    <string name="today_add_placeholder">Nova tarefa… (ex.: amanhã às 15h ligar pro contador)</string>
+    <string name="today_add">Adicionar</string>
+    <string name="today_due">até %1$s</string>
+    <string name="today_when_today">hoje</string>
+    <string name="today_when_tomorrow">amanhã</string>
+    <string name="today_dictation_start">Ditar uma tarefa</string>
+    <string name="today_dictation_stop">Parar de ditar</string>
+    <string name="today_dictation_listening">Ouvindo… %1$d s · toque no microfone para parar</string>
+    <string name="today_dictation_understanding">Entendendo…</string>
+    <string name="today_dictation_no_model">Para ditar, baixe o modelo da transcrição: Biblioteca → engrenagem (Ajustes). O áudio fica no celular.</string>
+    <string name="today_sync_unpaired">Pareie com o PC (na Biblioteca) para as tarefas irem e voltarem.</string>
+    <string name="today_sync_error">As tarefas não sincronizaram: %1$s</string>
+    <string name="today_synced_at">Atualizado com o PC às %1$s</string>
+    <string name="today_sync_never">Ainda não sincronizou com o PC.</string>
+    <string name="today_sec_planned">Para hoje</string>
+    <string name="today_sec_inbox">Caixa de entrada</string>
+    <string name="today_sec_done">Feito hoje</string>
+    <string name="today_sec_routines">Rotinas</string>
+    <string name="today_show_later">Depois (%1$d)</string>
+    <string name="today_hide_later">Esconder o depois (%1$d)</string>
+    <string name="today_empty">Nada para hoje. Escreva ou dite uma tarefa acima.</string>
+    <string name="today_all_done">Tudo feito por hoje.</string>
+    <string name="today_overdue">atrasada</string>
+    <string name="today_chip_routine">rotina</string>
+    <string name="today_chip_voice">ditada</string>
+    <string name="today_chip_meeting">reunião</string>
+    <string name="today_chip_pending">só aqui</string>
+    <string name="today_more">Mais ações para "%1$s"</string>
+    <string name="today_move_today">Para hoje</string>
+    <string name="today_move_tomorrow">Para amanhã</string>
+    <string name="today_move_someday">Algum dia</string>
+    <string name="today_drop">Descartar</string>
+    <string name="today_accept_today">Hoje</string>
+    <string name="today_accept_tomorrow">Amanhã</string>
+    <string name="today_routine_daily">Todo dia</string>
+    <string name="today_routine_workdays">Dias úteis</string>
+    <string name="today_routine_monthly">Todo mês</string>
+    <string name="today_routine_paused">pausada</string>
+    <string name="channel_reminders">Lembretes de tarefas</string>
+    <string name="reminder_at">Às %1$s</string>
+    <string name="reminder_done">Concluir</string>
     <string name="undo">Desfazer</string>
     <string name="share_label">Transcrever com o ISPer</string>
 
@@ -155,6 +199,14 @@
     <plurals name="sync_waiting">
         <item quantity="one">%1$d gravação no PC, esperando a ata.</item>
         <item quantity="other">%1$d gravações no PC, esperando a ata.</item>
+    </plurals>
+    <plurals name="today_pending">
+        <item quantity="one">%1$d mudança esperando o PC</item>
+        <item quantity="other">%1$d mudanças esperando o PC</item>
+    </plurals>
+    <plurals name="today_kept_pc">
+        <item quantity="one">%1$d mudança daqui ficou com a versão do PC (mudou lá depois)</item>
+        <item quantity="other">%1$d mudanças daqui ficaram com a versão do PC (mudaram lá depois)</item>
     </plurals>
     <plurals name="sync_unsent">
         <item quantity="one">%1$d gravação ainda não foi.</item>
