@@ -8,8 +8,11 @@
 <link rel="stylesheet" href="assets/base.css">
 <style>
   html, body { height: 100%; }
+  /* A coluna nunca passa da janela: sem o minmax(0, …), o mínimo de um filho
+     (o nome do modelo no rodapé, sem quebra) alargava a página e cortava o
+     Salvar e os cartões à direita. */
   body {
-    display: grid; grid-template-rows: auto auto 1fr auto; overflow: hidden;
+    display: grid; grid-template-rows: auto auto 1fr auto; grid-template-columns: minmax(0, 1fr); overflow: hidden;
     border: 1px solid var(--line-2); background: var(--bg);
   }
 
@@ -36,7 +39,7 @@
   .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line-2); border-top-color: var(--accent); animation: spin .8s linear infinite; display: inline-block; vertical-align: -2px; margin-right: 8px; }
   .cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
   .card-task {
-    display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start;
     padding: 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel);
   }
   .card-task.reveal { animation: rise var(--dur-3) var(--ease-out) both; }
@@ -50,7 +53,8 @@
   .empty-box { display: grid; gap: 10px; justify-items: start; color: var(--muted); font-size: 13px; }
 
   /* ---- rodapé ---- */
-  .foot { display: flex; align-items: center; gap: 8px; padding: 10px 14px 14px 18px; border-top: 1px solid var(--line); }
+  .foot { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px 14px 14px 18px; border-top: 1px solid var(--line); }
+  .foot .btn { flex: none; }
   .via { font-size: 11.5px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .foot .spacer { flex: 1; }
   .foot kbd { margin-left: 4px; }
