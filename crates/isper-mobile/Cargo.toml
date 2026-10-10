@@ -18,6 +18,9 @@ isper-diarize = { path = "../isper-diarize" }
 isper-models = { path = "../isper-models" }
 # Fase 9.3: mandar as gravações ao PC e trazer a ata (ADR 0017).
 isper-sync = { path = "../isper-sync" }
+# Fase 10.6: as tarefas no bolso, com o mesmo leitor de datas do PC.
+isper-assist = { path = "../isper-assist" }
+chrono = "0.4.45"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread"] }

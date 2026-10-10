@@ -20,7 +20,8 @@
 //! Desde a 9.2, a fachada também grava ([`Recorder`], em [`recording`]): o
 //! `AudioRecord` do Android entrega PCM e o núcleo escreve o Ogg/Opus com o
 //! manifesto ao lado, à prova de queda. A sincronia com o PC (9.3) entra
-//! depois, em cima desta mesma fachada.
+//! depois, em cima desta mesma fachada, e as tarefas no bolso (10.6) em
+//! [`tasks`], sincronizadas na mesma rodada.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -49,6 +50,8 @@ pub mod sync;
 pub use sync::{
     PcInfo, PcLink, ReadyMinutes, RemoteStage, SyncListener, SyncSummary, retry_recording,
 };
+pub mod tasks;
+pub use tasks::{MobileDay, MobileRoutine, MobileTask, ParsedTask, TaskBook};
 
 /// Erro que chega ao app como exceção. A mensagem já vem em português e é
 /// para mostrar como está.

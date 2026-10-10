@@ -12,6 +12,8 @@
 //!   entrada, com o minuto em que foram ditas;
 //! - [`learn`]: a tarefa que se repete no mesmo dia da semana vira sugestão
 //!   de rotina, com os dias como evidência (aceitar e recusar são da pessoa);
+//! - [`phone`]: as tarefas no celular (10.6): o que muda lá chega ao PC com a
+//!   hora, e o último a escrever vence, por campo;
 //! - [`clock`]: o relógio, injetável nos testes, que diz que dia é "hoje".
 //!
 //! O schema é a v7 do banco, migrada pelo `isper-core` (uma cadeia de
@@ -24,6 +26,7 @@ pub mod clock;
 pub mod learn;
 pub mod meeting;
 pub mod model;
+pub mod phone;
 pub mod recur;
 pub mod store;
 mod text;

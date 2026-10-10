@@ -24,8 +24,8 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use crate::code::{PairingCode, dial_addr};
 use crate::proto::{
-    ErrorCode, ItemStatus, Minutes, RecordingOffer, RemoteState, Request, Response, read_frame,
-    write_frame,
+    ErrorCode, ItemStatus, Minutes, RecordingOffer, RemoteState, Request, Response, TasksRequest,
+    TasksResponse, read_frame, write_frame,
 };
 use crate::server::relay_mode;
 use crate::util::hex;
@@ -328,6 +328,14 @@ impl Session {
         match request(&self.conn, &Request::Minutes { id: id.to_string() }).await? {
             Response::Minutes(m) => Ok(Some(m)),
             Response::NoMinutes => Ok(None),
+            other => Err(unexpected(other)),
+        }
+    }
+
+    /// As tarefas (10.6): manda as mudanças do celular e traz o retrato.
+    pub async fn tasks(&self, req: TasksRequest) -> Result<TasksResponse> {
+        match request(&self.conn, &Request::Tasks(req)).await? {
+            Response::Tasks(resp) => Ok(resp),
             other => Err(unexpected(other)),
         }
     }

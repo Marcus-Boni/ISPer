@@ -59,6 +59,8 @@ struct FolderHost {
     dir: PathBuf,
     approve_all: bool,
     devices: Mutex<HashMap<String, String>>,
+    /// O banco das tarefas (10.6), quando este "PC" as guarda.
+    db: Option<PathBuf>,
 }
 
 impl FolderHost {
@@ -168,6 +170,37 @@ impl Host for FolderHost {
         }
     }
 
+    fn tasks(
+        &self,
+        device: &EndpointId,
+        req: isper_sync::proto::TasksRequest,
+    ) -> Option<Result<isper_sync::proto::TasksResponse, String>> {
+        let db = self.db.as_ref()?;
+        let result = isper_assist::AssistStore::open(db)
+            .and_then(|s| s.handle_phone(&req))
+            .map_err(|e| e.to_string());
+        // O que chegou, linha a linha, para o teste conferir.
+        match &result {
+            Ok(resp) => {
+                for (op, r) in req.ops.iter().zip(&resp.results) {
+                    let title = op.changes.get("title").and_then(|v| v.as_str());
+                    println!(
+                        "tarefa do celular {}: {} {}{}",
+                        device.fmt_short(),
+                        r.task_id.as_deref().unwrap_or("?"),
+                        title.map(|t| format!("\"{t}\" ")).unwrap_or_default(),
+                        r.error
+                            .as_deref()
+                            .map(|e| format!("(erro: {e})"))
+                            .unwrap_or_else(|| format!("({})", r.applied.join(", "))),
+                    );
+                }
+            }
+            Err(e) => println!("tarefas do celular: {e}"),
+        }
+        Some(result)
+    }
+
     fn minutes(&self, device: &EndpointId, id: &str) -> Option<Minutes> {
         let markdown = std::fs::read_to_string(self.minutes_path(device, id)).ok()?;
         // Uma ata escrita no Windows pode vir com BOM, e aí o "# " da primeira
@@ -194,8 +227,13 @@ pub(crate) fn receive(
     approve_all: bool,
     relay: Option<&str>,
     valid_secs: u64,
+    db: Option<&Path>,
 ) -> anyhow::Result<()> {
     std::fs::create_dir_all(dir)?;
+    // O MeetingStore migra o banco (a cadeia é dele) antes de o celular chegar.
+    if let Some(db) = db {
+        drop(isper_core::store::MeetingStore::open(db)?);
+    }
     let key = load_or_create_key(&dir.join("chave-do-pc.txt"))?;
     let devices: HashMap<String, String> = std::fs::read(dir.join("aparelhos.json"))
         .ok()
@@ -205,6 +243,7 @@ pub(crate) fn receive(
         dir: dir.to_path_buf(),
         approve_all,
         devices: Mutex::new(devices),
+        db: db.map(Path::to_path_buf),
     });
     let relay = relay
         .map(RelayUrl::from_str)

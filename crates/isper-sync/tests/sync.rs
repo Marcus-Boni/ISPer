@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use isper_sync::client::Client;
 use isper_sync::code::PairingCode;
-use isper_sync::proto::{Minutes, RecordingOffer, RemoteState};
+use isper_sync::proto::{Minutes, RecordingOffer, RemoteState, TasksRequest, TasksResponse};
 use isper_sync::server::{Approval, Host, Server, ServerConfig};
 use isper_sync::{EndpointId, SecretKey, SyncError, sha256_file};
 
@@ -24,6 +24,9 @@ struct TestHost {
     devices: Mutex<HashMap<EndpointId, String>>,
     received: Mutex<HashMap<String, (RecordingOffer, PathBuf)>>,
     done: Mutex<HashMap<String, String>>,
+    /// Este PC guarda tarefas? (o `isper-cli receber` sem banco não guarda)
+    tasks: AtomicBool,
+    task_ops: Mutex<Vec<String>>,
 }
 
 impl TestHost {
@@ -34,6 +37,8 @@ impl TestHost {
             devices: Mutex::default(),
             received: Mutex::default(),
             done: Mutex::default(),
+            tasks: AtomicBool::new(true),
+            task_ops: Mutex::default(),
         })
     }
 
@@ -87,6 +92,38 @@ impl Host for TestHost {
             return RemoteState::Queued;
         }
         RemoteState::Unknown
+    }
+    fn tasks(
+        &self,
+        _device: &EndpointId,
+        req: TasksRequest,
+    ) -> Option<Result<TasksResponse, String>> {
+        if !self.tasks.load(Ordering::Relaxed) {
+            return None;
+        }
+        let mut seen = self.task_ops.lock().unwrap();
+        let results = req
+            .ops
+            .iter()
+            .map(|op| {
+                seen.push(op.op_id.clone());
+                isper_assist::phone::OpResult {
+                    op_id: op.op_id.clone(),
+                    task_id: Some(format!("pc-{}", seen.len())),
+                    applied: op.changes.keys().cloned().collect(),
+                    ..Default::default()
+                }
+            })
+            .collect();
+        Some(Ok(TasksResponse {
+            now_ms: req.now_ms + 1_000,
+            results,
+            snapshot: isper_assist::phone::Snapshot {
+                today: chrono::NaiveDate::from_ymd_opt(2026, 10, 10).unwrap(),
+                tasks: Vec::new(),
+                routines: Vec::new(),
+            },
+        }))
     }
     fn minutes(&self, _device: &EndpointId, id: &str) -> Option<Minutes> {
         let title = self.done.lock().unwrap().get(id)?.clone();
@@ -345,6 +382,51 @@ async fn aparelho_estranho_esquecido_ou_com_arquivo_corrompido_nao_entra() {
         Err(SyncError::NotPaired)
     ));
 
+    phone.close().await;
+    server.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn tarefas_vao_e_o_retrato_volta() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (server, host) = server(&tmp.path().join("pc")).await;
+    let code = local_code(&server, server.start_pairing().unwrap());
+    let phone = Client::bind(SecretKey::generate(), None, false)
+        .await
+        .unwrap();
+    let pc = phone.pair(&code, "Galaxy Tab A9", "teste").await.unwrap();
+    let session = phone.connect(&pc).await.unwrap();
+    let op = isper_assist::phone::PhoneOp::new(
+        None,
+        [("title".to_string(), serde_json::json!("Ligar pro contador"))]
+            .into_iter()
+            .collect(),
+        1_000,
+    );
+    let resp = session
+        .tasks(TasksRequest {
+            now_ms: 5_000,
+            ops: vec![op.clone()],
+        })
+        .await
+        .unwrap();
+    assert_eq!(resp.results[0].op_id, op.op_id);
+    assert_eq!(resp.results[0].task_id.as_deref(), Some("pc-1"));
+    assert_eq!(resp.now_ms, 6_000);
+    assert_eq!(*host.task_ops.lock().unwrap(), std::slice::from_ref(&op.op_id));
+
+    // Um PC que não guarda tarefas diz isso, sem derrubar a conexão.
+    host.tasks.store(false, Ordering::Relaxed);
+    let e = session
+        .tasks(TasksRequest {
+            now_ms: 5_000,
+            ops: Vec::new(),
+        })
+        .await
+        .unwrap_err();
+    assert!(e.to_string().contains("não sincroniza tarefas"), "{e}");
+    assert!(session.hello("Galaxy Tab A9", "teste").await.is_ok());
+    session.close();
     phone.close().await;
     server.shutdown().await;
 }
