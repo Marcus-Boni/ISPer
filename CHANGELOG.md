@@ -11,6 +11,15 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-10
+
+A versão do assistente pessoal (Fase 10). A tela Hoje junta as suas tarefas,
+as rotinas, a agenda do Outlook e o que você ficou de fazer em cada reunião;
+o assistente responde sobre o seu dia dizendo de onde veio cada fato, aprende
+o que se repete e só muda alguma coisa com o seu toque; e as tarefas vão para
+o celular (app Android 0.5.0-tarefas), com ditado no próprio aparelho e
+lembretes na hora.
+
 ### Adicionado
 - **Tela Hoje, o começo do assistente (Fase 10).** Um item novo na barra
   lateral, com o número de tarefas do dia ao lado (atalho Ctrl+T). As tarefas
@@ -1033,7 +1042,8 @@ dia e de noite, em português ou em inglês, e utilizável só pelo teclado.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.25.1...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.25.1...v0.26.0
 [0.25.1]: https://github.com/Marcus-Boni/ISPer/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.23.0...v0.24.0
