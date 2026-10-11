@@ -38,10 +38,10 @@ android {
         // O versionCode sobe a cada APK distribuído, e o Android nunca instala
         // um menor por cima de um maior. O versionName é o que o PC mostra do
         // celular pareado: o minor diz a etapa (0.1 laboratório da 9.1, 0.2
-        // gravador da 9.2, 0.3 sincronia da 9.3, 0.4 transcrição da 9.4), e o
-        // patch, as correções.
-        versionCode = 6
-        versionName = "0.4.1-transcricao"
+        // gravador da 9.2, 0.3 sincronia da 9.3, 0.4 transcrição da 9.4, 0.5
+        // tarefas no bolso da 10.6), e o patch, as correções.
+        versionCode = 7
+        versionName = "0.5.0-tarefas"
         ndk { abiFilters += rustAbis }
     }
 
