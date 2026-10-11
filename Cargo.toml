@@ -35,3 +35,11 @@ unwrap_used = "warn"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# No modo debug (`cargo test`, `cargo clippy`, `cargo build`), as dependências
+# de terceiros compilam sem informação de depuração: é ela que enche o
+# `target/debug` (os .pdb e o debuginfo de centenas de crates), e quase nunca
+# se depura dentro delas. O código do workspace continua com a depuração
+# completa; um backtrace que passa por uma dependência só perde a linha dela.
+[profile.dev.package."*"]
+debug = false
