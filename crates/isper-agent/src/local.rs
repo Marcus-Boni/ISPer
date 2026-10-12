@@ -40,6 +40,7 @@ pub(crate) const CREATE: &str = "criar_tarefa";
 pub(crate) const MOVE: &str = "mover_tarefa";
 pub(crate) const COMPLETE: &str = "concluir_tarefa";
 pub(crate) const REMEMBER: &str = "lembrar";
+pub(crate) const SPARE: &str = "quando_der_tempo";
 
 /// As ferramentas locais sobre um banco.
 pub(crate) struct LocalTools {
@@ -240,6 +241,17 @@ impl LocalTools {
                 ),
             ),
             tool(
+                SPARE,
+                "As listas \"Quando der tempo\" (estudar, ler, ideias): o que a pessoa guardou para fazer sem data, com quanto cada item leva e se está parado. Use para \"o que dá para fazer em 30 min?\", \"o que eu tinha para estudar?\". Com `minutos`, só o que cabe nesse tempo.",
+                object(
+                    json!({
+                        "minutos": {"type": ["integer", "null"], "description": "O tempo livre, em minutos; null traz tudo."},
+                        "lista": nullable("Parte do nome da lista (\"estudar\"); null traz todas."),
+                    }),
+                    &["minutos", "lista"],
+                ),
+            ),
+            tool(
                 REMEMBER,
                 "Guarda na memória do ISPer um fato curto e duradouro sobre a pessoa (quem é o gestor, em que projeto trabalha, um jeito de preferir), que ela vê e edita nas Configurações. Só quando ela pedir para lembrar, ou disser algo que vale para os próximos dias; nunca senha, segredo ou o que outra pessoa disse numa reunião. O ISPer pede a confirmação antes.",
                 object(
@@ -283,6 +295,7 @@ impl LocalTools {
             MOVE => self.move_task(args),
             COMPLETE => self.complete(args),
             REMEMBER => self.remember(args),
+            SPARE => self.spare(args),
             other => Err(format!("ferramenta desconhecida: {other}")),
         };
         result.unwrap_or_else(ToolOutcome::error)
@@ -592,6 +605,39 @@ impl LocalTools {
             })
             .collect();
         Self::ok(json!({"rotinas": items, "sugeridas": suggested}), sources)
+    }
+
+    fn spare(&self, args: &Value) -> Result<ToolOutcome, String> {
+        let store = self.assist()?;
+        let minutes = args.get("minutos").and_then(Value::as_i64);
+        let wanted = text_arg(args, "lista").map(fold);
+        let mut sources = Vec::new();
+        let mut items = Vec::new();
+        let mut names = Vec::new();
+        for l in store.lists_with_items().map_err(|e| e.to_string())? {
+            if wanted
+                .as_ref()
+                .is_some_and(|w| !fold(&l.list.name).contains(w.as_str()))
+            {
+                continue;
+            }
+            names.push(l.list.name.clone());
+            for t in &l.items {
+                let takes = isper_assist::spare::estimate(t);
+                if minutes.is_some_and(|m| i64::from(takes) > m) {
+                    continue;
+                }
+                sources.push(task_source(t));
+                items.push(json!({
+                    "ref": task_ref(t),
+                    "titulo": t.title,
+                    "lista": l.list.name,
+                    "minutos": t.estimate_min,
+                    "parado": l.stale.contains(&t.id),
+                }));
+            }
+        }
+        Self::ok(json!({"listas": names, "itens": items}), sources)
     }
 
     fn remember(&self, args: &Value) -> Result<ToolOutcome, String> {

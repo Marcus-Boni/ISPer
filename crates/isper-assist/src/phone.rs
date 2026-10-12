@@ -258,7 +258,11 @@ impl AssistStore {
         let since = self.clock.now_ms() - Duration::days(DONE_DAYS).num_milliseconds();
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {} FROM tasks
-              WHERE status IN ('open', 'inbox') OR (status = 'done' AND completed_at >= ?1)
+              WHERE ((status IN ('open', 'inbox')
+                       -- O celular ainda não tem a tela das listas (11.0): o
+                       -- item sem dia ficaria no Depois, que é o que ela evita.
+                       AND NOT (list_id IS NOT NULL AND planned_on IS NULL))
+                     OR (status = 'done' AND completed_at >= ?1))
               ORDER BY position, id",
             crate::store::TASK_COLUMNS
         ))?;

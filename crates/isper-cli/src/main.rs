@@ -23,6 +23,7 @@ use clap::{Parser, Subcommand};
 mod agente;
 mod aprender;
 mod bench;
+mod listas;
 mod opttime;
 mod reunioes;
 mod sync;
@@ -232,6 +233,46 @@ enum Cmd {
     /// (Fase 10.5)
     #[command(subcommand)]
     Memoria(MemoriaCmd),
+    /// As listas "Quando der tempo": o que não tem data (Fase 11.0)
+    #[command(subcommand)]
+    Listas(ListasCmd),
+}
+
+#[derive(Subcommand)]
+enum ListasCmd {
+    /// As listas com os itens (e quais estão parados)
+    Ver {
+        /// Banco (padrão: o do app, %APPDATA%\ISPer\isper.db)
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
+    /// Cria uma lista ("Estudar", "Ler")
+    Nova {
+        nome: String,
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
+    /// Um item numa lista
+    Adicionar {
+        /// O nome da lista
+        lista: String,
+        /// O item, entre aspas
+        titulo: String,
+        /// Quanto leva, em minutos
+        #[arg(long)]
+        min: Option<u16>,
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
+    /// Um item por linha de um arquivo (a lista copiada de outro lugar)
+    Colar {
+        /// O nome da lista
+        lista: String,
+        /// O arquivo de texto
+        arquivo: PathBuf,
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -583,6 +624,7 @@ fn main() -> anyhow::Result<()> {
         Cmd::Opttime(cmd) => run_opttime(cmd),
         Cmd::Agente(cmd) => run_agente(cmd),
         Cmd::Memoria(cmd) => run_memoria(cmd),
+        Cmd::Listas(cmd) => run_listas(cmd),
         Cmd::Reunioes(ReunioesCmd::Acoes {
             id,
             provider,
@@ -1164,6 +1206,22 @@ fn db_or_default(db: &Option<PathBuf>) -> anyhow::Result<PathBuf> {
     match db {
         Some(p) => Ok(p.clone()),
         None => default_db().context("pasta de dados do usuário indisponível"),
+    }
+}
+
+fn run_listas(cmd: &ListasCmd) -> anyhow::Result<()> {
+    match cmd {
+        ListasCmd::Ver { db } => listas::ver(&db_or_default(db)?),
+        ListasCmd::Nova { nome, db } => listas::nova(&db_or_default(db)?, nome),
+        ListasCmd::Adicionar {
+            lista,
+            titulo,
+            min,
+            db,
+        } => listas::adicionar(&db_or_default(db)?, lista, titulo, *min),
+        ListasCmd::Colar { lista, arquivo, db } => {
+            listas::colar(&db_or_default(db)?, lista, arquivo)
+        }
     }
 }
 

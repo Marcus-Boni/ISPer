@@ -14,9 +14,11 @@
 //!   de rotina, com os dias como evidência (aceitar e recusar são da pessoa);
 //! - [`phone`]: as tarefas no celular (10.6): o que muda lá chega ao PC com a
 //!   hora, e o último a escrever vence, por campo;
+//! - [`spare`]: o tempo livre da agenda e o item "Quando der tempo" que cabe
+//!   nele (11.0);
 //! - [`clock`]: o relógio, injetável nos testes, que diz que dia é "hoje".
 //!
-//! O schema é a v7 do banco, migrada pelo `isper-core` (uma cadeia de
+//! O schema é o da v9 do banco, migrada pelo `isper-core` (uma cadeia de
 //! migrações só). Nada aqui apaga: descartar é um estado, e cada mudança fica
 //! no diário com o "antes", que é o que o desfazer usa
 //! ([ADR 0009](../../../docs/adr/0009-nada-some-sem-o-usuario-pedir.md)).
@@ -28,6 +30,7 @@ pub mod meeting;
 pub mod model;
 pub mod phone;
 pub mod recur;
+pub mod spare;
 pub mod store;
 mod text;
 pub mod when;
@@ -40,12 +43,14 @@ pub use model::{
     TaskPatch, TaskStatus, Today, VERIFY_OPTTIME_DAY,
 };
 pub use recur::Rule;
-pub use store::{AssistStore, ImportOutcome, SCHEMA_VERSION_REQUIRED};
+pub use store::{
+    AssistStore, ImportOutcome, ListWithItems, SCHEMA_VERSION_REQUIRED, STALE_DAYS, TaskList,
+};
 
 /// Erros do assistente.
 #[derive(Debug, thiserror::Error)]
 pub enum AssistError {
-    /// O banco ainda não passou pela v7 (o `isper-core` migra ao abrir).
+    /// O banco ainda não passou pela v9 (o `isper-core` migra ao abrir).
     #[error(
         "o banco está na versão {0} do schema; o assistente precisa da {SCHEMA_VERSION_REQUIRED}"
     )]

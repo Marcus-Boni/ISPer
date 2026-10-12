@@ -31,6 +31,7 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0022](0022-conectores-mcp-e-opttime.md) | Conectores por MCP, com o OptTime como porta corporativa | aceita | 07/10/2026 |
 | [0023](0023-escada-de-confianca.md) | Escada de confiança: ler é livre, escrever pede um toque, automático só com verificador | aceita | 07/10/2026 |
 | [0024](0024-tarefas-no-bolso.md) | Tarefas no bolso: o PC é a fonte, o celular manda mudanças com a hora | aceita | 10/10/2026 |
+| [0025](0025-quando-der-tempo-e-projetos-locais.md) | "Quando der tempo" e projetos locais: listas sem data, e o projeto como lente que não depende do OptTime | aceita | 12/10/2026 |
 
 ## Como escrever um ADR
 

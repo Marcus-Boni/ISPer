@@ -589,6 +589,9 @@ mod tests {
             created_at: 0,
             updated_at: 0,
             completed_at: None,
+            list_id: None,
+            estimate_min: None,
+            project_id: None,
         };
         Occurrence {
             task,
