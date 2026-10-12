@@ -45,6 +45,7 @@ pub use model::{
 pub use recur::Rule;
 pub use store::{
     AssistStore, ImportOutcome, ListWithItems, SCHEMA_VERSION_REQUIRED, STALE_DAYS, TaskList,
+    clean_line,
 };
 
 /// Erros do assistente.
