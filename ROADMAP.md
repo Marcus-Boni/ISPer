@@ -22,6 +22,7 @@
 | F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; só com a janela aberta e notas salvas com a reunião (23/09); 3 itens em aberto — validar a memória, idioma do que a IA escreve e ver o sync do portal numa release |
 | F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (~15 MB/h no celular, a mesma transcrição do WAV; já gravou num Galaxy Tab A9), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. O teste de 2 h e o do Motorola/Xiaomi ficaram para depois. **9.3 em 25/09**: o celular manda as gravações para o PC, pareado por QR (iroh, com a chave de cada lado e sem servidor de fora), e a ata volta com "Ata pronta". A volta completa rodou num Galaxy S21 FE em 26/09; falta gravar longe do PC. **9.4 em 26/09**: o celular transcreve sozinho, com o mesmo passe final do PC, por padrão ao carregar e continuando de onde parou; a ata do PC substitui a do celular. 9.5 a 9.7 ainda são proposta |
 | F10 Assistente | 🟡 | **Aprovada em 07/10** ([ADRs 0021–0023](docs/adr/README.md)): tarefas, rotinas, memória e diário no ISPer; agenda, DevOps e horas pelo MCP do OptTime. Pré-requisito do OptTime no ar e conferido em 08/10. **10.0 (08/10)**: tarefas locais e a tela Hoje; a importação do Notion saiu do escopo. **10.1 (08/10)**: datas em português no texto, fala solta vira tarefas e o atalho de anotar com cartões de revisão; falta o corpus de 150 ditados para escolher o modelo |
+| F11 Sem data e por projeto | 🟡 | **Aprovada em 12/10** ([ADR 0025](docs/adr/0025-quando-der-tempo-e-projetos-locais.md)): listas "Quando der tempo" com o item fora do dia e a sugestão no tempo livre; projetos locais como lente, o OptTime só preenche. 11.0 em andamento |
 
 **155 itens entregues · 30 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
@@ -467,6 +468,30 @@ começam do zero na tela Hoje ([revisão do ADR 0021](docs/adr/0021-assistente-p
 
 - [x] Tarefas e rotinas no `isper/sync` (o último a escrever vence, por campo, pela hora de cada campo no diário; o relógio do celular corrigido; criar não duplica; [0024](docs/adr/0024-tarefas-no-bolso.md)); aba Hoje no Android com criar, concluir, mudar de dia e aceitar da caixa, ditado no aparelho (Whisper local) e lembretes na hora com "Concluir". Teste de ponta a ponta do critério no núcleo (iroh + `isper.db`) e e2e `tools/e2e/android-tasks.ps1` no emulador (10/10)
 - [ ] Pronto quando uma tarefa ditada no celular aparece no PC na próxima sincronia
+
+## Fase 11 — O que não tem data, e de que projeto é (a partir de 12/10/2026)
+
+Duas coisas ficavam de fora do Hoje: as anotações para estudar ou ler
+"quando der tempo", sem dia nem pressa, e os projetos, que são vários ao mesmo
+tempo e nem todos passam pelo OptTime. Decisões no ADR
+[0025](docs/adr/0025-quando-der-tempo-e-projetos-locais.md): listas livres do
+ISPer, o item de lista é uma tarefa sem dia que não pesa no dia, e o projeto é
+uma lente local que uma integração só preenche.
+
+### 11.0 "Quando der tempo"
+
+- [ ] Schema v9 numa migração só: listas, projetos e as colunas de projeto em tarefas, rotinas e reuniões (os ditados ficam de fora). Listas livres com itens que não entram no Hoje nem no contador; estimativa; agendar e devolver à lista; o selo "parado" depois de 60 dias e "Revisar parados"; a sugestão de um item que caiba no tempo livre da agenda; o assistente responde "o que dá para fazer em 30 min?"
+- [ ] Pronto quando as anotações de estudo saem do Notion, entram por copiar e colar, e uma delas volta sozinha num tempo livre da semana
+
+### 11.1 Projetos
+
+- [ ] Projetos locais (criar, renomear, cor, apelidos, arquivar), ligados ao OptTime quando houver (`opt_time_list_projects`); o projeto sugerido para a reunião pelo evento da agenda e herdado pelas tarefas dela; filtro por projeto no Hoje e na Biblioteca; o assistente filtra por projeto
+- [ ] Pronto quando as tarefas e reuniões de uma semana real saem com o projeto certo, com no máximo um toque cada
+
+### 11.2 A página do projeto
+
+- [ ] As tarefas abertas, as últimas reuniões e o que se decidiu nelas, as horas da semana pelo OptTime e os work items; a reunião com projeto vira sugestão de lançamento de horas nele
+- [ ] Pronto quando a página responde "como está o projeto X?" sem abrir outro sistema
 
 ## Boas práticas transversais
 

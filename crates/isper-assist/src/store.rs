@@ -17,18 +17,20 @@ use crate::clock::{Clock, SystemClock};
 use crate::model::{Actor, JournalEntry, NewTask, SourceKind, Task, TaskPatch, TaskStatus, Today};
 use crate::{AssistError, Result};
 
+mod lists;
 mod memories;
 mod routines;
 mod suggestions;
 
+pub use lists::{ListWithItems, MAX_PASTE_ITEMS, STALE_DAYS, TaskList, clean_line};
 pub use memories::PROMPT_MEMORIES;
 
 /// Versão do schema do `isper.db` que trouxe as tabelas do assistente.
-pub const SCHEMA_VERSION_REQUIRED: i64 = 7;
+pub const SCHEMA_VERSION_REQUIRED: i64 = 9;
 
 pub(crate) const TASK_COLUMNS: &str = "id, title, notes, status, planned_on, planned_time, due_on, priority, \
      area, source_kind, source_ref, external_ref, routine_id, position, created_at, updated_at, \
-     completed_at";
+     completed_at, list_id, estimate_min, project_id";
 
 /// Como a importação de uma tarefa terminou.
 #[derive(Debug, Clone, PartialEq)]
@@ -107,8 +109,10 @@ impl AssistStore {
             params![d],
         )?;
         let inbox = self.tasks_where("status = 'inbox' ORDER BY position DESC", params![])?;
+        // O que está numa lista "Quando der tempo" sem dia não pesa no dia.
         let later = self.tasks_where(
             "status = 'open'
+               AND NOT (list_id IS NOT NULL AND planned_on IS NULL)
                AND NOT ((planned_on IS NOT NULL AND planned_on <= ?1)
                      OR (due_on IS NOT NULL AND due_on <= ?1))
              ORDER BY planned_on IS NULL, planned_on, priority DESC, position, id",
@@ -224,12 +228,16 @@ impl AssistStore {
             created_at: now,
             updated_at: now,
             completed_at: None,
+            list_id: new.list_id,
+            estimate_min: new.estimate_min,
+            project_id: new.project_id,
         };
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
             &format!(
                 "INSERT INTO tasks ({TASK_COLUMNS})
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)"
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17,
+                         ?18, ?19, ?20)"
             ),
             params![
                 task.id,
@@ -249,6 +257,9 @@ impl AssistStore {
                 task.created_at,
                 task.updated_at,
                 task.completed_at,
+                task.list_id,
+                task.estimate_min,
+                task.project_id,
             ],
         )?;
         self.journal(&tx, now, actor, "task.created", None, &task, None, op_at)?;
@@ -445,7 +456,8 @@ impl AssistStore {
         tx.execute(
             "UPDATE tasks SET title = ?2, notes = ?3, status = ?4, planned_on = ?5,
                     planned_time = ?6, due_on = ?7, priority = ?8, area = ?9, position = ?10,
-                    updated_at = ?11, completed_at = ?12
+                    updated_at = ?11, completed_at = ?12, list_id = ?13, estimate_min = ?14,
+                    project_id = ?15
               WHERE id = ?1",
             params![
                 after.id,
@@ -460,6 +472,9 @@ impl AssistStore {
                 after.position,
                 after.updated_at,
                 after.completed_at,
+                after.list_id,
+                after.estimate_min,
+                after.project_id,
             ],
         )?;
         self.journal(
@@ -576,6 +591,9 @@ pub(crate) fn task_from_row(r: &Row<'_>) -> rusqlite::Result<Result<Task>> {
         r.get::<_, i64>(14)?,
         r.get::<_, i64>(15)?,
         r.get::<_, Option<i64>>(16)?,
+        r.get::<_, Option<String>>(17)?,
+        r.get::<_, Option<u16>>(18)?,
+        r.get::<_, Option<String>>(19)?,
     );
     Ok((|| {
         let (
@@ -591,6 +609,9 @@ pub(crate) fn task_from_row(r: &Row<'_>) -> rusqlite::Result<Result<Task>> {
             created_at,
             updated_at,
             completed_at,
+            list_id,
+            estimate_min,
+            project_id,
         ) = fields;
         Ok(Task {
             id,
@@ -610,6 +631,9 @@ pub(crate) fn task_from_row(r: &Row<'_>) -> rusqlite::Result<Result<Task>> {
             created_at,
             updated_at,
             completed_at,
+            list_id,
+            estimate_min,
+            project_id,
         })
     })())
 }
@@ -678,16 +702,16 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn banco_sem_a_v7_e_recusado() {
+    fn banco_sem_a_v9_e_recusado() {
         let path =
-            std::env::temp_dir().join(format!("isper-assist-test-v6-{}.db", std::process::id()));
+            std::env::temp_dir().join(format!("isper-assist-test-v8-{}.db", std::process::id()));
         let _ = std::fs::remove_file(&path);
         let conn = Connection::open(&path).unwrap();
-        conn.pragma_update(None, "user_version", 6).unwrap();
+        conn.pragma_update(None, "user_version", 8).unwrap();
         drop(conn);
         assert!(matches!(
             AssistStore::open(&path),
-            Err(AssistError::NotMigrated(6))
+            Err(AssistError::NotMigrated(8))
         ));
     }
 

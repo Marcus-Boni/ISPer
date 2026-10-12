@@ -293,7 +293,7 @@ fn like_pattern(q: &str) -> String {
 /// de versão maior (criado por um ISPer mais novo) é recusado em vez de
 /// alterado às cegas. Bancos anteriores a esta numeração chegam como 0 e
 /// passam pelo passo 1, que é idempotente sobre o que eles já têm.
-pub const SCHEMA_VERSION: i64 = 8;
+pub const SCHEMA_VERSION: i64 = 9;
 
 /// Eventos de métrica mais antigos que isto (90 dias) saem do banco.
 pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
@@ -417,6 +417,7 @@ fn migrate(conn: &Connection) -> Result<()> {
             5 => migrate_to_v6(&tx)?,
             6 => migrate_to_v7(&tx)?,
             7 => migrate_to_v8(&tx)?,
+            8 => migrate_to_v9(&tx)?,
             other => {
                 return Err(IsperError::Schema(format!(
                     "sem migração a partir da versão {other}"
@@ -725,6 +726,55 @@ fn migrate_to_v8(conn: &Connection) -> Result<()> {
          );
          CREATE INDEX IF NOT EXISTS idx_meeting_events_uid ON meeting_events(ical_uid);
          CREATE INDEX IF NOT EXISTS idx_meeting_events_series ON meeting_events(series_id);",
+    )?;
+    Ok(())
+}
+
+/// Passo 9 (Fase 11, [ADR 0025]) — as listas "Quando der tempo" e os
+/// projetos, numa migração só:
+///
+/// - `lists`: as listas livres da pessoa ("Estudar", "Ler"); o item de uma
+///   lista é uma tarefa sem dia com `tasks.list_id`, e `tasks.estimate_min` diz
+///   quanto ela leva (para caber num tempo livre);
+/// - `projects`: o projeto é do ISPer; `external_ref` (`opttime:<id>`) só liga
+///   a um sistema de fora, quando há; `aliases` é a lista JSON dos apelidos;
+/// - `project_id` em tarefas, rotinas e reuniões (os ditados ficam de fora).
+///
+/// Só acrescenta (colunas que aceitam vazio e tabelas novas), e é
+/// idempotente como os outros passos.
+///
+/// [ADR 0025]: ../../../docs/adr/0025-quando-der-tempo-e-projetos-locais.md
+fn migrate_to_v9(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS lists (
+             id           TEXT PRIMARY KEY,
+             name         TEXT NOT NULL,
+             position     REAL NOT NULL DEFAULT 0,
+             created_at   INTEGER NOT NULL,
+             updated_at   INTEGER NOT NULL,
+             archived_at  INTEGER
+         );
+         CREATE TABLE IF NOT EXISTS projects (
+             id            TEXT PRIMARY KEY,
+             name          TEXT NOT NULL,
+             color         TEXT,
+             aliases       TEXT NOT NULL DEFAULT '[]',
+             external_ref  TEXT,
+             created_at    INTEGER NOT NULL,
+             updated_at    INTEGER NOT NULL,
+             archived_at   INTEGER
+         );
+         CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_external_ref
+             ON projects(external_ref) WHERE external_ref IS NOT NULL;",
+    )?;
+    add_column_if_missing(conn, "tasks", "list_id", "TEXT")?;
+    add_column_if_missing(conn, "tasks", "estimate_min", "INTEGER")?;
+    add_column_if_missing(conn, "tasks", "project_id", "TEXT")?;
+    add_column_if_missing(conn, "routines", "project_id", "TEXT")?;
+    add_column_if_missing(conn, "meetings", "project_id", "TEXT")?;
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_tasks_list ON tasks(list_id) WHERE list_id IS NOT NULL;
+         CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id) WHERE project_id IS NOT NULL;",
     )?;
     Ok(())
 }
@@ -2006,6 +2056,51 @@ mod tests {
         let antes = std::fs::metadata(&backup).unwrap().len();
         MeetingStore::open(&path).unwrap();
         assert_eq!(std::fs::metadata(&backup).unwrap().len(), antes);
+    }
+
+    #[test]
+    fn a_v9_traz_listas_projetos_e_o_projeto_nas_tarefas_rotinas_e_reunioes() {
+        let path = temp_path("v9-listas-projetos");
+        let store = MeetingStore::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), 9);
+        let cols = |table: &str| -> Vec<String> {
+            let mut stmt = store
+                .conn
+                .prepare(&format!("SELECT name FROM pragma_table_info('{table}')"))
+                .unwrap();
+            stmt.query_map([], |r| r.get(0))
+                .unwrap()
+                .map(|c| c.unwrap())
+                .collect()
+        };
+        for c in ["list_id", "estimate_min", "project_id"] {
+            assert!(cols("tasks").iter().any(|x| x == c), "tasks.{c}");
+        }
+        assert!(cols("routines").iter().any(|x| x == "project_id"));
+        assert!(cols("meetings").iter().any(|x| x == "project_id"));
+        assert!(
+            !cols("dictations").iter().any(|x| x == "project_id"),
+            "ditados sem projeto"
+        );
+        assert!(cols("projects").iter().any(|x| x == "aliases"));
+        assert!(cols("lists").iter().any(|x| x == "archived_at"));
+        // A mesma ligação de fora não entra duas vezes.
+        store
+            .conn
+            .execute_batch(
+                "INSERT INTO projects (id, name, external_ref, created_at, updated_at)
+                     VALUES ('a', 'Portal', 'opttime:1', 0, 0);",
+            )
+            .unwrap();
+        assert!(
+            store
+                .conn
+                .execute_batch(
+                    "INSERT INTO projects (id, name, external_ref, created_at, updated_at)
+                         VALUES ('b', 'Portal 2', 'opttime:1', 0, 0);",
+                )
+                .is_err()
+        );
     }
 
     #[test]

@@ -182,6 +182,7 @@ Como responder:
 - Para criar, mover ou concluir tarefa e para lançar horas, chame a ferramenta: o ISPer mostra um cartão e a pessoa confirma. Não peça confirmação em texto e não diga que fez antes do resultado.
 - Se uma ferramenta falhar ou for recusada, diga o que faltou em uma linha.
 - Se a pessoa pedir para lembrar algo, ou disser um fato que vale para os próximos dias (quem é o gestor, um jeito de preferir), proponha guardar com `lembrar`. Nunca senha, segredo ou o que outra pessoa disse numa reunião.
+- Para tempo livre ou \"o que dá para fazer/estudar\", use `quando_der_tempo` (as listas sem data); sugira um item que caiba, não crie tarefa sem a pessoa pedir.
 - Rotinas sugeridas (em `rotinas`) são só sugestões: conte, com a evidência, e diga que dá para aceitar na tela Hoje. Você não cria rotina.{opttime}{memory}",
         weekday = weekday_pt(now.weekday()),
         date = now.format("%d/%m/%Y"),

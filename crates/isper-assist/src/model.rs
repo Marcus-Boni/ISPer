@@ -177,6 +177,16 @@ pub struct Task {
     pub updated_at: i64,
     /// Concluída em (ms UTC).
     pub completed_at: Option<i64>,
+    /// A lista "Quando der tempo" (11.0). Sem dia, a tarefa fica na lista e
+    /// fora do dia; agendada, vai para o Hoje e volta à lista se perder o dia.
+    #[serde(default)]
+    pub list_id: Option<String>,
+    /// Quanto leva, em minutos (para caber num tempo livre).
+    #[serde(default)]
+    pub estimate_min: Option<u16>,
+    /// O projeto (11.1).
+    #[serde(default)]
+    pub project_id: Option<String>,
 }
 
 /// Uma tarefa nova.
@@ -214,6 +224,15 @@ pub struct NewTask {
     /// Id no sistema de origem.
     #[serde(default)]
     pub external_ref: Option<String>,
+    /// A lista "Quando der tempo".
+    #[serde(default)]
+    pub list_id: Option<String>,
+    /// Quanto leva, em minutos.
+    #[serde(default)]
+    pub estimate_min: Option<u16>,
+    /// O projeto.
+    #[serde(default)]
+    pub project_id: Option<String>,
 }
 
 fn default_new_status() -> TaskStatus {
@@ -239,6 +258,9 @@ impl NewTask {
             source_kind: SourceKind::Manual,
             source_ref: None,
             external_ref: None,
+            list_id: None,
+            estimate_min: None,
+            project_id: None,
         }
     }
 
@@ -258,6 +280,9 @@ impl NewTask {
         check_priority(self.priority)?;
         self.area = clean_optional(self.area);
         self.external_ref = clean_optional(self.external_ref);
+        self.list_id = clean_optional(self.list_id);
+        self.project_id = clean_optional(self.project_id);
+        check_estimate(self.estimate_min)?;
         Ok(self)
     }
 }
@@ -287,6 +312,15 @@ pub struct TaskPatch {
     /// Nova área (`null` limpa).
     #[serde(default, deserialize_with = "double_option")]
     pub area: Option<Option<String>>,
+    /// A lista (`null` tira da lista).
+    #[serde(default, deserialize_with = "double_option")]
+    pub list_id: Option<Option<String>>,
+    /// A estimativa em minutos (`null` limpa).
+    #[serde(default, deserialize_with = "double_option")]
+    pub estimate_min: Option<Option<u16>>,
+    /// O projeto (`null` tira).
+    #[serde(default, deserialize_with = "double_option")]
+    pub project_id: Option<Option<String>>,
 }
 
 /// Distingue "campo ausente" (`None`) de "campo `null`" (`Some(None)`).
@@ -299,6 +333,14 @@ where
 }
 
 impl TaskPatch {
+    /// Só a lista (mover de uma lista para outra, ou tirar dela).
+    pub fn list(list_id: Option<String>) -> Self {
+        Self {
+            list_id: Some(list_id),
+            ..Self::default()
+        }
+    }
+
     /// Aplica a mudança sobre uma cópia da tarefa, validando.
     pub(crate) fn apply(self, task: &Task) -> Result<Task> {
         let mut out = task.clone();
@@ -331,7 +373,30 @@ impl TaskPatch {
         if let Some(area) = self.area {
             out.area = clean_optional(area);
         }
+        if let Some(list) = self.list_id {
+            out.list_id = clean_optional(list);
+        }
+        if let Some(estimate) = self.estimate_min {
+            check_estimate(estimate)?;
+            out.estimate_min = estimate;
+        }
+        if let Some(project) = self.project_id {
+            out.project_id = clean_optional(project);
+        }
         Ok(out)
+    }
+}
+
+/// Uma estimativa de até 8 horas (mais que isso não cabe num tempo livre).
+pub const MAX_ESTIMATE_MIN: u16 = 480;
+
+fn check_estimate(estimate: Option<u16>) -> Result<()> {
+    match estimate {
+        Some(0) => Err(AssistError::Invalid("estimativa de zero minuto".into())),
+        Some(m) if m > MAX_ESTIMATE_MIN => Err(AssistError::Invalid(format!(
+            "estimativa acima de {MAX_ESTIMATE_MIN} minutos"
+        ))),
+        _ => Ok(()),
     }
 }
 
@@ -780,6 +845,9 @@ mod tests {
             created_at: 0,
             updated_at: 0,
             completed_at: None,
+            list_id: None,
+            estimate_min: None,
+            project_id: None,
         }
     }
 
