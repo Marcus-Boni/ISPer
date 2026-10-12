@@ -33,7 +33,7 @@
     transition: background var(--dur-2), color var(--dur-2), border-color var(--dur-2);
   }
   .pick:hover { border-color: var(--line-2); color: var(--ink); }
-  .pick[aria-checked="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); }
+  .pick[aria-checked="true"], .pick[aria-pressed="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); }
 
   /* ---- seções ---- */
   .sec-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; }
@@ -228,6 +228,21 @@
   .confirm input[type=checkbox] { width: 15px; height: 15px; margin: 3px 0 0; accent-color: var(--accent); }
   .confirm.decided { opacity: .72; }
   .task.ping, .task.routine.ping { animation: ping 1.8s var(--ease-out); }
+
+  /* ---- quando der tempo (Fase 11.0) ---- */
+  .lbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 2px 0 10px; }
+  .ltabs { display: contents; }
+  .lbar .pick { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lbar .edit { width: 180px; }
+  .lbar-acts { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; }
+  .ladd { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; align-items: start; margin-bottom: 6px; }
+  .ladd textarea { resize: none; field-sizing: content; min-height: 40px; max-height: 168px; padding: 9px 12px; line-height: 1.45; }
+  .ladd .when { grid-column: 1 / -1; }
+  .chip.est { cursor: pointer; font: inherit; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .chip.est.none { border-style: dashed; color: var(--muted); background: transparent; }
+  .chip.est:hover { border-color: var(--line-2); color: var(--ink); }
+  .acts .move { max-width: 140px; padding: 2px 6px; font-size: 12px; }
+  .sug.tip { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); background: color-mix(in srgb, var(--good-soft) 55%, transparent); }
   @keyframes ping { 0%, 45% { background: var(--accent-soft); } 100% { background: transparent; } }
 </style>
 </head>
@@ -304,6 +319,11 @@
       <ul class="suggest" id="list-suggest"></ul>
     </section>
 
+    <section id="sec-spare-tip" aria-labelledby="h-spare-tip" hidden>
+      <div class="sec-head"><h2 class="eyebrow" id="h-spare-tip" data-i18n="today.sec.spare-tip">Tempo livre</h2></div>
+      <ul class="suggest" id="spare-tip" aria-live="polite"></ul>
+    </section>
+
     <section id="sec-later" aria-labelledby="h-later" hidden>
       <details id="later">
         <summary><span class="sec-head"><span class="eyebrow" id="h-later" data-i18n="today.sec.later">Depois</span><span class="count" id="c-later"></span></span></summary>
@@ -314,6 +334,32 @@
     <section id="sec-done" aria-labelledby="h-done" hidden>
       <div class="sec-head"><h2 class="eyebrow" id="h-done" data-i18n="today.sec.done">Feito hoje</h2><span class="count" id="c-done"></span></div>
       <ul class="tasks" id="list-done"></ul>
+    </section>
+
+    <section id="sec-spare" aria-labelledby="h-spare">
+      <details id="spare-box">
+        <summary><span class="sec-head"><span class="eyebrow" id="h-spare" data-i18n="today.sec.spare">Quando der tempo</span><span class="count" id="c-spare"></span></span></summary>
+        <p class="sec-hint" id="spare-hint" data-i18n="today.spare.hint">Para estudar, ler ou fazer sem data. Não entra no dia nem no número da barra; volta sugerido quando a agenda tem um tempo livre.</p>
+        <div class="lbar">
+          <div class="ltabs" id="spare-tabs" role="radiogroup" aria-label="Listas" data-i18n-attr="aria-label:today.spare.lists-aria"></div>
+          <button class="pick" type="button" id="spare-new" data-i18n="today.spare.new-list">+ Nova lista</button>
+          <span class="lbar-acts">
+            <button class="btn btn-ghost btn-sm" type="button" id="spare-review" aria-pressed="false" hidden></button>
+            <button class="btn btn-ghost btn-sm" type="button" id="spare-rename" hidden data-i18n="today.spare.rename">Renomear</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="spare-archive" hidden data-i18n="today.spare.archive">Arquivar</button>
+          </span>
+        </div>
+        <p class="sec-hint" id="spare-review-hint" hidden data-i18n="today.spare.review-hint">Sem mudança há 60 dias. Mantenha, agende ou descarte.</p>
+        <form class="ladd" id="ladd" autocomplete="off" hidden>
+          <label class="sr-only" for="l-text" data-i18n="today.spare.add-label">Novo item da lista</label>
+          <textarea class="field" id="l-text" rows="1" maxlength="20000" placeholder="Novo item… (cole várias linhas para criar vários)" data-i18n-attr="placeholder:today.spare.placeholder"></textarea>
+          <button class="btn btn-primary" type="submit" data-i18n="today.add.submit">Adicionar</button>
+          <div class="when" role="group" aria-labelledby="l-est-lbl" id="l-est">
+            <span class="lbl" id="l-est-lbl" data-i18n="today.spare.takes">Leva</span>
+          </div>
+        </form>
+        <ul class="tasks" id="list-spare"></ul>
+      </details>
     </section>
 
     <section id="sec-routines" aria-labelledby="h-routines">
@@ -480,6 +526,17 @@
     if (fromMeeting) box.appendChild(fromMeeting);
     else if (SOURCES[task.source_kind]) box.appendChild(el('span', 'chip chip-info', t(SOURCES[task.source_kind])));
     if (task.area) box.appendChild(el('span', 'chip', task.area));
+    if (section === 'spare') {
+      box.appendChild(estChip(task));
+      if (isStale(task)) {
+        const c = el('span', 'chip chip-warn', t('today.spare.stale'));
+        c.title = t('today.spare.stale-title');
+        box.appendChild(c);
+      }
+      if (reviewStale) box.appendChild(el('span', 'chip', listName(task.list_id)));
+    } else if (task.list_id && listName(task.list_id)) {
+      box.appendChild(el('span', 'chip', listName(task.list_id)));
+    }
     return box;
   }
 
@@ -576,6 +633,21 @@
     } else if (section === 'later') {
       acts.appendChild(actButton(t('today.act.today'), t('today.act.today-aria', { t: task.title }),
         () => plan(task, todayIso(), t('today.toast.today'))));
+    } else if (section === 'spare') {
+      acts.appendChild(actButton(t('today.act.today'), t('today.act.today-aria', { t: task.title }),
+        () => plan(task, todayIso(), t('today.toast.today'))));
+      acts.appendChild(actButton(t('today.act.tomorrow'), t('today.act.tomorrow-aria', { t: task.title }),
+        () => plan(task, tomorrowIso(), t('today.toast.tomorrow'))));
+      if (isStale(task)) {
+        acts.appendChild(actButton(t('today.spare.keep'), t('today.spare.keep-aria', { t: task.title }),
+          () => change('list_keep', { id: task.id }, t('today.toast.kept'))));
+      }
+      if (listsOf().length > 1) acts.appendChild(moveSelect(task));
+    }
+    // Agendado, o item de uma lista pode voltar para ela (sem dia).
+    if ((section === 'planned' || section === 'later') && task.list_id && listName(task.list_id)) {
+      acts.appendChild(actButton(t('today.act.to-list'), t('today.act.to-list-aria', { t: task.title, l: listName(task.list_id) }),
+        () => plan(task, null, t('today.toast.to-list'))));
     }
     if (!done) {
       acts.appendChild(iconButton(I_EDIT, t('today.act.edit-aria', { t: task.title }), () => startEdit(task, title)));
@@ -634,6 +706,7 @@
     $('c-done').textContent = String(done.length);
     fill('list-done', done, 'done', fresh);
 
+    renderSpare(fresh);
     renderRoutines();
   }
 
@@ -645,10 +718,12 @@
     if (mine !== seq) return;
     const nextSig = JSON.stringify(next) + '|' + todayIso();
     if (nextSig === sig) return;
-    const known = new Set(data ? [...data.planned, ...data.inbox, ...data.later, ...data.done_today].map((x) => x.id) : []);
-    const fresh = data ? new Set([...next.planned, ...next.inbox, ...next.later, ...next.done_today].map((x) => x.id).filter((id) => !known.has(id))) : null;
+    const ids = (d) => [...d.planned, ...d.inbox, ...d.later, ...d.done_today, ...(d.lists || []).flatMap((l) => l.items)].map((x) => x.id);
+    const known = new Set(data ? ids(data) : []);
+    const fresh = data ? new Set(ids(next).filter((id) => !known.has(id))) : null;
     sig = nextSig;
     data = next;
+    loadTip();
     // Editando um título, a lista espera: redesenhar tiraria o campo do lugar.
     if (document.activeElement && document.activeElement.classList.contains('edit')) return;
     render(fresh);
@@ -717,6 +792,238 @@
     await refresh();
   });
 
+
+  // ---------------------------------------------- quando der tempo (11.0)
+  // As listas do que não tem data, fora do dia e do número da barra. Os itens
+  // são tarefas: Hoje, Amanhã, concluir e descartar têm o Desfazer de sempre.
+  // Daqui são a lista, o colar várias linhas e o "manter" do item parado.
+  const ESTIMATES = [15, 30, 60, 120];
+  let curList = null;
+  let reviewStale = false;
+  let addEst = null;
+  const listsOf = () => (data && data.lists) || [];
+  const listName = (id) => (listsOf().find((l) => l.id === id) || {}).name || '';
+  const isStale = (task) => listsOf().some((l) => l.stale.includes(task.id));
+
+  // A estimativa é um selo que troca a cada clique: 15, 30, 60, 120, nenhuma.
+  function estChip(task) {
+    const m = task.estimate_min;
+    const label = m ? '~' + hm(m) : t('today.spare.est-none');
+    const b = el('button', 'chip est' + (m ? '' : ' none'), label);
+    b.type = 'button';
+    b.setAttribute('aria-label', t('today.spare.est-aria', { t: task.title, m: label }));
+    b.addEventListener('click', () => {
+      const i = ESTIMATES.indexOf(m);
+      change('task_update', { id: task.id, patch: { estimate_min: i + 1 < ESTIMATES.length ? ESTIMATES[i + 1] : null } });
+    });
+    return b;
+  }
+
+  function moveSelect(task) {
+    const s = el('select', 'field field-sm move');
+    s.setAttribute('aria-label', t('today.spare.move-aria', { t: task.title }));
+    for (const l of listsOf()) {
+      const o = el('option', null, l.name);
+      o.value = l.id;
+      o.selected = l.id === task.list_id;
+      s.appendChild(o);
+    }
+    s.addEventListener('change', () => change('task_update', { id: task.id, patch: { list_id: s.value } }, t('today.toast.moved', { l: listName(s.value) })));
+    return s;
+  }
+
+  function renderSpare(fresh) {
+    const lists = listsOf();
+    const stale = lists.flatMap((l) => l.items.filter((x) => l.stale.includes(x.id)));
+    $('c-spare').textContent = String(lists.reduce((n, l) => n + l.items.length, 0) || '');
+    if (!lists.some((l) => l.id === curList)) curList = lists.length ? lists[0].id : null;
+    if (!stale.length) reviewStale = false;
+
+    $('spare-tabs').replaceChildren(...lists.map((l) => {
+      const b = el('button', 'pick', l.items.length ? l.name + ' · ' + l.items.length : l.name);
+      b.type = 'button';
+      b.title = l.name;
+      b.dataset.list = l.id;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(!reviewStale && l.id === curList));
+      b.addEventListener('click', () => { curList = l.id; reviewStale = false; renderSpare(null); });
+      return b;
+    }));
+    const review = $('spare-review');
+    review.hidden = !stale.length;
+    review.textContent = reviewStale ? t('today.spare.review-off') : t('today.spare.review', { n: stale.length });
+    review.setAttribute('aria-pressed', String(reviewStale));
+    $('spare-rename').hidden = $('spare-archive').hidden = !curList || reviewStale;
+    $('spare-review-hint').hidden = !reviewStale;
+    $('ladd').hidden = !curList || reviewStale;
+    $('l-est').querySelectorAll('.pick').forEach((b) => {
+      b.textContent = hm(Number(b.dataset.min));
+      b.setAttribute('aria-pressed', String(Number(b.dataset.min) === addEst));
+    });
+
+    const items = reviewStale ? stale : ((lists.find((l) => l.id === curList) || {}).items || []);
+    if (!lists.length) $('list-spare').replaceChildren(emptyState(t('today.spare.empty-lists')));
+    else if (!items.length) $('list-spare').replaceChildren(emptyState(t('today.spare.empty')));
+    else fill('list-spare', items, 'spare', fresh);
+  }
+
+  // O nome de uma lista se escreve no lugar do botão: Enter (ou sair do
+  // campo) guarda, Esc desiste.
+  function nameInput(node, initial, save) {
+    const input = el('input', 'field field-sm edit');
+    input.value = initial;
+    input.maxLength = 60;
+    input.setAttribute('aria-label', t(initial ? 'today.spare.rename-aria' : 'today.spare.new-list-aria'));
+    let closed = false;
+    const finish = async (ok) => {
+      if (closed) return;
+      closed = true;
+      const value = input.value.trim();
+      input.replaceWith(node);
+      if (ok && value && value !== initial) await save(value);
+      else render(null);
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
+    node.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  async function listCommand(cmd, args, msg) {
+    let out = null;
+    try {
+      out = await invoke(cmd, args);
+      if (msg) toast(msg, 'ok');
+    } catch (e) { toast(t('common.error', { e }), 'err'); }
+    sig = '';
+    await refresh();
+    return out;
+  }
+
+  $('spare-new').addEventListener('click', () => nameInput($('spare-new'), '', async (name) => {
+    const l = await listCommand('list_create', { name }, t('today.toast.list-created'));
+    if (!l) return;
+    curList = l.id;
+    reviewStale = false;
+    render(null);
+    $('l-text').focus();
+  }));
+  $('spare-rename').addEventListener('click', () => {
+    const l = listsOf().find((x) => x.id === curList);
+    const tab = $('spare-tabs').querySelector('[aria-checked="true"]');
+    if (l && tab) nameInput(tab, l.name, (name) => listCommand('list_rename', { id: l.id, name }, t('today.toast.list-renamed')));
+  });
+  // Arquivar não apaga nada: o aviso traz a lista de volta.
+  $('spare-archive').addEventListener('click', async () => {
+    const l = listsOf().find((x) => x.id === curList);
+    if (!l) return;
+    try {
+      await invoke('list_set_archived', { id: l.id, archived: true });
+      toast(t('today.toast.list-archived', { l: l.name }), 'ok', 6000, { action: { label: t('common.undo'), run: async () => {
+        try {
+          await invoke('list_set_archived', { id: l.id, archived: false });
+          curList = l.id;
+        } catch (e) { toast(t('common.error', { e }), 'err'); }
+        refresh();
+      } } });
+    } catch (e) { toast(t('common.error', { e }), 'err'); }
+    refresh();
+  });
+  $('spare-review').addEventListener('click', () => { reviewStale = !reviewStale; renderSpare(null); });
+  $('spare-tabs').addEventListener('keydown', (e) => {
+    const lists = listsOf();
+    if ((e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') || !lists.length) return;
+    const i = Math.max(0, lists.findIndex((l) => l.id === curList));
+    curList = lists[(i + (e.key === 'ArrowRight' ? 1 : lists.length - 1)) % lists.length].id;
+    reviewStale = false;
+    renderSpare(null);
+    const b = $('spare-tabs').querySelector('[aria-checked="true"]');
+    if (b) b.focus();
+    e.preventDefault();
+  });
+
+  // Quanto leva o item novo (opcional; clicar de novo tira).
+  for (const m of ESTIMATES) {
+    // O rótulo vem no desenho: o `hm` das rotinas ainda não existe aqui.
+    const b = el('button', 'pick');
+    b.type = 'button';
+    b.dataset.min = String(m);
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => { addEst = addEst === m ? null : m; renderSpare(null); });
+    $('l-est').appendChild(b);
+  }
+
+  // Enter adiciona; várias linhas coladas viram um item por linha.
+  $('ladd').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = $('l-text');
+    const text = input.value.trim();
+    if (!text || !curList) { input.focus(); return; }
+    try {
+      const n = await invoke('list_add', { listId: curList, text, estimateMin: addEst });
+      input.value = '';
+      if (n > 1) toast(t('today.toast.list-pasted', { n }), 'ok');
+    } catch (err) {
+      toast(t('common.error', { e: err }), 'err');
+    }
+    input.focus();
+    await refresh();
+  });
+  $('l-text').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('ladd').requestSubmit(); }
+  });
+
+  // ---- o tempo livre: um item que cabe na próxima janela da agenda.
+  // Sugestão, nunca mudança: "Fazer agora" é que põe no dia. "Agora não"
+  // cala até a janela acabar (o fim dela é estável; o começo é "agora").
+  let tip = null;
+  let tipSeq = 0;
+  let tipDismissed = null;
+  const tipSkip = [];
+  let spareDayEnd = null; // os e2e trocam o fim do expediente ("23:59:00")
+  async function loadTip() {
+    const mine = ++tipSeq;
+    let next = null;
+    try { next = await invoke('spare_suggest', { skip: tipSkip, dayEnd: spareDayEnd }); } catch (_) {}
+    if (mine !== tipSeq) return;
+    tip = next && next.window.end !== tipDismissed ? next : null;
+    renderTip();
+  }
+
+  function renderTip() {
+    const box = $('spare-tip');
+    $('sec-spare-tip').hidden = !tip;
+    if (!tip) { box.replaceChildren(); return; }
+    const { window: w, task, list } = tip;
+    const why = [tip.starts_now
+      ? t('today.tip.now', { to: clockOf(w.end) })
+      : t('today.tip.later', { from: clockOf(w.start), to: clockOf(w.end) })];
+    if (task.estimate_min) why.push(t('today.tip.takes', { e: hm(task.estimate_min) }));
+    if (list) why.push(t('today.tip.from', { l: list }));
+    const li = el('li', 'sug tip');
+    li.dataset.id = task.id;
+    const body = el('div', 'body');
+    body.append(el('span', 'sug-title', task.title), el('span', 'sug-why', why.join(' · ')));
+    const acts = el('div', 'sug-acts');
+    acts.append(
+      actButton(t('today.tip.do'), t('today.tip.do-aria', { t: task.title }), () => {
+        tipDismissed = w.end;
+        tipSkip.length = 0;
+        plan(task, todayIso(), t('today.toast.today'));
+      }, 'btn btn-primary btn-sm'),
+      actButton(t('today.tip.other'), null, async () => {
+        tipSkip.push(task.id);
+        await loadTip();
+        if (!tip) { tipSkip.length = 0; tipDismissed = w.end; toast(t('today.tip.no-more'), 'info', 3600); }
+      }, 'btn btn-ghost btn-sm'),
+      actButton(t('today.tip.dismiss'), null, () => { tipDismissed = w.end; tip = null; renderTip(); }, 'btn btn-ghost btn-sm'));
+    li.append(body, acts);
+    box.replaceChildren(li);
+  }
 
   // ------------------------------------------------------------- rotinas
   // A tarefa de uma rotina com verificador mostra a última conferência no
@@ -1240,6 +1547,7 @@
     try { next = await invoke('agenda_today', { force: !!force }); } catch (e) { return; }
     agenda = next;
     renderAgenda();
+    loadTip();
   }
 
   function renderAgenda() {
@@ -1636,7 +1944,7 @@
   // ------------------------------------------------------------ eventos
   listen('isper-tasks', () => refresh());
   document.addEventListener('isper-view', (e) => { if (e.detail && e.detail.active) { refresh(); loadAgenda(false); } });
-  document.addEventListener('isper-i18n', () => { sig = ''; renderAgenda(); paintDays(); paintMonthDays(); if (!editing) $('r-submit').textContent = t('today.routines.create'); render(null); });
+  document.addEventListener('isper-i18n', () => { sig = ''; renderAgenda(); renderTip(); paintDays(); paintMonthDays(); if (!editing) $('r-submit').textContent = t('today.routines.create'); render(null); });
   // Virou o dia com a tela aberta: o "hoje" muda.
   let lastDay = todayIso();
   setInterval(() => { if (todayIso() !== lastDay) { lastDay = todayIso(); sig = ''; refresh(); } }, 60_000);

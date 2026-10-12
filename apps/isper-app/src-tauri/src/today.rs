@@ -10,8 +10,8 @@
 use crate::prelude::*;
 use isper_assist::when::{ParsedTask, parse_task};
 use isper_assist::{
-    Actor, AssistStore, Clock, NewTask, Routine, RoutineSuggestion, SystemClock, Task, TaskPatch,
-    TaskStatus, Today,
+    Actor, AssistStore, Clock, ListWithItems, NewTask, Routine, RoutineSuggestion, SystemClock,
+    Task, TaskPatch, TaskStatus, Today,
 };
 
 /// Evento que avisa as janelas de que as tarefas mudaram.
@@ -32,7 +32,11 @@ pub(crate) fn open_assist() -> anyhow::Result<AssistStore> {
     Ok(AssistStore::open(&path)?)
 }
 
-fn changed(app: &AppHandle, store: &AssistStore, task: Task) -> Result<TaskChange, String> {
+pub(crate) fn changed(
+    app: &AppHandle,
+    store: &AssistStore,
+    task: Task,
+) -> Result<TaskChange, String> {
     let undo = store.last_change(&task.id).map_err(|e| e.to_string())?;
     let _ = app.emit(TASKS_EVENT, ());
     Ok(TaskChange { task, undo })
@@ -47,6 +51,8 @@ pub(crate) struct TodayView {
     routines: Vec<Routine>,
     /// As rotinas sugeridas pela tarefa que se repete (Fase 10.5).
     suggestions: Vec<RoutineSuggestion>,
+    /// As listas "Quando der tempo", com os itens sem dia (Fase 11.0).
+    lists: Vec<ListWithItems>,
     opttime: bool,
 }
 
@@ -75,6 +81,7 @@ pub(crate) fn today_load(app: AppHandle) -> Result<TodayView, String> {
                 tracing::warn!("sugestões de rotina: {e}");
                 Vec::new()
             }),
+            lists: store.lists_with_items()?,
             opttime: crate::connectors::token_present(),
         })
     })()

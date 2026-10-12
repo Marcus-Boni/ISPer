@@ -28,6 +28,7 @@ mod home;
 mod i18n;
 mod insights;
 mod library;
+mod lists;
 mod meeting_inbox;
 mod meetings;
 mod memory;
@@ -306,6 +307,12 @@ fn main() {
             today::task_set_status,
             today::task_accept,
             today::task_undo,
+            lists::list_create,
+            lists::list_rename,
+            lists::list_set_archived,
+            lists::list_add,
+            lists::list_keep,
+            lists::spare_suggest,
             shell_ready,
             shell_view,
             shell_status,
