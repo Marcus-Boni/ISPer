@@ -11,6 +11,21 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **Quando der tempo (Fase 11.0).** Uma seção nova na tela Hoje para o que
+  não tem data: o que estudar, ler ou fazer um dia. Crie as suas listas
+  ("Estudar", "Ler", "Ideias") e cole a lista que você já tem em outro lugar:
+  cada linha vira um item, sem os marcadores. Os itens não entram no dia nem
+  no número da barra lateral. Diga quanto cada um leva (15 min a 2 h), traga
+  para hoje ou amanhã, devolva à lista, mude de lista. O item parado há 60
+  dias ganha um selo, e "Revisar parados" mostra só esses para manter,
+  agendar ou descartar. Arquivar uma lista tem Desfazer e não apaga nada.
+- **Tempo livre.** Com o OptTime conectado, quando a agenda tem uma janela
+  livre até o fim do expediente, o Hoje sugere um item que cabe nela, o que
+  espera há mais tempo primeiro. "Outra" troca a sugestão, e nada vai para o
+  dia sem o seu toque. O assistente também responde "o que dá para estudar
+  em 30 minutos?".
+
 ## [0.26.0] - 2026-10-10
 
 A versão do assistente pessoal (Fase 10). A tela Hoje junta as suas tarefas,
