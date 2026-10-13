@@ -11,6 +11,14 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-12
+
+O que não tem data ganha lugar no ISPer (Fase 11.0). As anotações para
+estudar, ler ou fazer um dia ficam em listas suas, coladas de onde já estão,
+sem pesar no dia nem no número da barra lateral; e voltam sozinhas como
+sugestão quando a agenda tem um tempo livre. O banco ganha também o lugar dos
+projetos, que chegam na próxima versão.
+
 ### Adicionado
 - **Quando der tempo (Fase 11.0).** Uma seção nova na tela Hoje para o que
   não tem data: o que estudar, ler ou fazer um dia. Crie as suas listas
