@@ -25,6 +25,7 @@ mod aprender;
 mod bench;
 mod listas;
 mod opttime;
+mod projetos;
 mod reunioes;
 mod sync;
 mod tarefas;
@@ -236,6 +237,27 @@ enum Cmd {
     /// As listas "Quando der tempo": o que não tem data (Fase 11.0)
     #[command(subcommand)]
     Listas(ListasCmd),
+    /// Os projetos: a lente de tarefas e reuniões (Fase 11.1)
+    #[command(subcommand)]
+    Projetos(ProjetosCmd),
+}
+
+#[derive(Subcommand)]
+enum ProjetosCmd {
+    /// Os projetos ativos, com os apelidos e a ligação com o OptTime
+    Ver {
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
+    /// Cria um projeto local
+    Novo {
+        nome: String,
+        /// Outro nome com que ele aparece num convite (pode repetir)
+        #[arg(long = "apelido")]
+        apelidos: Vec<String>,
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -625,6 +647,7 @@ fn main() -> anyhow::Result<()> {
         Cmd::Agente(cmd) => run_agente(cmd),
         Cmd::Memoria(cmd) => run_memoria(cmd),
         Cmd::Listas(cmd) => run_listas(cmd),
+        Cmd::Projetos(cmd) => run_projetos(cmd),
         Cmd::Reunioes(ReunioesCmd::Acoes {
             id,
             provider,
@@ -1206,6 +1229,15 @@ fn db_or_default(db: &Option<PathBuf>) -> anyhow::Result<PathBuf> {
     match db {
         Some(p) => Ok(p.clone()),
         None => default_db().context("pasta de dados do usuário indisponível"),
+    }
+}
+
+fn run_projetos(cmd: &ProjetosCmd) -> anyhow::Result<()> {
+    match cmd {
+        ProjetosCmd::Ver { db } => projetos::ver(&db_or_default(db)?),
+        ProjetosCmd::Novo { nome, apelidos, db } => {
+            projetos::novo(&db_or_default(db)?, nome, apelidos)
+        }
     }
 }
 

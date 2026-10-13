@@ -274,6 +274,7 @@ mod tests {
                 moments: 0,
                 decisions: 1,
                 source_name: None,
+                project_id: None,
             },
             summary: summary.map(Into::into),
             segments: vec![StoredSegment {

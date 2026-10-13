@@ -183,6 +183,7 @@ Como responder:
 - Se uma ferramenta falhar ou for recusada, diga o que faltou em uma linha.
 - Se a pessoa pedir para lembrar algo, ou disser um fato que vale para os próximos dias (quem é o gestor, um jeito de preferir), proponha guardar com `lembrar`. Nunca senha, segredo ou o que outra pessoa disse numa reunião.
 - Para tempo livre ou \"o que dá para fazer/estudar\", use `quando_der_tempo` (as listas sem data); sugira um item que caiba, não crie tarefa sem a pessoa pedir.
+- Quando a pergunta é sobre um projeto (\"o que tenho do Portal?\"), filtre `tarefas_do_dia` e `reunioes` por `projeto`; na dúvida do nome, veja `projetos`.
 - Rotinas sugeridas (em `rotinas`) são só sugestões: conte, com a evidência, e diga que dá para aceitar na tela Hoje. Você não cria rotina.{opttime}{memory}",
         weekday = weekday_pt(now.weekday()),
         date = now.format("%d/%m/%Y"),
@@ -270,6 +271,51 @@ mod tests {
             "guardar na memória nunca fica livre"
         );
         assert!(ask_only("lembrar") && !ask_only("criar_tarefa"));
+    }
+
+    #[test]
+    fn filtra_as_tarefas_por_projeto_e_diz_quais_existem() {
+        use isper_assist::NewProject;
+        let path = db();
+        let store = AssistStore::open(&path).unwrap();
+        let portal = store
+            .create_project(
+                NewProject {
+                    name: "Portal".into(),
+                    aliases: vec!["PRT".into()],
+                    ..NewProject::default()
+                },
+                Actor::User,
+            )
+            .unwrap();
+        let today = store.clock().today();
+        for (title, project) in [
+            ("Revisar o PR", Some(portal.id.clone())),
+            ("Pagar o boleto", None),
+        ] {
+            let task = NewTask {
+                planned_on: Some(today),
+                project_id: project,
+                ..NewTask::titled(title)
+            };
+            store.create_task(task, Actor::User).unwrap();
+        }
+        let tools = LocalTools::new(&path);
+        let out = tools.call("tarefas_do_dia", &json!({"dia": null, "projeto": "prt"}));
+        assert!(!out.is_error, "{}", out.content);
+        assert!(
+            out.content.contains("Revisar o PR") && out.content.contains("\"projeto\":\"Portal\"")
+        );
+        assert!(
+            !out.content.contains("Pagar o boleto"),
+            "o filtro tira a sem projeto"
+        );
+        let none = tools.call("tarefas_do_dia", &json!({"dia": null, "projeto": "mrp"}));
+        assert!(
+            none.is_error && none.content.contains("Portal"),
+            "{}",
+            none.content
+        );
     }
 
     #[test]
