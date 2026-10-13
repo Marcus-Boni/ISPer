@@ -43,6 +43,8 @@ pub struct MeetingRow {
     /// Nome do arquivo de áudio de onde a reunião veio, quando ela foi
     /// importada (Fase 9.0) em vez de gravada.
     pub source_name: Option<String>,
+    /// O projeto (Fase 11.1), marcado pela pessoa ou sugerido pelo ISPer.
+    pub project_id: Option<String>,
 }
 
 /// Um celular pareado com este PC (Fase 9.3).
@@ -255,7 +257,7 @@ const MEETING_COLUMNS: &str = "m.id, m.title, m.started_at, m.duration_secs,
     (SELECT COUNT(DISTINCT s.speaker) FROM segments s WHERE s.meeting_id = m.id AND s.speaker != 'Eu'),
     (SELECT COUNT(*) FROM moments mo WHERE mo.meeting_id = m.id),
     (SELECT COUNT(*) FROM decisions de WHERE de.meeting_id = m.id),
-    m.source_name";
+    m.source_name, m.project_id";
 
 fn row_to_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<MeetingRow> {
     Ok(MeetingRow {
@@ -270,6 +272,7 @@ fn row_to_meeting(row: &rusqlite::Row<'_>) -> rusqlite::Result<MeetingRow> {
         moments: row.get(8)?,
         decisions: row.get(9)?,
         source_name: row.get(10)?,
+        project_id: row.get(11)?,
     })
 }
 

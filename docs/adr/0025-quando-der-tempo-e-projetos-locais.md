@@ -53,6 +53,27 @@ O OptTime tem a lista de projetos em que se aponta hora
   três colunas de projeto, numa migração só, para a 11.1 não mexer de novo no
   banco.
 
+### Projetos na prática (11.1, decidido em 12/10)
+
+- **A reunião já sai marcada, e a pessoa corrige.** Casada com um evento da
+  agenda, ela ganha o projeto da reunião anterior da mesma série (ou do
+  mesmo evento); sem série com projeto, o nome ou um apelido que aparece no
+  assunto como palavra inteira, o mais longo primeiro. Empate entre dois
+  projetos não marca nada. Acertando, zero toques; errando, um.
+- **"Sugerido" vem do diário, não de uma coluna nova.** A marca do ISPer vai
+  para o diário com o assistente como autor; enquanto a última marca não for
+  da pessoa, a tela mostra "sugerido". Marcar o mesmo projeto confirma.
+- **As tarefas da reunião herdam o projeto** e acompanham a troca: as ainda
+  abertas que estavam com o projeto de antes mudam junto, cada uma no diário.
+- **Do OptTime, a pessoa escolhe quais trazer** (os projetos ativos em que ela
+  aponta horas). Um projeto local sem ligação e de mesmo nome é ligado, e o
+  código de lá vira apelido; trazer de novo não duplica.
+- **Os projetos se cuidam nas Configurações → Projetos**; o Hoje e a
+  Biblioteca têm o selo, o seletor e o filtro. O assistente filtra tarefas e
+  reuniões por projeto (`projeto`) e lista os projetos (`projetos`).
+- **As rotinas ficam sem projeto por enquanto:** a coluna existe, mas o
+  critério da 11.1 é de tarefas e reuniões.
+
 ## Consequências
 
 - O "Depois" da tela Hoje deixa de mostrar as tarefas sem dia que estão numa
@@ -77,6 +98,9 @@ O OptTime tem a lista de projetos em que se aponta hora
 ## Onde vive
 
 `crates/isper-core/src/store.rs` (migração v9), `crates/isper-assist`
-(`model.rs`, `store/lists.rs`, `spare.rs` para o tempo livre),
-`crates/isper-agent` (a ferramenta `quando_der_tempo`), a seção "Quando der
-tempo" da tela Hoje e o `isper-cli listas`.
+(`model.rs`, `store/lists.rs`, `spare.rs` para o tempo livre,
+`store/projects.rs` para os projetos e o da reunião), `crates/isper-mcp`
+(`opt_time_list_projects`), `crates/isper-agent` (as ferramentas
+`quando_der_tempo` e `projetos`, o filtro `projeto`), a seção "Quando der
+tempo" da tela Hoje, a seção Projetos das Configurações e o `isper-cli listas`
+e `projetos`.

@@ -18,8 +18,8 @@ pub mod opttime;
 
 pub use client::{Connection, Endpoint, ToolError, ToolOutput, ToolSummary};
 pub use opttime::{
-    Agenda, AgendaEvent, Applied, ApplyItem, ApplyRequest, DaySummary, OptTime, Suggestion,
-    Suggestions, Whoami, match_event,
+    Agenda, AgendaEvent, Applied, ApplyItem, ApplyRequest, DaySummary, OptProject, OptTime,
+    ProjectList, Suggestion, Suggestions, Whoami, match_event,
 };
 
 /// O que pode dar errado ao falar com um servidor MCP.

@@ -9,6 +9,7 @@
 //!
 //! [ADR 0023]: ../../../docs/adr/0023-escada-de-confianca.md
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
@@ -41,6 +42,7 @@ pub(crate) const MOVE: &str = "mover_tarefa";
 pub(crate) const COMPLETE: &str = "concluir_tarefa";
 pub(crate) const REMEMBER: &str = "lembrar";
 pub(crate) const SPARE: &str = "quando_der_tempo";
+pub(crate) const PROJECTS: &str = "projetos";
 
 /// As ferramentas locais sobre um banco.
 pub(crate) struct LocalTools {
@@ -139,6 +141,39 @@ fn fold(text: &str) -> String {
         .collect()
 }
 
+/// Id → nome de todos os projetos (também os arquivados: o que já foi
+/// marcado continua com nome).
+fn project_names(store: &AssistStore) -> Result<HashMap<String, String>, String> {
+    let mut all = store.projects(false).map_err(|e| e.to_string())?;
+    all.extend(store.projects(true).map_err(|e| e.to_string())?);
+    Ok(all.into_iter().map(|p| (p.id, p.name)).collect())
+}
+
+/// O projeto pedido em `projeto` (parte do nome ou de um apelido, sem
+/// acento): o id, ou um erro que diz quais existem.
+fn project_arg(store: &AssistStore, args: &Value) -> Result<Option<String>, String> {
+    let Some(wanted) = text_arg(args, "projeto").map(fold) else {
+        return Ok(None);
+    };
+    let projects = store.projects(false).map_err(|e| e.to_string())?;
+    let hit = |n: &String| fold(n).contains(wanted.as_str());
+    projects
+        .iter()
+        .find(|p| hit(&p.name) || p.aliases.iter().any(hit))
+        .map(|p| Some(p.id.clone()))
+        .ok_or_else(|| {
+            let names: Vec<&str> = projects.iter().map(|p| p.name.as_str()).collect();
+            format!(
+                "não há projeto \"{wanted}\"; os projetos são: {}",
+                if names.is_empty() {
+                    "nenhum".to_string()
+                } else {
+                    names.join(", ")
+                }
+            )
+        })
+}
+
 impl LocalTools {
     pub(crate) fn new(db: &Path) -> Self {
         Self {
@@ -160,8 +195,11 @@ impl LocalTools {
                 TASKS,
                 "As tarefas de um dia na tela Hoje: para fazer (com as atrasadas), a caixa de entrada, as de depois e as concluídas no dia. Use para \"o que eu tenho hoje\", \"o que ficou pra trás\", \"o que eu concluí\".",
                 object(
-                    json!({"dia": nullable("Dia AAAA-MM-DD; null é hoje.")}),
-                    &["dia"],
+                    json!({
+                        "dia": nullable("Dia AAAA-MM-DD; null é hoje."),
+                        "projeto": nullable("Parte do nome (ou um apelido) do projeto, de `projetos`; null traz todas."),
+                    }),
+                    &["dia", "projeto"],
                 ),
             ),
             tool(
@@ -180,8 +218,9 @@ impl LocalTools {
                         "de": nullable("Primeiro dia AAAA-MM-DD; null é 7 dias atrás."),
                         "ate": nullable("Último dia AAAA-MM-DD; null é hoje."),
                         "texto": nullable("Texto para filtrar (título ou o que foi dito); null lista todas."),
+                        "projeto": nullable("Parte do nome (ou um apelido) do projeto, de `projetos`; null lista todas."),
                     }),
-                    &["de", "ate", "texto"],
+                    &["de", "ate", "texto", "projeto"],
                 ),
             ),
             tool(
@@ -252,6 +291,11 @@ impl LocalTools {
                 ),
             ),
             tool(
+                PROJECTS,
+                "Os projetos da pessoa no ISPer, com os apelidos e se estão ligados ao OptTime. Use para saber de que projeto se fala antes de filtrar `tarefas_do_dia` ou `reunioes` por projeto.",
+                object(json!({}), &[]),
+            ),
+            tool(
                 REMEMBER,
                 "Guarda na memória do ISPer um fato curto e duradouro sobre a pessoa (quem é o gestor, em que projeto trabalha, um jeito de preferir), que ela vê e edita nas Configurações. Só quando ela pedir para lembrar, ou disser algo que vale para os próximos dias; nunca senha, segredo ou o que outra pessoa disse numa reunião. O ISPer pede a confirmação antes.",
                 object(
@@ -296,6 +340,7 @@ impl LocalTools {
             COMPLETE => self.complete(args),
             REMEMBER => self.remember(args),
             SPARE => self.spare(args),
+            PROJECTS => self.projects(),
             other => Err(format!("ferramenta desconhecida: {other}")),
         };
         result.unwrap_or_else(ToolOutcome::error)
@@ -313,14 +358,30 @@ impl LocalTools {
         let store = self.assist()?;
         let today = store.clock().today();
         let day = day_arg(args, "dia")?.unwrap_or(today);
-        let d = store.today_for(day).map_err(|e| e.to_string())?;
+        let names = project_names(&store)?;
+        let only = project_arg(&store, args)?;
+        let mut d = store.today_for(day).map_err(|e| e.to_string())?;
+        if let Some(id) = &only {
+            for tasks in [
+                &mut d.planned,
+                &mut d.inbox,
+                &mut d.later,
+                &mut d.done_today,
+            ] {
+                tasks.retain(|t| t.project_id.as_ref() == Some(id));
+            }
+        }
         let mut sources = Vec::new();
         let mut list = |tasks: &[Task]| -> Vec<Value> {
             tasks
                 .iter()
                 .map(|t| {
                     sources.push(task_source(t));
-                    task_json(t, today)
+                    let mut v = task_json(t, today);
+                    if let Some(name) = t.project_id.as_ref().and_then(|id| names.get(id)) {
+                        v["projeto"] = json!(name);
+                    }
+                    v
                 })
                 .collect()
         };
@@ -403,10 +464,14 @@ impl LocalTools {
             None => store.list_meetings(),
         }
         .map_err(|e| e.to_string())?;
+        let assist = self.assist()?;
+        let names = project_names(&assist)?;
+        let only = project_arg(&assist, args)?;
         let mut sources = Vec::new();
         let items: Vec<Value> = rows
             .into_iter()
             .filter(|m| Self::meeting_day(&m.started_at).is_some_and(|d| d >= from && d <= to))
+            .filter(|m| only.is_none() || m.project_id == only)
             .take(MEETINGS_LIMIT)
             .map(|m| {
                 sources.push(Source {
@@ -422,6 +487,7 @@ impl LocalTools {
                     "duracao_min": (m.duration_secs / 60.0).round(),
                     "tem_resumo": m.has_summary,
                     "decisoes_validadas": m.decisions,
+                    "projeto": m.project_id.as_ref().and_then(|id| names.get(id)),
                 })
             })
             .collect();
@@ -638,6 +704,23 @@ impl LocalTools {
             }
         }
         Self::ok(json!({"listas": names, "itens": items}), sources)
+    }
+
+    fn projects(&self) -> Result<ToolOutcome, String> {
+        let store = self.assist()?;
+        let items: Vec<Value> = store
+            .projects(false)
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|p| {
+                json!({
+                    "nome": p.name,
+                    "apelidos": p.aliases,
+                    "opttime": p.external_ref.is_some_and(|r| r.starts_with(isper_assist::OPTTIME_REF)),
+                })
+            })
+            .collect();
+        Self::ok(json!({ "projetos": items }), Vec::new())
     }
 
     fn remember(&self, args: &Value) -> Result<ToolOutcome, String> {

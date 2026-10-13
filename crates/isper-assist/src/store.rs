@@ -19,11 +19,15 @@ use crate::{AssistError, Result};
 
 mod lists;
 mod memories;
+mod projects;
 mod routines;
 mod suggestions;
 
 pub use lists::{ListWithItems, MAX_PASTE_ITEMS, STALE_DAYS, TaskList, clean_line};
 pub use memories::PROMPT_MEMORIES;
+pub use projects::{
+    LinkedProject, MeetingProject, NewProject, OPTTIME_REF, Project, ProjectPatch, match_project,
+};
 
 /// Versão do schema do `isper.db` que trouxe as tabelas do assistente.
 pub const SCHEMA_VERSION_REQUIRED: i64 = 9;
@@ -311,9 +315,24 @@ impl AssistStore {
         if already {
             return Ok(Vec::new());
         }
+        // As tarefas herdam o projeto da reunião (11.1).
+        let project: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT project_id FROM meetings WHERE id = ?1",
+                params![meeting_id],
+                |r| r.get(0),
+            )
+            .optional()?
+            .flatten();
         drafts
             .into_iter()
-            .map(|d| self.create_task(d, Actor::Assistant))
+            .map(|mut d| {
+                if d.project_id.is_none() {
+                    d.project_id = project.clone();
+                }
+                self.create_task(d, Actor::Assistant)
+            })
             .collect()
     }
 

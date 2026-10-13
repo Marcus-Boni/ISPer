@@ -269,6 +269,23 @@ pub(crate) fn finish_meeting(
                 tracing::info!(meeting_id, "reunião casada com o evento da agenda");
                 title = event.subject.clone();
                 app_title = None;
+                // Fase 11.1: o projeto que o ISPer reconhece (a série, o
+                // assunto) vem antes das ações, para as tarefas herdarem.
+                let suggested = crate::today::open_assist().and_then(|s| {
+                    Ok(s.suggest_meeting_project(
+                        meeting_id,
+                        &event.ical_uid,
+                        event.series(),
+                        &event.subject,
+                    )?)
+                });
+                match suggested {
+                    Ok(Some(p)) => {
+                        tracing::info!(meeting_id, project = %p.name, "projeto sugerido")
+                    }
+                    Ok(None) => {}
+                    Err(e) => tracing::warn!(meeting_id, "não consegui sugerir o projeto: {e}"),
+                }
             }
             Err(e) => tracing::warn!(meeting_id, "não consegui casar a reunião com a agenda: {e}"),
         }

@@ -25,6 +25,7 @@ const DAY_SUMMARY: &str = "opt_time_get_today_summary";
 const SUGGEST: &str = "opt_time_suggest_daily_entries";
 const APPLY: &str = "opt_time_apply_suggestions";
 const AGENDA: &str = "opt_time_get_my_agenda";
+const PROJECTS: &str = "opt_time_list_projects";
 
 /// Quem é o dono do token e o que está conectado (`opt_time_whoami`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -354,6 +355,39 @@ pub struct Attendance {
     pub minutes: i64,
 }
 
+/// Um projeto em que a pessoa pode apontar horas (`opt_time_list_projects`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OptProject {
+    /// Id no OptTime.
+    pub id: String,
+    /// Nome.
+    pub name: String,
+    /// Código ("PRT").
+    #[serde(default)]
+    pub code: String,
+    /// Cor, como veio.
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Cliente.
+    #[serde(default)]
+    pub client_name: Option<String>,
+}
+
+/// Os projetos ativos em que a pessoa pode apontar horas.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectList {
+    /// Os projetos, por nome.
+    pub projects: Vec<OptProject>,
+    /// Quantos havia (podem ter vindo menos).
+    #[serde(default)]
+    pub total: i64,
+    /// Vieram menos do que havia.
+    #[serde(default)]
+    pub truncated: bool,
+}
+
 /// Um evento da agenda.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -504,6 +538,14 @@ impl OptTime {
         self.endpoint.call_typed(AGENDA, args).await
     }
 
+    /// Os projetos ativos em que a pessoa pode apontar horas (até 200), para
+    /// ela escolher quais trazer para o ISPer (Fase 11.1).
+    pub async fn projects(&self) -> Result<ProjectList> {
+        self.endpoint
+            .call_typed(PROJECTS, json!({ "status": "active", "limit": 200 }))
+            .await
+    }
+
     /// Grava as sugestões aprovadas, numa transação do OptTime. Só depois do
     /// toque do usuário ([ADR 0023]).
     ///
@@ -544,6 +586,25 @@ mod tests {
         let w: Whoami = serde_json::from_value(v).unwrap();
         assert_eq!(w.missing_scopes(), ["calendar:read"]);
         assert!(w.evening_digest_enabled);
+    }
+
+    #[test]
+    fn lista_de_projetos_abre() {
+        // A forma do `listProjects` do OptTime (dados trocados): sem cliente,
+        // com campos que o ISPer não usa.
+        let v = json!({
+            "projects": [
+                { "id": "p1", "name": "Portal", "code": "PRT", "color": "#3b82f6", "status": "active",
+                  "billable": true, "clientName": "ACME", "azureProjectId": null, "azureProjectName": null },
+                { "id": "p2", "name": "MRP", "code": "MRP", "color": "#10b981", "status": "active",
+                  "billable": false, "clientName": null, "azureProjectId": null, "azureProjectName": null }
+            ],
+            "total": 2, "returned": 2, "truncated": false
+        });
+        let l: ProjectList = serde_json::from_value(v).unwrap();
+        assert_eq!(l.projects.len(), 2);
+        assert_eq!(l.projects[0].code, "PRT");
+        assert_eq!(l.projects[1].client_name, None);
     }
 
     #[test]

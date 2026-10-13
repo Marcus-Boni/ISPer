@@ -324,7 +324,7 @@ pub struct TaskPatch {
 }
 
 /// Distingue "campo ausente" (`None`) de "campo `null`" (`Some(None)`).
-fn double_option<'de, D, T>(d: D) -> std::result::Result<Option<Option<T>>, D::Error>
+pub(crate) fn double_option<'de, D, T>(d: D) -> std::result::Result<Option<Option<T>>, D::Error>
 where
     D: Deserializer<'de>,
     T: Deserialize<'de>,
