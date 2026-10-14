@@ -18,7 +18,7 @@ thiserror = "2"
 toml = "1"
 tracing = "0.1"
 # Pastas conhecidas do Windows — ver config_path().
-dirs = "6"
+dirs = "7"
 
 # Cofre de senhas do sistema para a chave do provedor: o Credential Manager
 # no Windows. Nas outras plataformas o `keyring` compila sem cofre nativo (a
