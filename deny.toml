@@ -19,7 +19,17 @@ yanked = "deny"
 # chega por urlpattern → tauri-utils — não estão ao nosso alcance; o Dependabot
 # traz a correção quando o Tauri trocar.
 unmaintained = "workspace"
-ignore = []
+# zip < 9 (RUSTSEC-2026-0367/0368/0369: links simbólicos e SUID/SGID ao
+# extrair um zip de terceiros, no Unix). Chega por dois caminhos fora do nosso
+# alcance, e nenhum extrai zip de quem não confiamos: o build do
+# sherpa-onnx-sys (o pacote dele, na compilação) e o tauri-plugin-updater (a
+# atualização, depois da assinatura conferida com a nossa chave). O ISPer é
+# Windows. Sair daqui quando os dois aceitarem zip 9.
+ignore = [
+    { id = "RUSTSEC-2026-0367", reason = "zip 2 (build do sherpa-onnx-sys, só o pacote dele) e zip 4 (tauri-plugin-updater, só depois da assinatura conferida); sem zip 9 em nenhum dos dois até 19/10/2026: tirar quando atualizarem" },
+    { id = "RUSTSEC-2026-0368", reason = "zip 2 (build do sherpa-onnx-sys, só o pacote dele) e zip 4 (tauri-plugin-updater, só depois da assinatura conferida); sem zip 9 em nenhum dos dois até 19/10/2026: tirar quando atualizarem" },
+    { id = "RUSTSEC-2026-0369", reason = "zip 2 (build do sherpa-onnx-sys, só o pacote dele) e zip 4 (tauri-plugin-updater, só depois da assinatura conferida); sem zip 9 em nenhum dos dois até 19/10/2026: tirar quando atualizarem" },
+]
 
 [licenses]
 version = 2
