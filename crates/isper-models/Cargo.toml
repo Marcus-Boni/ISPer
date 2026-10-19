@@ -13,7 +13,7 @@ sha2 = "0.11"
 thiserror = "2"
 tracing = "0.1"
 # Pastas conhecidas do Windows (SHGetKnownFolderPath) — ver models_dir().
-dirs = "6"
+dirs = "7"
 
 [lints]
 workspace = true
