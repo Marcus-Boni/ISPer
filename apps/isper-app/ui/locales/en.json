@@ -723,6 +723,8 @@
   "settings.assistente.tool.diario": "Read the journal (what changed on a day)",
   "settings.assistente.tool.lembrar": "Save to memory",
   "settings.assistente.tool.mover_tarefa": "Move a task to another day",
+  "settings.assistente.tool.projetos": "See the projects",
+  "settings.assistente.tool.quando_der_tempo": "See the \"When there's time\" lists",
   "settings.assistente.tool.reuniao": "Read a meeting (summary and excerpts)",
   "settings.assistente.tool.reunioes": "List recorded meetings",
   "settings.assistente.tool.rotinas": "See routines",
