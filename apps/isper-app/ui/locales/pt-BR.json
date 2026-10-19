@@ -723,6 +723,8 @@
   "settings.assistente.tool.diario": "Ler o diário (o que mudou num dia)",
   "settings.assistente.tool.lembrar": "Guardar na memória",
   "settings.assistente.tool.mover_tarefa": "Mover tarefa de dia",
+  "settings.assistente.tool.projetos": "Ver os projetos",
+  "settings.assistente.tool.quando_der_tempo": "Ver as listas \"Quando der tempo\"",
   "settings.assistente.tool.reuniao": "Ler uma reunião (resumo e trechos)",
   "settings.assistente.tool.reunioes": "Listar as reuniões gravadas",
   "settings.assistente.tool.rotinas": "Ver as rotinas",
