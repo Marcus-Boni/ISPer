@@ -1,28 +1,26 @@
 {
   "repository": "Marcus-Boni/ISPer",
-  "tag": "v0.26.0",
-  "version": "0.26.0",
+  "tag": "v0.27.0",
+  "version": "0.27.0",
   "channel": "stable",
-  "publishedAt": "2026-10-11T01:24:02Z",
-  "fetchedAt": "2026-10-11T01:24:16.406Z",
-  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.26.0",
+  "publishedAt": "2026-10-13T02:52:08Z",
+  "fetchedAt": "2026-10-26T18:04:33.832Z",
+  "releaseUrl": "https://github.com/Marcus-Boni/ISPer/releases/tag/v0.27.0",
   "notes": [
-    "Adicionado — Tela Hoje, o começo do assistente (Fase 10). Um item novo na barra lateral, com o número de tarefas do dia ao lado (atalho Ctrl+T).",
-    "Adicionado — Datas no texto da tarefa. \"amanhã às 3 ligar pro João\" vira a tarefa \"Ligar pro João\" para amanhã às 15:00, na tela Hoje e no Ctrl+K, com uma prévia antes de salvar.",
-    "Adicionado — Anotar tarefas falando (Ctrl+Alt+A). Como o ditado: segure e fale, ou toque e fale.",
-    "Adicionado — Rotinas na tela Hoje. O que se repete vira tarefa sozinho, no dia certo: todo dia, dias úteis, alguns dias da semana ou todo mês, com hora se quiser."
+    "Adicionado — Quando der tempo (Fase 11.0). Uma seção nova na tela Hoje para o que não tem data: o que estudar, ler ou fazer um dia.",
+    "Adicionado — Tempo livre. Com o OptTime conectado, quando a agenda tem uma janela livre até o fim do expediente, o Hoje sugere um item que cabe nela, o que espera há mais tempo primeiro."
   ],
   "assets": [
     {
-      "name": "ISPer_0.26.0_x64-cpu-setup.exe",
+      "name": "ISPer_0.27.0_x64-cpu-setup.exe",
       "platform": "windows",
       "arch": "x64",
       "variant": "cpu",
       "kind": "installer",
-      "sizeBytes": 16304792,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.26.0/ISPer_0.26.0_x64-cpu-setup.exe",
-      "sha256": "9692633cb3dc573355a2e25f28c45c0850d1514aea536bdb9c41c9141d1f33cd",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.26.0/SHA256SUMS.txt",
+      "sizeBytes": 16355784,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.27.0/ISPer_0.27.0_x64-cpu-setup.exe",
+      "sha256": "706576347b141d84e64f1efd58ab2af7fefeee16b6ed3e541c607395c3fe0127",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.27.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
@@ -31,15 +29,15 @@
       ]
     },
     {
-      "name": "ISPer_0.26.0_x64-setup.exe",
+      "name": "ISPer_0.27.0_x64-setup.exe",
       "platform": "windows",
       "arch": "x64",
       "variant": "cuda",
       "kind": "installer",
-      "sizeBytes": 484354302,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.26.0/ISPer_0.26.0_x64-setup.exe",
-      "sha256": "474b9b5790557366a459076c545a42282405e0c32ec8a7a1412fc9ff135af8e9",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.26.0/SHA256SUMS.txt",
+      "sizeBytes": 484438772,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.27.0/ISPer_0.27.0_x64-setup.exe",
+      "sha256": "65bad6d6b3ea6768fccbc018e19f20d7c42a46617826e68f8bac0769914c1aef",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.27.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
@@ -48,15 +46,15 @@
       ]
     },
     {
-      "name": "ISPer_0.26.0_x64-cpu-portable.zip",
+      "name": "ISPer_0.27.0_x64-cpu-portable.zip",
       "platform": "windows",
       "arch": "x64",
       "variant": "cpu",
       "kind": "portable",
-      "sizeBytes": 23852660,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.26.0/ISPer_0.26.0_x64-cpu-portable.zip",
-      "sha256": "c1ddf977b5b54dee175840c984400fff19052c47cf6dd8def220b7624970d78b",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.26.0/SHA256SUMS.txt",
+      "sizeBytes": 23918013,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.27.0/ISPer_0.27.0_x64-cpu-portable.zip",
+      "sha256": "b83f2599f40325a289c729d6269e3b678a05dff2329dd01777b4ecde6c857800",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.27.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
@@ -65,15 +63,15 @@
       ]
     },
     {
-      "name": "ISPer_0.26.0_x64-portable.zip",
+      "name": "ISPer_0.27.0_x64-portable.zip",
       "platform": "windows",
       "arch": "x64",
       "variant": "cuda",
       "kind": "portable",
-      "sizeBytes": 511203928,
-      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.26.0/ISPer_0.26.0_x64-portable.zip",
-      "sha256": "28e1beec38c3cf250e74b10eb0fcf869f020f6b149ac237dc4d96eb0cb852934",
-      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.26.0/SHA256SUMS.txt",
+      "sizeBytes": 511284982,
+      "downloadUrl": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.27.0/ISPer_0.27.0_x64-portable.zip",
+      "sha256": "c939aec06384e8b60c1bb1c09f4379efefa076114d8adeb7e86a2c905cd912b0",
+      "checksumSource": "https://github.com/Marcus-Boni/ISPer/releases/download/v0.27.0/SHA256SUMS.txt",
       "authenticodeStatus": "not-signed",
       "requirements": [
         "Windows 10/11 x64",
