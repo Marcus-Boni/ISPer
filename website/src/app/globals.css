@@ -3711,3 +3711,344 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
   .listen-pill { max-width: calc(100% - 2.25rem); }
   .stage-controls span { display: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   After the click: the download page gives way to three steps and a drawn
+   browser pointing at the file that just arrived. The steps carry everything
+   in text; the scene only shows where to look. Full screen, like the moment
+   it is: the one thing left to do is open the file.
+   --------------------------------------------------------------------------- */
+
+/* A native modal <dialog>: undo the UA box so it fills the screen. */
+.after-download {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+}
+
+.after-download:not([open]) { display: none; }
+
+.after-download[open] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  background: var(--bg);
+  overflow-y: auto;
+  animation: after-in var(--dur-page) var(--ease-out) both;
+}
+
+.after-download:focus { outline: none; }
+
+@keyframes after-in {
+  from { opacity: 0; transform: translateY(0.75rem); }
+}
+
+.after-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(2rem, 6vw, 5rem) clamp(1.5rem, 6vw, 5.5rem);
+}
+
+.after-brand {
+  margin-bottom: clamp(2rem, 6vh, 3.5rem);
+  color: var(--ink);
+}
+
+.after-brand span { color: var(--accent); }
+
+.after-title {
+  max-width: 11ch;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 5vw, 4.1rem);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+
+.after-title em {
+  color: var(--accent-2);
+  font-style: italic;
+  font-weight: 520;
+}
+
+.after-steps {
+  display: grid;
+  gap: 1.35rem;
+  max-width: 44ch;
+  margin: clamp(1.75rem, 4vh, 2.5rem) 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: after-step;
+}
+
+.after-steps li {
+  position: relative;
+  padding-left: 2.6rem;
+  counter-increment: after-step;
+}
+
+.after-steps li::before {
+  content: counter(after-step);
+  position: absolute;
+  top: -0.1rem;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.after-steps h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.after-steps p {
+  margin: 0.3rem 0 0;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+.after-steps code {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+
+.after-steps .after-note {
+  border-left: 2px solid var(--warn);
+  padding-left: 0.75rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.after-retry {
+  margin: clamp(1.75rem, 4vh, 2.5rem) 0 0;
+  color: var(--muted);
+}
+
+.after-back {
+  align-self: flex-start;
+  margin-top: 0.6rem;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.after-close {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+
+.after-close:hover { background: var(--panel-2); color: var(--ink); }
+.after-close svg { width: 1.1rem; height: 1.1rem; }
+
+/* The scene: a browser on the warm desk, its downloads open. */
+.after-visual {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  border-left: 1px solid var(--line);
+  background:
+    radial-gradient(60% 50% at 70% 25%, rgba(240, 126, 114, 0.12), transparent 70%),
+    var(--bg-2);
+  padding: clamp(2rem, 5vw, 4rem);
+}
+
+.after-browser {
+  position: relative;
+  width: min(34rem, 100%);
+  aspect-ratio: 16 / 11;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow-floating);
+}
+
+.after-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+  padding: 0.6rem 0.75rem;
+}
+
+.after-dots { display: flex; gap: 0.35rem; }
+.after-dots i { width: 0.6rem; height: 0.6rem; border-radius: 999px; background: var(--line-2); }
+
+.after-url {
+  flex: 1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-2);
+  padding: 0.3rem 0.8rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.after-dl {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--accent-ink);
+  animation: after-glow 2.4s var(--ease-soft) infinite;
+}
+
+.after-dl svg { width: 1rem; height: 1rem; }
+
+@keyframes after-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 126, 114, 0.5); }
+  50% { box-shadow: 0 0 0 0.45rem rgba(240, 126, 114, 0); }
+}
+
+.after-page {
+  display: grid;
+  gap: 0.7rem;
+  padding: 2.5rem 1.5rem;
+}
+
+.after-page i { height: 0.9rem; border-radius: 999px; background: var(--panel-2); }
+.after-page i:nth-child(1) { width: 55%; height: 1.4rem; }
+.after-page i:nth-child(2) { width: 80%; }
+.after-page i:nth-child(3) { width: 65%; }
+
+.after-popover {
+  position: absolute;
+  top: 3.3rem;
+  right: 0.6rem;
+  width: min(19rem, 78%);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--panel-3);
+  box-shadow: var(--shadow-floating);
+  padding: 0.6rem;
+}
+
+.after-popover-head {
+  display: block;
+  padding: 0.15rem 0.35rem 0.5rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.after-file {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: var(--r-sm);
+  padding: 0.55rem 0.5rem;
+  animation: after-pick 4.8s var(--ease-soft) infinite;
+}
+
+.after-file-icon {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  color: var(--accent-2);
+}
+
+.after-file-icon svg { width: 0.95rem; height: 0.95rem; }
+
+.after-file-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@keyframes after-pick {
+  0%, 52% { background: transparent; box-shadow: none; }
+  58%, 88% { background: var(--accent-soft); box-shadow: inset 0 0 0 1px rgba(240, 126, 114, 0.45); }
+  100% { background: transparent; box-shadow: none; }
+}
+
+/* The cursor travels from the page to the file and double-clicks it. */
+.after-cursor {
+  position: absolute;
+  top: 80%;
+  left: 22%;
+  width: 1.6rem;
+  height: 1.6rem;
+  fill: var(--ink);
+  stroke: var(--bg);
+  stroke-width: 1.4;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+  animation: after-cursor 4.8s var(--ease-soft) infinite;
+}
+
+@keyframes after-cursor {
+  0%, 8% { top: 80%; left: 22%; opacity: 0; transform: scale(1); }
+  16% { opacity: 1; }
+  48% { top: 46%; left: 70%; transform: scale(1); }
+  53%, 61% { top: 46%; left: 70%; transform: scale(0.84); }
+  57%, 66% { top: 46%; left: 70%; transform: scale(1); }
+  90% { top: 46%; left: 70%; opacity: 1; }
+  100% { top: 46%; left: 70%; opacity: 0; }
+}
+
+@media (max-width: 860px) {
+  /* Stacked, the steps come first and the scene follows: a grid row would
+     squeeze the browser to fit the screen height. */
+  .after-download[open] { display: block; }
+  .after-copy { padding-top: 4rem; }
+  .after-visual { display: block; min-height: 0; border-left: 0; border-top: 1px solid var(--line); padding: 2rem 1.25rem 3rem; }
+  .after-browser { margin-inline: auto; }
+  .after-brand { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .after-download, .after-dl, .after-file, .after-cursor { animation: none; }
+  .after-file { background: var(--accent-soft); }
+  .after-cursor { top: 46%; left: 70%; }
+}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, Code2, Cpu, Download, FileCheck2, FolderArchive, LifeBuoy, MonitorCog, ShieldCheck, TriangleAlert } from "lucide-react";
+import { AfterDownload } from "@/components/download/after-download";
 import { IntegrityCheck } from "@/components/download/integrity-check";
 import { RecommendedDownload } from "@/components/download/recommended-download";
 import { cudaMinimum, hasWideCuda, variantProfiles } from "@/lib/download-profile";
@@ -77,11 +78,11 @@ export default function DownloadPage() {
                   </ul>
                   <p className="compare-model">{profile.model}</p>
                   <div className="compare-actions">
-                    <a className="button button-secondary" href={asset.downloadUrl}>
+                    <a className="button button-secondary" href={asset.downloadUrl} data-download={asset.name}>
                       <Download aria-hidden="true" />Instalador<span className="compare-size">{formatBytes(asset.sizeBytes)}</span>
                     </a>
                     {zip ? (
-                      <a className="text-link" href={zip.downloadUrl}>
+                      <a className="text-link" href={zip.downloadUrl} data-download={zip.name} data-kind="portable">
                         <FolderArchive aria-hidden="true" />Portátil (zip) · {formatBytes(zip.sizeBytes)}
                       </a>
                     ) : null}
@@ -182,6 +183,7 @@ export default function DownloadPage() {
             </section>
           </div>
         </div>
+        <AfterDownload signed={signed} />
       </main>
     </PageTransition>
   );
