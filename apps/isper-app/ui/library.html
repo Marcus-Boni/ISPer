@@ -440,6 +440,12 @@
       const bOpen = el('button', 'btn', t('library.open-md')); bOpen.disabled = !m.md_path;
       bOpen.addEventListener('click', () => invoke('open_meeting_file', { id }).catch(e => toast(t('common.error', { e }), 'err')));
       actions.appendChild(bOpen);
+      // A reunião vai inteira para o assistente, anexada à pergunta no Hoje.
+      if (window.ISPER_SHELL && window.ISPER_SHELL.open) {
+        const bAsk = el('button', 'btn btn-ghost', t('library.ask'));
+        bAsk.addEventListener('click', () => window.ISPER_SHELL.open('today', { attach: { kind: 'reuniao', id: String(id), label: m.title } }));
+        actions.appendChild(bAsk);
+      }
       if (det.summary) {
         const bSum = el('button', 'btn btn-ghost', t('library.copy-summary'));
         bSum.addEventListener('click', () => copyText(det.summary, bSum, t('library.summary-copied')));

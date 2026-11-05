@@ -20,7 +20,7 @@ use std::time::Instant;
 
 use anyhow::{Context, bail};
 use chrono::{Duration, Local};
-use isper_agent::{CLOSING, IsperHost, MORNING, OptTimeTools, system_prompt};
+use isper_agent::{CLOSING, IsperHost, MORNING, OptTimeTools, Persona, system_prompt};
 use isper_assist::{Actor, AssistStore, NewRoutine, NewTask, SourceKind, TaskStatus};
 use isper_core::store::{MeetingStore, NewImportedMeeting};
 use isper_llm::LlmProvider;
@@ -317,6 +317,7 @@ pub fn perguntar(
         Local::now(),
         inner.opttime().is_some(),
         &memory_lines(db),
+        &Persona::default(),
     );
     eprintln!("via {} ({})", provider.name(), provider.model());
     let a = run(provider.as_ref(), &traced, &system, question, approve)?;
@@ -365,6 +366,7 @@ pub fn avaliar(
         Local::now(),
         inner.opttime().is_some(),
         &memory_lines(db),
+        &Persona::default(),
     );
     let file = std::fs::File::open(cases).with_context(|| cases.display().to_string())?;
     let mut report = Vec::new();

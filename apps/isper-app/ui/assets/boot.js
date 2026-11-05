@@ -47,6 +47,7 @@
     // Para a tela avisar a janela (ex.: alterações não salvas).
     window.ISPER_SHELL = {
       setDirty: function (view, on) { if (host.ISPER_SHELL) host.ISPER_SHELL.setDirty(view, on); },
+      open: function (view, params) { if (host.ISPER_SHELL) host.ISPER_SHELL.open(view, params); },
     };
   }
 

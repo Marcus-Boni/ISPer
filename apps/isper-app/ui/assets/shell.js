@@ -357,6 +357,9 @@
     // Para os testes e2e (cdp-target.mjs): põe uma tela à vista sem mexer no
     // foco e sem descartar a primeira configuração, que o roteiro ainda usa.
     show: (view) => show(view, null, { force: true, focus: false, keep: true }),
+    // Uma tela pede outra com parâmetros (a Biblioteca abre o Hoje com a
+    // reunião anexada à pergunta).
+    open: (view, params) => show(view, params),
     setDirty(view, on) {
       if (!(view in dirty)) return;
       dirty[view] = !!on;

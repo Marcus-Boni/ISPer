@@ -23,7 +23,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::connectors::{ConnectorError, opttime_endpoint, token_present};
 use crate::prelude::*;
-use isper_agent::{IsperHost, OptTimeTools, default_or_chosen, local_catalog, system_prompt};
+use isper_agent::{
+    IsperHost, OptTimeTools, Persona, default_or_chosen, local_catalog, system_prompt,
+};
 use isper_llm::LlmError;
 use isper_llm::agent::{Conversation, Permission, Step, advance, resume};
 
@@ -152,12 +154,29 @@ fn chosen(app: &AppHandle) -> HashMap<String, Permission> {
         .collect()
 }
 
+/// A persona escolhida nas Configurações.
+fn persona(app: &AppHandle) -> Persona {
+    let c = app.state::<AppState>().config.lock_or_recover().clone();
+    Persona {
+        name: c.assistant_name,
+        tone: c.assistant_tone,
+        length: c.assistant_length,
+    }
+}
+
+/// O que leva uma volta do agente.
+enum Turn {
+    /// Uma pergunta, com os registros anexados (`(tipo, id)`).
+    Ask(String, Vec<(String, String)>),
+    /// Os ids aprovados no cartão.
+    Confirm(Vec<String>),
+}
+
 /// Uma volta do agente: até a resposta ou até uma ação pedir o toque.
-/// `approved` traz os ids aprovados no cartão (`None` = pergunta nova).
 fn run(
     app: &AppHandle,
     conv: &mut Conversation,
-    approved: Option<&[String]>,
+    turn: &Turn,
 ) -> Result<(Step, Option<ConnectorError>), AssistantError> {
     let provider = isper_llm::provider_from_settings(&isper_llm::load_settings())?;
     let (opttime, opttime_error) = match opttime_tools(app) {
@@ -176,12 +195,20 @@ fn run(
         chrono::Local::now(),
         opttime.is_some(),
         &memories,
+        &persona(app),
     );
     let db = db_path().map_err(|e| AssistantError::new("failed", e.to_string()))?;
     let host = IsperHost::new(&db, opttime, chosen(app));
-    let step = match approved {
-        None => advance(provider.as_ref(), &host, &system, conv)?,
-        Some(ids) => resume(provider.as_ref(), &host, &system, conv, ids)?,
+    let step = match turn {
+        Turn::Ask(question, attached) => {
+            // A pergunta vai com os registros anexados, lidos agora, e as
+            // fontes deles entram na conversa para a resposta poder citá-los.
+            let (question, sources) = host.attach(question, attached);
+            conv.ask(&question);
+            conv.add_sources(sources);
+            advance(provider.as_ref(), &host, &system, conv)?
+        }
+        Turn::Confirm(ids) => resume(provider.as_ref(), &host, &system, conv, ids)?,
     };
     Ok((step, opttime_error))
 }
@@ -194,12 +221,12 @@ async fn drive(
     app: AppHandle,
     id: u64,
     mut conv: Conversation,
-    approved: Option<Vec<String>>,
+    turn: Turn,
     restore: Option<Conversation>,
 ) -> Result<AssistantReply, AssistantError> {
     let worker = app.clone();
     let (conv, result) = tauri::async_runtime::spawn_blocking(move || {
-        let result = run(&worker, &mut conv, approved.as_deref());
+        let result = run(&worker, &mut conv, &turn);
         (conv, result)
     })
     .await
@@ -225,18 +252,41 @@ async fn drive(
     })
 }
 
-/// Uma pergunta ao assistente. `fresh` começa uma conversa nova; sem ele, a
-/// pergunta segue a conversa em andamento (e um cartão aberto conta como
-/// recusado).
+/// Quantos registros uma pergunta leva.
+const MAX_ATTACHMENTS: usize = 6;
+
+/// Um registro anexado à pergunta ("@" na barra ou "Perguntar sobre isto").
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct Attachment {
+    /// `tarefa` · `reuniao` · `projeto`.
+    kind: String,
+    id: String,
+}
+
+/// Uma pergunta ao assistente, com os registros anexados. `fresh` começa uma
+/// conversa nova; sem ele, a pergunta segue a conversa em andamento (e um
+/// cartão aberto conta como recusado).
 #[tauri::command]
 pub(crate) async fn assistant_ask(
     app: AppHandle,
     question: String,
     fresh: bool,
+    attachments: Option<Vec<Attachment>>,
 ) -> Result<AssistantReply, AssistantError> {
     let question = question.trim().to_string();
     if question.is_empty() {
         return Err(AssistantError::new("failed", "pergunta vazia"));
+    }
+    let attached: Vec<(String, String)> = attachments
+        .unwrap_or_default()
+        .into_iter()
+        .map(|a| (a.kind, a.id))
+        .collect();
+    if attached.len() > MAX_ATTACHMENTS {
+        return Err(AssistantError::new(
+            "failed",
+            format!("no máximo {MAX_ATTACHMENTS} registros por pergunta"),
+        ));
     }
     let (id, before) = {
         let mut slot = SESSION.lock_or_recover();
@@ -252,9 +302,14 @@ pub(crate) async fn assistant_ask(
             }
         }
     };
-    let mut conv = before.clone();
-    conv.ask(&question);
-    drive(app, id, conv, None, Some(before)).await
+    drive(
+        app,
+        id,
+        before.clone(),
+        Turn::Ask(question, attached),
+        Some(before),
+    )
+    .await
 }
 
 /// O resumo da manhã (`morning`) ou o fechamento do dia (`closing`), numa
@@ -274,7 +329,7 @@ pub(crate) async fn assistant_brief(
             ));
         }
     };
-    assistant_ask(app, question.to_string(), true).await
+    assistant_ask(app, question.to_string(), true, None).await
 }
 
 /// O toque no cartão: roda as ações aprovadas (os ids das chamadas), recusa
@@ -299,7 +354,7 @@ pub(crate) async fn assistant_confirm(
         session.conv.take().unwrap_or_default()
     };
     let ran = !approved.is_empty();
-    drive(app, id, conv, Some(approved), None)
+    drive(app, id, conv, Turn::Confirm(approved), None)
         .await
         .map_err(|e| {
             if ran && e.code == "failed" {
@@ -441,6 +496,47 @@ pub(crate) fn assistant_set_permission(
         c.clone()
     };
     config::save(&cfg).map_err(|e| e.to_string())
+}
+
+/// A persona como as telas mostram.
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct PersonaView {
+    name: Option<String>,
+    tone: String,
+    length: String,
+}
+
+/// O nome, o tom e o tamanho das respostas do assistente.
+#[tauri::command]
+pub(crate) fn assistant_persona(app: AppHandle) -> PersonaView {
+    let p = persona(&app);
+    PersonaView {
+        name: p.name,
+        tone: p.tone,
+        length: p.length,
+    }
+}
+
+/// Muda a persona na hora (a próxima pergunta já sai com ela). Devolve como
+/// ficou, já normalizada (nome numa linha e curto; tom e tamanho da lista).
+#[tauri::command]
+pub(crate) fn assistant_set_persona(
+    app: AppHandle,
+    name: Option<String>,
+    tone: String,
+    length: String,
+) -> Result<PersonaView, String> {
+    let cfg = {
+        let state = app.state::<AppState>();
+        let mut c = state.config.lock_or_recover();
+        c.assistant_name = name;
+        c.assistant_tone = tone;
+        c.assistant_length = length;
+        c.normalize();
+        c.clone()
+    };
+    config::save(&cfg).map_err(|e| e.to_string())?;
+    Ok(assistant_persona(app))
 }
 
 #[cfg(test)]

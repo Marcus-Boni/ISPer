@@ -11,6 +11,19 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **O jeito do assistente.** Em Configurações → Assistente, dê um nome a ele
+  e escolha o tom (direto, caloroso ou formal) e o tamanho das respostas
+  (curtas, normais ou detalhadas). Vale na hora, e a tela Hoje passa a
+  chamá-lo pelo nome. Muda só o estilo: o que ele pode fazer sem perguntar
+  continua nas permissões.
+- **Anexar registros à pergunta.** Na barra do assistente, digite @ (ou
+  clique no botão @) e escolha uma tarefa, uma reunião ou um projeto: o
+  registro vai inteiro com a pergunta (as notas da tarefa; o resumo e as
+  ações da reunião; as tarefas e as reuniões do projeto) e a resposta cita
+  de onde tirou. Cada tarefa do Hoje ganha o "Perguntar sobre isto", e cada
+  reunião da Biblioteca, o "Perguntar ao assistente".
+
 ## [0.27.0] - 2026-10-12
 
 O que não tem data ganha lugar no ISPer (Fase 11.0). As anotações para

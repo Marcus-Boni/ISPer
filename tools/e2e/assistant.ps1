@@ -3,8 +3,9 @@
 # (fake-opttime.mjs), os dois em 127.0.0.1: sem IA configurada o erro leva as
 # Configuracoes; com ela, a pergunta volta com a fonte citada e clicavel, criar
 # tarefa espera o cartao (Fazer cria, Agora nao e uma pergunta nova nao), a
-# ferramenta bloqueada nas permissoes nem chega a IA, e o fechamento do dia le
-# as horas no OptTime sem perguntar.
+# ferramenta bloqueada nas permissoes nem chega a IA, o fechamento do dia le
+# as horas no OptTime sem perguntar, e a persona (nome e tom) e os registros
+# anexados pelo @ chegam a IA.
 #
 #   .\tools\e2e\assistant.ps1 -Exe <caminho do exe>
 #
@@ -205,10 +206,81 @@ try {
   $morningReq = Get-List "http://127.0.0.1:$llmPort/requests" | Select-Object -Last 1
   Check ($morningReq.question -like 'Monte o resumo da minha manh*') "e manda o pedido pronto a IA"
 
+  # 9) Persona e anexos: o nome e o tom vao para a IA; o registro anexado
+  # pelo @ vai lido na pergunta, e a resposta cita sem chamar ferramenta.
+  Invoke-Isper 'open_settings_window' "{ section: 'assistente' }" | Out-Null
+  Wait-IsperWindow 'settings.html' | Out-Null
+  for ($i = 0; $i -lt 20; $i++) {
+    if (EvJson 'settings.html' 'JSON.stringify(!!document.querySelector("#ptone [aria-checked=true]"))') { break }
+    Start-Sleep -Milliseconds 200
+  }
+  EvJson 'settings.html' 'JSON.stringify((() => { const i = document.getElementById("pname"); i.value = "Lia"; i.dispatchEvent(new Event("change")); document.querySelector("#ptone button[data-v=warm]").click(); return true; })())' | Out-Null
+  $per = $null
+  for ($i = 0; $i -lt 20; $i++) {
+    $per = Invoke-Isper 'assistant_persona'
+    if ($per.name -eq 'Lia' -and $per.tone -eq 'warm') { break }
+    Start-Sleep -Milliseconds 250
+  }
+  Check ($per.name -eq 'Lia' -and $per.tone -eq 'warm' -and $per.length -eq 'normal') "Configuracoes: nome e tom guardados na hora ($($per.name), $($per.tone), $($per.length))"
+  $seg = EvJson 'settings.html' 'JSON.stringify(document.querySelector("#ptone [aria-checked=true]").dataset.v)'
+  Check ($seg -eq 'warm') "o tom escolhido fica marcado ('$seg')"
+
+  Invoke-Isper 'open_today_window' | Out-Null
+  Wait-IsperWindow 'today.html' | Out-Null
+  Click-Today 'document.getElementById("assist-new")' | Out-Null
+  $head = $null
+  for ($i = 0; $i -lt 20; $i++) {
+    $head = EvJson 'today.html' 'JSON.stringify(document.getElementById("h-assist").textContent)'
+    if ($head -eq 'Lia') { break }
+    Start-Sleep -Milliseconds 250
+  }
+  Check ($head -eq 'Lia') "o Hoje chama o assistente pelo nome ('$head')"
+
+  EvJson 'today.html' 'JSON.stringify((() => { const i = document.getElementById("ask-q"); i.focus(); i.value = "@revisar"; i.setSelectionRange(8, 8); i.dispatchEvent(new Event("input")); return true; })())' | Out-Null
+  $pk = $null
+  for ($i = 0; $i -lt 20; $i++) {
+    $pk = EvJson 'today.html' 'JSON.stringify({ open: !document.getElementById("ask-pick").hidden, expanded: document.getElementById("ask-q").getAttribute("aria-expanded"), items: [...document.querySelectorAll("#ask-pick li[role=option]:not([aria-disabled])")].map(li => li.textContent) })'
+    if ($pk.open -and @($pk.items).Count -ge 1) { break }
+    Start-Sleep -Milliseconds 200
+  }
+  Check ($pk.open -and $pk.expanded -eq 'true' -and (Count-Like $pk.items 'Tarefa*Revisar o contrato*') -eq 1) "@ abre o seletor com a tarefa ($(@($pk.items) -join ' | '))"
+  EvJson 'today.html' 'JSON.stringify((() => { document.getElementById("ask-q").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })); return true; })())' | Out-Null
+  $ch = EvJson 'today.html' 'JSON.stringify({ chips: [...document.querySelectorAll("#ask-att .att-chip")].map(c => c.textContent), q: document.getElementById("ask-q").value, open: !document.getElementById("ask-pick").hidden })'
+  Check (@($ch.chips).Count -eq 1 -and @($ch.chips)[0] -like 'Tarefa*Revisar*' -and $ch.q -eq '' -and -not $ch.open) "Enter vira o chip e tira o @ do texto"
+
+  $nBefore = @(Get-List "http://127.0.0.1:$llmPort/requests").Count
+  Ask 'o que falta nisso?'
+  $s10 = Wait-Assist { param($s) (Last-Turn $s).text -like '*Sobre o anexo*' }
+  $t10 = Last-Turn $s10
+  Check ($t10.text -like '*Revisar o contrato da Marca*' -and @($t10.sources).Count -eq 1 -and @($t10.sources)[0].link) "a resposta cita o anexo, com a fonte clicavel ('$($t10.text)')"
+  Check (@($s10.turns)[-2].text -like 'o que falta nisso?*Revisar o contrato*') "a pergunta mostra o anexo ('$(@($s10.turns)[-2].text)')"
+  $attReq = @(Get-List "http://127.0.0.1:$llmPort/requests" | Select-Object -Skip $nBefore)
+  Check ($attReq.Count -eq 1) "respondeu numa chamada so, sem ferramenta ($($attReq.Count))"
+  Check ($attReq[0].question -like '*Registros que anexei*' -and $attReq[0].question -like '*"notas"*') "o registro vai inteiro na pergunta"
+  Check ($attReq[0].system -like 'Voc* Lia,*' -and $attReq[0].system -like '*Com calor*') "e as instrucoes trazem o nome e o tom"
+  $left = EvJson 'today.html' 'JSON.stringify(document.querySelectorAll("#ask-att .att-chip").length)'
+  Check ($left -eq 0) "depois de perguntar, os chips saem da barra"
+
+  # "Perguntar sobre isto" numa tarefa e o pedido de outra tela (a Biblioteca).
+  Click-Today '[...document.querySelectorAll("#list-planned .acts button")].find(b => (b.getAttribute("aria-label") || "").startsWith("Perguntar ao assistente sobre: Ligar"))' | Out-Null
+  EvJson 'today.html' 'JSON.stringify((() => { window.ISPER_SHELL.open("today", { attach: { kind: "reuniao", id: "999", label: "Reuniao de teste" } }); return true; })())' | Out-Null
+  $c2 = $null
+  for ($i = 0; $i -lt 20; $i++) {
+    $c2 = EvJson 'today.html' 'JSON.stringify([...document.querySelectorAll("#ask-att .att-chip")].map(c => c.textContent))'
+    if (@($c2).Count -ge 2) { break }
+    Start-Sleep -Milliseconds 200
+  }
+  Check ((Count-Like $c2 'Tarefa*Ligar pro Jo*') -eq 1 -and (Count-Like $c2 'Reuni*Reuniao de teste*') -eq 1) "Perguntar sobre isto e o pedido da Biblioteca viram chips ($(@($c2) -join ' | '))"
+  Click-Today 'document.querySelector("#ask-att .att-chip button")' | Out-Null
+  Click-Today 'document.querySelector("#ask-att .att-chip button")' | Out-Null
+  $left = EvJson 'today.html' 'JSON.stringify(document.querySelectorAll("#ask-att .att-chip").length)'
+  Check ($left -eq 0) "o x tira o chip"
+
   $errs = @(Get-JsErrors 'today.html') + @(Get-JsErrors 'settings.html')
   Check (@($errs | Where-Object { $_ }).Count -eq 0) "Hoje e Configuracoes sem erros de JS$(Format-JsErrors $errs)"
 } finally {
   Invoke-Isper 'assistant_set_permission' "{ name: 'criar_tarefa', permission: null }" | Out-Null
+  Invoke-Isper 'assistant_set_persona' "{ name: null, tone: 'direct', length: 'normal' }" | Out-Null
   Invoke-Isper 'opttime_clear_token' | Out-Null
   Invoke-Isper 'opttime_set_url' "{ url: null }" | Out-Null
   if ($llmToml) { Remove-Item $llmToml -ErrorAction SilentlyContinue }

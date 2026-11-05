@@ -166,6 +166,16 @@ pub struct AppConfig {
     /// livre, escrever pergunta); o que apaga nunca fica liberado.
     #[serde(default)]
     pub agent_permissions: std::collections::BTreeMap<String, String>,
+    /// O nome do assistente (Configurações → Assistente). `None` = "o
+    /// assistente". Vai para o prompt: uma linha, até 40 caracteres.
+    #[serde(default)]
+    pub assistant_name: Option<String>,
+    /// O tom do assistente: `direct` · `warm` · `formal`. Muda só o estilo.
+    #[serde(default = "default_assistant_tone")]
+    pub assistant_tone: String,
+    /// O tamanho das respostas: `short` · `normal` · `detailed`.
+    #[serde(default = "default_assistant_length")]
+    pub assistant_length: String,
     /// Aviso de preparo 10 minutos antes das reuniões da agenda (Fase 10.3).
     #[serde(default = "default_true")]
     pub meeting_prep: bool,
@@ -232,11 +242,22 @@ impl Default for AppConfig {
             sidebar_collapsed: false,
             opttime_url: None,
             agent_permissions: Default::default(),
+            assistant_name: None,
+            assistant_tone: default_assistant_tone(),
+            assistant_length: default_assistant_length(),
             meeting_prep: true,
             meeting_inbox: true,
             config_version: CONFIG_VERSION,
         }
     }
+}
+
+fn default_assistant_tone() -> String {
+    "direct".into()
+}
+
+fn default_assistant_length() -> String {
+    "normal".into()
 }
 
 fn default_theme() -> String {
@@ -373,6 +394,21 @@ impl AppConfig {
         clean(&mut self.opttime_url);
         self.agent_permissions
             .retain(|_, v| matches!(v.as_str(), "allow" | "ask" | "never"));
+        self.assistant_name = self
+            .assistant_name
+            .take()
+            .map(|n| n.chars().filter(|c| !c.is_control()).take(40).collect());
+        clean(&mut self.assistant_name);
+        pick(
+            &mut self.assistant_tone,
+            &["direct", "warm", "formal"],
+            "direct",
+        );
+        pick(
+            &mut self.assistant_length,
+            &["short", "normal", "detailed"],
+            "normal",
+        );
         lowered_or(&mut self.lang, default_lang());
         lowered_or(&mut self.meeting_source, default_source());
         let mut dictionary: Vec<String> = Vec::with_capacity(self.dictionary.len());
@@ -620,10 +656,24 @@ mod tests {
             call_detect: "AUTO".into(),
             insights_interval_min: 42,
             copilot_filter: " JEV ".into(),
+            assistant_name: Some(
+                " Lia
+ do ISPer, um nome bem comprido demais para caber "
+                    .into(),
+            ),
+            assistant_tone: " WARM ".into(),
+            assistant_length: "enorme".into(),
             ..AppConfig::default()
         };
         cfg.normalize();
         assert_eq!(cfg.copilot_filter, "jev");
+        assert_eq!(
+            cfg.assistant_name.as_deref(),
+            Some("Lia do ISPer, um nome bem comprido dema"),
+            "uma linha, até 40 caracteres"
+        );
+        assert_eq!(cfg.assistant_tone, "warm");
+        assert_eq!(cfg.assistant_length, "normal");
         assert_eq!(cfg.shortcut, None);
         assert_eq!(cfg.lang, "pt-br");
         assert_eq!(

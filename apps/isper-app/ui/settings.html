@@ -92,6 +92,8 @@
   .perm-name code { font-size: 10.5px; color: var(--muted); }
   .perm .mnote { grid-column: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .perm .seg { grid-row: 1 / span 2; grid-column: 2; }
+  .perm .pname { width: 220px; padding: 6px 10px; }
+  #persona .perm .seg { grid-row: auto; }
   .seg { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--panel-2); }
   .seg button {
     font: inherit; font-size: 11.5px; font-weight: 500; padding: 3px 11px; border: none; border-radius: var(--r-pill);
@@ -479,6 +481,30 @@
 
 <section class="card reveal" id="assistente" data-i="5" aria-labelledby="h-assistente">
   <h2 id="h-assistente" data-i18n="settings.assistente.titulo">Assistente</h2>
+  <p class="hint mt0" data-i18n="settings.assistente.persona-lead">Como ele se apresenta e fala na tela Hoje. Muda só o estilo: o que ele pode fazer continua nas permissões abaixo.</p>
+  <div class="perm-list" id="persona">
+    <div class="perm">
+      <label class="perm-name" for="pname" data-i18n="settings.assistente.name">Nome</label>
+      <input class="field pname" id="pname" maxlength="40" autocomplete="off" spellcheck="false" placeholder="Assistente" data-i18n-attr="placeholder:settings.assistente.name-placeholder">
+    </div>
+    <div class="perm">
+      <span class="perm-name" id="ptone-l" data-i18n="settings.assistente.tone">Tom</span>
+      <div class="seg" id="ptone" role="radiogroup" aria-labelledby="ptone-l">
+        <button type="button" role="radio" aria-checked="false" data-v="direct" data-i18n="settings.assistente.tone.direct">Direto</button>
+        <button type="button" role="radio" aria-checked="false" data-v="warm" data-i18n="settings.assistente.tone.warm">Caloroso</button>
+        <button type="button" role="radio" aria-checked="false" data-v="formal" data-i18n="settings.assistente.tone.formal">Formal</button>
+      </div>
+    </div>
+    <div class="perm">
+      <span class="perm-name" id="plength-l" data-i18n="settings.assistente.length">Respostas</span>
+      <div class="seg" id="plength" role="radiogroup" aria-labelledby="plength-l">
+        <button type="button" role="radio" aria-checked="false" data-v="short" data-i18n="settings.assistente.length.short">Curtas</button>
+        <button type="button" role="radio" aria-checked="false" data-v="normal" data-i18n="settings.assistente.length.normal">Normais</button>
+        <button type="button" role="radio" aria-checked="false" data-v="detailed" data-i18n="settings.assistente.length.detailed">Detalhadas</button>
+      </div>
+    </div>
+  </div>
+  <h3 data-i18n="settings.assistente.perms">Permissões</h3>
   <p class="hint mt0" data-i18n="settings.assistente.lead">O que o assistente da tela Hoje pode fazer sem perguntar. Ler é livre; criar, mover, concluir e lançar horas pedem o seu toque num cartão. O que apaga nunca fica livre. As ferramentas rodam no seu PC: a IA só vê o que elas devolvem para a pergunta.</p>
   <h3 data-i18n="settings.assistente.isper">No ISPer</h3>
   <div class="perm-list" id="agisper"></div>
@@ -1327,6 +1353,36 @@
       : v.opttime_error ? t('settings.assistente.ot-error', { e: connErr(v.opttime_error) })
       : t('settings.assistente.ot-empty');
   }
+  // ---- assistente: o nome, o tom e o tamanho das respostas (valem na hora)
+  let persona = null;
+  function paintPersona() {
+    if (!persona) return;
+    if (document.activeElement !== $('pname')) $('pname').value = persona.name || '';
+    for (const [box, v] of [['ptone', persona.tone], ['plength', persona.length]]) {
+      for (const b of $(box).children) b.setAttribute('aria-checked', String(b.dataset.v === v));
+    }
+  }
+  async function savePersona(patch) {
+    // Já junta aqui: um clique logo depois do nome não manda o nome antigo.
+    persona = { ...persona, ...patch };
+    try {
+      persona = await invoke('assistant_set_persona', persona);
+      status(t('settings.assistente.msg.persona'), 'ok');
+    } catch (e) { status(t('common.error', { e }), 'err'); }
+    paintPersona();
+  }
+  for (const [box, key] of [['ptone', 'tone'], ['plength', 'length']]) {
+    $(box).addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-v]');
+      if (b && persona && b.dataset.v !== persona[key]) savePersona({ [key]: b.dataset.v });
+    });
+  }
+  $('pname').addEventListener('change', () => {
+    const name = $('pname').value.trim() || null;
+    if (persona && name !== (persona.name || null)) savePersona({ name });
+  });
+  invoke('assistant_persona').then((p) => { persona = p; paintPersona(); }).catch(() => {});
+
   listen('isper-connector', () => loadAgentTools());
   document.addEventListener('isper-i18n', () => loadAgentTools());
   loadAgentTools();

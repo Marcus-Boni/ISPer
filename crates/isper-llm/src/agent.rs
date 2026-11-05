@@ -241,7 +241,9 @@ impl Conversation {
         self.messages.push(ChatMessage::Tools { results });
     }
 
-    fn add_sources(&mut self, sources: Vec<Source>) {
+    /// Junta fontes que a resposta pode citar, sem repetir: as que as
+    /// ferramentas trazem e as dos registros anexados à pergunta.
+    pub fn add_sources(&mut self, sources: Vec<Source>) {
         for s in sources {
             if !self.sources.iter().any(|k| k.reference == s.reference) {
                 self.sources.push(s);

@@ -11,7 +11,9 @@
 // - "cria" → criar_tarefa ("Ligar pro João", hoje às 15:00);
 // - "horas" / "Feche o meu dia" → opt_time_get_today_summary;
 // - com os resultados na mão, responde em tópicos citando cada [[ref]] que
-//   veio deles; recusa vira "Tudo bem, não fiz.".
+//   veio deles; recusa vira "Tudo bem, não fiz.";
+// - pergunta com "Registros que anexei" → "Sobre o anexo:", citando os
+//   registros que vieram nela, sem chamar ferramenta.
 //
 // Ferramenta pedida que não veio na lista (bloqueada nas permissões) vira a
 // resposta "Essa ferramenta está bloqueada.". GET /requests devolve o resumo
@@ -73,6 +75,14 @@ function reply(body) {
   });
 
   if (!results.length) {
+    // Registros anexados à pergunta já vêm lidos: responde citando-os, sem
+    // ferramenta.
+    const anexos = question.includes('Registros que anexei')
+      ? question.split('\n').filter((l) => l.startsWith('- {')).flatMap((l) => {
+        try { return refsIn(JSON.parse(l.slice(2))); } catch { return []; }
+      })
+      : [];
+    if (anexos.length) return { content: ['Sobre o anexo:', ...anexos.map((f) => `- **${f.title}** [[${f.ref}]]`)].join('\n') };
     const wanted = plan(question);
     if (!wanted.length) return { content: 'Não sei responder isso no teste.' };
     const calls = wanted.filter(([name]) => offered.includes(name));

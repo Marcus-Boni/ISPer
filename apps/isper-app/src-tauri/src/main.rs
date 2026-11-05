@@ -297,6 +297,8 @@ fn main() {
             assistant::assistant_reset,
             assistant::assistant_tools,
             assistant::assistant_set_permission,
+            assistant::assistant_persona,
+            assistant::assistant_set_persona,
             open_meeting_at,
             today::today_load,
             today::today_badge,
