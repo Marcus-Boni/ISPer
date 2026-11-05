@@ -81,7 +81,7 @@ export function RecommendedDownload({ assets, version, wideCuda }: { assets: Rel
         </div>
       </div>
       <div className="recommend-action">
-        <a className="button button-primary button-large recommend-button" href={main.downloadUrl}>
+        <a className="button button-primary button-large recommend-button" href={main.downloadUrl} data-download={main.name}>
           <Download aria-hidden="true" />
           Baixar o ISPer {version}
           <span className="button-tag">{formatBytes(main.sizeBytes)}</span>
@@ -89,7 +89,7 @@ export function RecommendedDownload({ assets, version, wideCuda }: { assets: Rel
         {/* Numa NVIDIA mais antiga, a outra versão é justamente a que fecharia:
             ela continua na comparação, com o aviso, mas não ao lado do botão. */}
         {other && detected?.reason !== "nvidia-older" ? (
-          <a className="text-link recommend-other" href={other.downloadUrl}>
+          <a className="text-link recommend-other" href={other.downloadUrl} data-download={other.name}>
             ou baixar a versão {variantProfile[other.variant].short} ({formatBytes(other.sizeBytes)})
           </a>
         ) : null}
