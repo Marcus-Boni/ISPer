@@ -152,6 +152,10 @@ fn project_names(store: &AssistStore) -> Result<HashMap<String, String>, String>
 /// O projeto pedido em `projeto` (parte do nome ou de um apelido, sem
 /// acento): o id, ou um erro que diz quais existem.
 fn project_arg(store: &AssistStore, args: &Value) -> Result<Option<String>, String> {
+    // O anexo de projeto já sabe o id (não está no esquema do modelo).
+    if let Some(id) = text_arg(args, "projeto_id") {
+        return Ok(Some(id.to_string()));
+    }
     let Some(wanted) = text_arg(args, "projeto").map(fold) else {
         return Ok(None);
     };
@@ -344,6 +348,84 @@ impl LocalTools {
             other => Err(format!("ferramenta desconhecida: {other}")),
         };
         result.unwrap_or_else(ToolOutcome::error)
+    }
+
+    /// Um registro anexado à pergunta ("@" na tela Hoje ou "Perguntar sobre
+    /// isto"), com tudo que as ferramentas de leitura dariam dele.
+    pub(crate) fn attachment(&self, kind: &str, id: &str) -> ToolOutcome {
+        let result = match kind {
+            "tarefa" => self.task(id),
+            "reuniao" => self.meeting(&json!({ "id": id })),
+            "projeto" => self.project(id),
+            other => Err(format!("anexo desconhecido: {other}")),
+        };
+        result.unwrap_or_else(ToolOutcome::error)
+    }
+
+    /// Uma tarefa inteira: as notas, a prioridade, o projeto e a reunião de
+    /// onde ela saiu.
+    fn task(&self, id: &str) -> Result<ToolOutcome, String> {
+        let store = self.assist()?;
+        let t = store.task(id).map_err(|e| e.to_string())?;
+        let mut sources = vec![task_source(&t)];
+        let mut v = task_json(&t, store.clock().today());
+        v["notas"] = json!(t.notes);
+        v["prioridade"] = json!(t.priority);
+        v["area"] = json!(t.area);
+        if let Some(name) = t
+            .project_id
+            .as_ref()
+            .and_then(|id| project_names(&store).ok()?.remove(id))
+        {
+            v["projeto"] = json!(name);
+        }
+        let from = t.source_ref.as_ref();
+        if let Some(meeting) = from
+            .and_then(|r| r.get("meeting_id"))
+            .and_then(Value::as_i64)
+        {
+            let at = from
+                .and_then(|r| r.get("at_secs"))
+                .and_then(Value::as_f64)
+                .map(|s| s as f32);
+            let title = from
+                .and_then(|r| r.get("meeting_title"))
+                .and_then(Value::as_str)
+                .unwrap_or("Reunião");
+            let reference = meeting_ref(meeting, at);
+            sources.push(Source {
+                reference: reference.clone(),
+                kind: "reuniao".into(),
+                label: match at {
+                    Some(s) => format!("{title} · {}", clock(s)),
+                    None => title.to_string(),
+                },
+            });
+            v["da_reuniao"] = json!({"ref": reference, "id": meeting, "titulo": title});
+        }
+        Self::ok(v, sources)
+    }
+
+    /// Um projeto: as tarefas dele (como em `tarefas_do_dia`) e as reuniões
+    /// dos últimos 90 dias. Pelo id, não pelo nome: "Portal" não pode virar
+    /// "Portal do Cliente".
+    fn project(&self, id: &str) -> Result<ToolOutcome, String> {
+        let store = self.assist()?;
+        let p = store.project(id).map_err(|e| e.to_string())?;
+        let since = store.clock().today() - chrono::Duration::days(90);
+        let args = json!({"dia": null, "projeto_id": p.id, "de": since.to_string()});
+        let tasks = self.tasks(&args)?;
+        let meetings = self.list_meetings(&args)?;
+        let parse = |s: &str| serde_json::from_str::<Value>(s).unwrap_or(Value::Null);
+        let value = json!({
+            "projeto": p.name,
+            "apelidos": p.aliases,
+            "tarefas": parse(&tasks.content),
+            "reunioes_90_dias": parse(&meetings.content),
+        });
+        let mut sources = tasks.sources;
+        sources.extend(meetings.sources);
+        Self::ok(value, sources)
     }
 
     fn ok(value: Value, sources: Vec<Source>) -> Result<ToolOutcome, String> {

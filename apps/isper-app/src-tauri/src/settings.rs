@@ -466,10 +466,13 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         // O tema muda na hora por `set_ui_theme`, não pelo Salvar.
         theme: previous.theme.clone(),
         ui_lang: previous.ui_lang.clone(),
-        // O endereço do OptTime e as permissões do assistente mudam na hora,
+        // O endereço do OptTime, as permissões e a persona do assistente mudam na hora,
         // pelas telas deles.
         opttime_url: previous.opttime_url.clone(),
         agent_permissions: previous.agent_permissions.clone(),
+        assistant_name: previous.assistant_name.clone(),
+        assistant_tone: previous.assistant_tone.clone(),
+        assistant_length: previous.assistant_length.clone(),
         // A janela principal guarda o próprio tamanho e a barra lateral.
         main_window: previous.main_window,
         sidebar_collapsed: previous.sidebar_collapsed,

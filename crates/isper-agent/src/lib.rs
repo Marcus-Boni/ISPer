@@ -21,7 +21,7 @@ use std::path::Path;
 
 use chrono::{DateTime, Datelike, Local, Weekday};
 use isper_llm::ToolSpec;
-use isper_llm::agent::{Permission, ToolHost, ToolOutcome};
+use isper_llm::agent::{Permission, Source, ToolHost, ToolOutcome};
 use local::LocalTools;
 use serde_json::Value;
 
@@ -80,6 +80,36 @@ impl IsperHost {
     /// O conector do OptTime em uso, se houver.
     pub fn opttime(&self) -> Option<&OptTimeTools> {
         self.opttime.as_ref()
+    }
+
+    /// A pergunta com os registros que a pessoa anexou (`(tipo, id)`, com
+    /// tipo `tarefa`, `reuniao` ou `projeto`), lidos agora do banco no mesmo
+    /// formato das ferramentas, e as fontes deles para a resposta citar. Um
+    /// registro que não dá para ler vira uma linha dizendo isso, sem derrubar
+    /// a pergunta.
+    pub fn attach(&self, question: &str, items: &[(String, String)]) -> (String, Vec<Source>) {
+        let mut text = question.trim().to_string();
+        let mut sources = Vec::new();
+        if items.is_empty() {
+            return (text, sources);
+        }
+        text.push_str(
+            "\n\nRegistros que anexei (lidos agora do ISPer; cite pelas referências \"ref\"):",
+        );
+        for (kind, id) in items {
+            let out = self.local.attachment(kind, id);
+            if out.is_error {
+                text.push_str(&format!(
+                    "\n- {kind}:{id} — não deu para ler: {}",
+                    out.content
+                ));
+            } else {
+                text.push_str("\n- ");
+                text.push_str(&out.content);
+                sources.extend(out.sources);
+            }
+        }
+        (text, sources)
     }
 }
 
@@ -147,15 +177,59 @@ fn weekday_pt(w: Weekday) -> &'static str {
     }
 }
 
+/// Como o assistente se apresenta e fala (Configurações → Assistente). Muda
+/// só o estilo: as regras do prompt valem do mesmo jeito para qualquer
+/// persona. Valor fora da lista vale o padrão.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Persona {
+    /// O nome que ele usa; `None` é só "o assistente".
+    pub name: Option<String>,
+    /// `direct` (padrão) · `warm` · `formal`.
+    pub tone: String,
+    /// `short` · `normal` (padrão) · `detailed`.
+    pub length: String,
+}
+
+impl Persona {
+    fn style(&self) -> String {
+        let tone = match self.tone.as_str() {
+            "warm" => {
+                "Com calor e leveza, como um colega próximo: pode reconhecer o esforço e encorajar, sem exagero e sem emoji."
+            }
+            "formal" => {
+                "Com cordialidade e formalidade, como um assistente executivo: frases completas, sem gíria."
+            }
+            _ => "Direto, como um colega que sabe da agenda: sem rodeio nem elogio.",
+        };
+        let length = match self.length.as_str() {
+            "short" => "O mínimo que resolve: sem introdução nem fecho, uma linha quando der.",
+            "detailed" => "Pode detalhar: dê o contexto e o porquê que ajudarem, em tópicos.",
+            _ => "Curto: tópicos quando houver lista.",
+        };
+        format!("{tone} {length}")
+    }
+}
+
 /// As instruções do agente: quem é a pessoa, que horas são, o que ele sabe
-/// dela (a memória, que ela vê e edita) e como citar.
+/// dela (a memória, que ela vê e edita), como citar e o jeito de falar
+/// ([`Persona`]).
 pub fn system_prompt(
     me: Option<&str>,
     now: DateTime<Local>,
     with_opttime: bool,
     memories: &[String],
+    persona: &Persona,
 ) -> String {
     let who = me.map(|n| format!(" de {n}")).unwrap_or_default();
+    let intro = match persona.name.as_deref() {
+        Some(name) => format!(
+            "Você é {name}, o assistente pessoal{who} no ISPer, o app de ditado e reuniões dele. Se perguntarem o seu nome, é {name}."
+        ),
+        None => {
+            format!("Você é o assistente pessoal{who} no ISPer, o app de ditado e reuniões dele.")
+        }
+    };
+    let style = persona.style();
     let memory = if memories.is_empty() {
         String::new()
     } else {
@@ -171,10 +245,12 @@ pub fn system_prompt(
         "\n- O OptTime não está conectado: sem agenda do Outlook nem horas. Se a pergunta depender disso, diga."
     };
     format!(
-        "Você é o assistente pessoal{who} no ISPer, o app de ditado e reuniões dele. Hoje é {weekday}, {date} ({iso}), {time}.
+        "{intro} Hoje é {weekday}, {date} ({iso}), {time}.
 
 Como responder:
-- Em português, curto e direto, como um colega que sabe da agenda. Tópicos quando houver lista.
+- Em português. {style}
+- O jeito de falar é só estilo: as regras abaixo valem sempre, do mesmo jeito.
+- Quando a pessoa anexa registros à pergunta, eles já vêm lidos do ISPer: responda com eles e cite pelas referências deles; busque mais só se faltar.
 - Use as ferramentas para buscar os fatos antes de responder. Não invente tarefa, reunião, horário nem número.
 - Se faltar detalhe, chame a ferramenta de novo (por exemplo `reuniao` com `busca`) em vez de pedir para a pessoa abrir ou procurar algo.
 - Cite a origem de cada fato com a referência que vem nos resultados, entre colchetes duplos, logo depois do fato: [[tarefa:…]], [[reuniao:42@754]], [[opttime:…]]. Só cite referências que vieram das ferramentas.
@@ -332,7 +408,7 @@ mod tests {
             call("r1", "rotinas", json!({})),
             says("Nenhuma sugerida."),
         ]);
-        let system = system_prompt(None, Local::now(), false, &[]);
+        let system = system_prompt(None, Local::now(), false, &[], &Persona::default());
         let mut conv = Conversation::new("lembra que meu gestor é o Carlos");
         let Step::Confirm { actions } = advance(&fake, &host, &system, &mut conv).unwrap() else {
             panic!("guardar pede o toque");
@@ -385,7 +461,13 @@ mod tests {
             ),
             says("Criei a tarefa."),
         ]);
-        let system = system_prompt(Some("Marcus"), Local::now(), false, &[]);
+        let system = system_prompt(
+            Some("Marcus"),
+            Local::now(),
+            false,
+            &[],
+            &Persona::default(),
+        );
         let mut conv = Conversation::new("o que eu tenho hoje?");
         let Step::Answer { sources, .. } = advance(&fake, &host, &system, &mut conv).unwrap()
         else {
@@ -424,13 +506,128 @@ mod tests {
     #[test]
     fn instrucoes_trazem_o_dia_e_o_jeito_de_citar() {
         let now = Local::now();
-        let s = system_prompt(Some("Marcus"), now, true, &[]);
+        let s = system_prompt(Some("Marcus"), now, true, &[], &Persona::default());
         assert!(s.contains(&now.format("%Y-%m-%d").to_string()));
         assert!(s.contains("[[reuniao:42@754]]"));
         assert!(s.contains("opt_time_"));
         assert!(!s.contains("O que você sabe da pessoa"));
-        assert!(system_prompt(None, now, false, &[]).contains("não está conectado"));
-        let s = system_prompt(None, now, false, &["Meu gestor é o Carlos".into()]);
+        assert!(
+            system_prompt(None, now, false, &[], &Persona::default())
+                .contains("não está conectado")
+        );
+        let s = system_prompt(
+            None,
+            now,
+            false,
+            &["Meu gestor é o Carlos".into()],
+            &Persona::default(),
+        );
         assert!(s.ends_with("- Meu gestor é o Carlos"));
+    }
+
+    #[test]
+    fn persona_muda_o_nome_e_o_jeito_sem_mexer_nas_regras() {
+        let now = Local::now();
+        let base = system_prompt(None, now, false, &[], &Persona::default());
+        assert!(base.starts_with("Você é o assistente pessoal"));
+        assert!(base.contains("Direto,"));
+        let lia = Persona {
+            name: Some("Lia".into()),
+            tone: "warm".into(),
+            length: "short".into(),
+        };
+        let s = system_prompt(None, now, false, &[], &lia);
+        assert!(s.starts_with("Você é Lia, o assistente pessoal"));
+        assert!(s.contains("seu nome, é Lia"));
+        assert!(s.contains("Com calor") && s.contains("O mínimo que resolve"));
+        assert!(!s.contains("Direto,"));
+        let rules = |x: &str| x[x.find("- O jeito de falar").unwrap()..].to_string();
+        assert_eq!(rules(&base), rules(&s), "as regras são as mesmas");
+        let odd = Persona {
+            tone: "pirata".into(),
+            length: "enorme".into(),
+            ..Persona::default()
+        };
+        assert_eq!(
+            system_prompt(None, now, false, &[], &odd),
+            base,
+            "valor fora da lista vale o padrão"
+        );
+    }
+
+    #[test]
+    fn anexos_vao_lidos_na_pergunta_e_a_resposta_cita_sem_buscar() {
+        use isper_assist::NewProject;
+        let path = db();
+        let store = AssistStore::open(&path).unwrap();
+        let project = |name: &str| {
+            store
+                .create_project(
+                    NewProject {
+                        name: name.into(),
+                        ..NewProject::default()
+                    },
+                    Actor::User,
+                )
+                .unwrap()
+        };
+        let portal = project("Portal");
+        let cliente = project("Portal do Cliente");
+        let task = |title: &str, notes: &str, project: &str| {
+            store
+                .create_task(
+                    NewTask {
+                        notes: notes.into(),
+                        project_id: Some(project.to_string()),
+                        ..NewTask::titled(title)
+                    },
+                    Actor::User,
+                )
+                .unwrap()
+        };
+        let t = task("Revisar o contrato", "Ver a cláusula 4", &portal.id);
+        task("Deploy do cliente", "", &cliente.id);
+        let host = IsperHost::new(&path, None, HashMap::new());
+        let (text, sources) = host.attach(
+            " o que falta aqui? ",
+            &[
+                ("tarefa".into(), t.id.clone()),
+                ("projeto".into(), portal.id.clone()),
+                ("reuniao".into(), "999".into()),
+            ],
+        );
+        assert!(text.starts_with("o que falta aqui?\n\nRegistros que anexei"));
+        assert!(
+            text.contains("Ver a cláusula 4"),
+            "a tarefa vai inteira, com as notas"
+        );
+        assert!(text.contains("\"projeto\":\"Portal\""));
+        assert!(
+            !text.contains("Deploy do cliente"),
+            "o projeto vai pelo id, não pelo nome parecido"
+        );
+        assert!(
+            text.contains("reuniao:999 — não deu para ler"),
+            "o que não dá para ler vira uma linha, sem derrubar a pergunta"
+        );
+        assert_eq!(host.attach("só isso", &[]), ("só isso".into(), Vec::new()));
+
+        let fake = FakeChat::new(vec![says(&format!(
+            "Falta a cláusula 4 [[tarefa:{}]].",
+            t.id
+        ))]);
+        let system = system_prompt(None, Local::now(), false, &[], &Persona::default());
+        let mut conv = Conversation::new(&text);
+        conv.add_sources(sources);
+        let Step::Answer { sources, .. } = advance(&fake, &host, &system, &mut conv).unwrap()
+        else {
+            panic!("esperava resposta");
+        };
+        assert_eq!(
+            sources.len(),
+            1,
+            "a citação do anexo vira fonte sem ferramenta"
+        );
+        assert_eq!(sources[0].label, "Revisar o contrato");
     }
 }

@@ -53,6 +53,8 @@ pub(crate) struct TodayView {
     suggestions: Vec<RoutineSuggestion>,
     /// As listas "Quando der tempo", com os itens sem dia (Fase 11.0).
     lists: Vec<ListWithItems>,
+    /// Os projetos ativos, para anexar um à pergunta do assistente.
+    projects: Vec<isper_assist::Project>,
     opttime: bool,
 }
 
@@ -82,6 +84,7 @@ pub(crate) fn today_load(app: AppHandle) -> Result<TodayView, String> {
                 Vec::new()
             }),
             lists: store.lists_with_items()?,
+            projects: store.projects(false)?,
             opttime: crate::connectors::token_present(),
         })
     })()

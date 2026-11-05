@@ -190,8 +190,37 @@
   .assist { display: grid; gap: 8px; }
   .assist .sec-head { align-items: center; margin: 0; flex-wrap: wrap; }
   .assist-quick { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
-  .ask { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .ask { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; }
   .ask .field { padding: 9px 12px; }
+  .ask-in { position: relative; min-width: 0; }
+  .ask-in .field { width: 100%; }
+  #ask-at { width: 36px; font: 600 14px var(--font-mono); }
+  /* Registros anexados à pergunta (@ ou "Perguntar sobre isto"). */
+  .att { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+  .att:empty { display: none; }
+  .att-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 2px 3px 2px 9px; animation: none; }
+  .att-chip .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+  .att-chip button {
+    display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: none; border-radius: 9px;
+    background: none; color: var(--muted); cursor: pointer; transition: color var(--dur-1) ease, background-color var(--dur-1) ease;
+  }
+  .att-chip button:hover { color: var(--ink); background: var(--panel-2); }
+  .att-chip button:active { transform: scale(.94); }
+  .att-chip svg { width: 10px; height: 10px; }
+  .att .k, .pick-list .k, .att-mini .k { font: 600 9.5px var(--font-mono); text-transform: uppercase; letter-spacing: .05em; color: var(--accent); }
+  /* O seletor do @: abre pelo teclado, então aparece sem animação. */
+  .pick-list {
+    position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-sm); box-shadow: var(--shadow-2);
+    max-height: 288px; overflow: auto;
+  }
+  .pick-list li { display: grid; grid-template-columns: 62px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .pick-list li[aria-selected="true"] { background: var(--accent-soft); }
+  .pick-list .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pick-list .h { font-size: 11px; color: var(--muted); }
+  .pick-list li[aria-disabled="true"] { grid-template-columns: 1fr; color: var(--muted); cursor: default; }
+  .att-mini { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; margin-top: 5px; }
+  .att-mini .chip { animation: none; font-size: 11px; gap: 5px; }
   .thread { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
   .thread:empty { display: none; }
   .turn-q {
@@ -275,7 +304,7 @@
 
     <section id="sec-assist" class="assist" aria-labelledby="h-assist">
       <div class="sec-head">
-        <h2 class="eyebrow" id="h-assist" data-i18n="today.sec.assist">Assistente</h2>
+        <h2 class="eyebrow" id="h-assist">Assistente</h2>
         <div class="assist-quick">
           <button class="btn btn-ghost btn-sm" type="button" id="assist-morning" data-i18n="today.assist.morning">Resumo da manhã</button>
           <button class="btn btn-ghost btn-sm" type="button" id="assist-closing" data-i18n="today.assist.closing">Fechar o dia</button>
@@ -283,8 +312,13 @@
         </div>
       </div>
       <form class="ask" id="ask" autocomplete="off">
-        <label class="sr-only" for="ask-q" data-i18n="today.assist.label">Pergunta ao assistente</label>
-        <input class="field" id="ask-q" maxlength="2000" placeholder="Pergunte sobre o seu dia… (ex.: o que a Ana me pediu na daily?)" data-i18n-attr="placeholder:today.assist.placeholder">
+        <ul class="att" id="ask-att" aria-label="Anexados à pergunta" data-i18n-attr="aria-label:today.assist.attached"></ul>
+        <div class="ask-in">
+          <label class="sr-only" for="ask-q" data-i18n="today.assist.label">Pergunta ao assistente</label>
+          <input class="field" id="ask-q" maxlength="2000" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ask-pick" placeholder="Pergunte sobre o seu dia… (ex.: o que a Ana me pediu na daily?)" data-i18n-attr="placeholder:today.assist.placeholder">
+          <ul class="pick-list" id="ask-pick" role="listbox" hidden aria-label="Anexar à pergunta" data-i18n-attr="aria-label:today.assist.att-pick"></ul>
+        </div>
+        <button class="btn btn-ghost" type="button" id="ask-at" title="Anexar uma tarefa, reunião ou projeto (@)" aria-label="Anexar uma tarefa, reunião ou projeto" data-i18n-attr="title:today.assist.att-button-title, aria-label:today.assist.att-button">@</button>
         <button class="btn" type="submit" id="ask-go" data-i18n="today.assist.ask">Perguntar</button>
       </form>
       <p class="sec-hint m0" id="assist-hint" data-i18n="today.assist.hint">Responde com o que está no ISPer e no OptTime, dizendo de onde veio. Antes de criar, mover ou lançar algo, pede o seu toque.</p>
@@ -459,6 +493,7 @@
   const I_CHECK = 'M3.5 8.4 6.6 11.4 12.5 4.8';
   const I_DROP = 'M4 4l8 8M12 4l-8 8';
   const I_EDIT = 'M10.5 2.8l2.7 2.7L6 12.7H3.3V10z';
+  const I_ASK = 'M2.8 3.3h10.4v7H7.4l-3 2.4v-2.4H2.8z';
 
   // ------------------------------------------------------------ desfazer
   // Toda mudança volta com o id dela no diário; o aviso oferece desfazer, e o
@@ -649,6 +684,8 @@
       acts.appendChild(actButton(t('today.act.to-list'), t('today.act.to-list-aria', { t: task.title, l: listName(task.list_id) }),
         () => plan(task, null, t('today.toast.to-list'))));
     }
+    acts.appendChild(iconButton(I_ASK, t('today.act.ask-aria', { t: task.title }),
+      () => askAbout({ kind: 'tarefa', id: task.id, label: task.title })));
     if (!done) {
       acts.appendChild(iconButton(I_EDIT, t('today.act.edit-aria', { t: task.title }), () => startEdit(task, title)));
       acts.appendChild(iconButton(I_DROP, t('today.act.drop-aria', { t: task.title }),
@@ -1706,7 +1743,7 @@
   let openCard = null;
 
   function paintAsk() {
-    for (const id of ['ask-q', 'ask-go', 'assist-morning', 'assist-closing']) $(id).disabled = asking;
+    for (const id of ['ask-q', 'ask-go', 'ask-at', 'assist-morning', 'assist-closing']) $(id).disabled = asking;
     $('assist-new').hidden = asking || !$('thread').children.length;
     $('assist-hint').hidden = !!$('thread').children.length;
   }
@@ -1900,24 +1937,26 @@
     if (acts.children.length) li.appendChild(acts);
   }
 
-  // `brief` pede o resumo da manhã ou o fechamento (sempre numa conversa nova).
-  async function ask(question, brief) {
+  // `brief` pede o resumo da manhã ou o fechamento (sempre numa conversa nova);
+  // `att`, os registros anexados à pergunta.
+  async function ask(question, brief, att = []) {
     if (asking) return;
     if (openCard) openCard(t('today.assist.ignored'));
     const fresh = !!brief || convId == null;
     if (brief) { $('thread').replaceChildren(); convId = null; }
     asking = true;
     const label = brief === 'morning' ? t('today.assist.morning') : brief === 'closing' ? t('today.assist.closing') : question;
-    const q = addTurn(el('li', 'turn-q', label));
+    const q = addTurn(questionTurn(label, att));
     const li = waitTurn();
     try {
+      const attachments = att.map(({ kind, id }) => ({ kind, id }));
       const reply = brief
         ? await invoke('assistant_brief', { kind: brief })
-        : await invoke('assistant_ask', { question, fresh });
+        : await invoke('assistant_ask', { question, fresh, attachments });
       convId = reply.id;
       showReply(li, reply);
     } catch (e) {
-      errorTurn(li, e, () => { q.remove(); li.remove(); ask(question, brief); });
+      errorTurn(li, e, () => { q.remove(); li.remove(); ask(question, brief, att); });
     }
     asking = false;
     paintAsk();
@@ -1927,10 +1966,193 @@
   $('ask').addEventListener('submit', (ev) => {
     ev.preventDefault();
     const q = $('ask-q').value.trim();
-    if (!q) return;
+    if (!q) {
+      if (attached.length) { toast(t('today.assist.att-need-q'), 'info'); $('ask-q').focus(); }
+      return;
+    }
     $('ask-q').value = '';
-    ask(q, null);
+    const att = attached;
+    attached = [];
+    paintAtt();
+    ask(q, null, att);
   });
+
+  function questionTurn(text, att) {
+    const li = el('li', 'turn-q', text);
+    if (att.length) {
+      const row = el('span', 'att-mini');
+      for (const a of att) {
+        const c = el('span', 'chip');
+        c.append(el('span', 'k', t(KIND_KEY[a.kind])), document.createTextNode(a.label));
+        row.appendChild(c);
+      }
+      li.appendChild(row);
+    }
+    return li;
+  }
+
+  // ---- anexar registros à pergunta: "@" na barra (ou o botão @) e
+  // "Perguntar sobre isto" numa tarefa ou reunião. O registro vai inteiro,
+  // lido do ISPer na hora; a resposta cita as fontes dele como as das
+  // ferramentas. O seletor abre pelo teclado: sem animação.
+  const MAX_ATT = 6;
+  const KIND_KEY = { tarefa: 'today.assist.kind.tarefa', reuniao: 'today.assist.kind.reuniao', projeto: 'today.assist.kind.projeto' };
+  const foldText = (s) => String(s || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  let attached = [];
+  const pick = { open: false, items: [], active: 0, token: null, seq: 0 };
+
+  function attach(item) {
+    if (attached.some((a) => a.kind === item.kind && a.id === item.id)) return true;
+    if (attached.length >= MAX_ATT) { toast(t('today.assist.att-max', { n: MAX_ATT }), 'info'); return false; }
+    attached.push(item);
+    paintAtt();
+    return true;
+  }
+  function paintAtt() {
+    $('ask-att').replaceChildren(...attached.map((a, i) => {
+      const li = el('li', 'chip att-chip');
+      li.title = a.label;
+      li.append(el('span', 'k', t(KIND_KEY[a.kind])), el('span', 't', a.label));
+      const x = el('button');
+      x.type = 'button';
+      x.setAttribute('aria-label', t('today.assist.att-remove', { t: a.label }));
+      x.appendChild(svg(I_DROP));
+      x.addEventListener('click', () => { attached.splice(i, 1); paintAtt(); $('ask-q').focus(); });
+      li.appendChild(x);
+      return li;
+    }));
+  }
+  function askAbout(item) {
+    if (!attach(item)) return;
+    $('sec-assist').scrollIntoView({ block: 'nearest', behavior: UI.reduce() ? 'auto' : 'smooth' });
+    $('ask-q').focus();
+  }
+
+  // O "@palavra" logo antes do cursor, se houver.
+  function tokenAt() {
+    const i = $('ask-q');
+    const before = i.value.slice(0, i.selectionStart == null ? i.value.length : i.selectionStart);
+    const m = before.match(/(?:^|\s)@([^@\n]{0,40})$/);
+    return m ? { query: m[1], start: before.length - m[1].length - 1 } : null;
+  }
+  // Projetos e tarefas vêm do que a tela já carregou; reuniões, da Biblioteca.
+  async function candidates(query) {
+    const f = foldText(query.trim());
+    const hit = (s) => !f || foldText(s).includes(f);
+    const projects = ((data && data.projects) || [])
+      .filter((p) => hit(p.name) || (p.aliases || []).some(hit))
+      .slice(0, 2).map((p) => ({ kind: 'projeto', id: p.id, label: p.name }));
+    const seen = new Set();
+    const all = data ? [...data.planned, ...data.inbox, ...data.later, ...data.done_today, ...listsOf().flatMap((l) => l.items || [])] : [];
+    const tasks = all.filter((x) => !seen.has(x.id) && seen.add(x.id) && hit(x.title))
+      .slice(0, 4).map((x) => ({ kind: 'tarefa', id: x.id, label: x.title }));
+    let meetings = [];
+    try {
+      const rows = await invoke('list_meetings', { query: query.trim() || null });
+      meetings = rows.slice(0, 4).map((m) => ({ kind: 'reuniao', id: String(m.id), label: m.title, hint: String(m.started_at || '').slice(0, 10) }));
+    } catch (_) {}
+    // O que já virou chip não aparece de novo.
+    return [...projects, ...tasks, ...meetings].filter((c) => !attached.some((a) => a.kind === c.kind && a.id === c.id));
+  }
+  async function openPick() {
+    const tok = tokenAt();
+    if (!tok) { closePick(); return; }
+    const seq = ++pick.seq;
+    const items = await candidates(tok.query);
+    if (seq !== pick.seq) return;
+    pick.token = tok;
+    pick.items = items;
+    pick.active = 0;
+    pick.open = true;
+    const box = $('ask-pick');
+    if (!items.length) {
+      const none = el('li', null, t('today.assist.att-none'));
+      none.setAttribute('role', 'option');
+      none.setAttribute('aria-disabled', 'true');
+      box.replaceChildren(none);
+    } else {
+      box.replaceChildren(...items.map((it, i) => {
+        const li = el('li');
+        li.id = 'ask-pick-' + i;
+        li.setAttribute('role', 'option');
+        li.append(el('span', 'k', t(KIND_KEY[it.kind])), el('span', 't', it.label), el('span', 'h', it.hint || ''));
+        li.addEventListener('mousedown', (e) => e.preventDefault());
+        li.addEventListener('click', () => choose(i));
+        li.addEventListener('mousemove', () => { if (pick.active !== i) { pick.active = i; paintActive(); } });
+        return li;
+      }));
+    }
+    box.hidden = false;
+    $('ask-q').setAttribute('aria-expanded', 'true');
+    paintActive();
+  }
+  function paintActive() {
+    const lis = [...$('ask-pick').children];
+    lis.forEach((li, i) => li.setAttribute('aria-selected', String(!!pick.items.length && i === pick.active)));
+    const cur = pick.items.length ? lis[pick.active] : null;
+    if (cur) { $('ask-q').setAttribute('aria-activedescendant', cur.id); cur.scrollIntoView({ block: 'nearest' }); }
+    else $('ask-q').removeAttribute('aria-activedescendant');
+  }
+  function closePick() {
+    pick.seq++;
+    if (!pick.open) return;
+    pick.open = false;
+    pick.items = [];
+    $('ask-pick').hidden = true;
+    $('ask-q').setAttribute('aria-expanded', 'false');
+    $('ask-q').removeAttribute('aria-activedescendant');
+  }
+  // Troca o "@palavra" pelo chip.
+  function choose(i) {
+    const it = pick.items[i];
+    const tok = pick.token;
+    if (!it || !tok) return;
+    const input = $('ask-q');
+    const end = input.selectionStart == null ? input.value.length : input.selectionStart;
+    input.value = input.value.slice(0, tok.start) + input.value.slice(end);
+    input.setSelectionRange(tok.start, tok.start);
+    closePick();
+    attach(it);
+    input.focus();
+  }
+  $('ask-q').addEventListener('input', openPick);
+  $('ask-q').addEventListener('click', openPick);
+  $('ask-q').addEventListener('blur', closePick);
+  $('ask-q').addEventListener('keydown', (e) => {
+    if (pick.open && pick.items.length) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const n = pick.items.length;
+        pick.active = (pick.active + (e.key === 'ArrowDown' ? 1 : n - 1)) % n;
+        paintActive();
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); choose(pick.active); return; }
+    }
+    if (pick.open && e.key === 'Escape') { e.preventDefault(); closePick(); return; }
+    const i = e.target;
+    if (e.key === 'Backspace' && attached.length && i.selectionStart === 0 && i.selectionEnd === 0) { attached.pop(); paintAtt(); }
+  });
+  $('ask-at').addEventListener('click', () => {
+    const i = $('ask-q');
+    const at = i.selectionStart == null ? i.value.length : i.selectionStart;
+    const pad = at > 0 && !/\s/.test(i.value[at - 1]) ? ' @' : '@';
+    i.value = i.value.slice(0, at) + pad + i.value.slice(at);
+    i.focus();
+    i.setSelectionRange(at + pad.length, at + pad.length);
+    openPick();
+  });
+
+  // O nome do assistente (Configurações → Assistente) no título da seção.
+  let assistName = null;
+  const paintName = () => { $('h-assist').textContent = assistName || t('today.sec.assist'); };
+  async function loadPersona() {
+    try { assistName = (await invoke('assistant_persona')).name; } catch (_) {}
+    paintName();
+  }
+  document.addEventListener('isper-i18n', () => { paintName(); paintAtt(); });
+  document.addEventListener('isper-view', (e) => { if (e.detail && e.detail.active) loadPersona(); });
+  loadPersona();
   $('assist-morning').addEventListener('click', () => ask(null, 'morning'));
   $('assist-closing').addEventListener('click', () => ask(null, 'closing'));
   $('assist-new').addEventListener('click', () => {
@@ -1956,6 +2178,7 @@
     open(p) {
       if (p.focusAdd) { const i = $('add-title'); i.focus(); i.select(); }
       if (p.focusAsk) { const i = $('ask-q'); i.focus(); i.select(); }
+      if (p.attach) askAbout(p.attach);
     },
   };
 
