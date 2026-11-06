@@ -473,6 +473,7 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         assistant_name: previous.assistant_name.clone(),
         assistant_tone: previous.assistant_tone.clone(),
         assistant_length: previous.assistant_length.clone(),
+        assistant_mascot: previous.assistant_mascot,
         // A janela principal guarda o próprio tamanho e a barra lateral.
         main_window: previous.main_window,
         sidebar_collapsed: previous.sidebar_collapsed,
