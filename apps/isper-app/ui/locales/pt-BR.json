@@ -711,6 +711,7 @@
   "settings.assistente.length.detailed": "Detalhadas",
   "settings.assistente.length.normal": "Normais",
   "settings.assistente.length.short": "Curtas",
+  "settings.assistente.mascot": "Mostrar o mascote no Hoje (o ponto da marca, animado)",
   "settings.assistente.msg.persona": "Pronto: a próxima resposta já sai assim.",
   "settings.assistente.msg.reset": "\"{s}\" voltou ao padrão.",
   "settings.assistente.msg.set": "\"{s}\" agora: {p}.",

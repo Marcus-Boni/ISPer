@@ -70,6 +70,8 @@ function Click-Card([string]$Prefix) {
   Click-Today ('[...document.querySelectorAll("#thread > li.confirm:last-child .turn-acts button")].find(b => b.textContent.startsWith("' + $Prefix + '"))')
 }
 function Count-Like($items, [string]$pattern) { @($items | Where-Object { $_ -like $pattern }).Count }
+# O mascote do assistente: visivel? em que estado (data-state)?
+function Get-Mascot { EvJson 'today.html' 'JSON.stringify((() => { const c = document.getElementById("assist-mascot"); return { shown: !c.hidden, state: c.dataset.state || null }; })())' }
 
 $day = (Get-Date).ToString('yyyy-MM-dd')
 $llmToml = $null
@@ -105,6 +107,8 @@ try {
   $src = @($t2.sources)[0]
   Check ($src.text -like '1Revisar o contrato*' -and $src.link) "a fonte e clicavel ('$($src.text)')"
   Check ((-not $s2.hint) -and $s2.newBtn) "com conversa, a dica sai e aparece Nova conversa"
+  $m2 = Get-Mascot
+  Check ($m2.shown -and @('speaking', 'idle') -contains $m2.state) "o mascote aparece e fala com a resposta ('$($m2.state)')"
   Click-Today 'document.querySelector("#thread .sources .chip")' | Out-Null
   $sPing = Wait-Assist { param($s) @($s.ping).Count -ge 1 } -Seconds 4
   Check ((Count-Like $sPing.ping 'Revisar o contrato*') -eq 1) "clicar na fonte destaca a tarefa na lista"
@@ -114,6 +118,7 @@ try {
   $s3 = Wait-Assist { param($s) (Last-Turn $s).cls -like '*confirm*' }
   $t3 = Last-Turn $s3
   Check ($t3.boxes -eq 1 -and $t3.text -like '*Ligar pro Jo*' -and $t3.text -like '*15:00*') "o cartao descreve a tarefa a criar ('$($t3.text)')"
+  Check ((Get-Mascot).state -eq 'confirm') "com o cartao, o mascote pede o toque"
   Check ((Count-Like $t3.buttons 'Fazer') -eq 1 -and (Count-Like $t3.buttons 'Agora n*') -eq 1) "com Fazer e Agora nao"
   Check ((Count-Like $s3.planned 'Ligar pro Jo*') -eq 0) "nada criado antes do toque"
   Click-Card 'Fazer' | Out-Null
@@ -192,6 +197,7 @@ try {
   Check (@($s8.turns)[0].text -eq 'Fechar o dia' -and @($s8.turns).Count -eq 2) "Fechar o dia comeca uma conversa nova"
   $t8 = Last-Turn $s8
   Check ($t8.text -like '*4h40*') "o fechamento traz as horas do OptTime ('$($t8.text)')"
+  Check ((Get-Mascot).state -eq 'done') "o dia fechado e a comemoracao do mascote"
   $ot = @($t8.sources) | Where-Object { $_.text -like '*OptTime*' } | Select-Object -First 1
   Check ($null -ne $ot -and -not $ot.link) "a fonte do OptTime aparece, sem link ('$($ot.text)')"
   $after = @(Get-List "http://127.0.0.1:$otPort/calls" | Where-Object { $_.name -eq 'opt_time_get_today_summary' }).Count
@@ -276,11 +282,29 @@ try {
   $left = EvJson 'today.html' 'JSON.stringify(document.querySelectorAll("#ask-att .att-chip").length)'
   Check ($left -eq 0) "o x tira o chip"
 
+  # O mascote some e volta pela opcao das Configuracoes.
+  Invoke-Isper 'assistant_set_persona' "{ name: 'Lia', tone: 'warm', length: 'normal', mascot: false }" | Out-Null
+  Invoke-Isper 'open_settings_window' "{ section: 'assistente' }" | Out-Null
+  Wait-IsperWindow 'settings.html' | Out-Null
+  Invoke-Isper 'open_today_window' | Out-Null
+  Wait-IsperWindow 'today.html' | Out-Null
+  $off = $null
+  for ($i = 0; $i -lt 20; $i++) { $off = Get-Mascot; if (-not $off.shown) { break }; Start-Sleep -Milliseconds 200 }
+  Check (-not $off.shown) "desligado nas Configuracoes, o mascote some do Hoje"
+  Invoke-Isper 'assistant_set_persona' "{ name: 'Lia', tone: 'warm', length: 'normal', mascot: true }" | Out-Null
+  Invoke-Isper 'open_settings_window' "{ section: 'assistente' }" | Out-Null
+  Wait-IsperWindow 'settings.html' | Out-Null
+  Invoke-Isper 'open_today_window' | Out-Null
+  Wait-IsperWindow 'today.html' | Out-Null
+  $on = $null
+  for ($i = 0; $i -lt 20; $i++) { $on = Get-Mascot; if ($on.shown -and $on.state) { break }; Start-Sleep -Milliseconds 200 }
+  Check ($on.shown -and $on.state -eq 'idle') "ligado de novo, ele volta ('$($on.state)')"
+
   $errs = @(Get-JsErrors 'today.html') + @(Get-JsErrors 'settings.html')
   Check (@($errs | Where-Object { $_ }).Count -eq 0) "Hoje e Configuracoes sem erros de JS$(Format-JsErrors $errs)"
 } finally {
   Invoke-Isper 'assistant_set_permission' "{ name: 'criar_tarefa', permission: null }" | Out-Null
-  Invoke-Isper 'assistant_set_persona' "{ name: null, tone: 'direct', length: 'normal' }" | Out-Null
+  Invoke-Isper 'assistant_set_persona' "{ name: null, tone: 'direct', length: 'normal', mascot: true }" | Out-Null
   Invoke-Isper 'opttime_clear_token' | Out-Null
   Invoke-Isper 'opttime_set_url' "{ url: null }" | Out-Null
   if ($llmToml) { Remove-Item $llmToml -ErrorAction SilentlyContinue }

@@ -504,6 +504,8 @@ pub(crate) struct PersonaView {
     name: Option<String>,
     tone: String,
     length: String,
+    /// O mascote aparece no Hoje.
+    mascot: bool,
 }
 
 /// O nome, o tom e o tamanho das respostas do assistente.
@@ -514,17 +516,24 @@ pub(crate) fn assistant_persona(app: AppHandle) -> PersonaView {
         name: p.name,
         tone: p.tone,
         length: p.length,
+        mascot: app
+            .state::<AppState>()
+            .config
+            .lock_or_recover()
+            .assistant_mascot,
     }
 }
 
 /// Muda a persona na hora (a próxima pergunta já sai com ela). Devolve como
 /// ficou, já normalizada (nome numa linha e curto; tom e tamanho da lista).
+/// `mascot` ausente mantém o que estava.
 #[tauri::command]
 pub(crate) fn assistant_set_persona(
     app: AppHandle,
     name: Option<String>,
     tone: String,
     length: String,
+    mascot: Option<bool>,
 ) -> Result<PersonaView, String> {
     let cfg = {
         let state = app.state::<AppState>();
@@ -532,6 +541,9 @@ pub(crate) fn assistant_set_persona(
         c.assistant_name = name;
         c.assistant_tone = tone;
         c.assistant_length = length;
+        if let Some(on) = mascot {
+            c.assistant_mascot = on;
+        }
         c.normalize();
         c.clone()
     };

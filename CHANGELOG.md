@@ -12,6 +12,12 @@ bata com ela.
 ## [Unreleased]
 
 ### Adicionado
+- **O mascote do assistente.** O ponto de gravação da marca ganhou vida no
+  cabeçalho do assistente, na tela Hoje: pensa enquanto o assistente
+  trabalha, fala quando a resposta chega, olha para o cartão quando precisa
+  do seu toque, comemora quando você fecha o dia e perde a cor quando falta
+  a IA. Clique nele para uma cutucada. Respeita o "reduzir movimento" do
+  Windows e pode ser desligado em Configurações → Assistente.
 - **O jeito do assistente.** Em Configurações → Assistente, dê um nome a ele
   e escolha o tom (direto, caloroso ou formal) e o tamanho das respostas
   (curtas, normais ou detalhadas). Vale na hora, e a tela Hoje passa a

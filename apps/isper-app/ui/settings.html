@@ -503,6 +503,9 @@
         <button type="button" role="radio" aria-checked="false" data-v="detailed" data-i18n="settings.assistente.length.detailed">Detalhadas</button>
       </div>
     </div>
+    <div class="perm">
+      <label class="switch"><input type="checkbox" id="pmascot"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.assistente.mascot">Mostrar o mascote no Hoje (o ponto da marca, animado)</span></label>
+    </div>
   </div>
   <h3 data-i18n="settings.assistente.perms">Permissões</h3>
   <p class="hint mt0" data-i18n="settings.assistente.lead">O que o assistente da tela Hoje pode fazer sem perguntar. Ler é livre; criar, mover, concluir e lançar horas pedem o seu toque num cartão. O que apaga nunca fica livre. As ferramentas rodam no seu PC: a IA só vê o que elas devolvem para a pergunta.</p>
@@ -1358,6 +1361,7 @@
   function paintPersona() {
     if (!persona) return;
     if (document.activeElement !== $('pname')) $('pname').value = persona.name || '';
+    $('pmascot').checked = persona.mascot !== false;
     for (const [box, v] of [['ptone', persona.tone], ['plength', persona.length]]) {
       for (const b of $(box).children) b.setAttribute('aria-checked', String(b.dataset.v === v));
     }
@@ -1377,6 +1381,7 @@
       if (b && persona && b.dataset.v !== persona[key]) savePersona({ [key]: b.dataset.v });
     });
   }
+  $('pmascot').addEventListener('change', () => { if (persona) savePersona({ mascot: $('pmascot').checked }); });
   $('pname').addEventListener('change', () => {
     const name = $('pname').value.trim() || null;
     if (persona && name !== (persona.name || null)) savePersona({ name });

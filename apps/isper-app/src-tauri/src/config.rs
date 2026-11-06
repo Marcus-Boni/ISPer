@@ -176,6 +176,10 @@ pub struct AppConfig {
     /// O tamanho das respostas: `short` · `normal` · `detailed`.
     #[serde(default = "default_assistant_length")]
     pub assistant_length: String,
+    /// O mascote do assistente no Hoje (o ponto da marca, animado). Desligado,
+    /// fica só o texto.
+    #[serde(default = "default_true")]
+    pub assistant_mascot: bool,
     /// Aviso de preparo 10 minutos antes das reuniões da agenda (Fase 10.3).
     #[serde(default = "default_true")]
     pub meeting_prep: bool,
@@ -245,6 +249,7 @@ impl Default for AppConfig {
             assistant_name: None,
             assistant_tone: default_assistant_tone(),
             assistant_length: default_assistant_length(),
+            assistant_mascot: true,
             meeting_prep: true,
             meeting_inbox: true,
             config_version: CONFIG_VERSION,

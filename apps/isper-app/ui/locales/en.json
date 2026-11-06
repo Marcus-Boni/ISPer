@@ -711,6 +711,7 @@
   "settings.assistente.length.detailed": "Detailed",
   "settings.assistente.length.normal": "Normal",
   "settings.assistente.length.short": "Short",
+  "settings.assistente.mascot": "Show the mascot on Today (the brand dot, animated)",
   "settings.assistente.msg.persona": "Done: the next answer comes out this way.",
   "settings.assistente.msg.reset": "\"{s}\" is back to its default.",
   "settings.assistente.msg.set": "\"{s}\" is now: {p}.",
