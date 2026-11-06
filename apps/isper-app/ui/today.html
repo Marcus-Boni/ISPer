@@ -193,11 +193,26 @@
   .mascot { width: 52px; height: 52px; margin: -10px -2px -10px -8px; flex: none; cursor: pointer; }
   .mascot[hidden] { display: none; }
   .assist-quick { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
-  .ask { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; }
+  .ask { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; }
   .ask .field { padding: 9px 12px; }
   .ask-in { position: relative; min-width: 0; }
   .ask-in .field { width: 100%; }
   #ask-at { width: 36px; font: 600 14px var(--font-mono); }
+  /* O microfone: segurar é falar, um toque ouve até a pausa. O anel cresce com
+     a voz (--lvl, 0–1); com "reduzir movimento", fica parado. */
+  #ask-mic { position: relative; width: 36px; padding: 0; display: grid; place-items: center; touch-action: none; }
+  #ask-mic svg { width: 16px; height: 16px; }
+  #ask-mic::after {
+    content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; opacity: 0;
+    box-shadow: 0 0 0 calc(2px + var(--lvl, 0) * 6px) color-mix(in srgb, var(--accent) 28%, transparent);
+    transition: opacity var(--dur-2) var(--ease-out), box-shadow 90ms linear;
+  }
+  #ask-mic[aria-pressed="true"], #ask-mic[aria-pressed="true"]:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  #ask-mic[aria-pressed="true"]::after { opacity: 1; }
+  #ask-mic.is-loading svg { display: none; }
+  .voice-status { font-size: 12px; color: var(--muted); }
+  .voice-status[data-kind="error"] { color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { #ask-mic::after { transition: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent); } }
   /* Registros anexados à pergunta (@ ou "Perguntar sobre isto"). */
   .att { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
   .att:empty { display: none; }
@@ -322,9 +337,11 @@
           <input class="field" id="ask-q" maxlength="2000" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="ask-pick" placeholder="Pergunte sobre o seu dia… (ex.: o que a Ana me pediu na daily?)" data-i18n-attr="placeholder:today.assist.placeholder">
           <ul class="pick-list" id="ask-pick" role="listbox" hidden aria-label="Anexar à pergunta" data-i18n-attr="aria-label:today.assist.att-pick"></ul>
         </div>
+        <button class="btn btn-ghost" type="button" id="ask-mic" aria-pressed="false" title="Falar a pergunta: segure enquanto fala, ou toque uma vez e faça uma pausa no fim" aria-label="Falar a pergunta" data-i18n-attr="title:today.assist.mic-title, aria-label:today.assist.mic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.2a2.1 2.1 0 0 1 2.1 2.1v3.3a2.1 2.1 0 0 1-4.2 0V4.3A2.1 2.1 0 0 1 8 2.2zM4.3 7.5a3.7 3.7 0 0 0 7.4 0M8 11.2v2.6"/></svg></button>
         <button class="btn btn-ghost" type="button" id="ask-at" title="Anexar uma tarefa, reunião ou projeto (@)" aria-label="Anexar uma tarefa, reunião ou projeto" data-i18n-attr="title:today.assist.att-button-title, aria-label:today.assist.att-button">@</button>
         <button class="btn" type="submit" id="ask-go" data-i18n="today.assist.ask">Perguntar</button>
       </form>
+      <p class="voice-status m0" id="ask-voice" role="status" hidden></p>
       <p class="sec-hint m0" id="assist-hint" data-i18n="today.assist.hint">Responde com o que está no ISPer e no OptTime, dizendo de onde veio. Antes de criar, mover ou lançar algo, pede o seu toque.</p>
       <ol class="thread" id="thread" aria-live="polite"></ol>
     </section>
@@ -1745,9 +1762,14 @@
   let convId = null;
   let asking = false;
   let openCard = null;
+  // A escuta pelo microfone (ver "falar com o assistente", mais abaixo).
+  const voice = { stage: 'idle', down: 0, live: false, ignore: false };
 
   function paintAsk() {
-    for (const id of ['ask-q', 'ask-go', 'ask-at', 'assist-morning', 'assist-closing']) $(id).disabled = asking;
+    // Ouvindo, a caixa continua editável; o resto espera o texto chegar.
+    const busy = voice.stage !== 'idle';
+    for (const id of ['ask-q', 'ask-go', 'ask-at', 'assist-morning', 'assist-closing']) $(id).disabled = asking || (busy && id !== 'ask-q');
+    $('ask-mic').disabled = asking;
     $('assist-new').hidden = asking || !$('thread').children.length;
     $('assist-hint').hidden = !!$('thread').children.length;
   }
@@ -2151,6 +2173,147 @@
     i.setSelectionRange(at + pad.length, at + pad.length);
     openPick();
   });
+
+  // --------------------------------------------- falar com o assistente
+  // O microfone grava pelo mesmo gravador e Whisper do ditado. Segurar é
+  // falar e soltar transcreve; um toque ouve até a pausa (ou outro toque);
+  // Esc cancela. O texto ouvido entra na caixa: nada vai para a IA sem você
+  // conferir e mandar. O andamento vem do back (`isper-assist-voice`), porque
+  // a pausa do mãos-livres encerra sem toque na tela.
+  const HOLD_MS = 350; // o TAP_THRESHOLD do ditado: menos que isso é um toque
+  const VOICE_KEY = { listening: 'today.assist.mic-listening', handsfree: 'today.assist.mic-handsfree', transcribing: 'today.assist.mic-transcribing' };
+  let voiceOp = Promise.resolve();
+  let lvl = 0;
+  let lvlFrame = 0;
+  // As chamadas saem na ordem dos toques: o toque rápido só liga o mãos-livres
+  // depois de a escuta ter começado.
+  const queueVoice = (fn) => { voiceOp = voiceOp.then(fn, fn); return voiceOp; };
+  const hearing = () => voice.stage === 'listening' || voice.stage === 'handsfree';
+
+  function voiceMsg(text, kind) {
+    const m = $('ask-voice');
+    m.textContent = text || '';
+    m.dataset.kind = kind || '';
+    m.hidden = !text;
+  }
+  function setVoice(stage) {
+    voice.stage = stage;
+    const b = $('ask-mic');
+    b.setAttribute('aria-pressed', String(hearing()));
+    b.classList.toggle('is-loading', stage === 'transcribing');
+    if (!hearing()) b.style.removeProperty('--lvl');
+    if (VOICE_KEY[stage]) voiceMsg(t(VOICE_KEY[stage]));
+    paintAsk();
+  }
+  async function listenVoice(handsfree) {
+    try {
+      await invoke('assistant_listen', { handsfree });
+      voice.live = true;
+    } catch (e) {
+      voice.live = false;
+      voice.down = 0;
+      setVoice('idle');
+      voiceMsg(String(e), 'error');
+      mood('idle');
+    }
+  }
+  function stopVoice(cancel) {
+    if (cancel) {
+      // Esc durante a transcrição: o texto que chegar depois não entra.
+      if (voice.stage === 'transcribing') voice.ignore = true;
+      setVoice('idle');
+      voiceMsg(null);
+      mood('idle');
+    }
+    return queueVoice(() => voice.live && invoke('assistant_listen_stop', { cancel }).catch(() => {}));
+  }
+  // A fala entra onde o cursor estava (a caixa não perde o foco ao apertar o
+  // botão), separada por espaço do que já havia.
+  function putHeard(text) {
+    const i = $('ask-q');
+    const s = i.selectionStart == null ? i.value.length : i.selectionStart;
+    const e = i.selectionEnd == null ? s : i.selectionEnd;
+    const before = i.value.slice(0, s);
+    const after = i.value.slice(e);
+    const head = before + (before && !/\s$/.test(before) ? ' ' : '') + text;
+    const full = head + (after && !/^\s/.test(after) ? ' ' : '') + after;
+    i.value = i.maxLength > 0 ? full.slice(0, i.maxLength) : full;
+    i.focus();
+    const at = Math.min(head.length, i.value.length);
+    i.setSelectionRange(at, at);
+  }
+
+  const micBtn = $('ask-mic');
+  micBtn.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || micBtn.disabled) return;
+    // Sem foco no botão: o cursor fica na caixa, onde o texto vai entrar.
+    e.preventDefault();
+    if (voice.stage === 'handsfree') { stopVoice(false); return; }
+    if (voice.stage !== 'idle') return;
+    micBtn.setPointerCapture(e.pointerId);
+    voice.down = performance.now();
+    voice.ignore = false;
+    setVoice('listening');
+    mood('listening');
+    // A gravação começa já no aperto, para não perder a primeira sílaba.
+    queueVoice(() => listenVoice(false));
+  });
+  micBtn.addEventListener('pointerup', () => {
+    if (!voice.down) return;
+    const held = performance.now() - voice.down;
+    voice.down = 0;
+    if (held < HOLD_MS) queueVoice(() => voice.live && listenVoice(true));
+    else stopVoice(false);
+  });
+  micBtn.addEventListener('pointercancel', () => { if (voice.down) { voice.down = 0; stopVoice(true); } });
+  // Teclado (Espaço/Enter no botão) chega como clique sem ponteiro: um toque.
+  micBtn.addEventListener('click', (e) => {
+    if (e.detail !== 0) return;
+    if (voice.stage === 'idle') {
+      voice.ignore = false;
+      setVoice('handsfree');
+      mood('listening');
+      queueVoice(() => listenVoice(true));
+    } else if (hearing()) stopVoice(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || voice.stage === 'idle') return;
+    e.preventDefault();
+    e.stopPropagation();
+    stopVoice(true);
+  }, true);
+  // Saiu do Hoje (outra tela, janela escondida): não fica ouvindo sozinho.
+  document.addEventListener('isper-view', (e) => { if (e.detail && !e.detail.active && voice.stage !== 'idle') stopVoice(true); });
+  addEventListener('pagehide', () => { if (voice.stage !== 'idle') stopVoice(true); });
+
+  listen('isper-assist-voice', (ev) => {
+    const p = ev.payload || {};
+    if (VOICE_KEY[p.stage]) {
+      // Um evento atrasado de uma escuta já cancelada não reabre o estado.
+      if (voice.stage === 'idle') return;
+      setVoice(p.stage);
+      mood(p.stage === 'transcribing' ? 'thinking' : 'listening');
+      return;
+    }
+    const ignore = voice.ignore;
+    voice.ignore = false;
+    voice.live = false;
+    voice.down = 0;
+    setVoice('idle');
+    mood('idle');
+    if (ignore) { voiceMsg(null); return; }
+    if (p.stage === 'heard' && p.text) { voiceMsg(null); putHeard(p.text); }
+    else if (p.stage === 'error') voiceMsg(p.message || t('errors.not-understood'), 'error');
+    else voiceMsg(null);
+  });
+  listen('isper-level', (ev) => {
+    if (!hearing()) return;
+    lvl = Math.max(0, Math.min(1, (Number(ev.payload) || 0) * 14));
+    if (mascot) mascot.level(lvl);
+    if (lvlFrame || UI.reduce()) return;
+    lvlFrame = requestAnimationFrame(() => { lvlFrame = 0; if (hearing()) micBtn.style.setProperty('--lvl', lvl.toFixed(3)); });
+  });
+  document.addEventListener('isper-i18n', () => { if (VOICE_KEY[voice.stage]) voiceMsg(t(VOICE_KEY[voice.stage])); });
 
   // O mascote segue o assistente: pensa enquanto responde, fala quando a
   // resposta chega, pede o toque com o cartão, comemora o dia fechado e

@@ -282,6 +282,45 @@ try {
   $left = EvJson 'today.html' 'JSON.stringify(document.querySelectorAll("#ask-att .att-chip").length)'
   Check ($left -eq 0) "o x tira o chip"
 
+  # 11) Falar com o assistente: o microfone da barra. Um toque comeca a ouvir
+  # (o teclado chega como clique sem ponteiro); Esc cancela sem tocar na
+  # caixa. Sem modelo de voz ou sem microfone no perfil de teste, o erro tem
+  # de aparecer na hora, embaixo da barra. O texto ouvido chega pelo evento
+  # do back, aqui emitido pela pagina: entra na caixa no cursor e NAO e
+  # mandado a IA (quem manda e o usuario, com Enter).
+  $voiceJs = 'JSON.stringify((() => { const b = document.getElementById("ask-mic"); const m = document.getElementById("ask-voice"); const q = document.getElementById("ask-q"); return { pressed: b.getAttribute("aria-pressed"), loading: b.classList.contains("is-loading"), go: document.getElementById("ask-go").disabled, msg: m.hidden ? null : m.textContent, kind: m.dataset.kind || "", q: q.value, focus: document.activeElement === q, turns: document.getElementById("thread").children.length }; })())'
+  function Get-Voice { EvJson 'today.html' $voiceJs }
+  EvJson 'today.html' 'JSON.stringify((() => { const q = document.getElementById("ask-q"); q.value = "sobre a Marca"; q.focus(); q.setSelectionRange(q.value.length, q.value.length); return true; })())' | Out-Null
+  $before = Get-Voice
+  Check ($before.pressed -eq 'false' -and $before.msg -eq $null) "o microfone comeca parado, sem aviso"
+  Click-Today 'document.getElementById("ask-mic")' | Out-Null
+  $v1 = $null
+  for ($i = 0; $i -lt 20; $i++) { $v1 = Get-Voice; if ($v1.kind -eq 'error' -or ($v1.pressed -eq 'true' -and (Get-Mascot).state -eq 'listening')) { break }; Start-Sleep -Milliseconds 150 }
+  if ($v1.kind -eq 'error') {
+    Check ($v1.pressed -eq 'false' -and $v1.msg) "sem modelo ou microfone, o erro aparece na hora ('$($v1.msg)')"
+  } else {
+    Check ($v1.pressed -eq 'true' -and $v1.msg -like 'Ouvindo*' -and $v1.go) "um toque comeca a ouvir: botao pressionado, aviso e Perguntar em espera ('$($v1.msg)')"
+    Check ((Get-Mascot).state -eq 'listening') "o mascote ouve junto"
+    EvJson 'today.html' 'JSON.stringify(document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })))' | Out-Null
+    Start-Sleep -Milliseconds 1500
+    $v2 = Get-Voice
+    Check ($v2.pressed -eq 'false' -and -not $v2.loading -and $v2.msg -eq $null -and -not $v2.go -and $v2.q -eq 'sobre a Marca') "Esc cancela: nada transcrito, a caixa como estava ('$($v2.q)')"
+    Check ((Get-Mascot).state -eq 'idle') "e o mascote volta ao normal ('$((Get-Mascot).state)')"
+  }
+  $reqBefore = @(Get-List "http://127.0.0.1:$llmPort/requests").Count
+  EvJson 'today.html' 'JSON.stringify((() => { const q = document.getElementById("ask-q"); q.setSelectionRange(q.value.length, q.value.length); window.__TAURI__.event.emit("isper-assist-voice", { stage: "heard", text: "o que falta fechar?" }); return true; })())' | Out-Null
+  $v3 = $null
+  for ($i = 0; $i -lt 20; $i++) { $v3 = Get-Voice; if ($v3.q -ne 'sobre a Marca') { break }; Start-Sleep -Milliseconds 150 }
+  Check ($v3.q -eq 'sobre a Marca o que falta fechar?' -and $v3.focus) "o que foi ouvido entra na caixa, no cursor, com o foco nela ('$($v3.q)')"
+  Start-Sleep -Milliseconds 600
+  $reqAfter = @(Get-List "http://127.0.0.1:$llmPort/requests").Count
+  Check ($reqAfter -eq $reqBefore -and (Get-Voice).turns -eq $v3.turns) "e nao vai sozinho para a IA ($reqBefore -> $reqAfter pedidos)"
+  EvJson 'today.html' 'JSON.stringify(window.__TAURI__.event.emit("isper-assist-voice", { stage: "error", message: "nao entendi - tente de novo" }) && true)' | Out-Null
+  $v4 = $null
+  for ($i = 0; $i -lt 20; $i++) { $v4 = Get-Voice; if ($v4.msg) { break }; Start-Sleep -Milliseconds 150 }
+  Check ($v4.kind -eq 'error' -and $v4.msg -like 'nao entendi*' -and $v4.pressed -eq 'false') "um erro da escuta aparece embaixo da barra ('$($v4.msg)')"
+  EvJson 'today.html' 'JSON.stringify((() => { document.getElementById("ask-q").value = ""; return true; })())' | Out-Null
+
   # O mascote some e volta pela opcao das Configuracoes.
   Invoke-Isper 'assistant_set_persona' "{ name: 'Lia', tone: 'warm', length: 'normal', mascot: false }" | Out-Null
   Invoke-Isper 'open_settings_window' "{ section: 'assistente' }" | Out-Null
