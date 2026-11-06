@@ -12,6 +12,11 @@ bata com ela.
 ## [Unreleased]
 
 ### Adicionado
+- **Falar com o assistente.** A barra do assistente, na tela Hoje, ganhou
+  um microfone: segure enquanto fala, ou toque uma vez e faça uma pausa no
+  fim. O Whisper transcreve no seu PC, com o seu dicionário, e o texto entra
+  na caixa para você conferir e mandar: nada vai para a IA sem você ver. Esc
+  cancela. Enquanto você fala, o mascote ouve e ondula com a sua voz.
 - **O mascote do assistente.** O ponto de gravação da marca ganhou vida no
   cabeçalho do assistente, na tela Hoje: pensa enquanto o assistente
   trabalha, fala quando a resposta chega, olha para o cartão quando precisa

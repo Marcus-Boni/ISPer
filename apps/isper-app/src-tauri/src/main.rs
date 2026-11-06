@@ -14,6 +14,7 @@
 
 mod agenda;
 mod assistant;
+mod assistant_voice;
 mod audio_import;
 mod calls;
 mod capture;
@@ -269,6 +270,8 @@ fn main() {
             capture::capture_save,
             capture::capture_discard,
             capture::capture_text,
+            assistant_voice::assistant_listen,
+            assistant_voice::assistant_listen_stop,
             connectors::opttime_status,
             connectors::opttime_set_token,
             connectors::opttime_clear_token,
@@ -389,7 +392,7 @@ fn main() {
                 active_copilot_shortcut: Mutex::new(String::new()),
                 capture_shortcut: Mutex::new(None),
                 active_capture_shortcut: Mutex::new(String::new()),
-                capturing: Mutex::new(false),
+                route: Mutex::new(AudioRoute::default()),
                 capture_view: Mutex::new(capture::CaptureView::default()),
                 moments: Mutex::new(Vec::new()),
                 live: Mutex::new(Vec::new()),
@@ -566,19 +569,24 @@ fn main() {
                 for RecorderEvent::Finished(result) in events.iter() {
                     *handle.state::<AppState>().phase.lock_or_recover() = Phase::Processing;
 
-                    // Gravação do atalho de anotar: vira cartões, não é colada.
-                    let capturing = std::mem::take(
-                        &mut *handle.state::<AppState>().capturing.lock_or_recover(),
-                    );
-                    if capturing {
-                        capture::process(&handle, result);
-                        let state = handle.state::<AppState>();
-                        let mut phase = state.phase.lock_or_recover();
-                        if matches!(*phase, Phase::Processing) {
-                            *phase = Phase::Idle;
+                    // Quem pediu a gravação: o atalho de anotar vira cartões e
+                    // o microfone do assistente vai para a caixa do Hoje; só o
+                    // ditado é colado.
+                    let route =
+                        std::mem::take(&mut *handle.state::<AppState>().route.lock_or_recover());
+                    let result = match route {
+                        AudioRoute::Dictation => result,
+                        AudioRoute::Capture => {
+                            capture::process(&handle, result);
+                            back_to_idle(&handle);
+                            continue;
                         }
-                        continue;
-                    }
+                        AudioRoute::Assistant { cancelled } => {
+                            assistant_voice::process(&handle, result, cancelled);
+                            back_to_idle(&handle);
+                            continue;
+                        }
+                    };
 
                     let outcome = result
                         .map_err(anyhow::Error::from)
@@ -618,6 +626,17 @@ fn main() {
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 for level in levels.iter() {
+                    // A janela principal só recebe enquanto o assistente ouve:
+                    // ~100 leituras/s do ditado comum seriam ruído para o Hoje.
+                    let to_assistant = handle
+                        .state::<AppState>()
+                        .route
+                        .lock_or_recover()
+                        .is_assistant();
+                    if to_assistant {
+                        let _ = handle.emit_to(MAIN, "isper-level", level);
+                        continue;
+                    }
                     let _ = handle.emit_to("overlay", "isper-level", level);
                     let _ = handle.emit_to(capture::LABEL, "isper-level", level);
                 }
@@ -634,4 +653,14 @@ fn main() {
                 undo::flush_all();
             }
         });
+}
+
+/// Depois de uma gravação que não é ditado (captura, assistente): libera o
+/// microfone para a próxima. Um novo toque pode já ter mudado a fase.
+fn back_to_idle(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut phase = state.phase.lock_or_recover();
+    if matches!(*phase, Phase::Processing) {
+        *phase = Phase::Idle;
+    }
 }

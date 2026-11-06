@@ -80,6 +80,27 @@ pub(crate) enum Phase {
     Processing,
 }
 
+/// Quem recebe a gravação do microfone quando ela termina. Um lugar só
+/// decide: o laço do gravador em `main.rs` tira a rota (`take`) e despacha.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum AudioRoute {
+    /// O atalho de ditado: transcreve e cola no app focado.
+    #[default]
+    Dictation,
+    /// O atalho de anotar: vira cartões de tarefa.
+    Capture,
+    /// O microfone do assistente, no Hoje: o texto vai para a caixa de
+    /// pergunta. `cancelled` = Esc ou saiu da tela: descarta sem transcrever.
+    Assistant { cancelled: bool },
+}
+
+impl AudioRoute {
+    /// É uma escuta do assistente (cancelada ou não)?
+    pub(crate) fn is_assistant(self) -> bool {
+        matches!(self, AudioRoute::Assistant { .. })
+    }
+}
+
 /// Estado do motor Whisper — fonte única para a tela Início responder
 /// "por que não transcreve?" sem adivinhar.
 #[derive(Clone, serde::Serialize)]
@@ -127,9 +148,9 @@ pub(crate) struct AppState {
     /// Atalho de anotar tarefas por voz (Fase 10.1).
     pub(crate) capture_shortcut: Mutex<Option<Shortcut>>,
     pub(crate) active_capture_shortcut: Mutex<String>,
-    /// A gravação em curso é uma captura de tarefas, não um ditado: quando
-    /// ela termina, o texto vira cartões em vez de ser colado.
-    pub(crate) capturing: Mutex<bool>,
+    /// Para quem vai a gravação em curso: ditado (colado), captura de
+    /// tarefas (cartões) ou pergunta ao assistente (a caixa do Hoje).
+    pub(crate) route: Mutex<AudioRoute>,
     /// O que a janela de captura mostra (ela relê ao abrir: eventos mandados
     /// antes de a página carregar se perderiam).
     pub(crate) capture_view: Mutex<crate::capture::CaptureView>,

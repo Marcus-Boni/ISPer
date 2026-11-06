@@ -41,6 +41,8 @@ Dois caminhos foram testados num protótipo antes de entrar no app:
   nada muda. Fora da tela ou com a janela escondida, não desenha.
 - Sem WebGL (driver, área de trabalho remota), o canvas some e o assistente
   segue igual.
+- O "ouvindo" tem dono desde o microfone da barra do assistente: enquanto
+  ele ouve, o mascote segue o nível da voz (`level`), e transcrevendo, pensa.
 - O canvas é decorativo para o leitor de tela (o texto já diz o estado); o
   estado fica em `data-state`, que o e2e `assistant.ps1` confere.
 

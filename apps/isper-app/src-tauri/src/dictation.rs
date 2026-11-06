@@ -20,8 +20,12 @@ pub(crate) fn on_pressed(app: &AppHandle) {
         Phase::Recording { started, handsfree } => {
             // Segundo toque encerra o mãos-livres na hora. Só conta DEPOIS de
             // virar mãos-livres: o auto-repeat dispara Pressed repetido
-            // enquanto a tecla está segurada no push-to-talk.
-            if handsfree && started.elapsed() > Duration::from_millis(500) {
+            // enquanto a tecla está segurada no push-to-talk. A gravação tem
+            // de ser do ditado: a da captura e a do assistente têm dono.
+            if handsfree
+                && started.elapsed() > Duration::from_millis(500)
+                && *state.route.lock_or_recover() == AudioRoute::Dictation
+            {
                 *phase = Phase::Processing;
                 drop(phase);
                 state.audio.stop();
@@ -33,6 +37,9 @@ pub(crate) fn on_pressed(app: &AppHandle) {
 
 pub(crate) fn on_released(app: &AppHandle) {
     let state = app.state::<AppState>();
+    if *state.route.lock_or_recover() != AudioRoute::Dictation {
+        return;
+    }
     let mut phase = state.phase.lock_or_recover();
     if let Phase::Recording {
         started,

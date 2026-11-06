@@ -111,7 +111,7 @@ pub(crate) fn on_pressed(app: &AppHandle) {
                 handsfree: false,
             };
             drop(phase);
-            *state.capturing.lock_or_recover() = true;
+            *state.route.lock_or_recover() = AudioRoute::Capture;
             set_view(app, |v| {
                 v.stage = Stage::Listening;
                 v.message = None;
@@ -125,7 +125,7 @@ pub(crate) fn on_pressed(app: &AppHandle) {
             // também chega como Pressed).
             if handsfree
                 && started.elapsed() > Duration::from_millis(500)
-                && *state.capturing.lock_or_recover()
+                && *state.route.lock_or_recover() == AudioRoute::Capture
             {
                 *phase = Phase::Processing;
                 drop(phase);
@@ -138,7 +138,7 @@ pub(crate) fn on_pressed(app: &AppHandle) {
 
 pub(crate) fn on_released(app: &AppHandle) {
     let state = app.state::<AppState>();
-    if !*state.capturing.lock_or_recover() {
+    if *state.route.lock_or_recover() != AudioRoute::Capture {
         return;
     }
     let mut phase = state.phase.lock_or_recover();
