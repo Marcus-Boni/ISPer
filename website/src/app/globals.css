@@ -3719,6 +3719,9 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
    it is: the one thing left to do is open the file.
    --------------------------------------------------------------------------- */
 
+/* While it is open, only the dialog scrolls: the page behind stays put. */
+html:has(.after-download[open]) { overflow: hidden; }
+
 /* A native modal <dialog>: undo the UA box so it fills the screen. */
 .after-download {
   position: fixed;
@@ -4012,7 +4015,9 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
   100% { background: transparent; box-shadow: none; }
 }
 
-/* The cursor travels from the page to the file and double-clicks it. */
+/* The cursor travels from the page to the file and double-clicks it. The end
+   point is in the popover's own units (rem from the top, from the right edge),
+   so it lands on the file row at any width. */
 .after-cursor {
   position: absolute;
   top: 80%;
@@ -4030,11 +4035,11 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 @keyframes after-cursor {
   0%, 8% { top: 80%; left: 22%; opacity: 0; transform: scale(1); }
   16% { opacity: 1; }
-  48% { top: 46%; left: 70%; transform: scale(1); }
-  53%, 61% { top: 46%; left: 70%; transform: scale(0.84); }
-  57%, 66% { top: 46%; left: 70%; transform: scale(1); }
-  90% { top: 46%; left: 70%; opacity: 1; }
-  100% { top: 46%; left: 70%; opacity: 0; }
+  48% { top: 6.4rem; left: calc(100% - 8rem); transform: scale(1); }
+  53%, 61% { top: 6.4rem; left: calc(100% - 8rem); transform: scale(0.84); }
+  57%, 66% { top: 6.4rem; left: calc(100% - 8rem); transform: scale(1); }
+  90% { top: 6.4rem; left: calc(100% - 8rem); opacity: 1; }
+  100% { top: 6.4rem; left: calc(100% - 8rem); opacity: 0; }
 }
 
 @media (max-width: 860px) {
@@ -4050,5 +4055,5 @@ kbd { min-width: 1.75rem; padding: .25rem .45rem; border: 1px solid var(--line-2
 @media (prefers-reduced-motion: reduce) {
   .after-download, .after-dl, .after-file, .after-cursor { animation: none; }
   .after-file { background: var(--accent-soft); }
-  .after-cursor { top: 46%; left: 70%; }
+  .after-cursor { top: 6.4rem; left: calc(100% - 8rem); }
 }
