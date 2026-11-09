@@ -10,7 +10,7 @@ publish = false
 # `isper-core`, que tem a cadeia única de migrações do isper.db; este crate
 # abre o banco já migrado e não puxa o Whisper.
 [dependencies]
-rusqlite = { version = "0.40.2", features = ["bundled"] }
+rusqlite = { version = "0.41.1", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
