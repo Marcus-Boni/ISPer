@@ -11,6 +11,14 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-08
+
+O assistente ganha jeito e rosto. Ele tem nome, tom e tamanho de resposta
+escolhidos por você; recebe tarefas, reuniões e projetos anexados à
+pergunta; ouve pelo microfone da tela Hoje; e aparece como o ponto da marca,
+vivo, acompanhando o que faz. Por baixo, ele passa a conhecer os seus
+projetos, e as dependências sobem (Tauri 2.12).
+
 ### Adicionado
 - **Falar com o assistente.** A barra do assistente, na tela Hoje, ganhou
   um microfone: segure enquanto fala, ou toque uma vez e faça uma pausa no
@@ -34,6 +42,12 @@ bata com ela.
   ações da reunião; as tarefas e as reuniões do projeto) e a resposta cita
   de onde tirou. Cada tarefa do Hoje ganha o "Perguntar sobre isto", e cada
   reunião da Biblioteca, o "Perguntar ao assistente".
+- **O assistente conhece os seus projetos.** Pergunte pelas tarefas ou pelas
+  reuniões de um projeto e ele filtra; a reunião casada com um evento da
+  agenda já sai com o projeto da reunião anterior da mesma série (ou o que o
+  assunto cita), marcado como sugerido. As tarefas da reunião acompanham o
+  projeto dela. Trazer os projetos do OptTime liga cada um ao do ISPer de
+  mesmo nome, sem duplicar.
 
 ## [0.27.0] - 2026-10-12
 
@@ -1089,7 +1103,9 @@ dia e de noite, em português ou em inglês, e utilizável só pelo teclado.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.27.0...v0.28.0
+[0.27.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.25.1...v0.26.0
 [0.25.1]: https://github.com/Marcus-Boni/ISPer/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.24.0...v0.25.0
