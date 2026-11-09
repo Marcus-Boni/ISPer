@@ -35,7 +35,9 @@ $fakeExe = Join-Path $fake 'ISPer_99.0.0_x64-setup.exe'
 $bytes = New-Object byte[] (3 * 1024 * 1024)
 (New-Object System.Random).NextBytes($bytes)
 [System.IO.File]::WriteAllBytes($fakeExe, $bytes)
-npx --yes '@tauri-apps/cli@^2' signer sign -f $KeyPath -p "" $fakeExe | Out-Null
+# A chave nao tem senha. `-p ""` nao serve: o PowerShell 5.1 descarta o argumento vazio e o
+# -p engole o caminho do arquivo. `--password=` e um argumento so, com valor vazio.
+npx --yes '@tauri-apps/cli@^2' signer sign -f $KeyPath '--password=' $fakeExe | Out-Null
 if (-not (Test-Path "$fakeExe.sig")) { throw "assinatura da release falsa nao gerada" }
 $latest = [ordered]@{
   version   = '99.0.0'
