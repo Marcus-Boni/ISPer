@@ -1,0 +1,21 @@
+[
+  {
+    "title": "Chamada | Microsoft Teams",
+    "tree": {
+      "r": "window",
+      "t": "Chamada | Microsoft Teams",
+      "k": [
+        { "r": "button", "t": "Desativar mudo (Ctrl+Shift+M)" },
+        { "r": "button", "t": "Desligar" },
+        {
+          "r": "tree",
+          "t": "Participantes",
+          "k": [
+            { "r": "tree item", "t": "Bruno Lima (Você), Organizador, Mudo" },
+            { "r": "tree item", "t": "José Antônio, Participante, Sem mudo" }
+          ]
+        }
+      ]
+    }
+  }
+]

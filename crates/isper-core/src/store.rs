@@ -112,6 +112,24 @@ pub struct StoredSegment {
     pub end_secs: f32,
     /// Texto da fala.
     pub text: String,
+    /// O nome que a chamada do Teams deu a esta fala, quando deu. Só a
+    /// leitura da Biblioteca ([`MeetingStore::get_meeting_for_library`]) o
+    /// preenche: a ata, as exportações, a busca, o resumo e a sincronia
+    /// continuam no rótulo `speaker`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detected_speaker: Option<String>,
+}
+
+/// O que aconteceu ao publicar a transcrição do passe final.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FinalPublish {
+    /// A transcrição foi trocada; quantas falas ficaram.
+    Published(usize),
+    /// Alguém editou os falantes da reunião enquanto o passe rodava: a
+    /// transcrição salva, com a edição, ficou.
+    Superseded,
+    /// A reunião foi excluída enquanto o passe rodava: nada foi gravado.
+    Missing,
 }
 
 /// Uma reunião inteira, para a tela da Biblioteca.
@@ -296,7 +314,7 @@ fn like_pattern(q: &str) -> String {
 /// de versão maior (criado por um ISPer mais novo) é recusado em vez de
 /// alterado às cegas. Bancos anteriores a esta numeração chegam como 0 e
 /// passam pelo passo 1, que é idempotente sobre o que eles já têm.
-pub const SCHEMA_VERSION: i64 = 9;
+pub const SCHEMA_VERSION: i64 = 10;
 
 /// Eventos de métrica mais antigos que isto (90 dias) saem do banco.
 pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
@@ -421,6 +439,7 @@ fn migrate(conn: &Connection) -> Result<()> {
             6 => migrate_to_v7(&tx)?,
             7 => migrate_to_v8(&tx)?,
             8 => migrate_to_v9(&tx)?,
+            9 => migrate_to_v10(&tx)?,
             other => {
                 return Err(IsperError::Schema(format!(
                     "sem migração a partir da versão {other}"
@@ -778,6 +797,29 @@ fn migrate_to_v9(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE INDEX IF NOT EXISTS idx_tasks_list ON tasks(list_id) WHERE list_id IS NOT NULL;
          CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id) WHERE project_id IS NOT NULL;",
+    )?;
+    Ok(())
+}
+
+/// Passo 10 — nomes da chamada do Teams ([ADR 0027]).
+///
+/// - `segments.detected_speaker`: o nome que a leitura da janela do Teams
+///   deu à fala, ao lado do rótulo `speaker` (que continua o canônico, o
+///   que a ata e as exportações usam). Vazio em todo o histórico.
+/// - `meetings.speaker_rev`: sobe a cada edição de falante da reunião. O
+///   passe final guarda a revisão ao começar e só publica se ela não mudou
+///   — renomear "Participante 1" durante o passe não se perde mais.
+///
+/// Só acrescenta, e é idempotente como os outros passos.
+///
+/// [ADR 0027]: ../../../docs/adr/0027-nomes-da-chamada-do-teams.md
+fn migrate_to_v10(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "segments", "detected_speaker", "TEXT")?;
+    add_column_if_missing(
+        conn,
+        "meetings",
+        "speaker_rev",
+        "INTEGER NOT NULL DEFAULT 0",
     )?;
     Ok(())
 }
@@ -1285,12 +1327,62 @@ impl MeetingStore {
         meeting_id: i64,
         segments: &[(String, f32, f32, String)],
     ) -> Result<usize> {
+        match self.publish_final_segments(meeting_id, segments, &[], None)? {
+            FinalPublish::Published(n) => Ok(n),
+            FinalPublish::Missing => Err(IsperError::Schema(format!(
+                "a reunião {meeting_id} não existe mais — o passe final não foi gravado"
+            ))),
+            // Sem revisão esperada, nunca acontece.
+            FinalPublish::Superseded => Ok(0),
+        }
+    }
+
+    /// Publica a transcrição do passe final, com os nomes que a chamada do
+    /// Teams deu a cada fala (`detected[i]` é o da fala `i`; vazio = nenhum).
+    ///
+    /// Tudo numa transação que antes confere:
+    ///
+    /// - que a reunião ainda existe — excluída durante o passe, ela não
+    ///   volta como falas soltas no banco ([`FinalPublish::Missing`]);
+    /// - com `expected_rev`, que ninguém editou os falantes desde que o passe
+    ///   começou ([`MeetingStore::speaker_rev`]) — se editou, a transcrição
+    ///   salva, com a edição, fica ([`FinalPublish::Superseded`]).
+    ///
+    /// Os vetores da busca da reunião saem junto, como em
+    /// [`MeetingStore::replace_segments`].
+    pub fn publish_final_segments(
+        &self,
+        meeting_id: i64,
+        segments: &[(String, f32, f32, String)],
+        detected: &[Option<String>],
+        expected_rev: Option<i64>,
+    ) -> Result<FinalPublish> {
         if segments.is_empty() {
             return Err(IsperError::Schema(
                 "passe final sem segmentos — a transcrição ao vivo foi mantida".into(),
             ));
         }
+        if !detected.is_empty() && detected.len() != segments.len() {
+            return Err(IsperError::Schema(format!(
+                "{} nomes para {} falas",
+                detected.len(),
+                segments.len()
+            )));
+        }
         let tx = self.conn.unchecked_transaction()?;
+        let rev: Option<i64> = tx
+            .query_row(
+                "SELECT speaker_rev FROM meetings WHERE id = ?1",
+                params![meeting_id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let Some(rev) = rev else {
+            return Ok(FinalPublish::Missing);
+        };
+        if expected_rev.is_some_and(|e| e != rev) {
+            return Ok(FinalPublish::Superseded);
+        }
         tx.execute(
             "DELETE FROM segments WHERE meeting_id = ?1",
             params![meeting_id],
@@ -1301,24 +1393,70 @@ impl MeetingStore {
         )?;
         {
             let mut stmt = tx.prepare(
-                "INSERT INTO segments (meeting_id, speaker, start_secs, end_secs, text)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT INTO segments (meeting_id, speaker, start_secs, end_secs, text, detected_speaker)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             )?;
-            for (speaker, start, end, text) in segments {
-                stmt.execute(params![meeting_id, speaker, start, end, text])?;
+            for (i, (speaker, start, end, text)) in segments.iter().enumerate() {
+                let name = detected
+                    .get(i)
+                    .and_then(|n| n.as_deref())
+                    .map(str::trim)
+                    .filter(|n| !n.is_empty());
+                stmt.execute(params![meeting_id, speaker, start, end, text, name])?;
             }
         }
         tx.commit()?;
-        Ok(segments.len())
+        Ok(FinalPublish::Published(segments.len()))
+    }
+
+    /// A revisão das edições de falante da reunião (`None`: não existe).
+    pub fn speaker_rev(&self, meeting_id: i64) -> Result<Option<i64>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT speaker_rev FROM meetings WHERE id = ?1",
+                params![meeting_id],
+                |r| r.get(0),
+            )
+            .optional()?)
     }
 
     /// Renomeia um falante em todos os segmentos da reunião ("Participante 1"
     /// → "Tatiana"). Devolve quantos segmentos mudaram.
+    ///
+    /// O nome dado à mão vale mais que o detectado na chamada: as sugestões
+    /// do grupo renomeado saem na mesma transação, e a revisão de falantes
+    /// sobe (um passe final em andamento não desfaz a edição).
     pub fn rename_speaker(&self, meeting_id: i64, from: &str, to: &str) -> Result<usize> {
-        let n = self.conn.execute(
-            "UPDATE segments SET speaker = ?3 WHERE meeting_id = ?1 AND speaker = ?2",
+        let tx = self.conn.unchecked_transaction()?;
+        let n = tx.execute(
+            "UPDATE segments SET speaker = ?3, detected_speaker = NULL
+             WHERE meeting_id = ?1 AND speaker = ?2",
             params![meeting_id, from, to.trim()],
         )?;
+        tx.execute(
+            "UPDATE meetings SET speaker_rev = speaker_rev + 1 WHERE id = ?1",
+            params![meeting_id],
+        )?;
+        tx.commit()?;
+        Ok(n)
+    }
+
+    /// Apaga os nomes detectados na chamada do Teams desta reunião, sem
+    /// tocar nas falas nem nos nomes dados à mão. Devolve quantas falas
+    /// perderam o nome.
+    pub fn clear_detected_speakers(&self, meeting_id: i64) -> Result<usize> {
+        let tx = self.conn.unchecked_transaction()?;
+        let n = tx.execute(
+            "UPDATE segments SET detected_speaker = NULL
+             WHERE meeting_id = ?1 AND detected_speaker IS NOT NULL",
+            params![meeting_id],
+        )?;
+        tx.execute(
+            "UPDATE meetings SET speaker_rev = speaker_rev + 1 WHERE id = ?1",
+            params![meeting_id],
+        )?;
+        tx.commit()?;
         Ok(n)
     }
 
@@ -1792,8 +1930,24 @@ impl MeetingStore {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
-    /// Uma reunião com resumo e transcript completo.
+    /// Uma reunião com resumo e transcript completo, com os rótulos
+    /// canônicos de falante (sem os nomes detectados na chamada).
     pub fn get_meeting(&self, meeting_id: i64) -> Result<Option<MeetingDetail>> {
+        self.meeting_detail(meeting_id, false)
+    }
+
+    /// A reunião como a Biblioteca mostra: além do rótulo canônico
+    /// (`speaker`, a chave para renomear), o nome que a chamada do Teams deu
+    /// a cada fala (`detected_speaker`). É a única leitura com esses nomes.
+    pub fn get_meeting_for_library(&self, meeting_id: i64) -> Result<Option<MeetingDetail>> {
+        self.meeting_detail(meeting_id, true)
+    }
+
+    fn meeting_detail(
+        &self,
+        meeting_id: i64,
+        with_detected: bool,
+    ) -> Result<Option<MeetingDetail>> {
         let sql = format!("SELECT {MEETING_COLUMNS} FROM meetings m WHERE m.id = ?1");
         let meeting = self
             .conn
@@ -1812,7 +1966,7 @@ impl MeetingStore {
             .optional()?
             .unwrap_or_default();
         let mut stmt = self.conn.prepare(
-            "SELECT speaker, start_secs, end_secs, text FROM segments
+            "SELECT speaker, start_secs, end_secs, text, detected_speaker FROM segments
              WHERE meeting_id = ?1 ORDER BY start_secs, id",
         )?;
         let segments = stmt
@@ -1822,6 +1976,7 @@ impl MeetingStore {
                     start_secs: r.get::<_, f64>(1)? as f32,
                     end_secs: r.get::<_, f64>(2)? as f32,
                     text: r.get(3)?,
+                    detected_speaker: if with_detected { r.get(4)? } else { None },
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -2065,7 +2220,7 @@ mod tests {
     fn a_v9_traz_listas_projetos_e_o_projeto_nas_tarefas_rotinas_e_reunioes() {
         let path = temp_path("v9-listas-projetos");
         let store = MeetingStore::open(&path).unwrap();
-        assert_eq!(store.schema_version().unwrap(), 9);
+        assert!(store.schema_version().unwrap() >= 9);
         let cols = |table: &str| -> Vec<String> {
             let mut stmt = store
                 .conn
@@ -3225,6 +3380,249 @@ Curto.",
         store.delete_dictation(d).unwrap();
         store.delete_meeting(id).unwrap();
         assert_eq!(store.embeddings_stats("fake/m3").unwrap().chunks, 0);
+    }
+    // ------------------------------------------- nomes da chamada (v10)
+
+    fn finais() -> Vec<(String, f32, f32, String)> {
+        vec![
+            ("Eu".into(), 0.0, 2.0, "Bom dia.".into()),
+            (
+                "Participante 1".into(),
+                2.5,
+                6.0,
+                "Bom dia, pessoal.".into(),
+            ),
+            ("Participante 2".into(), 6.5, 9.0, "Oi.".into()),
+            ("Participante 1".into(), 9.5, 12.0, "Vamos lá.".into()),
+        ]
+    }
+
+    fn nomes() -> Vec<Option<String>> {
+        vec![
+            None,
+            Some("Ana Souza".into()),
+            None,
+            Some("Ana Souza".into()),
+        ]
+    }
+
+    fn detectados(store: &MeetingStore, id: i64) -> Vec<Option<String>> {
+        store
+            .get_meeting_for_library(id)
+            .unwrap()
+            .unwrap()
+            .segments
+            .into_iter()
+            .map(|s| s.detected_speaker)
+            .collect()
+    }
+
+    #[test]
+    fn banco_da_v9_ganha_nomes_vazios_e_os_rotulos_ficam() {
+        let path = temp_path("v9-para-v10");
+        let id = {
+            let store = MeetingStore::open(&path).unwrap();
+            let id = store
+                .save("Da 0.28", "19/11/2026 09:00", &sample_result(), None)
+                .unwrap();
+            store
+                .rename_speaker(id, "Participantes", "Tatiana")
+                .unwrap();
+            store
+                .conn
+                .execute_batch(
+                    "ALTER TABLE segments DROP COLUMN detected_speaker;
+                     ALTER TABLE meetings DROP COLUMN speaker_rev;
+                     PRAGMA user_version = 9;",
+                )
+                .unwrap();
+            id
+        };
+        let store = MeetingStore::open(&path).unwrap();
+        assert_eq!(store.schema_version().unwrap(), SCHEMA_VERSION);
+        assert!(
+            pre_migration_backup_path(&path, 9).exists(),
+            "cópia da v9 antes de migrar"
+        );
+        let det = store.get_meeting_for_library(id).unwrap().unwrap();
+        let rotulos: Vec<&str> = det.segments.iter().map(|s| s.speaker.as_str()).collect();
+        assert_eq!(rotulos, ["Eu", "Tatiana", "Tatiana"]);
+        assert!(det.segments.iter().all(|s| s.detected_speaker.is_none()));
+        assert_eq!(store.speaker_rev(id).unwrap(), Some(0));
+    }
+
+    #[test]
+    fn nomes_detectados_so_saem_na_leitura_da_biblioteca() {
+        let store = temp_store("detectados");
+        let id = store
+            .save("Reunião", "19/11/2026 10:00", &sample_result(), None)
+            .unwrap();
+        assert_eq!(
+            store
+                .publish_final_segments(id, &finais(), &nomes(), Some(0))
+                .unwrap(),
+            FinalPublish::Published(4)
+        );
+        assert_eq!(detectados(&store, id), nomes());
+        // Todas as outras leituras ficam no rótulo canônico.
+        let canon = store.get_meeting(id).unwrap().unwrap();
+        assert!(canon.segments.iter().all(|s| s.detected_speaker.is_none()));
+        let json = serde_json::to_string(&canon).unwrap();
+        assert!(!json.contains("Ana Souza"), "{json}");
+        assert!(!json.contains("detected_speaker"), "o campo nem aparece");
+        assert_eq!(
+            store.speakers(id).unwrap(),
+            ["Eu", "Participante 1", "Participante 2"]
+        );
+        // Lista de nomes que não bate com as falas é recusada.
+        assert!(
+            store
+                .publish_final_segments(id, &finais(), &[None], None)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn renomear_durante_o_passe_final_nao_se_perde_com_duas_conexoes() {
+        let path = temp_path("rev-duas-conexoes");
+        let passe = MeetingStore::open(&path).unwrap();
+        let biblioteca = MeetingStore::open(&path).unwrap();
+        let id = passe
+            .save("Reunião", "19/11/2026 11:00", &sample_result(), None)
+            .unwrap();
+        // O passe começa e guarda a revisão…
+        let rev = passe.speaker_rev(id).unwrap().unwrap();
+        // …a pessoa renomeia pela Biblioteca, na outra conexão…
+        assert_eq!(
+            biblioteca
+                .rename_speaker(id, "Participantes", "Tatiana")
+                .unwrap(),
+            2
+        );
+        // …e a publicação percebe e não passa por cima.
+        assert_eq!(
+            passe
+                .publish_final_segments(id, &finais(), &nomes(), Some(rev))
+                .unwrap(),
+            FinalPublish::Superseded
+        );
+        let det = biblioteca.get_meeting_for_library(id).unwrap().unwrap();
+        assert_eq!(det.segments.len(), 3, "a transcrição salva ficou");
+        assert_eq!(
+            det.segments
+                .iter()
+                .filter(|s| s.speaker == "Tatiana")
+                .count(),
+            2,
+            "com a edição"
+        );
+        assert!(det.segments.iter().all(|s| s.detected_speaker.is_none()));
+        // Sem revisão esperada (opção desligada), o passe publica como antes.
+        assert_eq!(passe.replace_segments(id, &finais()).unwrap(), 4);
+    }
+
+    #[test]
+    fn reuniao_excluida_durante_o_passe_nao_volta() {
+        let store = temp_store("excluida-no-passe");
+        let id = store
+            .save("Reunião", "19/11/2026 12:00", &sample_result(), None)
+            .unwrap();
+        let rev = store.speaker_rev(id).unwrap();
+        store.delete_meeting(id).unwrap();
+        assert_eq!(store.speaker_rev(id).unwrap(), None);
+        assert_eq!(
+            store
+                .publish_final_segments(id, &finais(), &nomes(), rev)
+                .unwrap(),
+            FinalPublish::Missing
+        );
+        assert!(store.replace_segments(id, &finais()).is_err());
+        let soltas: i64 = store
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM segments WHERE meeting_id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(soltas, 0, "nenhuma fala órfã");
+        assert!(store.get_meeting(id).unwrap().is_none());
+    }
+
+    #[test]
+    fn renomear_troca_a_sugestao_do_grupo_pelo_nome_dado() {
+        let store = temp_store("renomear-detectado");
+        let id = store
+            .save("Reunião", "19/11/2026 13:00", &sample_result(), None)
+            .unwrap();
+        store
+            .publish_final_segments(
+                id,
+                &finais(),
+                &[None, Some("Ana Souza".into()), Some("João".into()), None],
+                None,
+            )
+            .unwrap();
+        let rev = store.speaker_rev(id).unwrap().unwrap();
+        // A edição é pela chave do falante, mesmo com o nome detectado na tela.
+        assert_eq!(
+            store
+                .rename_speaker(id, "Participante 1", "Ana Paula")
+                .unwrap(),
+            2
+        );
+        assert_eq!(store.speaker_rev(id).unwrap(), Some(rev + 1));
+        let det = store.get_meeting_for_library(id).unwrap().unwrap();
+        let pares: Vec<(&str, Option<&str>)> = det
+            .segments
+            .iter()
+            .map(|s| (s.speaker.as_str(), s.detected_speaker.as_deref()))
+            .collect();
+        assert_eq!(
+            pares,
+            [
+                ("Eu", None),
+                ("Ana Paula", None),
+                ("Participante 2", Some("João")),
+                ("Ana Paula", None)
+            ],
+            "só o grupo renomeado perde a sugestão"
+        );
+    }
+
+    #[test]
+    fn remover_nomes_detectados_preserva_falas_e_nomes_manuais() {
+        let store = temp_store("remover-detectados");
+        let id = store
+            .save("Reunião", "19/11/2026 14:00", &sample_result(), None)
+            .unwrap();
+        store
+            .publish_final_segments(
+                id,
+                &finais(),
+                &[None, Some("Ana Souza".into()), Some("João".into()), None],
+                None,
+            )
+            .unwrap();
+        store
+            .rename_speaker(id, "Participante 1", "Ana Paula")
+            .unwrap();
+        let rev = store.speaker_rev(id).unwrap().unwrap();
+        assert_eq!(store.clear_detected_speakers(id).unwrap(), 1);
+        assert_eq!(store.speaker_rev(id).unwrap(), Some(rev + 1));
+        let det = store.get_meeting_for_library(id).unwrap().unwrap();
+        assert_eq!(det.segments.len(), 4);
+        assert!(det.segments.iter().all(|s| s.detected_speaker.is_none()));
+        assert_eq!(
+            det.segments
+                .iter()
+                .map(|s| s.speaker.as_str())
+                .collect::<Vec<_>>(),
+            ["Eu", "Ana Paula", "Participante 2", "Ana Paula"]
+        );
+        assert_eq!(det.segments[1].text, "Bom dia, pessoal.");
+        // De novo: nada a remover, e não é erro.
+        assert_eq!(store.clear_detected_speakers(id).unwrap(), 0);
     }
 }
 

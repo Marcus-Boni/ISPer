@@ -467,11 +467,25 @@ pub struct MeetingHandle {
     stop_txs: Vec<Sender<()>>,
     done_rx: Receiver<Result<MeetingResult>>,
     started: Instant,
+    binding: Arc<loopback::CaptureBinding>,
     /// Avisos não-fatais da abertura (ex.: Teams não encontrado → sistema).
     pub warnings: Vec<String>,
 }
 
 impl MeetingHandle {
+    /// O instante zero do relógio da reunião: o áudio gravado em
+    /// `t` segundos foi ouvido em `started() + t`. É um `Instant` (no Windows,
+    /// o QueryPerformanceCounter), comum a qualquer leitura feita no mesmo
+    /// computador.
+    pub fn started(&self) -> Instant {
+        self.started
+    }
+
+    /// Qual processo o canal dos participantes está gravando agora.
+    pub fn capture_binding(&self) -> Arc<loopback::CaptureBinding> {
+        Arc::clone(&self.binding)
+    }
+
     /// Encerra a gravação e espera a transcrição dos blocos restantes.
     pub fn stop(self) -> Result<MeetingResult> {
         for tx in &self.stop_txs {
@@ -523,6 +537,7 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
     // fazia o loopback perder os primeiros segundos.
     let mut stop_txs = Vec::new();
     let mut warnings = Vec::new();
+    let binding = Arc::new(loopback::CaptureBinding::default());
     for speaker in [Speaker::Others, Speaker::Me] {
         let (stop_tx, stop_rx) = unbounded::<()>();
         stop_txs.push(stop_tx);
@@ -530,8 +545,11 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
         let ready_tx = ready_tx.clone();
         let source = source.clone();
         let device = input_device.clone();
+        let binding = Arc::clone(&binding);
         std::thread::spawn(move || {
-            capture_channel(speaker, source, device, started, stop_rx, job_tx, ready_tx)
+            capture_channel(
+                speaker, source, device, started, stop_rx, job_tx, ready_tx, binding,
+            )
         });
         match ready_rx.recv_timeout(Duration::from_secs(8)) {
             Ok(Ok(None)) => {}
@@ -572,6 +590,7 @@ pub fn start(engine: Arc<WhisperEngine>, opts: MeetingOptions) -> Result<Meeting
         stop_txs,
         done_rx,
         started,
+        binding,
         warnings,
     })
 }
@@ -677,6 +696,7 @@ impl AudioFeed for LoopbackFeed {
 }
 
 /// Abre a fonte certa para o canal e roda o fatiador de blocos.
+#[allow(clippy::too_many_arguments)]
 fn capture_channel(
     speaker: Speaker,
     source: LoopbackSource,
@@ -685,6 +705,7 @@ fn capture_channel(
     stop_rx: Receiver<()>,
     job_tx: Sender<Job>,
     ready_tx: Sender<Result<Option<String>>>,
+    binding: Arc<loopback::CaptureBinding>,
 ) {
     match speaker {
         // "Eu": microfone via cpal, como no ditado.
@@ -705,7 +726,9 @@ fn capture_channel(
             let (pump_stop_tx, pump_stop_rx) = unbounded::<()>();
             let (data_tx, data_rx) = unbounded();
             let (lb_ready_tx, lb_ready_rx) = unbounded();
-            std::thread::spawn(move || loopback::run(source, pump_stop_rx, data_tx, lb_ready_tx));
+            std::thread::spawn(move || {
+                loopback::run_bound(source, pump_stop_rx, data_tx, lb_ready_tx, &binding)
+            });
             let ready = match lb_ready_rx.recv_timeout(Duration::from_secs(8)) {
                 Ok(Ok(ready)) => ready,
                 Ok(Err(e)) => {

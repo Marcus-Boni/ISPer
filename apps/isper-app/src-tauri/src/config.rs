@@ -113,6 +113,13 @@ pub struct AppConfig {
     /// que dá a transcrição boa o bastante para virar ata.
     #[serde(default = "default_true")]
     pub final_pass: bool,
+    /// Nomes da chamada do Teams na Biblioteca (ADR 0027): durante a
+    /// gravação com "Só o Microsoft Teams", ler a janela da chamada pelo
+    /// UI Automation e, depois do passe final, dar às falas dos participantes
+    /// o nome que o Teams mostrava. Desligado por padrão; ligar vale a partir
+    /// da próxima gravação.
+    #[serde(default)]
+    pub teams_speaker_names: bool,
     /// Transcrever o que for deixado na pasta `Documentos\ISPer\Importar`
     /// (Fase 9.0). Ligado por padrão: a pasta só existe para isso, e o
     /// arquivo nunca é apagado — muda para `Importados` depois de virar
@@ -234,6 +241,7 @@ impl Default for AppConfig {
             overlay_pinned: false,
             retention_days: 0,
             final_pass: true,
+            teams_speaker_names: false,
             import_watch: true,
             phone_sync: false,
             phone_relay: None,

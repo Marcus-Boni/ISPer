@@ -2,7 +2,7 @@
 
 use crate::prelude::*;
 use isper_core::loopback::LoopbackSource;
-use isper_core::meeting::{self, MeetingHandle, MeetingOptions, MeetingSegment};
+use isper_core::meeting::{self, MeetingOptions, MeetingSegment};
 
 /// Depois de um ditado ou reunião: se houver reunião ativa, o overlay volta
 /// a mostrar o estado dela; se estiver fixo, volta ao repouso; senão, esconde.
@@ -146,7 +146,14 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
             if !handle.warnings.is_empty() {
                 payload["message"] = json!(handle.warnings.join(" · "));
             }
-            *state.meeting.lock_or_recover() = Some(handle);
+            // Só depois que o áudio abriu: o leitor precisa saber qual Teams
+            // está sendo gravado de fato.
+            let names = crate::teams_names::TeamsNamesSession::start_if_enabled(
+                app,
+                handle.started(),
+                handle.capture_binding(),
+            );
+            *state.meeting.lock_or_recover() = Some(ActiveMeeting { handle, names });
             *state.meeting_started.lock_or_recover() = Some(Instant::now());
             set_meeting_text(app, &meeting_item_text(app, true));
             set_tray_recording(app, true);
@@ -183,9 +190,12 @@ pub(crate) fn toggle_meeting(app: &AppHandle) -> anyhow::Result<()> {
 /// por isso fazia ninguém esperar, e os rótulos ficavam genéricos para sempre.
 pub(crate) fn finish_meeting(
     app: &AppHandle,
-    handle: MeetingHandle,
+    active: ActiveMeeting,
     copilot: CopilotWrapUp,
 ) -> anyhow::Result<String> {
+    let ActiveMeeting { handle, names } = active;
+    // A leitura da chamada para junto com a gravação, sem esperar o leitor.
+    let evidence = names.map(crate::teams_names::TeamsNamesSession::seal);
     let result = handle.stop()?;
     if result.segments.is_empty() {
         anyhow::bail!(crate::i18n::tr(app, "errors.no-speech-meeting"));
@@ -252,6 +262,24 @@ pub(crate) fn finish_meeting(
     // As notas também: e daqui em diante o bloco do Copilot grava direto
     // nesta reunião, se o usuário continuar escrevendo.
     attach_saved_meeting(app, &copilot, &store, meeting_id);
+
+    // Com os nomes do Teams ligados nesta gravação, a revisão das edições
+    // de falante é guardada agora: se alguém renomear um falante enquanto o
+    // passe final roda, a edição vale mais que o passe (ADR 0027).
+    let final_names = match evidence {
+        Some(evidence) => match store.speaker_rev(meeting_id) {
+            Ok(Some(expected_rev)) => Some(crate::teams_names::FinalNames {
+                evidence,
+                expected_rev,
+            }),
+            Ok(None) => None,
+            Err(e) => {
+                tracing::warn!(meeting_id, "nomes do Teams: revisão ilegível ({e})");
+                None
+            }
+        },
+        None => None,
+    };
 
     // Fase 10.3: o evento da agenda em que a gravação aconteceu dá o nome da
     // reunião (o assunto do convite é o nome que ela tem) e fica ligado a
@@ -366,7 +394,7 @@ pub(crate) fn finish_meeting(
     // substitui a transcrição ao vivo no banco, regrava o `.md` e refaz o
     // resumo e a busca. O título vai junto: é o que o app pôs, e só ele pode
     // dar lugar ao título da IA.
-    final_pass::run_in_background(app.clone(), meeting_id, result, app_title);
+    final_pass::run_in_background(app.clone(), meeting_id, result, app_title, final_names);
 
     Ok(md_path.display().to_string())
 }

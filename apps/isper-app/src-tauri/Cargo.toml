@@ -67,7 +67,16 @@ isper-llm = { path = "../../../crates/isper-llm", features = ["testing"] }
 [target.'cfg(windows)'.dependencies]
 # SetWindowPos direto: reafirma o indicador no topo da faixa "sempre no topo"
 # (o tao não reaplica a flag quando ela já está ligada).
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+# Job Object e QueryPerformanceCounter: o leitor da chamada do Teams
+# (teams_names.rs) morre com o app e carimba as leituras no relógio da reunião.
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Security",
+    "Win32_System_JobObjects",
+    "Win32_System_Performance",
+    "Win32_System_Threading",
+] }
 # Toasts do Windows (mesma base do plugin oficial) + registro do nosso
 # AppUserModelID no HKCU para o exe "solto" aparecer como ISPer, com ícone.
 tauri-winrt-notification = "0.8"

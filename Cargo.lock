@@ -3278,6 +3278,7 @@ dependencies = [
  "tracing",
  "wasapi",
  "whisper-rs",
+ "windows 0.62.2",
 ]
 
 [[package]]

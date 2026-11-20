@@ -29,6 +29,7 @@ mod projetos;
 mod reunioes;
 mod sync;
 mod tarefas;
+mod teams_probe;
 use isper_core::loopback::LoopbackSource;
 use isper_core::meeting::{self, MeetingOptions};
 use isper_core::{WhisperEngine, audio, store::MeetingStore};
@@ -240,6 +241,22 @@ enum Cmd {
     /// Os projetos: a lente de tarefas e reuniões (Fase 11.1)
     #[command(subcommand)]
     Projetos(ProjetosCmd),
+    /// Sonda dos nomes do Teams: lê a janela da chamada aberta como o app
+    /// lê e mostra o que dá para usar (validação em chamada real, ADR 0027)
+    TeamsProbe {
+        /// Por quantos segundos ler
+        #[arg(long, default_value_t = 60)]
+        seconds: u64,
+        /// Intervalo entre leituras, em ms
+        #[arg(long, default_value_t = 500)]
+        every_ms: u64,
+        /// Mostrar os nomes no terminal (nunca vão para arquivo nenhum)
+        #[arg(long)]
+        names: bool,
+        /// Gravar a última árvore lida, anonimizada, como fixture de teste
+        #[arg(long)]
+        fixture: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -648,6 +665,12 @@ fn main() -> anyhow::Result<()> {
         Cmd::Memoria(cmd) => run_memoria(cmd),
         Cmd::Listas(cmd) => run_listas(cmd),
         Cmd::Projetos(cmd) => run_projetos(cmd),
+        Cmd::TeamsProbe {
+            seconds,
+            every_ms,
+            names,
+            fixture,
+        } => teams_probe::run(*seconds, *every_ms, *names, fixture.as_deref()),
         Cmd::Reunioes(ReunioesCmd::Acoes {
             id,
             provider,

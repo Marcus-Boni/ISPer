@@ -11,6 +11,7 @@
 //! | Etapa | Módulos |
 //! |---|---|
 //! | captura | [`audio`] (microfone, WAV, resample), [`loopback`] (o que sai na caixa de som), [`recorder`] (ditado), [`calls`] (chamada do Teams em andamento) |
+//! | nomes da chamada | [`speaker_names`] (a janela do Teams pelo UI Automation, e quem disse cada fala) |
 //! | gravações do celular | [`capture`] (o Ogg/Opus e o manifesto ao lado; recuperação depois de uma queda) |
 //! | arquivos de áudio | [`decode`] (MP3, M4A, WAV, FLAC, OGG, Opus → 16 kHz mono), [`ogg_opus`] (gravar e ler Ogg/Opus, à prova de queda), [`recording`] (data e título pelo nome do arquivo) |
 //! | reunião ao vivo | [`meeting`] (os dois canais no relógio da reunião), [`chunk`] (corte em silêncio) |
@@ -47,6 +48,7 @@ pub mod profile;
 pub mod recorder;
 pub mod recording;
 mod resume;
+pub mod speaker_names;
 pub mod store;
 pub mod text;
 pub mod vad;

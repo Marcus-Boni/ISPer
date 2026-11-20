@@ -96,6 +96,8 @@
   .seg .sp { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; border-radius: 4px; padding: 0 4px; margin: 0 -4px; transition: background var(--dur-2); }
   .seg .sp:hover { background: var(--panel-2); }
   .seg .sp input { width: 100%; font: 600 13.5px var(--font-body); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--accent); background: var(--bg-2); color: var(--ink); outline: none; }
+  .seg .sp.detected { text-decoration: underline dotted; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  .detected-note { margin: -2px 0 8px; }
   .sp.eu { color: var(--accent); } .sp.p1 { color: var(--p1); } .sp.p2 { color: var(--p2); } .sp.p3 { color: var(--p3); } .sp.p4 { color: var(--p4); } .sp.p5 { color: var(--p5); } .sp.px { color: var(--muted); }
 
   /* Busca dentro da reunião: barra fixa no topo do painel + destaques. */
@@ -247,15 +249,19 @@
   // Mesmas regras do núcleo (meeting.rs): um parágrafo só continua se for o
   // mesmo falante, com pausa < 4 s e sem passar de 60 s.
   const GROUP_MAX_SECS = 60, GROUP_GAP_SECS = 4;
-  function groupSpeech(segments) {
+  // `withDetected`: o nome lido da chamada do Teams (só na tela) também
+  // separa parágrafos — o mesmo "Participante 1" pode ter falas com e sem
+  // nome. Sem ele, os grupos são os da ata (Copiar transcript).
+  function groupSpeech(segments, withDetected) {
     const groups = [];
     for (const s of segments) {
       const text = (s.text || '').trim();
       if (!text) continue;
+      const detected = (withDetected && s.detected_speaker) || null;
       const g = groups[groups.length - 1];
-      if (g && g.speaker === s.speaker && s.start_secs - g.end_secs < GROUP_GAP_SECS && s.end_secs - g.start_secs <= GROUP_MAX_SECS) {
+      if (g && g.speaker === s.speaker && g.detected === detected && s.start_secs - g.end_secs < GROUP_GAP_SECS && s.end_secs - g.start_secs <= GROUP_MAX_SECS) {
         g.text += ' ' + text; g.end_secs = Math.max(g.end_secs, s.end_secs);
-      } else groups.push({ speaker: s.speaker, start_secs: s.start_secs, end_secs: s.end_secs, text });
+      } else groups.push({ speaker: s.speaker, detected, start_secs: s.start_secs, end_secs: s.end_secs, text });
     }
     return groups;
   }
@@ -400,7 +406,8 @@
       d.classList.remove('filtering');
       if (!det) { d.appendChild(placeholder(t('library.not-found'))); return; }
       const m = det.meeting;
-      const groups = groupSpeech(det.segments);
+      const groups = groupSpeech(det.segments, true);
+      const hasDetected = groups.some(g => g.detected);
       // Cores por ordem de aparição — nomes personalizados continuam coloridos.
       const order = [];
       const spClass = (sp) => {
@@ -409,7 +416,8 @@
         if (i < 0) { order.push(sp); i = order.length - 1; }
         return 'p' + (Math.min(i, 4) + 1);
       };
-      const transcriptText = () => groups.map(g => '[' + fmtClock(g.start_secs) + '] ' + speaker(g.speaker) + ': ' + g.text).join('\n');
+      // Copiar transcript leva os rótulos da ata, nunca os nomes detectados.
+      const transcriptText = () => groupSpeech(det.segments, false).map(g => '[' + fmtClock(g.start_secs) + '] ' + speaker(g.speaker) + ': ' + g.text).join('\n');
 
       const head = el('div', 'dhead');
       const h2 = el('h2', '', m.title);
@@ -464,6 +472,26 @@
           catch (e) { UI.busy(b, false); toast(t('library.export-failed', { e }), 'err'); }
         });
         actions.appendChild(b);
+      }
+      if (hasDetected) {
+        const bNames = el('button', 'btn btn-ghost', t('library.detected.remove'));
+        bNames.id = 'remove-detected';
+        bNames.title = t('library.detected.remove-title');
+        let armed = null;
+        bNames.addEventListener('click', async () => {
+          if (!armed) {
+            bNames.textContent = t('library.detected.confirm');
+            armed = setTimeout(() => { armed = null; bNames.textContent = t('library.detected.remove'); }, 4000);
+            return;
+          }
+          clearTimeout(armed); armed = null;
+          try {
+            await invoke('remove_detected_speakers', { id });
+            toast(t('library.detected.removed'), 'ok');
+            showMeeting(id, { keepScroll: true });
+          } catch (e) { toast(t('common.error', { e }), 'err'); }
+        });
+        actions.appendChild(bNames);
       }
       const bDel = el('button', 'btn btn-danger ml-auto', t('library.delete'));
       bDel.title = t('library.delete-title');
@@ -605,10 +633,14 @@
         d.appendChild(box);
       }
       d.appendChild(el('h3', 'eyebrow', t('library.transcript')));
+      if (hasDetected) d.appendChild(el('p', 'hint detected-note', t('library.detected.note')));
 
       // Renomear falante: clique no nome → input; Enter aplica em toda a reunião.
-      const renameSpeaker = (spEl, from) => {
-        const shown = speaker(from);
+      // A edição é sempre pela chave do falante ("Participante 1"), mesmo
+      // com o nome detectado na tela; confirmar o nome detectado (Enter sem
+      // mudar) também vale — ele passa a ser o nome da reunião, ata incluída.
+      const renameSpeaker = (spEl, from, detected) => {
+        const shown = detected || speaker(from);
         const input = el('input'); input.value = shown; input.setAttribute('aria-label', t('library.speaker.aria'));
         spEl.replaceChildren(input); input.focus(); input.select();
         let done = false;
@@ -616,7 +648,7 @@
         const commit = async () => {
           if (done) return; done = true;
           const to = input.value.trim();
-          if (!to || to === from || to === shown) { restore(); return; }
+          if (!to || to === from || (to === shown && !detected)) { restore(); return; }
           try {
             const n = await invoke('rename_speaker', { id, from, to });
             toast(t('library.speaker.renamed', { n, to }), 'ok');
@@ -634,10 +666,14 @@
         segEls.set(g, seg);
         if (n < 14) { seg.classList.add('reveal'); seg.style.setProperty('--i', String(n)); }
         seg.appendChild(el('div', 'ts', fmtClock(g.start_secs)));
-        const sp = el('div', 'sp ' + spClass(g.speaker), speaker(g.speaker));
-        sp.title = t('library.speaker.title', { name: speaker(g.speaker) });
-        keyboardClick(sp, t('library.speaker.rename-aria', { name: speaker(g.speaker) }));
-        sp.addEventListener('click', () => { if (!sp.querySelector('input')) renameSpeaker(sp, g.speaker); });
+        const shownName = g.detected || speaker(g.speaker);
+        const sp = el('div', 'sp ' + spClass(g.speaker) + (g.detected ? ' detected' : ''), shownName);
+        sp.title = g.detected
+          ? t('library.speaker.detected-title', { label: speaker(g.speaker) })
+          : t('library.speaker.title', { name: shownName });
+        if (g.detected) sp.dataset.speakerKey = g.speaker;
+        keyboardClick(sp, t('library.speaker.rename-aria', { name: shownName }));
+        sp.addEventListener('click', () => { if (!sp.querySelector('input')) renameSpeaker(sp, g.speaker, g.detected); });
         seg.appendChild(sp);
         const tx = el('div', 'tx', g.text); tx.dataset.raw = g.text;
         seg.appendChild(tx);
