@@ -1,0 +1,52 @@
+[
+  {
+    "title": "Reunião de planejamento | Microsoft Teams",
+    "tree": {
+      "r": "window",
+      "t": "Reunião de planejamento | Microsoft Teams",
+      "k": [
+        {
+          "r": "group",
+          "t": "Controles da reunião",
+          "k": [
+            { "r": "button", "t": "Câmera" },
+            { "r": "button", "t": "Ativar mudo (Ctrl+Shift+M)" },
+            { "r": "button", "t": "Compartilhar" },
+            { "r": "button", "t": "Pessoas" },
+            { "r": "button", "t": "Chat" },
+            { "r": "split button", "t": "Sair" }
+          ]
+        },
+        {
+          "r": "group",
+          "t": "Galeria",
+          "k": [
+            { "r": "group", "t": "Ana Souza, Sem mudo, Vídeo desligado" },
+            { "r": "group", "t": "Carla Ávila Nogueira, Mudo" }
+          ]
+        },
+        {
+          "r": "tree",
+          "t": "Participantes",
+          "k": [
+            {
+              "r": "tree item",
+              "t": "Nesta reunião (3)",
+              "k": [
+                { "r": "tree item", "t": "Bruno Lima (Você), Organizador, Sem mudo" },
+                { "r": "tree item", "t": "Ana Souza, Apresentador, Sem mudo, Falando" },
+                {
+                  "r": "tree item",
+                  "k": [
+                    { "r": "text", "t": "Carla Ávila Nogueira" },
+                    { "r": "image", "t": "Microfone desativado" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

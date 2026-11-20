@@ -1,0 +1,31 @@
+[
+  {
+    "title": "Weekly sync | Microsoft Teams",
+    "tree": {
+      "r": "window",
+      "t": "Weekly sync | Microsoft Teams",
+      "k": [
+        {
+          "r": "tool bar",
+          "t": "Meeting controls",
+          "k": [
+            { "r": "button", "t": "Mute (Ctrl+Shift+M)" },
+            { "r": "button", "t": "Camera" },
+            { "r": "button", "t": "People" },
+            { "r": "button", "t": "Leave" }
+          ]
+        },
+        { "r": "text", "t": "Sam Rivera is speaking" },
+        {
+          "r": "list",
+          "t": "Participants (3)",
+          "k": [
+            { "r": "list item", "t": "Dana Smith (You), Organizer, Unmuted" },
+            { "r": "list item", "t": "Lee Park, Presenter, Muted" },
+            { "r": "list item", "t": "Sam Rivera, Attendee, Unmuted, Speaking" }
+          ]
+        }
+      ]
+    }
+  }
+]

@@ -112,6 +112,16 @@ pub(crate) enum EngineStatus {
     Failed { message: String },
 }
 
+/// Uma gravação de reunião e o que é dela: encerrar por qualquer caminho
+/// (janela, fim automático da chamada, sair pela bandeja) leva as duas
+/// coisas juntas, e a coleta de uma gravação nunca vai parar noutra.
+pub(crate) struct ActiveMeeting {
+    /// A gravação em si.
+    pub(crate) handle: MeetingHandle,
+    /// A leitura da chamada do Teams, quando a opção está ligada.
+    pub(crate) names: Option<crate::teams_names::TeamsNamesSession>,
+}
+
 pub(crate) struct AppState {
     /// Carregado em background no startup; `None` enquanto carrega.
     pub(crate) engine: Mutex<Option<Arc<WhisperEngine>>>,
@@ -121,8 +131,9 @@ pub(crate) struct AppState {
     pub(crate) config: Mutex<AppConfig>,
     /// Rótulo do atalho registrado no momento (p/ a bandeja e as configurações).
     pub(crate) active_shortcut: Mutex<String>,
-    /// Gravação de reunião em andamento (Fase 4).
-    pub(crate) meeting: Mutex<Option<MeetingHandle>>,
+    /// Gravação de reunião em andamento (Fase 4), com a coleta dos nomes da
+    /// chamada que pertence a ela.
+    pub(crate) meeting: Mutex<Option<ActiveMeeting>>,
     /// Quando a reunião atual começou (cronômetro da tela Início).
     pub(crate) meeting_started: Mutex<Option<Instant>>,
     /// Reunião que a Biblioteca deve abrir já selecionada.

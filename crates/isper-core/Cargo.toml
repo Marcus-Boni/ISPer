@@ -37,6 +37,15 @@ symphonia = { version = "0.6.1", default-features = false, features = ["aac", "f
 # compila sem isto.
 [target.'cfg(windows)'.dependencies]
 wasapi = "0.25.0"
+# UI Automation (nomes da chamada do Teams, `speaker_names::uia`): a mesma
+# versão que o Tauri/WebView2 já compilam, só com as features a mais.
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_UI_Accessibility",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [lints]
 workspace = true

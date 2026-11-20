@@ -11,6 +11,25 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **Identificar falantes do Teams (beta).** Com "Só o Microsoft Teams" como
+  fonte do áudio, o ISPer pode ler a janela da chamada do Teams durante a
+  gravação — o mesmo que um leitor de tela lê — e, depois do passe final, dar
+  às falas dos participantes o nome que o Teams mostrava. Só quando a
+  evidência é clara: a pessoa marcada falando, presente uma vez no painel
+  Pessoas, concordando com o grupo da diarização; senão fica "Participante
+  N". Os nomes aparecem só na Biblioteca, com sublinhado pontilhado: a ata,
+  as exportações, a busca e a IA continuam com o rótulo, até você confirmar
+  o nome com um clique. "Remover nomes detectados" apaga as sugestões de uma
+  reunião. Desligado por padrão, em Configurações → Reuniões; nada sai do PC
+  ([ADR 0027](docs/adr/0027-nomes-da-chamada-do-teams.md)).
+- **`isper-cli teams-probe`**: mostra o que a janela da chamada do Teams dá
+  para ler e grava a árvore anonimizada como fixture de teste.
+
+### Corrigido
+- Uma reunião excluída enquanto o passe final rodava voltava como falas
+  soltas no banco; agora o passe percebe e não grava nada.
+
 ## [0.28.0] - 2026-11-08
 
 O assistente ganha jeito e rosto. Ele tem nome, tom e tamanho de resposta

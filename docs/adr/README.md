@@ -33,6 +33,7 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0024](0024-tarefas-no-bolso.md) | Tarefas no bolso: o PC é a fonte, o celular manda mudanças com a hora | aceita | 10/10/2026 |
 | [0025](0025-quando-der-tempo-e-projetos-locais.md) | "Quando der tempo" e projetos locais: listas sem data, e o projeto como lente que não depende do OptTime | aceita | 12/10/2026 |
 | [0026](0026-mascote-do-assistente.md) | O mascote do assistente é o ponto da marca, vivo, em WebGL com o three.js embutido | aceita | 05/11/2026 |
+| [0027](0027-nomes-da-chamada-do-teams.md) | Nomes dos falantes lidos da janela do Teams, só na Biblioteca e só com evidência | aceita (piloto) | 20/11/2026 |
 
 ## Como escrever um ADR
 

@@ -17,11 +17,14 @@
 //
 // Ferramenta pedida que não veio na lista (bloqueada nas permissões) vira a
 // resposta "Essa ferramenta está bloqueada.". GET /requests devolve o resumo
-// de cada chamada recebida. Só escuta em 127.0.0.1.
+// de cada chamada recebida com ferramentas; GET /plain, o texto inteiro das
+// chamadas sem ferramenta (resumo, título), para o e2e conferir o que saiu da
+// máquina. Só escuta em 127.0.0.1.
 import http from 'node:http';
 
 const port = Number(process.argv[2] || 0);
 const requests = [];
+const plain = [];
 let nextCall = 1;
 
 const today = () => {
@@ -111,6 +114,11 @@ function reply(body) {
 }
 
 const server = http.createServer((req, res) => {
+  if (req.method === 'GET' && req.url === '/plain') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(plain));
+    return;
+  }
   if (req.method === 'GET' && req.url === '/requests') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(requests));
@@ -127,7 +135,12 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     let body;
     try { body = JSON.parse(raw); } catch { res.writeHead(400).end(); return; }
-    // Sem ferramentas (resumos, títulos): um texto curto basta.
+    // Sem ferramentas (resumos, títulos): um texto curto basta, e o texto
+    // que chegou fica guardado inteiro.
+    if (!body.tools) {
+      const text = (body.messages || []).map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
+      plain.push({ model: body.model, text: text.join(String.fromCharCode(10)) });
+    }
     const message = body.tools ? reply(body) : { content: 'ok' };
     if (body.stream) {
       res.writeHead(200, { 'Content-Type': 'text/event-stream' });

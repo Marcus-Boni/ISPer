@@ -241,6 +241,9 @@
     <option value="teams" data-i18n="settings.reunioes.so-microsoft-teams">Só o Microsoft Teams</option>
   </select>
   <p class="hint" data-i18n="settings.reunioes.so-teams-usa-process-loopback">"Só o Teams" usa o process loopback do Windows — ignora notificações, músicas e outros apps. Se o Teams não estiver aberto na hora, o ISPer cai para o sistema e avisa no indicador.</p>
+  <label class="switch mt8"><input type="checkbox" id="teamsnames" aria-describedby="teamsnameshint teamsnamesreq"><span class="track"><span class="thumb"></span></span><span data-i18n="settings.reunioes.teams-names">Identificar falantes do Teams (beta)</span></label>
+  <p class="hint" id="teamsnameshint" data-i18n="settings.reunioes.teams-names-hint">Durante a gravação, o ISPer lê a janela da chamada do Teams e, depois do passe final, dá às falas dos participantes o nome que o Teams mostrava.</p>
+  <p class="hint" id="teamsnamesreq" role="status" aria-live="polite" hidden></p>
   <label class="lbl" data-i18n="settings.reunioes.quem-falou-diarizacao">Quem falou o quê (diarização)</label>
   <div class="row">
     <span class="hint m0" id="diarstate">…</span>
@@ -680,6 +683,8 @@
       $('autoupdate').checked = s.auto_update_check !== false;
       $('speakers').value = String(s.meeting_speakers || 0);
       $('finalpass').checked = s.final_pass !== false;
+      $('teamsnames').checked = !!s.teams_speaker_names;
+      teamsNamesReq();
       $('importwatch').checked = s.import_watch !== false;
       $('meetinginbox').checked = s.meeting_inbox !== false;
       $('meetingprep').checked = s.meeting_prep !== false;
@@ -777,12 +782,33 @@
     setProgress(box, done, total);
   });
 
+  // Nomes do Teams: o que ainda falta para a opção funcionar, conforme o
+  // que está na tela agora (a fonte do áudio, o passe final, os modelos).
+  let diarReady = null;
+  function teamsNamesReq() {
+    const box = $('teamsnamesreq');
+    if (!$('teamsnames').checked) { box.hidden = true; return; }
+    const missing = [];
+    if ($('source').value !== 'teams') missing.push(t('settings.reunioes.teams-names-need-source'));
+    if (!$('finalpass').checked) missing.push(t('settings.reunioes.teams-names-need-final'));
+    if (diarReady === false) missing.push(t('settings.reunioes.teams-names-need-diar'));
+    box.textContent = missing.length
+      ? t('settings.reunioes.teams-names-missing', { items: missing.join(' · ') })
+      : t('settings.reunioes.teams-names-ready');
+    box.classList.toggle('text-good', !missing.length);
+    box.hidden = false;
+  }
+  for (const id of ['teamsnames', 'source', 'finalpass']) $(id).addEventListener('change', teamsNamesReq);
+  document.addEventListener('isper-i18n', teamsNamesReq);
+
   async function refreshDiarize() {
     try {
       const ok = await invoke('diarize_status');
       $('diarstate').textContent = ok ? t('settings.msg.diar-installed') : t('settings.msg.diar-missing');
       $('diarstate').classList.toggle('text-good', ok);
       $('diardl').hidden = ok;
+      diarReady = ok;
+      teamsNamesReq();
     } catch (_) {}
   }
   $('diardl').addEventListener('click', async () => {
@@ -908,7 +934,7 @@
   $('provider').addEventListener('change', () => { $('llmbasebox').hidden = $('provider').value !== 'openai'; });
   const SAVED_BY_BUTTON = new Set(['shortcut', 'lang', 'dict', 'source', 'provider', 'model', 'llmbase', 'autostart', 'showhome', 'mic',
     'mshortcut', 'markshortcut', 'copilotshortcut', 'captureshortcut', 'polish', 'pstyle', 'after', 'voicecmd', 'autoupdate', 'retention',
-    'speakers', 'finalpass', 'importwatch', 'meetinginbox', 'meetingprep', 'diarthr', 'calldetect', 'insights', 'insint', 'copfilter', 'embprovider',
+    'speakers', 'finalpass', 'teamsnames', 'importwatch', 'meetinginbox', 'meetingprep', 'diarthr', 'calldetect', 'insights', 'insint', 'copfilter', 'embprovider',
     'embmodel', 'embbase']);
   let isDirty = false;
   function setDirty(on) {
@@ -958,6 +984,7 @@
         retention_days: ($('retconfirm').hidden ? Number($('retention').value) : Number(retentionSaved)) || 0,
         meeting_speakers: Number($('speakers').value) || 0,
         final_pass: $('finalpass').checked,
+        teams_speaker_names: $('teamsnames').checked,
         import_watch: $('importwatch').checked,
         meeting_inbox: $('meetinginbox').checked,
         meeting_prep: $('meetingprep').checked,
@@ -1419,6 +1446,7 @@
     add(t('settings.diag.retention'), d.retention_days ? t('settings.diag.retention-days', { n: d.retention_days }) : t('settings.diag.retention-forever'));
     add(t('settings.diag.speakers'), d.meeting_speakers ? String(d.meeting_speakers) : t('settings.diag.speakers-auto'));
     add(t('settings.diag.final-pass'), d.final_pass === false ? t('settings.diag.off') : t('settings.diag.on'));
+    add(t('settings.diag.teams-names'), d.teams_speaker_names ? t('settings.diag.on') : t('settings.diag.off'));
     for (const m of (d.metrics || [])) {
       const name = m.kind === 'dictation' ? t('settings.diag.dictations-30') : m.kind === 'meeting_block' ? t('settings.diag.blocks-30') : t('settings.diag.kind-30', { kind: m.kind });
       const rate = m.total ? Math.round(m.errors / m.total * 1000) / 10 : 0;

@@ -34,6 +34,7 @@ use isper_core::context::MeetingContext;
 use isper_core::meeting;
 use isper_core::meeting::MeetingResult;
 use isper_core::pipeline::{self, Diarizer, DiarizerOutput, FinalConfig, FinalTranscript};
+use isper_core::store::FinalPublish;
 
 /// Uma fala pronta para o banco: falante, início, fim, texto.
 pub(crate) type Row = (String, f32, f32, String);
@@ -103,6 +104,7 @@ pub(crate) fn run_in_background(
     meeting_id: i64,
     result: MeetingResult,
     app_title: Option<String>,
+    names: Option<crate::teams_names::FinalNames>,
 ) {
     {
         let state = app.state::<AppState>();
@@ -113,8 +115,8 @@ pub(crate) fn run_in_background(
 
     std::thread::spawn(move || {
         let started = Instant::now();
-        let published = match run(&app, meeting_id, &result) {
-            Ok(Some(n)) => {
+        let published = match run(&app, meeting_id, &result, names) {
+            Ok(Outcome::Published(n)) => {
                 tracing::info!(
                     meeting_id,
                     falas = n,
@@ -123,8 +125,19 @@ pub(crate) fn run_in_background(
                 );
                 true
             }
-            Ok(None) => {
+            Ok(Outcome::Disabled) => {
                 tracing::info!(meeting_id, "passe final desligado na configuração");
+                false
+            }
+            Ok(Outcome::Superseded) => {
+                tracing::info!(
+                    meeting_id,
+                    "um falante foi renomeado durante o passe final — a transcrição salva, com a edição, ficou"
+                );
+                false
+            }
+            Ok(Outcome::Missing) => {
+                tracing::info!(meeting_id, "a reunião foi excluída durante o passe final");
                 false
             }
             Err(e) => {
@@ -271,10 +284,27 @@ pub(crate) fn transcribe_mixed(
     Ok(out.speaker_rows())
 }
 
-fn run(app: &AppHandle, meeting_id: i64, result: &MeetingResult) -> anyhow::Result<Option<usize>> {
+/// Como terminou um passe final que não falhou.
+enum Outcome {
+    /// Desligado na configuração.
+    Disabled,
+    /// Publicado; quantas falas.
+    Published(usize),
+    /// Alguém editou os falantes durante o passe: ficou a transcrição salva.
+    Superseded,
+    /// A reunião foi excluída durante o passe.
+    Missing,
+}
+
+fn run(
+    app: &AppHandle,
+    meeting_id: i64,
+    result: &MeetingResult,
+    names: Option<crate::teams_names::FinalNames>,
+) -> anyhow::Result<Outcome> {
     let opts = options(app);
     if !app.state::<AppState>().config.lock_or_recover().final_pass {
-        return Ok(None);
+        return Ok(Outcome::Disabled);
     }
     let engine = loaded_engine(app)?;
     // O modelo de VAD tem 0,9 MB e é baixado na primeira reunião.
@@ -314,10 +344,25 @@ fn run(app: &AppHandle, meeting_id: i64, result: &MeetingResult) -> anyhow::Resu
     );
     rows.sort_by(|a, b| a.1.total_cmp(&b.1));
 
+    // Nomes da chamada do Teams (ADR 0027): cruzados com as falas finais,
+    // na ordem delas. Com a opção ligada nesta gravação, a publicação também
+    // confere a revisão das edições — mesmo que nenhum nome tenha saído.
+    let (detected, expected_rev) = match &names {
+        Some(n) => (
+            crate::teams_names::names_for_rows(app, meeting_id, &rows, &n.evidence),
+            Some(n.expected_rev),
+        ),
+        None => (Vec::new(), None),
+    };
     let store = open_store()?;
-    let n = store.replace_segments(meeting_id, &rows)?;
-    rewrite_markdown(&store, meeting_id);
-    Ok(Some(n))
+    match store.publish_final_segments(meeting_id, &rows, &detected, expected_rev)? {
+        FinalPublish::Published(n) => {
+            rewrite_markdown(&store, meeting_id);
+            Ok(Outcome::Published(n))
+        }
+        FinalPublish::Superseded => Ok(Outcome::Superseded),
+        FinalPublish::Missing => Ok(Outcome::Missing),
+    }
 }
 
 fn log_report(meeting_id: i64, canal: &str, out: &FinalTranscript) {

@@ -1,0 +1,49 @@
+[
+  {
+    "title": "Reunião de planejamento | Microsoft Teams",
+    "tree": {
+      "r": "window",
+      "t": "Reunião de planejamento | Microsoft Teams",
+      "k": [
+        {
+          "r": "group",
+          "t": "Controles da reunião",
+          "k": [
+            { "r": "button", "t": "Ativar mudo (Ctrl+Shift+M)" },
+            { "r": "button", "t": "Sair" }
+          ]
+        },
+        {
+          "r": "group",
+          "t": "Chat da reunião",
+          "k": [
+            {
+              "r": "list",
+              "k": [
+                { "r": "list item", "t": "Ana Souza está falando" },
+                { "r": "list item", "t": "Vamos rever o orçamento depois" }
+              ]
+            },
+            { "r": "edit", "t": "Digite uma mensagem" }
+          ]
+        },
+        {
+          "r": "pane",
+          "t": "Legendas ao vivo",
+          "k": [
+            { "r": "text", "t": "Carla Ávila Nogueira: o orçamento fecha em março" }
+          ]
+        },
+        {
+          "r": "tree",
+          "t": "Participantes",
+          "k": [
+            { "r": "tree item", "t": "Bruno Lima (Você), Organizador, Sem mudo" },
+            { "r": "tree item", "t": "Ana Souza, Apresentador, Sem mudo" },
+            { "r": "tree item", "t": "Carla Ávila Nogueira, Convidado, Mudo" }
+          ]
+        }
+      ]
+    }
+  }
+]

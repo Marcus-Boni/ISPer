@@ -52,6 +52,8 @@ pub(crate) struct SettingsDto {
     retention_days: u32,
     /// Passe final ligado (refaz a transcrição ao encerrar a reunião).
     final_pass: bool,
+    /// Nomes da chamada do Teams na Biblioteca (desligado por padrão).
+    teams_speaker_names: bool,
     /// Transcrever o que cair na pasta Importar (Fase 9.0).
     import_watch: bool,
     /// Aviso de preparo antes das reuniões da agenda (Fase 10.3).
@@ -125,6 +127,9 @@ pub(crate) struct SettingsPatch {
     /// Avançado — passe final ligado (padrão) ou não.
     #[serde(default)]
     final_pass: Option<bool>,
+    /// Nomes da chamada do Teams (ausente = mantém).
+    #[serde(default)]
+    teams_speaker_names: Option<bool>,
     /// Vigiar a pasta Importar (ausente = mantém).
     #[serde(default)]
     import_watch: Option<bool>,
@@ -397,6 +402,7 @@ pub(crate) fn get_settings(app: AppHandle) -> Result<SettingsDto, String> {
         emb_key_present,
         retention_days: cfg.retention_days,
         final_pass: cfg.final_pass,
+        teams_speaker_names: cfg.teams_speaker_names,
         import_watch: cfg.import_watch,
         meeting_prep: cfg.meeting_prep,
         meeting_inbox: cfg.meeting_inbox,
@@ -453,6 +459,9 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
         retention_days: patch.retention_days.unwrap_or_default(),
         // Avançado: o que a tela não mandar mantém o valor atual.
         final_pass: patch.final_pass.unwrap_or(previous.final_pass),
+        teams_speaker_names: patch
+            .teams_speaker_names
+            .unwrap_or(previous.teams_speaker_names),
         import_watch: patch.import_watch.unwrap_or(previous.import_watch),
         meeting_prep: patch.meeting_prep.unwrap_or(previous.meeting_prep),
         meeting_inbox: patch.meeting_inbox.unwrap_or(previous.meeting_inbox),
@@ -486,6 +495,13 @@ pub(crate) fn apply_settings(app: AppHandle, patch: SettingsPatch) -> Result<Str
     config::save(&cfg).map_err(|e| e.to_string())?;
     *state.config.lock_or_recover() = cfg.clone();
     state.audio.set_device(cfg.input_device.clone());
+
+    // Nomes do Teams desligados: a coleta em andamento para, e o que foi
+    // coletado (desta gravação e das que esperam o passe final) não vira
+    // nome — mesmo que a opção volte a ser ligada antes de o passe acabar.
+    if previous.teams_speaker_names && !cfg.teams_speaker_names {
+        crate::teams_names::revoke();
+    }
 
     // Prazo de retenção novo (ou mais curto): aplica agora, em segundo plano.
     if cfg.retention_days != 0 && cfg.retention_days != previous.retention_days {
@@ -687,6 +703,8 @@ pub(crate) struct Diagnostics {
     retention_days: u32,
     /// Métricas locais dos últimos 30 dias (ditado, blocos de reunião).
     metrics: Vec<isper_core::store::KindMetrics>,
+    /// Nomes da chamada do Teams ligados (só o estado: nunca um nome).
+    teams_speaker_names: bool,
 }
 
 /// Raio-X para suporte: caminhos, modelo, DLLs do CUDA, dispositivos.
@@ -694,9 +712,13 @@ pub(crate) struct Diagnostics {
 pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
     let state = app.state::<AppState>();
     let engine = state.engine_status.lock_or_recover().clone();
-    let (preferred, retention_days) = {
+    let (preferred, retention_days, teams_speaker_names) = {
         let cfg = state.config.lock_or_recover();
-        (cfg.model.clone(), cfg.retention_days)
+        (
+            cfg.model.clone(),
+            cfg.retention_days,
+            cfg.teams_speaker_names,
+        )
     };
     let db_file = crate::paths::roaming_dir().map(|d| d.join("isper.db"));
     let db_bytes = db_file
@@ -762,6 +784,7 @@ pub(crate) fn diagnostics(app: AppHandle) -> Diagnostics {
         db_bytes,
         retention_days,
         metrics,
+        teams_speaker_names,
     }
 }
 

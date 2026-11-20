@@ -18,12 +18,33 @@ pub(crate) fn list_meetings(query: Option<String>) -> Result<Vec<MeetingRow>, St
     Ok(rows)
 }
 
+/// A reunião como a Biblioteca mostra: com os nomes detectados na chamada do
+/// Teams ao lado dos rótulos (ADR 0027). É a única saída desses nomes — a
+/// ata, as exportações, a busca, o resumo e a sincronia leem o rótulo.
 #[tauri::command]
 pub(crate) fn get_meeting(id: i64) -> Result<Option<MeetingDetail>, String> {
     open_store()
         .map_err(|e| e.to_string())?
-        .get_meeting(id)
+        .get_meeting_for_library(id)
         .map_err(|e| e.to_string())
+}
+
+/// "Remover nomes detectados": apaga as sugestões da chamada do Teams desta
+/// reunião, sem tocar nas falas nem nos nomes dados à mão. Devolve quantas
+/// falas perderam o nome. A ata não muda: ela nunca teve esses nomes.
+#[tauri::command]
+pub(crate) fn remove_detected_speakers(app: AppHandle, id: i64) -> Result<usize, String> {
+    let store = open_store().map_err(|e| e.to_string())?;
+    let n = store
+        .clear_detected_speakers(id)
+        .map_err(|e| e.to_string())?;
+    tracing::info!(
+        meeting_id = id,
+        falas = n,
+        "nomes do Teams removidos da reunião"
+    );
+    notify_status(&app);
+    Ok(n)
 }
 
 #[tauri::command]
@@ -282,6 +303,7 @@ mod tests {
                 start_secs: 4.0,
                 end_secs: 9.0,
                 text: "Fechamos em quarenta mil.".into(),
+                detected_speaker: None,
             }],
             moments: Vec::new(),
             decisions: vec![StoredDecision {
@@ -342,6 +364,19 @@ mod tests {
         assert!(!texto.contains(meeting::NOTES_HEADING));
         assert!(!texto.contains("ligar para o jurídico"));
         assert!(!texto.contains("Do ao vivo."));
+    }
+
+    #[test]
+    fn nome_detectado_na_chamada_nao_entra_na_ata_nem_no_resumo() {
+        // Mesmo que a leitura da Biblioteca chegue até aqui com o nome que o
+        // Teams mostrava, a ata, o "Copiar ata" e o texto do resumo usam o
+        // rótulo guardado (ADR 0027).
+        let mut d = detalhe(Some("## Resumo\nFechado."), None);
+        d.segments[0].detected_speaker = Some("Zuleika Sintética".into());
+        let md = meeting_markdown(&d, None);
+        assert!(md.contains("Participante 1"), "{md}");
+        assert!(!md.contains("Zuleika"), "{md}");
+        assert!(!summary_input(&d).contains("Zuleika"));
     }
 
     #[test]

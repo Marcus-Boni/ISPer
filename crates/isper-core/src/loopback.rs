@@ -66,6 +66,49 @@ impl LoopbackSource {
     }
 }
 
+/// Qual processo o loopback está gravando de fato agora.
+///
+/// "Só o Teams" na configuração não prova a origem do áudio: com o Teams
+/// fechado o loopback cai para o sistema inteiro, e quando o cliente estagna
+/// ele reabre — às vezes num Teams que reiniciou, com outro PID. Quem cruza
+/// a tela do Teams com o áudio (`speaker_names`) precisa saber disso para
+/// não dar o nome de quem aparece numa janela a um som que veio de outra.
+#[derive(Debug, Default)]
+pub struct CaptureBinding {
+    state: std::sync::Mutex<BindingState>,
+}
+
+/// Um instante do [`CaptureBinding`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct BindingState {
+    /// PID raiz do processo gravado (`None`: o sistema inteiro, ou a captura
+    /// fechada/caída).
+    pub pid: Option<u32>,
+    /// Muda a cada abertura ou reabertura: duas leituras com a mesma geração
+    /// falam do mesmo áudio contínuo.
+    pub generation: u64,
+}
+
+impl CaptureBinding {
+    /// O estado atual.
+    pub fn current(&self) -> BindingState {
+        *self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// Registra uma abertura (ou queda, com `None`): a geração avança.
+    pub fn set(&self, pid: Option<u32>) {
+        let mut s = self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        s.pid = pid;
+        s.generation += 1;
+    }
+}
+
 /// Informações devolvidas quando a captura abre.
 pub struct LoopbackReady {
     /// Taxa de amostragem do loopback, em Hz (a do endpoint).
@@ -93,12 +136,30 @@ const STALL_TIMEOUT: Duration = Duration::from_millis(1000);
 /// Roda o loop de captura até chegar QUALQUER coisa em `stop_rx` (ou o canal
 /// fechar). Deve rodar numa thread própria (inicializa COM nela). Amostras
 /// f32 intercaladas (48 kHz, 2 canais) saem por `tx`.
-#[cfg(windows)]
 pub fn run(
     source: LoopbackSource,
     stop_rx: Receiver<()>,
     tx: Sender<Vec<f32>>,
     ready_tx: Sender<Result<LoopbackReady>>,
+) {
+    run_bound(
+        source,
+        stop_rx,
+        tx,
+        ready_tx,
+        &std::sync::Arc::new(CaptureBinding::default()),
+    );
+}
+
+/// O mesmo que [`run`], registrando em `binding` qual processo está sendo
+/// gravado a cada abertura e reabertura.
+#[cfg(windows)]
+pub fn run_bound(
+    source: LoopbackSource,
+    stop_rx: Receiver<()>,
+    tx: Sender<Vec<f32>>,
+    ready_tx: Sender<Result<LoopbackReady>>,
+    binding: &std::sync::Arc<CaptureBinding>,
 ) {
     if let Err(e) = wasapi::initialize_mta().ok() {
         let _ = ready_tx.send(Err(IsperError::Audio(format!("COM: {e}"))));
@@ -121,12 +182,14 @@ pub fn run(
     }
     match open(&effective) {
         Ok(session) => {
+            binding.set(session.pid);
             let _ = ready_tx.send(Ok(LoopbackReady {
                 sample_rate: RATE as u32,
                 channels: CH as u16,
                 warning,
             }));
-            pump(session, &effective, stop_rx, tx);
+            pump(session, &effective, stop_rx, tx, binding);
+            binding.set(None);
         }
         Err(e) => {
             let _ = ready_tx.send(Err(e));
@@ -138,11 +201,12 @@ pub fn run(
 /// o áudio de outro app de chamada. A reunião ao vivo com "Participantes" é
 /// coisa do desktop; aqui a captura falha na hora, dizendo o motivo.
 #[cfg(not(windows))]
-pub fn run(
+pub fn run_bound(
     _source: LoopbackSource,
     _stop_rx: Receiver<()>,
     _tx: Sender<Vec<f32>>,
     ready_tx: Sender<Result<LoopbackReady>>,
+    _binding: &std::sync::Arc<CaptureBinding>,
 ) {
     let _ = ready_tx.send(Err(IsperError::Audio(
         "o áudio do sistema (loopback) só é capturado no Windows".into(),
@@ -153,7 +217,7 @@ pub fn run(
 /// nome) — o process loopback com `include_tree` pega os filhos, onde o
 /// áudio do Teams novo de fato toca (WebView2).
 #[cfg(windows)]
-fn find_root_pid(names: &[String]) -> Option<u32> {
+pub fn find_root_pid(names: &[String]) -> Option<u32> {
     let sys = sysinfo::System::new_all();
     let matches: Vec<(u32, Option<u32>)> = sys
         .processes()
@@ -177,6 +241,8 @@ fn find_root_pid(names: &[String]) -> Option<u32> {
 
 #[cfg(windows)]
 struct Session {
+    /// O processo gravado (`None`: o sistema inteiro).
+    pid: Option<u32>,
     capture_client: wasapi::AudioClient,
     capture: wasapi::AudioCaptureClient,
     event: wasapi::Handle,
@@ -212,17 +278,23 @@ fn open(source: &LoopbackSource) -> Result<Session> {
 
     // Cliente de captura: do endpoint inteiro (loopback clássico) ou de um
     // processo específico (process loopback).
-    let mut capture_client = match source {
-        LoopbackSource::System => wa(device.get_iaudioclient(), "audio client (captura)")?,
+    let (mut capture_client, pid) = match source {
+        LoopbackSource::System => (
+            wa(device.get_iaudioclient(), "audio client (captura)")?,
+            None,
+        ),
         LoopbackSource::Process { names } => {
             let pid = find_root_pid(names).ok_or_else(|| {
                 IsperError::Audio(format!("processo {} não encontrado", names.join("/")))
             })?;
             tracing::info!(pid, "process loopback em {}", names.join("/"));
-            wa(
-                wasapi::AudioClient::new_application_loopback_client(pid, true),
-                "process loopback client",
-            )?
+            (
+                wa(
+                    wasapi::AudioClient::new_application_loopback_client(pid, true),
+                    "process loopback client",
+                )?,
+                Some(pid),
+            )
         }
     };
     wa(
@@ -250,6 +322,7 @@ fn open(source: &LoopbackSource) -> Result<Session> {
     let name = device.get_friendlyname().unwrap_or_default();
     tracing::info!(device = %name, ?source, sample_rate = RATE, channels = CH, "capturando loopback (com keepalive)");
     Ok(Session {
+        pid,
         capture_client,
         capture,
         event,
@@ -265,6 +338,7 @@ fn pump(
     source: &LoopbackSource,
     stop_rx: Receiver<()>,
     tx: Sender<Vec<f32>>,
+    binding: &CaptureBinding,
 ) {
     let mut bytes: VecDeque<u8> = VecDeque::with_capacity(RATE * BYTES_PER_FRAME);
     let mut last_packet = Instant::now();
@@ -334,9 +408,12 @@ fn pump(
             tracing::warn!("loopback estagnou — reabrindo o cliente");
             let _ = session.capture_client.stop_stream();
             let _ = session.render_client.stop_stream();
+            // Até reabrir, o áudio não é de ninguém.
+            binding.set(None);
             match open(source) {
                 Ok(s) => {
                     session = s;
+                    binding.set(session.pid);
                     last_packet = Instant::now();
                 }
                 Err(e) => {

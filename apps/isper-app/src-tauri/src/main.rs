@@ -44,6 +44,7 @@ mod search;
 mod settings;
 mod shortcuts;
 mod state;
+mod teams_names;
 mod today;
 mod tray;
 mod ui;
@@ -123,6 +124,12 @@ pub(crate) fn init_logging() -> Option<tracing_appender::non_blocking::WorkerGua
 }
 
 fn main() {
+    // O leitor da chamada do Teams é este mesmo exe, num subprocesso (ver
+    // teams_names.rs). Ele sai antes de tudo: não abre log, não migra pastas,
+    // não sobe o Tauri nem a instância única.
+    if let Some(code) = teams_names::run_reader_if_requested() {
+        std::process::exit(code);
+    }
     // Dados locais mudaram de pasta na 0.12.2: move antes de o log abrir.
     let migrated = paths::migrate_legacy_local();
     let _log_guard = init_logging();
@@ -252,6 +259,7 @@ fn main() {
             list_input_devices,
             live_transcript,
             rename_speaker,
+            remove_detected_speakers,
             export_meeting,
             open_logs_folder,
             diagnostics,
