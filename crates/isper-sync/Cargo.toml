@@ -12,7 +12,7 @@ publish = false
 # a configuração peça, e nada de UPnP no roteador.
 iroh = { version = "1.2", default-features = false, features = ["tls-ring"] }
 # Acha o PC na rede local quando o IP dele muda (DHCP).
-iroh-mdns-address-lookup = "0.5"
+iroh-mdns-address-lookup = "0.6"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "fs", "io-util", "sync"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
