@@ -11,6 +11,16 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-20
+
+A Biblioteca passa a saber quem falou nas chamadas do Teams. Com a opção
+ligada, o ISPer lê a janela da chamada enquanto grava e, depois do passe
+final, mostra o nome de cada participante sobre o "Participante N" — só
+quando a evidência é clara, e sem que o nome saia da Biblioteca até você
+confirmá-lo. O banco passa para a versão 10 (uma cópia da versão anterior é
+guardada antes de migrar) e o SQLite embutido recebe uma correção de
+segurança.
+
 ### Adicionado
 - **Identificar falantes do Teams (beta).** Com "Só o Microsoft Teams" como
   fonte do áudio, o ISPer pode ler a janela da chamada do Teams durante a
@@ -29,6 +39,12 @@ bata com ela.
 ### Corrigido
 - Uma reunião excluída enquanto o passe final rodava voltava como falas
   soltas no banco; agora o passe percebe e não grava nada.
+
+### Segurança
+- **SQLite 3.54** (rusqlite 0.41.1): corrige a leitura de memória não
+  inicializada quando um banco é aberto com um arquivo `-wal` de outro
+  tamanho de página (RUSTSEC-2026-0459). O banco fica na versão 10 do
+  schema; a cópia `isper.db.v9.bak` é o caminho de volta para a 0.28.
 
 ## [0.28.0] - 2026-11-08
 
@@ -1122,7 +1138,8 @@ dia e de noite, em português ou em inglês, e utilizável só pelo teclado.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.25.1...v0.26.0
