@@ -498,7 +498,7 @@ uma lente local que uma integração só preenche.
 
 A ideia: parar de organizar transcrições em pastas à mão e poder entregar uma reunião inteira a outro agente de IA, limpa e com contexto.
 
-- [ ] **Formato para agente** (sem IA, só reorganiza o que já existe): cabeçalho estruturado com projeto, data, duração, participantes e origem; depois resumo, decisões e ações; por fim as falas com horário. Entra aqui o nome padronizado do `.md` (data, projeto, assunto) e o projeto no cabeçalho, adiados da 11.1 porque o formato é escrito em muitos lugares e a importação o lê de volta
+- [x] **Formato para agente** (22/11, [ADR 0029](docs/adr/0029-reuniao-pronta-para-agente.md)): "Copiar para agente" e a exportação "Agente" geram, sem IA, um Markdown com cabeçalho YAML (data, projeto, participantes, origem, evento), a linha de contexto, o resumo, o que foi validado, as notas, os momentos e as falas com horário, na versão da tela; o arquivo sai com o nome padronizado `aaaa-mm-dd hhhmm - Projeto - Assunto.md`. A ata de sempre não muda
 - [x] **"Otimizar" a transcrição** (22/11, [ADR 0028](docs/adr/0028-otimizar-a-transcricao.md)): limpeza fiel, só no botão, uma versão limpa por fala ao lado da original (schema v11), em lotes pelo id da fala; a tela alterna Otimizada/Original, copiar e exportar seguem a tela, o assistente cita a limpa; a ata, o resumo e a busca ficam na original
 - [ ] Pronto quando uma reunião real vai para um agente num toque e ele responde sobre ela sem pedir contexto
 

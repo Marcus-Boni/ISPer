@@ -35,6 +35,7 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0026](0026-mascote-do-assistente.md) | O mascote do assistente é o ponto da marca, vivo, em WebGL com o three.js embutido | aceita | 05/11/2026 |
 | [0027](0027-nomes-da-chamada-do-teams.md) | Nomes dos falantes lidos da janela do Teams, só na Biblioteca e só com evidência | aceita (piloto) | 20/11/2026 |
 | [0028](0028-otimizar-a-transcricao.md) | "Otimizar": versão limpa de cada fala ao lado da original, limpeza fiel, só no botão | aceita | 22/11/2026 |
+| [0029](0029-reuniao-pronta-para-agente.md) | A reunião pronta para agente: Markdown à parte com cabeçalho e contexto, nome padronizado, sem mexer na ata | aceita | 22/11/2026 |
 
 ## Como escrever um ADR
 

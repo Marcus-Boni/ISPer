@@ -635,10 +635,20 @@
       const bTx = el('button', 'btn btn-ghost', t('library.copy-transcript'));
       bTx.addEventListener('click', () => copyText(transcriptText(), bTx, t('library.transcript-copied')));
       actions.appendChild(bTx);
+      // Fase 11.3: a reunião inteira, com cabeçalho e contexto, para colar
+      // noutro agente de IA (a versão da tela).
+      const bAgent = el('button', 'btn btn-ghost', t('library.agent.copy'));
+      bAgent.id = 'copy-agent';
+      bAgent.title = t('library.agent.copy-title');
+      bAgent.addEventListener('click', async () => {
+        try { copyText(await invoke('meeting_agent_markdown', { id, clean: view === 'clean' }), bAgent, t('library.agent.copied')); }
+        catch (e) { toast(t('common.error', { e }), 'err'); }
+      });
+      actions.appendChild(bAgent);
       actions.appendChild(el('span', 'sep', t('library.export')));
-      for (const fmt of ['srt', 'docx']) {
-        const b = el('button', 'btn btn-ghost btn-sm', fmt.toUpperCase());
-        b.title = fmt === 'srt' ? t('library.export.srt') : t('library.export.docx');
+      for (const fmt of ['srt', 'docx', 'agente']) {
+        const b = el('button', 'btn btn-ghost btn-sm', fmt === 'agente' ? t('library.agent.export') : fmt.toUpperCase());
+        b.title = t({ srt: 'library.export.srt', docx: 'library.export.docx', agente: 'library.export.agent' }[fmt]);
         b.addEventListener('click', async () => {
           UI.busy(b, true);
           try { const path = await invoke('export_meeting', { id, format: fmt, clean: view === 'clean' }); UI.busy(b, false); UI.flash(b, t('common.saved')); toast(t('library.exported', { path }), 'ok', 4000); }
