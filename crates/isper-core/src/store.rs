@@ -1435,6 +1435,19 @@ impl MeetingStore {
             .optional()?)
     }
 
+    /// O nome de um projeto (Fase 11.1), para o que sai da reunião: o
+    /// Markdown para agente e o nome do arquivo dele.
+    pub fn project_name(&self, project_id: &str) -> Result<Option<String>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT name FROM projects WHERE id = ?1",
+                params![project_id],
+                |r| r.get(0),
+            )
+            .optional()?)
+    }
+
     /// As falas da reunião para o "Otimizar" (Fase 11.3): `(id, falante,
     /// texto)`, em ordem.
     pub fn segments_for_cleanup(&self, meeting_id: i64) -> Result<Vec<(i64, String, String)>> {

@@ -12,6 +12,13 @@ bata com ela.
 ## [Unreleased]
 
 ### Adicionado
+- **Reunião pronta para agente.** "Copiar para agente" na Biblioteca copia a
+  reunião inteira em Markdown para colar noutro agente de IA: cabeçalho com
+  data, projeto e participantes, uma linha explicando quem é "Eu" e
+  "Participante N", o resumo, o que foi validado no Copilot, as notas, os
+  momentos e as falas com horário (na versão que está na tela). A exportação
+  "Agente" grava o mesmo arquivo com um nome padronizado: data, projeto e
+  assunto.
 - **Otimizar a reunião.** Na Biblioteca, "Otimizar" pede à IA uma versão
   limpa de cada fala: sem hesitações, repetições e falsos começos, com os
   erros de transcrição corrigidos e o trecho ambíguo marcado com [?], sem

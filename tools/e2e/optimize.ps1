@@ -96,6 +96,17 @@ try {
     Check ($srt -like '*Vamos fechar o escopo*' -and $srt -notlike '*hum*') "o SRT leva as falas limpas"
   }
 
+  # 4b) Pronta para agente: o texto do "Copiar para agente" e o arquivo de
+  # nome padronizado, na versao da tela.
+  $hasBtn = EvJson 'library.html' 'JSON.stringify(!!document.getElementById("copy-agent"))'
+  Check $hasBtn "a reuniao tem 'Copiar para agente'"
+  $md = Invoke-Isper 'meeting_agent_markdown' "{ id: 9101, clean: true }" 'library.html'
+  Check ("$md".StartsWith("---`ntipo: reuniao`n") -and "$md" -like '*data: "2026-11-20"*' -and "$md" -like '*transcricao: otimizada*' -and "$md" -like '*Participante 1*' -and "$md" -like '*Vamos fechar o escopo*' -and "$md" -notlike '*hum,*') "o Markdown para agente tem o cabecalho e as falas limpas"
+  $orig = Invoke-Isper 'meeting_agent_markdown' "{ id: 9101, clean: false }" 'library.html'
+  Check ("$orig" -like '*transcricao: original*' -and "$orig" -like '*hum, vamos fechar*') "na Original, vai a transcricao como foi"
+  $apath = Invoke-Isper 'export_meeting' "{ id: 9101, format: 'agente', clean: true }" 'library.html'
+  Check ("$apath" -like '*2026-11-20 10h00 - Alinhamento do portal.md' -and (Test-Path -LiteralPath "$apath")) "exportar para agente grava com o nome padronizado ($apath)"
+
   # 5) Em ingles, as chaves existem.
   Invoke-Isper 'set_ui_lang' "{ lang: 'en' }" | Out-Null
   Start-Sleep -Milliseconds 800

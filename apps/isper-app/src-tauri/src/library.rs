@@ -1,6 +1,7 @@
 //! Biblioteca: leitura, renomear, exportar (MD/SRT/DOCX) e regravação do Markdown a partir do banco.
 
 use crate::prelude::*;
+use isper_core::agent_doc;
 use isper_core::meeting::{self, SegmentRef};
 use isper_core::store::{MeetingDetail, MeetingRow, MeetingStore, StoredSegment};
 
@@ -203,13 +204,25 @@ pub(crate) fn export_meeting(
         .get_meeting(id)
         .map_err(|e| e.to_string())?
         .ok_or("reunião não encontrada")?;
-    let clean = clean.unwrap_or(false);
+    // Só há versão otimizada quando a reunião foi otimizada (Fase 11.3).
+    let clean = clean.unwrap_or(false) && detail.segments.iter().any(|s| s.clean_text.is_some());
     if clean {
         use_clean_text(&mut detail.segments);
     }
+    let format = format.to_lowercase();
+    if format == "agente" {
+        let project = meeting_project_name(&store, &detail);
+        let out = meetings_dir()
+            .map_err(|e| e.to_string())?
+            .join(agent_doc::agent_file_name(&detail, project.as_deref()));
+        let text = agent_doc::to_agent_markdown(&detail, project.as_deref(), clean);
+        std::fs::write(&out, text).map_err(|e| e.to_string())?;
+        reveal_in_explorer(&out);
+        return Ok(out.display().to_string());
+    }
     let refs = segment_refs(&detail);
     let m = &detail.meeting;
-    let (ext, bytes): (&str, Vec<u8>) = match format.to_lowercase().as_str() {
+    let (ext, bytes): (&str, Vec<u8>) = match format.as_str() {
         "srt" => ("srt", isper_core::export::to_srt(&refs).into_bytes()),
         "docx" => (
             "docx",
@@ -239,12 +252,46 @@ pub(crate) fn export_meeting(
         base.with_extension(ext)
     };
     std::fs::write(&out, bytes).map_err(|e| e.to_string())?;
-    // Revela o arquivo no Explorer em vez de abri-lo: SRT/DOCX podem não ter
-    // programa associado, e o diálogo "com qual app?" no meio do fluxo irrita.
-    let _ = std::process::Command::new("explorer")
-        .arg(format!("/select,{}", out.to_string_lossy()))
-        .spawn();
+    reveal_in_explorer(&out);
     Ok(out.display().to_string())
+}
+
+/// Revela o arquivo no Explorer em vez de abri-lo: SRT/DOCX podem não ter
+/// programa associado, e o diálogo "com qual app?" no meio do fluxo irrita.
+fn reveal_in_explorer(path: &Path) {
+    let _ = std::process::Command::new("explorer")
+        .arg(format!("/select,{}", path.to_string_lossy()))
+        .spawn();
+}
+
+/// O nome do projeto da reunião, quando ela tem um que ainda existe.
+fn meeting_project_name(store: &MeetingStore, detail: &MeetingDetail) -> Option<String> {
+    let id = detail.meeting.project_id.as_deref()?;
+    store.project_name(id).unwrap_or_else(|e| {
+        tracing::warn!("não consegui ler o nome do projeto: {e}");
+        None
+    })
+}
+
+/// A reunião "pronta para agente" (Fase 11.3) como texto, para o "Copiar
+/// para agente": a versão otimizada com `clean`, quando existe.
+#[tauri::command]
+pub(crate) fn meeting_agent_markdown(id: i64, clean: Option<bool>) -> Result<String, String> {
+    let store = open_store().map_err(|e| e.to_string())?;
+    let mut detail = store
+        .get_meeting(id)
+        .map_err(|e| e.to_string())?
+        .ok_or("reunião não encontrada")?;
+    let clean = clean.unwrap_or(false) && detail.segments.iter().any(|s| s.clean_text.is_some());
+    if clean {
+        use_clean_text(&mut detail.segments);
+    }
+    let project = meeting_project_name(&store, &detail);
+    Ok(agent_doc::to_agent_markdown(
+        &detail,
+        project.as_deref(),
+        clean,
+    ))
 }
 
 /// Evento do progresso do "Otimizar": `{ id, done, total }` em lotes.

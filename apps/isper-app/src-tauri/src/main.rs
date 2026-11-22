@@ -262,6 +262,7 @@ fn main() {
             rename_speaker,
             remove_detected_speakers,
             export_meeting,
+            meeting_agent_markdown,
             open_logs_folder,
             diagnostics,
             export_diagnostics,

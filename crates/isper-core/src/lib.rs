@@ -27,6 +27,7 @@
 // do motor (fase 7.6), e um item novo sem doc não compila.
 #![deny(missing_docs)]
 
+pub mod agent_doc;
 pub mod align;
 pub mod audio;
 pub mod calls;
