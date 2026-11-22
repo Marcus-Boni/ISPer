@@ -11,6 +11,15 @@ bata com ela.
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-22
+
+As reuniões ganham lugar. A tela Projetos organiza todas elas por projeto,
+no lugar das pastas do Gerenciador de Arquivos, e toda reunião sai com o
+projeto ou o ISPer pergunta qual é. "Otimizar" limpa a transcrição ao lado
+da original, e a reunião vai pronta para outro agente de IA num toque. O
+banco passa para a versão 11 (uma cópia da versão anterior é guardada antes
+de migrar).
+
 ### Adicionado
 - **A tela Projetos.** Um item novo na barra lateral reúne as suas reuniões
   por projeto, no lugar das pastas: cada projeto mostra quantas reuniões e
@@ -46,6 +55,10 @@ bata com ela.
 
 ### Corrigido
 - O aviso de "gravação transcrita" mostrava `{actions}` cru no texto.
+
+### Segurança
+- **url 2.5.9**: corrige o estouro de pilha em `Url::origin()` com endereços
+  `blob:` aninhados (RUSTSEC-2026-0592).
 
 ## [0.29.0] - 2026-11-20
 
@@ -1174,7 +1187,8 @@ dia e de noite, em português ou em inglês, e utilizável só pelo teclado.
 - Loopback por processo (só o Teams), diarização com sherpa-onnx, Biblioteca
   de reuniões e ditados, indicador arrastável com modo mini.
 
-[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.29.0...HEAD
+[Unreleased]: https://github.com/Marcus-Boni/ISPer/compare/v0.30.0...HEAD
+[0.30.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/Marcus-Boni/ISPer/compare/v0.26.0...v0.27.0
