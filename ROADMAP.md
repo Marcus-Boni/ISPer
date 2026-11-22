@@ -494,12 +494,12 @@ uma lente local que uma integração só preenche.
 - [ ] As tarefas abertas, as últimas reuniões e o que se decidiu nelas, as horas da semana pelo OptTime e os work items; a reunião com projeto vira sugestão de lançamento de horas nele
 - [ ] Pronto quando a página responde "como está o projeto X?" sem abrir outro sistema
 
-### 11.3 A reunião pronta para um agente (proposta de 22/11, decidir antes de codar)
+### 11.3 A reunião pronta para um agente
 
 A ideia: parar de organizar transcrições em pastas à mão e poder entregar uma reunião inteira a outro agente de IA, limpa e com contexto.
 
 - [ ] **Formato para agente** (sem IA, só reorganiza o que já existe): cabeçalho estruturado com projeto, data, duração, participantes e origem; depois resumo, decisões e ações; por fim as falas com horário. Entra aqui o nome padronizado do `.md` (data, projeto, assunto) e o projeto no cabeçalho, adiados da 11.1 porque o formato é escrito em muitos lugares e a importação o lê de volta
-- [ ] **"Otimizar" a transcrição**: uma versão limpa ao lado da original (tira repetições, hesitações e falsos começos, corrige erros de transcrição pelo dicionário), nunca no lugar dela. A decidir: a camada nova no banco (o passe final regrava a original), a reescrita em partes (o resumo hoje corta em 60 mil caracteres), o custo (a saída tem quase o tamanho da entrada) e a regra do ambíguo (marcar o trecho, não reinterpretar, pela regra de "não inventar")
+- [x] **"Otimizar" a transcrição** (22/11, [ADR 0028](docs/adr/0028-otimizar-a-transcricao.md)): limpeza fiel, só no botão, uma versão limpa por fala ao lado da original (schema v11), em lotes pelo id da fala; a tela alterna Otimizada/Original, copiar e exportar seguem a tela, o assistente cita a limpa; a ata, o resumo e a busca ficam na original
 - [ ] Pronto quando uma reunião real vai para um agente num toque e ele responde sobre ela sem pedir contexto
 
 ## Boas práticas transversais

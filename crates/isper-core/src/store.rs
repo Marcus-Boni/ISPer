@@ -118,6 +118,11 @@ pub struct StoredSegment {
     /// continuam no rótulo `speaker`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detected_speaker: Option<String>,
+    /// A versão limpa pelo "Otimizar" (Fase 11.3), quando a reunião foi
+    /// otimizada: vazia é a fala que era só hesitação. A ata, o resumo e a
+    /// busca continuam na original.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clean_text: Option<String>,
 }
 
 /// O que aconteceu ao publicar a transcrição do passe final.
@@ -314,7 +319,7 @@ fn like_pattern(q: &str) -> String {
 /// de versão maior (criado por um ISPer mais novo) é recusado em vez de
 /// alterado às cegas. Bancos anteriores a esta numeração chegam como 0 e
 /// passam pelo passo 1, que é idempotente sobre o que eles já têm.
-pub const SCHEMA_VERSION: i64 = 10;
+pub const SCHEMA_VERSION: i64 = 11;
 
 /// Eventos de métrica mais antigos que isto (90 dias) saem do banco.
 pub const EVENTS_KEEP_SECS: i64 = 90 * 86_400;
@@ -440,6 +445,7 @@ fn migrate(conn: &Connection) -> Result<()> {
             7 => migrate_to_v8(&tx)?,
             8 => migrate_to_v9(&tx)?,
             9 => migrate_to_v10(&tx)?,
+            10 => migrate_to_v11(&tx)?,
             other => {
                 return Err(IsperError::Schema(format!(
                     "sem migração a partir da versão {other}"
@@ -821,6 +827,14 @@ fn migrate_to_v10(conn: &Connection) -> Result<()> {
         "speaker_rev",
         "INTEGER NOT NULL DEFAULT 0",
     )?;
+    Ok(())
+}
+
+/// v11 (Fase 11.3, "Otimizar"): a versão limpa de cada fala, ao lado da
+/// original. Vazia é a fala que era só hesitação; nula, a que fica como está.
+/// O passe final apaga as falas e leva a versão limpa junto.
+fn migrate_to_v11(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "segments", "clean_text", "TEXT")?;
     Ok(())
 }
 
@@ -1421,6 +1435,42 @@ impl MeetingStore {
             .optional()?)
     }
 
+    /// As falas da reunião para o "Otimizar" (Fase 11.3): `(id, falante,
+    /// texto)`, em ordem.
+    pub fn segments_for_cleanup(&self, meeting_id: i64) -> Result<Vec<(i64, String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, speaker, text FROM segments WHERE meeting_id = ?1 ORDER BY start_secs, id",
+        )?;
+        let rows = stmt.query_map(params![meeting_id], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Guarda a versão limpa (a anterior sai inteira; as falas fora de
+    /// `clean` ficam com a original). Recusa, sem gravar nada, se alguma
+    /// fala não é mais desta reunião: o passe final trocou a transcrição
+    /// enquanto a IA limpava. Devolve quantas falas ganharam versão limpa.
+    pub fn set_clean_texts(&self, meeting_id: i64, clean: &[(i64, String)]) -> Result<usize> {
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "UPDATE segments SET clean_text = NULL WHERE meeting_id = ?1",
+            params![meeting_id],
+        )?;
+        let mut stmt =
+            tx.prepare("UPDATE segments SET clean_text = ?3 WHERE id = ?1 AND meeting_id = ?2")?;
+        for (id, text) in clean {
+            if stmt.execute(params![id, meeting_id, text])? == 0 {
+                return Err(IsperError::Schema(format!(
+                    "a transcrição da reunião {meeting_id} mudou enquanto era otimizada"
+                )));
+            }
+        }
+        drop(stmt);
+        tx.commit()?;
+        Ok(clean.len())
+    }
+
     /// Renomeia um falante em todos os segmentos da reunião ("Participante 1"
     /// → "Tatiana"). Devolve quantos segmentos mudaram.
     ///
@@ -1966,8 +2016,8 @@ impl MeetingStore {
             .optional()?
             .unwrap_or_default();
         let mut stmt = self.conn.prepare(
-            "SELECT speaker, start_secs, end_secs, text, detected_speaker FROM segments
-             WHERE meeting_id = ?1 ORDER BY start_secs, id",
+            "SELECT speaker, start_secs, end_secs, text, detected_speaker, clean_text
+             FROM segments WHERE meeting_id = ?1 ORDER BY start_secs, id",
         )?;
         let segments = stmt
             .query_map(params![meeting_id], |r| {
@@ -1977,6 +2027,7 @@ impl MeetingStore {
                     end_secs: r.get::<_, f64>(2)? as f32,
                     text: r.get(3)?,
                     detected_speaker: if with_detected { r.get(4)? } else { None },
+                    clean_text: r.get(5)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -3287,6 +3338,45 @@ Curto.",
                 == 2
         );
         assert_eq!(detail.meeting.participants, 1);
+    }
+
+    #[test]
+    fn otimizar_guarda_a_versao_limpa_ao_lado_e_o_passe_final_a_leva() {
+        let store = temp_store("clean");
+        let id = store
+            .save("Reunião", "09/09/2026 10:00", &sample_result(), None)
+            .unwrap();
+        let segs = store.segments_for_cleanup(id).unwrap();
+        assert!(segs.len() >= 2);
+        let (first, second) = (segs[0].0, segs[1].0);
+        let n = store
+            .set_clean_texts(id, &[(first, "Limpa.".into()), (second, String::new())])
+            .unwrap();
+        assert_eq!(n, 2);
+        let d = store.get_meeting(id).unwrap().unwrap();
+        assert_eq!(d.segments[0].clean_text.as_deref(), Some("Limpa."));
+        assert_eq!(d.segments[1].clean_text.as_deref(), Some(""));
+        assert_eq!(d.segments[0].text, segs[0].2, "a original fica");
+
+        // Otimizar de novo troca a versão inteira.
+        store
+            .set_clean_texts(id, &[(second, "Outra.".into())])
+            .unwrap();
+        let d = store.get_meeting(id).unwrap().unwrap();
+        assert_eq!(d.segments[0].clean_text, None);
+
+        // Uma fala que não é mais da reunião: nada é gravado.
+        let err = store.set_clean_texts(id, &[(first, "x".into()), (-1, "y".into())]);
+        assert!(err.is_err());
+        let d = store.get_meeting(id).unwrap().unwrap();
+        assert_eq!(d.segments[1].clean_text.as_deref(), Some("Outra."));
+
+        // O passe final troca as falas e a versão limpa vai junto.
+        store
+            .replace_segments(id, &[("Eu".into(), 0.0, 1.0, "nova".into())])
+            .unwrap();
+        let d = store.get_meeting(id).unwrap().unwrap();
+        assert!(d.segments.iter().all(|s| s.clean_text.is_none()));
     }
 
     #[test]

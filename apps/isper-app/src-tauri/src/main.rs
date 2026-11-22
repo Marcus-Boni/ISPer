@@ -327,6 +327,7 @@ fn main() {
             lists::list_add,
             lists::list_keep,
             lists::spare_suggest,
+            optimize_meeting,
             projects::projects_list,
             projects::project_create,
             projects::project_update,

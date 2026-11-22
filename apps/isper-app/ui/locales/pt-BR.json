@@ -480,6 +480,17 @@
   "library.not-found": "reunião não encontrada",
   "library.notes.heading": "Suas notas (Copilot)",
   "library.open-md": "Abrir .md",
+  "library.optimize": "Otimizar",
+  "library.optimize.again": "Otimizar de novo",
+  "library.optimize.done": "Reunião otimizada: {n} falas limpas. A original continua em \"Original\".",
+  "library.optimize.failed": "Não deu para otimizar: {e}",
+  "library.optimize.no-ai": "Configure a IA em Configurações → Inteligência para otimizar.",
+  "library.optimize.progress": "Otimizando… {done}/{total}",
+  "library.optimize.running": "Otimizando…",
+  "library.optimize.title": "A IA limpa cada fala (hesitações, repetições, falsos começos e erros de transcrição) sem mudar o que foi dito; o trecho ambíguo ganha [?]. A original continua guardada. Só o texto das falas sai do PC.",
+  "library.optimize.view-aria": "Qual versão da transcrição mostrar",
+  "library.optimize.view-clean": "Otimizada",
+  "library.optimize.view-orig": "Original",
   "library.participants": {
     "one": "{n} participante",
     "other": "{n} participantes"

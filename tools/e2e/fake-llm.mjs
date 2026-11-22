@@ -113,6 +113,25 @@ function reply(body) {
   return { content: [head, ...found.map((f) => `- **${f.title}** [[${f.ref}]]`)].join('\n') };
 }
 
+// "Otimizar" (Fase 11.3): o pedido com o schema de "falas" volta com cada
+// "[id] Falante: texto" sem as hesitações (é, hum, né, tipo), começando em
+// maiúscula; a fala que era só hesitação volta vazia.
+const FILLERS = new Set(['é', 'hum', 'né', 'tipo', 'hã']);
+function cleanup(body) {
+  const schema = body.response_format?.json_schema?.schema;
+  if (!schema?.properties?.falas) return null;
+  const user = [...(body.messages || [])].reverse().find((m) => m.role === 'user')?.content || '';
+  const falas = [];
+  for (const line of String(user).split('\n')) {
+    const m = /^\[(\d+)\] [^:]+: (.*)$/.exec(line);
+    if (!m) continue;
+    const words = m[2].split(/\s+/).filter((w) => w && !FILLERS.has(w.replace(/[,.!?…]+$/, '').toLowerCase()));
+    const text = words.join(' ');
+    falas.push({ id: Number(m[1]), texto: text ? text[0].toUpperCase() + text.slice(1) : '' });
+  }
+  return { content: JSON.stringify({ falas }) };
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/plain') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -141,7 +160,7 @@ const server = http.createServer((req, res) => {
       const text = (body.messages || []).map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)));
       plain.push({ model: body.model, text: text.join(String.fromCharCode(10)) });
     }
-    const message = body.tools ? reply(body) : { content: 'ok' };
+    const message = body.tools ? reply(body) : cleanup(body) || { content: 'ok' };
     if (body.stream) {
       res.writeHead(200, { 'Content-Type': 'text/event-stream' });
       res.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: message.content || '' } }] })}\n\n`);
