@@ -22,7 +22,7 @@
 | F8 Copilot de reunião | 🟡 | entregue na v0.18.0 (22/09): decisões, ações, riscos e perguntas ao vivo, ata, streaming, memória de reuniões passadas, `Ctrl+Alt+C` e Biblioteca; em inglês desde a v0.19.0; só com a janela aberta e notas salvas com a reunião (23/09); 3 itens em aberto — validar a memória, idioma do que a IA escreve e ver o sync do portal numa release |
 | F9 ISPer no Bolso | 🟡 | **9.0 entregue (23/09)**: gravações de fora — MP3, M4A, WAV, FLAC e OGG, do Plaud, do celular ou de uma reunião gravada — viram reunião pela Biblioteca ou pela pasta vigiada `Documentos\ISPer\Importar`. **9.1 em 24/09**: o núcleo compila para Android, a diarização ficou 2,4× mais rápida (sherpa-onnx oficial) e um app de laboratório mede o passe final no celular; já rodou num Xiaomi (small q5 a 1,43× a duração do áudio), falta o celular do líder. **9.2 em 24/09**: o gravador — Ogg/Opus a 32 kbit/s (~15 MB/h no celular, a mesma transcrição do WAV; já gravou num Galaxy Tab A9), à prova de queda, com widget e bloco rápido; o desktop passou a ler Opus. O teste de 2 h e o do Motorola/Xiaomi ficaram para depois. **9.3 em 25/09**: o celular manda as gravações para o PC, pareado por QR (iroh, com a chave de cada lado e sem servidor de fora), e a ata volta com "Ata pronta". A volta completa rodou num Galaxy S21 FE em 26/09; falta gravar longe do PC. **9.4 em 26/09**: o celular transcreve sozinho, com o mesmo passe final do PC, por padrão ao carregar e continuando de onde parou; a ata do PC substitui a do celular. 9.5 a 9.7 ainda são proposta |
 | F10 Assistente | 🟡 | **Aprovada em 07/10** ([ADRs 0021–0023](docs/adr/README.md)): tarefas, rotinas, memória e diário no ISPer; agenda, DevOps e horas pelo MCP do OptTime. Pré-requisito do OptTime no ar e conferido em 08/10. **10.0 (08/10)**: tarefas locais e a tela Hoje; a importação do Notion saiu do escopo. **10.1 (08/10)**: datas em português no texto, fala solta vira tarefas e o atalho de anotar com cartões de revisão; falta o corpus de 150 ditados para escolher o modelo |
-| F11 Sem data e por projeto | 🟡 | **Aprovada em 12/10** ([ADR 0025](docs/adr/0025-quando-der-tempo-e-projetos-locais.md)): listas "Quando der tempo" com o item fora do dia e a sugestão no tempo livre; projetos locais como lente, o OptTime só preenche. 11.0 entregue (#135 #136), falta o critério com as anotações reais |
+| F11 Sem data e por projeto | 🟡 | **Aprovada em 12/10** ([ADR 0025](docs/adr/0025-quando-der-tempo-e-projetos-locais.md)): listas "Quando der tempo" com o item fora do dia e a sugestão no tempo livre; projetos locais como lente, o OptTime só preenche. 11.0 entregue (#135 #136), falta o critério com as anotações reais; 11.1 com o núcleo (#138) e a tela, toda reunião com projeto ou a pergunta, falta o critério com uma semana real; 11.3 (reunião pronta para agente, "Otimizar") proposta |
 
 **155 itens entregues · 30 em aberto** (2 deles de estudo pessoal; o placar sai das caixas do arquivo). Ordem sugerida: na próxima versão, validar numa reunião real o Copilot com a janela aberta e fechada, e as notas na ata e na Biblioteca — → a rodada com o NVDA (7.5), que é à mão → validar a memória do Copilot, com a busca semântica ligada, enquanto o winget e a SignPath tramitam.
 
@@ -485,13 +485,22 @@ uma lente local que uma integração só preenche.
 
 ### 11.1 Projetos
 
-- [ ] Projetos locais (criar, renomear, cor, apelidos, arquivar), ligados ao OptTime quando houver (`opt_time_list_projects`); o projeto sugerido para a reunião pelo evento da agenda e herdado pelas tarefas dela; filtro por projeto no Hoje e na Biblioteca; o assistente filtra por projeto
+- [x] Projetos locais (criar, renomear, cor, apelidos, arquivar), ligados ao OptTime quando houver (`opt_time_list_projects`); o projeto sugerido para a reunião pelo evento da agenda e herdado pelas tarefas dela; filtro por projeto no Hoje e na Biblioteca; o assistente filtra por projeto (#138 o núcleo; a tela: Configurações → Projetos com "Trazer do OptTime", selo, seletor e filtro no Hoje e na Biblioteca)
+- [x] Toda reunião com projeto ou a pergunta (revisão de 22/11): sem convite, o título que assenta (nome do arquivo, IA, passe final) também reconhece o projeto; sem certeza, o aviso de "reunião salva" diz "sem projeto" e a Biblioteca filtra as sem projeto. A lista mostra toda reunião na mesma ordem: assunto, quando, projeto
 - [ ] Pronto quando as tarefas e reuniões de uma semana real saem com o projeto certo, com no máximo um toque cada
 
 ### 11.2 A página do projeto
 
 - [ ] As tarefas abertas, as últimas reuniões e o que se decidiu nelas, as horas da semana pelo OptTime e os work items; a reunião com projeto vira sugestão de lançamento de horas nele
 - [ ] Pronto quando a página responde "como está o projeto X?" sem abrir outro sistema
+
+### 11.3 A reunião pronta para um agente (proposta de 22/11, decidir antes de codar)
+
+A ideia: parar de organizar transcrições em pastas à mão e poder entregar uma reunião inteira a outro agente de IA, limpa e com contexto.
+
+- [ ] **Formato para agente** (sem IA, só reorganiza o que já existe): cabeçalho estruturado com projeto, data, duração, participantes e origem; depois resumo, decisões e ações; por fim as falas com horário. Entra aqui o nome padronizado do `.md` (data, projeto, assunto) e o projeto no cabeçalho, adiados da 11.1 porque o formato é escrito em muitos lugares e a importação o lê de volta
+- [ ] **"Otimizar" a transcrição**: uma versão limpa ao lado da original (tira repetições, hesitações e falsos começos, corrige erros de transcrição pelo dicionário), nunca no lugar dela. A decidir: a camada nova no banco (o passe final regrava a original), a reescrita em partes (o resumo hoje corta em 60 mil caracteres), o custo (a saída tem quase o tamanho da entrada) e a regra do ambíguo (marcar o trecho, não reinterpretar, pela regra de "não inventar")
+- [ ] Pronto quando uma reunião real vai para um agente num toque e ele responde sobre ela sem pedir contexto
 
 ## Boas práticas transversais
 

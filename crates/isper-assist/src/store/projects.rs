@@ -593,6 +593,36 @@ impl AssistStore {
         }
         Ok(found)
     }
+
+    /// A reunião sem evento da agenda (a chamada sem convite, o áudio
+    /// importado, a gravação do celular) também ganha projeto quando o nome ou
+    /// um apelido aparece no título. Nada muda se ela já tem projeto ou se a
+    /// pessoa já mexeu no projeto dela (tirar também é decidir); dúvida não
+    /// marca, e a tela pergunta.
+    pub fn suggest_project_from_title(
+        &self,
+        meeting_id: i64,
+        title: &str,
+    ) -> Result<Option<Project>> {
+        if self.meeting_project(meeting_id)?.project_id.is_some() {
+            return Ok(None);
+        }
+        let decided: bool = self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM journal
+              WHERE object_kind = 'meeting' AND object_id = ?1
+                AND action = 'meeting.project' AND actor = ?2)",
+            params![meeting_id.to_string(), Actor::User.as_str()],
+            |r| r.get(0),
+        )?;
+        if decided {
+            return Ok(None);
+        }
+        let found = match_project(&self.projects(false)?, title).cloned();
+        if let Some(p) = &found {
+            self.set_meeting_project(meeting_id, Some(&p.id), Actor::Assistant)?;
+        }
+        Ok(found)
+    }
 }
 
 #[cfg(test)]
@@ -841,5 +871,51 @@ mod tests {
             .set_meeting_project(3, Some(&mrp.id), Actor::User)
             .unwrap();
         assert!(!mp.suggested);
+    }
+
+    #[test]
+    fn sem_convite_o_titulo_sugere_e_quem_ja_decidiu_nao_e_remarcado() {
+        let store = store();
+        let mrp = store
+            .create_project(named("MRP", &["Planejamento"]), Actor::User)
+            .unwrap();
+        store
+            .create_project(named("Portal", &["PRT"]), Actor::User)
+            .unwrap();
+        let only = |id: i64, title: &str| {
+            store
+                .conn
+                .execute(
+                    "INSERT INTO meetings (id, title, started_at, duration_secs)
+                     VALUES (?1, ?2, '13/10/2026 10:00', 600)",
+                    params![id, title],
+                )
+                .unwrap();
+        };
+
+        only(10, "Revisão do planejamento de outubro");
+        let s = store
+            .suggest_project_from_title(10, "Revisão do planejamento de outubro")
+            .unwrap();
+        assert_eq!(s.map(|p| p.id), Some(mrp.id.clone()));
+        assert!(store.meeting_project(10).unwrap().suggested);
+
+        only(11, "MRP e PRT");
+        assert_eq!(
+            store.suggest_project_from_title(11, "MRP e PRT").unwrap(),
+            None,
+            "empate: fica sem projeto, e a tela pergunta"
+        );
+
+        // A pessoa tirou o projeto: o título de depois (o passe final) não
+        // marca de novo.
+        store.set_meeting_project(10, None, Actor::User).unwrap();
+        assert_eq!(
+            store
+                .suggest_project_from_title(10, "Planejamento do MRP")
+                .unwrap(),
+            None
+        );
+        assert_eq!(store.meeting_project(10).unwrap().project_id, None);
     }
 }

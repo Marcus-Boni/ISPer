@@ -39,6 +39,7 @@ mod overlay;
 mod paths;
 mod phone_sync;
 mod prelude;
+mod projects;
 mod routines;
 mod search;
 mod settings;
@@ -326,6 +327,14 @@ fn main() {
             lists::list_add,
             lists::list_keep,
             lists::spare_suggest,
+            projects::projects_list,
+            projects::project_create,
+            projects::project_update,
+            projects::project_set_archived,
+            projects::opttime_projects,
+            projects::projects_link,
+            projects::meeting_project_get,
+            projects::meeting_project_set,
             shell_ready,
             shell_view,
             shell_status,

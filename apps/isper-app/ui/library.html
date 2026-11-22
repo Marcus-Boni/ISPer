@@ -78,6 +78,15 @@
   .badge { font-size: 11px; padding: 1px 7px; border-radius: var(--r-pill); border: 1px solid var(--line); color: var(--muted); }
   .badge.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
   .badge.score { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); font-variant-numeric: tabular-nums; }
+  /* Projetos (Fase 11.1): o filtro da lista, o selo e o seletor da reunião. */
+  .field-sm { width: auto; padding: 4px 8px; font-size: 12.5px; }
+  #projfilter { max-width: 200px; }
+  #projfilter[hidden] { display: none; }
+  .pdot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; background: var(--muted-2); }
+  .badge.proj { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-2); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dproj { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: -6px 0 14px; font-size: 12.5px; color: var(--muted); }
+  .dproj select { width: auto; max-width: 260px; }
+  .dproj select.unset { border-color: color-mix(in srgb, var(--warn) 60%, transparent); color: var(--warn); }
 
   #detail { overflow-y: auto; padding: 24px 30px; position: relative; }
   .placeholder { color: var(--muted); padding: 60px 20px; text-align: center; display: grid; gap: 10px; justify-items: center; }
@@ -197,6 +206,7 @@
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/><path d="M5 7h4M7 5v4" opacity=".7"/></svg>
     <span data-i18n="library.semantic">Semântica</span>
   </button>
+  <select class="field field-sm" id="projfilter" hidden aria-label="Filtrar por projeto" data-i18n-attr="aria-label:library.project.filter-aria"></select>
   <span class="count num" id="count"></span>
   <button class="btn btn-ghost" id="importbtn" data-i18n-attr="title:library.import.button-title,aria-label:library.import.button">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10.5V2.5M5 5.5l3-3 3 3"/><path d="M2.5 10v2.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V10"/></svg>
@@ -332,6 +342,35 @@
   // A busca semântica só faz sentido com pergunta de verdade (≥ 3 caracteres).
   const semanticActive = () => semantic && semanticAvailable && $('search').value.trim().length >= 3;
 
+  // ------------------------------------------------------------ projetos
+  // Fase 11.1: os ativos e os arquivados (uma reunião antiga pode ter um
+  // arquivado; ele aparece no selo, mas só os ativos são escolhidos).
+  let projects = [];
+  const projectById = (id) => projects.find((p) => p.id === id) || null;
+  function projDot(p) {
+    const d = el('span', 'pdot');
+    if (p && p.color) d.style.background = p.color;
+    return d;
+  }
+  async function loadProjects() {
+    try {
+      const [active, archived] = await Promise.all([invoke('projects_list', { archived: false }), invoke('projects_list', { archived: true })]);
+      projects = [...active, ...archived];
+    } catch (e) { toast(t('common.error', { e }), 'err'); return; }
+    const f = $('projfilter');
+    const keep = f.value;
+    const opt = (value, label) => { const o = el('option', null, label); o.value = value; return o; };
+    f.replaceChildren(opt('', t('library.project.all')), ...projects.filter((p) => !p.archived_at).map((p) => opt(p.id, p.name)), opt('none', t('library.project.none-filter')));
+    f.value = [...f.options].some((o) => o.value === keep) ? keep : '';
+    f.hidden = tab !== 'meetings' || !projects.length;
+  }
+  // A reunião passa no filtro de projeto escolhido ('' = todos, 'none' = sem).
+  function passesProject(projectId) {
+    const want = $('projfilter').value;
+    if (!want) return true;
+    return want === 'none' ? !projectId : projectId === want;
+  }
+
   // ------------------------------------------------------------ reuniões
   function meetingItem(r, extra) {
     const it = el('div', 'item' + (selected === r.id ? ' on' : ''));
@@ -340,7 +379,15 @@
     if (selected === r.id) it.setAttribute('aria-current', 'true');
     it.appendChild(el('div', 't', r.title));
     const m = el('div', 'm');
+    // A ordem fixa de toda reunião: quando, de que projeto, o assunto (acima).
     m.appendChild(el('span', '', r.started_at));
+    const p = r.project_id ? projectById(r.project_id) : null;
+    if (p) {
+      const b = el('span', 'badge proj');
+      b.append(projDot(p), document.createTextNode(p.name));
+      b.title = t('library.project.title', { p: p.name });
+      m.appendChild(b);
+    }
     m.appendChild(el('span', 'num', fmtClock(r.duration_secs)));
     if (extra && extra.score != null) { const s = el('span', 'badge score', pct(extra.score)); s.title = t('library.score-title'); m.appendChild(s); }
     if (r.participants != null) m.appendChild(el('span', 'badge', t('library.participants', { n: r.participants })));
@@ -366,17 +413,25 @@
     try {
       if (semanticActive()) {
         hits = await invoke('semantic_search', { kind: 'meeting', query: q, limit: 30 });
-        rows = hits.map(h => ({ id: h.id, title: h.title, started_at: h.started_at, duration_secs: h.duration_secs, participants: null, has_summary: false, moments: 0 }));
+        // A busca pelo sentido não traz o projeto: vem da lista inteira.
+        const all = projects.length ? await invoke('list_meetings', { query: null }) : [];
+        const projOf = new Map(all.map((r) => [r.id, r.project_id]));
+        rows = hits.map(h => ({ id: h.id, title: h.title, started_at: h.started_at, duration_secs: h.duration_secs, participants: null, has_summary: false, moments: 0, project_id: projOf.get(h.id) || null }));
       } else rows = await invoke('list_meetings', { query: q || null });
     }
     catch (e) { toast(t('common.error', { e }), 'err'); return; }
+    if (hits) {
+      const keep = rows.map((r) => passesProject(r.project_id));
+      hits = hits.filter((_, i) => keep[i]);
+      rows = rows.filter((_, i) => keep[i]);
+    } else rows = rows.filter((r) => passesProject(r.project_id));
     $('count').textContent = rows.length ? t('library.count.meetings', { n: rows.length }) : '';
-    const signature = (hits ? 'sem|' : 'lit|') + rows.map(r => r.id + ':' + r.title + ':' + r.has_summary + ':' + (selected === r.id)).join('|') + '|' + q;
+    const signature = (hits ? 'sem|' : 'lit|') + rows.map(r => r.id + ':' + r.title + ':' + r.has_summary + ':' + r.project_id + ':' + (selected === r.id)).join('|') + '|' + q + '|' + $('projfilter').value + '|' + projects.map((p) => p.id + p.name + p.color).join();
     if (list.dataset.sig === signature) return;
     list.dataset.sig = signature;
     const animate = !silent;
     list.replaceChildren();
-    if (!rows.length) { list.appendChild(placeholder(q ? (hits ? t('library.empty.semantic', { q }) : t('library.empty.meetings-query', { q })) : t('library.empty.meetings'))); return; }
+    if (!rows.length) { list.appendChild(placeholder(q ? (hits ? t('library.empty.semantic', { q }) : t('library.empty.meetings-query', { q })) : $('projfilter').value ? t('library.project.empty') : t('library.empty.meetings'))); return; }
     rows.forEach((r, i) => {
       const hit = hits ? hits[i] : null;
       const it = meetingItem(r, hit);
@@ -395,10 +450,60 @@
     if (animate) UI.stagger(list.children, 10);
   }
 
+  // O projeto da reunião, logo abaixo do título: escolher, trocar, tirar ou
+  // confirmar o que o ISPer sugeriu. Sem projeto, o seletor chama atenção:
+  // é ali que o aviso de "reunião salva" manda escolher.
+  function projectLine(id, projectId, suggested) {
+    const box = el('div', 'dproj');
+    const label = el('label', null, t('library.project.label'));
+    const s = el('select', 'field field-sm' + (projectId ? '' : ' unset'));
+    s.id = 'mproject';
+    label.htmlFor = s.id;
+    const opt = (value, text) => { const o = el('option', null, text); o.value = value; return o; };
+    s.appendChild(opt('', t(projects.some((p) => !p.archived_at) ? 'library.project.none-pick' : 'library.project.none')));
+    for (const p of projects) {
+      if (p.archived_at && p.id !== projectId) continue;
+      const o = opt(p.id, p.archived_at ? t('library.project.archived', { p: p.name }) : p.name);
+      o.disabled = !!p.archived_at;
+      s.appendChild(o);
+    }
+    s.value = projectId || '';
+    const set = async (value, msg) => {
+      try {
+        await invoke('meeting_project_set', { meetingId: id, projectId: value || null });
+        toast(msg, 'ok');
+      } catch (e) { toast(t('common.error', { e }), 'err'); }
+      $('list').dataset.sig = '';
+      await loadMeetings(true);
+      showMeeting(id, { keepScroll: true });
+    };
+    s.addEventListener('change', () => set(s.value, s.value ? t('library.project.set', { p: (projectById(s.value) || {}).name || '' }) : t('library.project.cleared')));
+    const p = projectById(projectId);
+    box.append(projDot(p), label, s);
+    if (projectId && suggested) {
+      box.appendChild(el('span', 'chip chip-info', t('library.project.suggested')));
+      const ok = el('button', 'btn btn-ghost btn-sm', t('library.project.confirm'));
+      ok.type = 'button';
+      ok.setAttribute('aria-label', t('library.project.confirm-aria', { p: p ? p.name : '' }));
+      ok.addEventListener('click', () => set(projectId, t('library.project.confirmed')));
+      box.appendChild(ok);
+    }
+    if (!projects.length) {
+      const hint = el('span', null, t('library.project.create-hint'));
+      box.appendChild(hint);
+    }
+    return box;
+  }
+
   async function showMeeting(id, opts = {}) {
     const d = $('detail');
     let det;
     try { det = await invoke('get_meeting', { id }); } catch (e) { toast(t('common.error', { e }), 'err'); return; }
+    // Se a marca do projeto ainda é só sugestão do ISPer (Fase 11.1).
+    if (det) {
+      try { det.projectSuggested = (await invoke('meeting_project_get', { meetingId: id })).suggested; }
+      catch (_) { det.projectSuggested = false; }
+    }
     const keepScroll = opts.keepScroll ? d.scrollTop : null;
     let jumpTo = null;   // elemento do trecho pedido pela busca semântica
     UI.swap(d, () => {
@@ -443,6 +548,7 @@
       d.appendChild(head);
       d.appendChild(el('div', 'meta', t('library.meta', { at: m.started_at, dur: fmtClock(m.duration_secs), segs: t('library.segments', { n: m.segments }), people: t('library.participants', { n: m.participants }) })));
       if (m.source_name) d.appendChild(el('div', 'meta', t('library.source.title', { name: m.source_name })));
+      d.appendChild(projectLine(id, m.project_id, det.projectSuggested));
 
       const actions = el('div', 'actions');
       const bOpen = el('button', 'btn', t('library.open-md')); bOpen.disabled = !m.md_path;
@@ -802,6 +908,8 @@
   function setTab(name) {
     tab = name;
     $('main').classList.toggle('dictations', name === 'dictations');
+    // Ditados não têm projeto (ADR 0025).
+    $('projfilter').hidden = name !== 'meetings' || !projects.length;
     $('search').placeholder = searchPlaceholder();
     $('list').dataset.sig = '';
     $('list').replaceChildren();
@@ -981,8 +1089,16 @@
 
   $('detail').replaceChildren(placeholder(t('library.select')));
   checkSemantic();
-  refresh();
-  selectPending();
+  $('projfilter').addEventListener('change', () => { $('list').dataset.sig = ''; refresh(true); });
+  // Projeto criado, renomeado ou marcado noutra tela: selo, filtro e seletor.
+  listen('isper-projects', async () => {
+    await loadProjects();
+    $('list').dataset.sig = '';
+    refresh(true);
+    if (tab === 'meetings' && selected != null && !(document.activeElement && document.activeElement.id === 'mproject')) showMeeting(selected, { keepScroll: true });
+  });
+  document.addEventListener('isper-i18n', () => loadProjects());
+  loadProjects().then(() => { refresh(); selectPending(); });
 </script>
 </body>
 </html>

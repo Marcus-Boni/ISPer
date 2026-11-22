@@ -289,6 +289,11 @@
   .chip.est.none { border-style: dashed; color: var(--muted); background: transparent; }
   .chip.est:hover { border-color: var(--line-2); color: var(--ink); }
   .acts .move { max-width: 140px; padding: 2px 6px; font-size: 12px; }
+  /* Projetos (Fase 11.1): o selo da tarefa e o filtro do dia. */
+  .chip.proj { display: inline-flex; align-items: center; gap: 5px; }
+  .pdot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; background: var(--muted-2); }
+  #projfilter { max-width: 200px; }
+  #projfilter[hidden] { display: none; }
   .sug.tip { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); background: color-mix(in srgb, var(--good-soft) 55%, transparent); }
   @keyframes ping { 0%, 45% { background: var(--accent-soft); } 100% { background: transparent; } }
 </style>
@@ -302,6 +307,7 @@
   </div>
   <div class="spacer"></div>
   <p class="summary" id="summary" role="status" aria-live="polite"></p>
+  <select class="field field-sm" id="projfilter" hidden aria-label="Filtrar as tarefas por projeto" data-i18n-attr="aria-label:today.project.filter-aria"></select>
 </header>
 
 <main>
@@ -582,6 +588,13 @@
     if (fromMeeting) box.appendChild(fromMeeting);
     else if (SOURCES[task.source_kind]) box.appendChild(el('span', 'chip chip-info', t(SOURCES[task.source_kind])));
     if (task.area) box.appendChild(el('span', 'chip', task.area));
+    const proj = projectOf(task.project_id);
+    if (proj) {
+      const c = el('span', 'chip proj');
+      c.append(projDot(proj), document.createTextNode(proj.name));
+      c.title = t('today.project.title', { p: proj.name });
+      box.appendChild(c);
+    }
     if (section === 'spare') {
       box.appendChild(estChip(task));
       if (isStale(task)) {
@@ -595,6 +608,44 @@
     }
     return box;
   }
+
+  // ------------------------------------------------------- projetos (11.1)
+  const activeProjects = () => (data && data.projects) || [];
+  const projectOf = (id) => (id && [...activeProjects(), ...((data && data.archived_projects) || [])].find((p) => p.id === id)) || null;
+  function projDot(p) {
+    const d = el('span', 'pdot');
+    if (p && p.color) d.style.background = p.color;
+    return d;
+  }
+  // Marcar, trocar ou tirar o projeto da tarefa (a da reunião já vem com o dela).
+  function projectSelect(task) {
+    const s = el('select', 'field field-sm move');
+    s.setAttribute('aria-label', t('today.project.pick-aria', { t: task.title }));
+    const opt = (value, label) => { const o = el('option', null, label); o.value = value; return o; };
+    s.appendChild(opt('', t('today.project.none')));
+    for (const p of activeProjects()) s.appendChild(opt(p.id, p.name));
+    const cur = projectOf(task.project_id);
+    if (cur && cur.archived_at) { const o = opt(cur.id, cur.name); o.disabled = true; s.appendChild(o); }
+    s.value = task.project_id || '';
+    s.addEventListener('change', () => change('task_update', { id: task.id, patch: { project_id: s.value || null } },
+      s.value ? t('today.project.set', { p: projectOf(s.value).name }) : t('today.project.cleared')));
+    return s;
+  }
+  // O filtro do dia: '' todos, 'none' os sem projeto, ou um projeto.
+  function passesProject(task) {
+    const want = $('projfilter').value;
+    if (!want) return true;
+    return want === 'none' ? !task.project_id : task.project_id === want;
+  }
+  function renderProjectFilter() {
+    const f = $('projfilter');
+    const keep = f.value;
+    const opt = (value, label) => { const o = el('option', null, label); o.value = value; return o; };
+    f.replaceChildren(opt('', t('today.project.all')), ...activeProjects().map((p) => opt(p.id, p.name)), opt('none', t('today.project.none-filter')));
+    f.value = [...f.options].some((o) => o.value === keep) ? keep : '';
+    f.hidden = !activeProjects().length;
+  }
+  $('projfilter').addEventListener('change', () => render(null));
 
   // A tarefa que saiu de uma reunião leva a ela, no minuto em que foi dita.
   function meetingChip(task) {
@@ -705,6 +756,7 @@
       acts.appendChild(actButton(t('today.act.to-list'), t('today.act.to-list-aria', { t: task.title, l: listName(task.list_id) }),
         () => plan(task, null, t('today.toast.to-list'))));
     }
+    if (!done && activeProjects().length) acts.appendChild(projectSelect(task));
     acts.appendChild(iconButton(I_ASK, t('today.act.ask-aria', { t: task.title }),
       () => askAbout({ kind: 'tarefa', id: task.id, label: task.title })));
     if (!done) {
@@ -738,7 +790,9 @@
 
   function render(fresh) {
     if (!data) return;
-    const { planned, inbox, later, done_today: done } = data;
+    renderProjectFilter();
+    // Com um projeto escolhido no filtro, o dia mostra só as dele.
+    const [planned, inbox, later, done] = [data.planned, data.inbox, data.later, data.done_today].map((xs) => xs.filter(passesProject));
 
     $('date').textContent = new Date().toLocaleDateString(lang(), { weekday: 'long', day: 'numeric', month: 'long' });
     const parts = [t('today.summary.planned', { n: planned.length })];
@@ -2379,6 +2433,7 @@
 
   // ------------------------------------------------------------ eventos
   listen('isper-tasks', () => refresh());
+  listen('isper-projects', () => refresh());
   document.addEventListener('isper-view', (e) => { if (e.detail && e.detail.active) { refresh(); loadAgenda(false); } });
   document.addEventListener('isper-i18n', () => { sig = ''; renderAgenda(); renderTip(); paintDays(); paintMonthDays(); if (!editing) $('r-submit').textContent = t('today.routines.create'); render(null); });
   // Virou o dia com a tela aberta: o "hoje" muda.

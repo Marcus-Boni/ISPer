@@ -11,6 +11,22 @@ bata com ela.
 
 ## [Unreleased]
 
+### Adicionado
+- **Projetos na tela.** Em Configurações → Projetos você cria, renomeia,
+  dá cor e apelidos e arquiva os seus projetos, e traz do OptTime só os que
+  escolher (um de mesmo nome é ligado, não duplicado). A Biblioteca mostra o
+  projeto de cada reunião, filtra por projeto (ou pelas sem projeto) e deixa
+  escolher, trocar ou confirmar o projeto sugerido; as tarefas abertas da
+  reunião acompanham. O Hoje ganha o selo, o seletor e o filtro de projeto
+  nas tarefas.
+- **Toda reunião com projeto, ou a pergunta.** A reunião sem convite (a
+  chamada avulsa, o áudio importado, a gravação do celular) também ganha o
+  projeto quando o nome ou um apelido aparece no título. Sem certeza, o aviso
+  de "reunião salva" diz "sem projeto" e abre a reunião para você escolher.
+
+### Corrigido
+- O aviso de "gravação transcrita" mostrava `{actions}` cru no texto.
+
 ## [0.29.0] - 2026-11-20
 
 A Biblioteca passa a saber quem falou nas chamadas do Teams. Com a opção

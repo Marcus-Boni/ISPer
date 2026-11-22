@@ -60,6 +60,20 @@ O OptTime tem a lista de projetos em que se aponta hora
   mesmo evento); sem série com projeto, o nome ou um apelido que aparece no
   assunto como palavra inteira, o mais longo primeiro. Empate entre dois
   projetos não marca nada. Acertando, zero toques; errando, um.
+- **Toda reunião tem projeto ou pergunta (revisto em 22/11).** A reunião sem
+  convite (a chamada avulsa, o áudio importado, a gravação do celular) também
+  é reconhecida, pelo nome ou apelido no título que assentou (o nome do
+  arquivo ou o da IA, inclusive o do passe final), se a pessoa ainda não
+  mexeu no projeto dela. A dúvida (empate ou nada reconhecido) continua sem
+  marcar, mas agora **pergunta**: o aviso de "reunião salva" diz "sem projeto"
+  e abre a reunião, onde o seletor fica em destaque, e a Biblioteca filtra
+  "Sem projeto" para arrumar as antigas.
+- **Título padronizado na tela, não no texto.** A lista da Biblioteca mostra
+  toda reunião na mesma ordem: o assunto, e embaixo quando, de que projeto e
+  quanto durou. O título guardado continua sendo o assunto do convite (regra
+  da 10.3) ou o da IA. O nome do `.md` e um cabeçalho com o projeto ficam
+  para a reunião "pronta para agente" (11.3): o formato do `.md` é escrito em
+  muitos lugares e a importação o lê de volta.
 - **"Sugerido" vem do diário, não de uma coluna nova.** A marca do ISPer vai
   para o diário com o assistente como autor; enquanto a última marca não for
   da pessoa, a tela mostra "sugerido". Marcar o mesmo projeto confirma.
@@ -69,7 +83,8 @@ O OptTime tem a lista de projetos em que se aponta hora
   aponta horas). Um projeto local sem ligação e de mesmo nome é ligado, e o
   código de lá vira apelido; trazer de novo não duplica.
 - **Os projetos se cuidam nas Configurações → Projetos**; o Hoje e a
-  Biblioteca têm o selo, o seletor e o filtro. O assistente filtra tarefas e
+  Biblioteca têm o selo, o seletor e o filtro (o arquivado aparece no selo de
+  quem já o tinha, mas não é oferecido). O assistente filtra tarefas e
   reuniões por projeto (`projeto`) e lista os projetos (`projetos`).
 - **As rotinas ficam sem projeto por enquanto:** a coluna existe, mas o
   critério da 11.1 é de tarefas e reuniões.

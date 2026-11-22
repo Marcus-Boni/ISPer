@@ -125,6 +125,15 @@ function tool(name, args) {
         timezone: 'America/Sao_Paulo', range: { start: isoIn(-720), end: isoIn(720) },
         sources: { outlook: true }, warnings: [], events: agendaEvents(),
       });
+    // Os projetos em que se aponta horas (Fase 11.1: "Trazer do OptTime").
+    case 'opt_time_list_projects':
+      return ok({
+        projects: [
+          { id: 'p1', name: 'Portal do Cliente', code: 'PRT', color: '#3d8bfd', clientName: 'ACME' },
+          { id: 'p2', name: 'Estoque', code: 'EST', color: 'azul', clientName: null },
+        ],
+        total: 2, truncated: false,
+      });
     case 'opt_time_apply_suggestions': {
       if (applied.has(args.idempotencyKey)) return ok({ ...applied.get(args.idempotencyKey), replayed: true });
       const items = Array.isArray(args.items) ? args.items : [];

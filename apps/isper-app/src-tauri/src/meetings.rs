@@ -356,6 +356,9 @@ pub(crate) fn finish_meeting(
         title = t.clone();
         app_title = Some(t);
     }
+    // Fase 11.1: sem convite (ou sem o projeto no convite), o título que
+    // assentou ainda pode dizer o projeto. Sem ele, o aviso pergunta.
+    let has_project = crate::projects::suggest_from_title(app, meeting_id, &title);
 
     // Busca semântica: transcript + resumo viram vetores em segundo plano
     // (só com provider de embeddings configurado). Também provisórios: o
@@ -385,6 +388,7 @@ pub(crate) fn finish_meeting(
             result.duration_secs,
             has_summary,
             actions,
+            has_project,
             &md_path,
         ),
     }
@@ -483,6 +487,16 @@ pub(crate) fn open_file(path: &Path) {
         .spawn();
 }
 
+/// O trecho do aviso que pergunta o projeto (Fase 11.1), quando a reunião
+/// saiu sem um; clicar no aviso abre a reunião, onde se escolhe.
+pub(crate) fn no_project_note(app: &AppHandle, has_project: bool) -> String {
+    if has_project {
+        String::new()
+    } else {
+        crate::i18n::tr(app, "notify.no-project")
+    }
+}
+
 /// Toast "Reunião salva" — clicar abre a Biblioteca já naquela reunião. Se o
 /// Windows recusar a notificação, abre o arquivo (o usuário não fica sem nada).
 #[allow(clippy::too_many_arguments)]
@@ -493,6 +507,7 @@ pub(crate) fn notify_meeting_saved(
     duration_secs: f32,
     has_summary: bool,
     actions: usize,
+    has_project: bool,
     md_path: &Path,
 ) {
     let summary = if has_summary {
@@ -512,6 +527,7 @@ pub(crate) fn notify_meeting_saved(
             ("duration", meeting::fmt_ts(duration_secs)),
             ("summary", summary),
             ("actions", actions),
+            ("project", no_project_note(app, has_project)),
         ],
     );
     let heading = crate::i18n::tr(app, "notify.meeting-saved");
