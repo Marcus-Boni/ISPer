@@ -756,7 +756,8 @@
       acts.appendChild(actButton(t('today.act.to-list'), t('today.act.to-list-aria', { t: task.title, l: listName(task.list_id) }),
         () => plan(task, null, t('today.toast.to-list'))));
     }
-    if (!done && activeProjects().length) acts.appendChild(projectSelect(task));
+    // As rotinas ficam sem projeto por ora (ADR 0025).
+    if (!done && !task.routine_id && activeProjects().length) acts.appendChild(projectSelect(task));
     acts.appendChild(iconButton(I_ASK, t('today.act.ask-aria', { t: task.title }),
       () => askAbout({ kind: 'tarefa', id: task.id, label: task.title })));
     if (!done) {
