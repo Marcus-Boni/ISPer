@@ -53,8 +53,11 @@ pub(crate) struct TodayView {
     suggestions: Vec<RoutineSuggestion>,
     /// As listas "Quando der tempo", com os itens sem dia (Fase 11.0).
     lists: Vec<ListWithItems>,
-    /// Os projetos ativos, para anexar um à pergunta do assistente.
+    /// Os projetos ativos: o selo, o seletor e o filtro das tarefas, e anexar
+    /// um à pergunta do assistente.
     projects: Vec<isper_assist::Project>,
+    /// Os arquivados, só para o selo de quem já estava marcado.
+    archived_projects: Vec<isper_assist::Project>,
     opttime: bool,
 }
 
@@ -85,6 +88,7 @@ pub(crate) fn today_load(app: AppHandle) -> Result<TodayView, String> {
             }),
             lists: store.lists_with_items()?,
             projects: store.projects(false)?,
+            archived_projects: store.projects(true)?,
             opttime: crate::connectors::token_present(),
         })
     })()

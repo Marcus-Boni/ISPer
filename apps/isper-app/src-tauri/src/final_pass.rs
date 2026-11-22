@@ -193,9 +193,13 @@ fn refresh_derived(app: &AppHandle, meeting_id: i64, app_title: Option<&str>) {
     match store.get_meeting(meeting_id) {
         Ok(Some(detail)) => {
             let text = summary_input(&detail);
-            summarize_saved(&store, meeting_id, &text, app_title, || {
+            let title = summarize_saved(&store, meeting_id, &text, app_title, || {
                 tracing::info!(meeting_id, "refazendo o resumo sobre a transcrição final");
             });
+            // O título novo da IA pode dizer o projeto que o provisório não dizia.
+            if let Some(t) = title {
+                crate::projects::suggest_from_title(app, meeting_id, &t);
+            }
         }
         // Excluída enquanto o passe final rodava.
         Ok(None) => return,

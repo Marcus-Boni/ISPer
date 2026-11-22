@@ -222,6 +222,8 @@ enum Done {
         secs: f32,
         md_path: PathBuf,
         has_summary: bool,
+        /// Saiu com projeto; sem ele, o aviso pergunta (Fase 11.1).
+        has_project: bool,
     },
     Duplicate {
         id: i64,
@@ -391,6 +393,9 @@ fn process(app: &AppHandle, job: &Job) -> Result<Done, Failure> {
     }) {
         title = t;
     }
+    // Fase 11.1: a gravação importada não tem convite; o título (o nome do
+    // arquivo ou o da IA) pode dizer o projeto. Sem ele, o aviso pergunta.
+    let has_project = crate::projects::suggest_from_title(app, id, &title);
     // Fase 10.3: as ações de "Eu" da gravação importada também vão para a
     // caixa de entrada (uma vez só, mesmo que o arquivo volte).
     crate::meeting_inbox::collect(
@@ -413,6 +418,7 @@ fn process(app: &AppHandle, job: &Job) -> Result<Done, Failure> {
         secs,
         md_path,
         has_summary,
+        has_project,
     })
 }
 
@@ -540,9 +546,10 @@ fn finish(app: &AppHandle, job: &Job, result: Result<Done, Failure>) {
                 secs,
                 md_path,
                 has_summary,
+                has_project,
             }),
             _,
-        ) => notify_done(app, *id, title, *secs, *has_summary, md_path),
+        ) => notify_done(app, *id, title, *secs, *has_summary, *has_project, md_path),
         // Da pasta vigiada e do celular ninguém está olhando: o erro vira
         // aviso. Da Biblioteca, ele aparece ali mesmo.
         (Err(f), Origin::Watched | Origin::Phone) if !f.cancelled => {
@@ -575,7 +582,15 @@ fn finish(app: &AppHandle, job: &Job, result: Result<Done, Failure>) {
     notify_status(app);
 }
 
-fn notify_done(app: &AppHandle, id: i64, title: &str, secs: f32, has_summary: bool, md: &Path) {
+fn notify_done(
+    app: &AppHandle,
+    id: i64,
+    title: &str,
+    secs: f32,
+    has_summary: bool,
+    has_project: bool,
+    md: &Path,
+) {
     let after = app
         .state::<AppState>()
         .config
@@ -594,7 +609,13 @@ fn notify_done(app: &AppHandle, id: i64, title: &str, secs: f32, has_summary: bo
             let line2 = crate::i18n::trv(
                 app,
                 "notify.meeting-saved-line2",
-                &[("duration", meeting::fmt_ts(secs)), ("summary", summary)],
+                &[
+                    ("duration", meeting::fmt_ts(secs)),
+                    ("summary", summary),
+                    // Sem ações aqui: o espaço não pode sair cru no aviso.
+                    ("actions", String::new()),
+                    ("project", no_project_note(app, has_project)),
+                ],
             );
             let heading = crate::i18n::tr(app, "notify.import-done");
             let app2 = app.clone();

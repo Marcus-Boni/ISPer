@@ -85,6 +85,18 @@
   .mem-acts { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
   .mem-edit { font-size: 13px; padding: 5px 8px; }
   @media (max-width: 560px) { .mem-add { grid-template-columns: 1fr; } .mem { grid-template-columns: 1fr; } .mem-acts { justify-content: flex-start; } }
+  /* Projetos (Fase 11.1): a cor, o nome e os apelidos, editáveis na linha. */
+  .proj-add { grid-template-columns: 1fr 1fr auto; }
+  .proj { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .proj-color { width: 22px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: none; cursor: pointer; overflow: hidden; }
+  .proj-color::-webkit-color-swatch-wrapper { padding: 0; }
+  .proj-color::-webkit-color-swatch { border: none; border-radius: 50%; }
+  .proj-dot { width: 12px; height: 12px; border-radius: 50%; justify-self: center; background: var(--muted-2); }
+  .proj-aliases { font-size: 12px; color: var(--muted); }
+  .ot-pick { display: grid; gap: 4px; max-height: 280px; overflow-y: auto; }
+  .ot-pick label { display: flex; gap: 8px; align-items: center; font-size: 13px; padding: 4px 0; }
+  .ot-pick .mnote { margin: 0; }
+  @media (max-width: 560px) { .proj-add { grid-template-columns: 1fr; } .proj { grid-template-columns: auto minmax(0, 1fr); } .proj .mem-acts { grid-column: 1 / -1; } }
   /* Assistente: o que cada ferramenta pode fazer sem perguntar (Fase 10.4). */
   .perm { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
   .perm-list > .perm:first-child { border-top: none; padding-top: 2px; }
@@ -432,6 +444,35 @@
     </select>
   </div>
   <p class="hint" data-i18n="settings.inteligencia.usa-provider-acima-so-texto">Usa o provider acima; só o texto do ditado é enviado. Acrescenta cerca de um segundo antes de colar. Se a API falhar ou não houver chave, o texto original é colado normalmente — o histórico guarda os dois.</p>
+</section>
+
+<section class="card reveal" id="projetos" data-i="5" aria-labelledby="h-projetos">
+  <h2 id="h-projetos" data-i18n="settings.projetos.titulo">Projetos</h2>
+  <p class="hint mt0" data-i18n="settings.projetos.lead">Organizam as reuniões e as tarefas. A reunião já sai com o projeto quando o ISPer o reconhece: o da reunião anterior da mesma série, ou o nome (ou um apelido) no assunto ou no título. Na dúvida, ela fica sem projeto e o aviso de reunião salva pergunta.</p>
+  <form class="mem-add proj-add" id="projadd" autocomplete="off">
+    <label class="sr-only" for="projname" data-i18n="settings.projetos.new-label">Novo projeto</label>
+    <input class="field" id="projname" maxlength="60" placeholder="Nome do projeto" data-i18n-attr="placeholder:settings.projetos.name-ph">
+    <label class="sr-only" for="projaliases" data-i18n="settings.projetos.aliases-aria">Apelidos, separados por vírgula</label>
+    <input class="field" id="projaliases" maxlength="400" placeholder="Apelidos, separados por vírgula (opcional)" data-i18n-attr="placeholder:settings.projetos.aliases-ph">
+    <button class="btn" type="submit" id="projsave" data-i18n="settings.projetos.create">Criar</button>
+  </form>
+  <div class="mem-list" id="projlist" aria-live="polite"></div>
+  <p class="hint" id="projempty" hidden data-i18n="settings.projetos.empty">Nenhum projeto ainda. Crie acima ou traga do OptTime.</p>
+  <div class="row mt10" id="projotrow" hidden>
+    <button class="btn btn-sm flex-none" type="button" id="projot" data-i18n="settings.projetos.ot">Trazer do OptTime</button>
+  </div>
+  <div class="conn" id="projotbox" hidden>
+    <p class="hint mt0" id="projotlead"></p>
+    <div class="ot-pick" id="projotlist"></div>
+    <div class="row mt10">
+      <button class="btn btn-sm flex-none" type="button" id="projotbring" data-i18n="settings.projetos.ot-bring">Trazer os marcados</button>
+      <button class="btn btn-sm btn-ghost flex-none" type="button" id="projotcancel" data-i18n="settings.projetos.ot-cancel">Cancelar</button>
+    </div>
+  </div>
+  <details class="conn-adv" id="projarchbox" hidden>
+    <summary class="hint" id="projarchsum"></summary>
+    <div class="mem-list archived" id="projarch"></div>
+  </details>
 </section>
 
 <section class="card reveal" id="conectores" data-i="5" aria-labelledby="h-conectores">
@@ -1327,6 +1368,189 @@
   listen('isper-memory', () => loadMemory());
   document.addEventListener('isper-i18n', () => loadMemory());
   loadMemory();
+
+  // ---- projetos (Fase 11.1): criar, cor, renomear, apelidos, arquivar e
+  // trazer do OptTime os escolhidos
+  const splitAliases = (s) => s.split(',').map((a) => a.trim()).filter(Boolean);
+  async function projSave(id, patch, msg) {
+    try {
+      await invoke('project_update', { id, patch });
+      if (msg) status(msg, 'ok');
+    } catch (e) { status(t('common.error', { e }), 'err'); }
+  }
+  // Um texto da linha vira campo: Enter (ou sair) guarda, Esc desiste.
+  function editProj(node, value, aria, save) {
+    const input = el('input', 'field mem-edit proj-edit');
+    input.value = value;
+    input.maxLength = 400;
+    input.setAttribute('aria-label', aria);
+    let done = false;
+    const finish = async (ok) => {
+      if (done) return;
+      done = true;
+      const v = input.value.trim();
+      if (ok && v !== value) await save(v);
+      loadProjects(true);
+    };
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+      if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
+    node.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+  function editable(node, label, run) {
+    node.tabIndex = 0;
+    node.setAttribute('role', 'button');
+    node.title = t('settings.projetos.edit-hint');
+    node.setAttribute('aria-label', label);
+    node.addEventListener('click', run);
+    node.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); run(); } });
+  }
+  function projRow(p, archived) {
+    const row = el('div', 'mem proj');
+    row.dataset.id = p.id;
+    let swatch;
+    if (archived) {
+      swatch = el('span', 'proj-dot');
+      if (p.color) swatch.style.background = p.color;
+    } else {
+      swatch = el('input', 'proj-color');
+      swatch.type = 'color';
+      swatch.value = p.color || '#888888';
+      swatch.setAttribute('aria-label', t('settings.projetos.color-aria', { p: p.name }));
+      swatch.addEventListener('change', () => projSave(p.id, { color: swatch.value }, t('settings.projetos.msg.saved')));
+    }
+    const main = el('div');
+    const name = el('div', 'mem-text', p.name);
+    const aliases = el('div', 'proj-aliases', p.aliases.length ? t('settings.projetos.aliases', { a: p.aliases.join(', ') }) : (archived ? '' : t('settings.projetos.no-aliases')));
+    if (!archived) {
+      editable(name, t('settings.projetos.edit-name-aria', { p: p.name }), () => editProj(name, p.name, t('settings.projetos.name-aria'),
+        (v) => v && projSave(p.id, { name: v }, t('settings.projetos.msg.saved'))));
+      editable(aliases, t('settings.projetos.edit-aliases-aria', { p: p.name }), () => editProj(aliases, p.aliases.join(', '), t('settings.projetos.aliases-aria'),
+        (v) => projSave(p.id, { aliases: splitAliases(v) }, t('settings.projetos.msg.saved'))));
+    }
+    main.append(name, aliases);
+    if (p.external_ref && p.external_ref.startsWith('opttime:')) {
+      const meta = el('div', 'mem-meta');
+      meta.appendChild(el('span', 'chip chip-info', t('settings.projetos.opttime-chip')));
+      main.appendChild(meta);
+    }
+    const acts = el('div', 'mem-acts');
+    const setArchived = async (on) => {
+      try { await invoke('project_set_archived', { id: p.id, archived: on }); } catch (e) { status(t('common.error', { e }), 'err'); return false; }
+      loadProjects();
+      return true;
+    };
+    if (archived) {
+      acts.appendChild(memButton(t('settings.projetos.restore'), t('settings.projetos.restore-aria', { p: p.name }), async () => {
+        if (await setArchived(false)) status(t('settings.projetos.msg.restored'), 'ok');
+      }));
+    } else {
+      acts.appendChild(memButton(t('settings.projetos.archive'), t('settings.projetos.archive-aria', { p: p.name }), async () => {
+        if (!(await setArchived(true))) return;
+        toast(t('settings.projetos.msg.archived'), 'ok', 6000, { action: { label: t('common.undo'), run: () => setArchived(false) } });
+      }));
+    }
+    row.append(swatch, main, acts);
+    return row;
+  }
+  let projActive = [];
+  async function loadProjects(force) {
+    let active, archived, ot;
+    try {
+      [active, archived, ot] = await Promise.all([
+        invoke('projects_list', { archived: false }),
+        invoke('projects_list', { archived: true }),
+        invoke('opttime_status').catch(() => null),
+      ]);
+    } catch (e) { status(t('common.error', { e }), 'err'); return; }
+    projActive = active;
+    $('projotrow').hidden = !(ot && ot.token_present);
+    if (!force && document.activeElement && document.activeElement.classList.contains('proj-edit')) return;
+    $('projlist').replaceChildren(...active.map((p) => projRow(p, false)));
+    $('projempty').hidden = !!active.length;
+    $('projarchbox').hidden = !archived.length;
+    $('projarchsum').textContent = t('settings.projetos.archived', { n: archived.length });
+    $('projarch').replaceChildren(...archived.map((p) => projRow(p, true)));
+  }
+  $('projadd').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const name = $('projname').value.trim();
+    if (!name) { $('projname').focus(); return; }
+    const b = $('projsave');
+    UI.busy(b, true);
+    try {
+      await invoke('project_create', { project: { name, aliases: splitAliases($('projaliases').value) } });
+      $('projname').value = '';
+      $('projaliases').value = '';
+      UI.busy(b, false);
+      UI.flash(b, t('common.saved'));
+      status(t('settings.projetos.msg.created'), 'ok');
+    } catch (e) {
+      UI.busy(b, false);
+      status(t('common.error', { e }), 'err');
+    }
+    loadProjects();
+    $('projname').focus();
+  });
+  // Trazer do OptTime: a lista de lá, os já trazidos marcados e travados.
+  let otProjects = [];
+  $('projot').addEventListener('click', async () => {
+    const b = $('projot');
+    UI.busy(b, true);
+    $('projotlead').textContent = t('settings.projetos.ot-loading');
+    let list;
+    try { list = await invoke('opttime_projects'); }
+    catch (e) {
+      UI.busy(b, false);
+      status(t('common.error', { e: (e && e.message) || e }), 'err');
+      return;
+    }
+    UI.busy(b, false);
+    otProjects = list.projects || [];
+    const linked = new Set([...projActive].map((p) => p.external_ref).filter(Boolean));
+    const lead = [otProjects.length ? t('settings.projetos.ot-lead') : t('settings.projetos.ot-none')];
+    if (list.truncated) lead.push(t('settings.projetos.ot-truncated', { n: otProjects.length, total: list.total }));
+    $('projotlead').textContent = lead.join(' ');
+    $('projotlist').replaceChildren(...otProjects.map((op) => {
+      const label = el('label');
+      const cb = el('input');
+      cb.type = 'checkbox';
+      cb.value = op.id;
+      const already = linked.has('opttime:' + op.id);
+      cb.checked = cb.disabled = already;
+      const txt = el('span', null, [op.name, op.code, op.clientName].filter(Boolean).join(' · '));
+      label.append(cb, txt);
+      if (already) label.appendChild(el('span', 'mnote', t('settings.projetos.ot-linked')));
+      return label;
+    }));
+    $('projotbring').hidden = !otProjects.length;
+    $('projotbox').hidden = false;
+  });
+  $('projotcancel').addEventListener('click', () => { $('projotbox').hidden = true; $('projot').focus(); });
+  $('projotbring').addEventListener('click', async () => {
+    const chosen = [...$('projotlist').querySelectorAll('input:checked:not(:disabled)')].map((cb) => otProjects.find((op) => op.id === cb.value)).filter(Boolean);
+    if (!chosen.length) { $('projotbox').hidden = true; return; }
+    const b = $('projotbring');
+    UI.busy(b, true);
+    try {
+      await invoke('projects_link', { items: chosen.map((op) => ({ external_ref: 'opttime:' + op.id, name: op.name, color: op.color || null, code: op.code || null })) });
+      UI.busy(b, false);
+      $('projotbox').hidden = true;
+      status(t('settings.projetos.msg.linked', { n: chosen.length }), 'ok');
+    } catch (e) {
+      UI.busy(b, false);
+      status(t('common.error', { e }), 'err');
+    }
+    loadProjects();
+  });
+  listen('isper-projects', () => loadProjects());
+  listen('isper-connector', () => loadProjects());
+  document.addEventListener('isper-i18n', () => loadProjects());
+  loadProjects();
 
   // ---- assistente: o que cada ferramenta pode fazer sem perguntar (ADR 0023)
   const PERMS = ['allow', 'ask', 'never'];
