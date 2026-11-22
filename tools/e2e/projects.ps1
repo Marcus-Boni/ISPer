@@ -94,6 +94,14 @@ try {
   $n = & python -c $py $db
   Check ("$n".Trim() -eq '2') "duas reunioes de teste no banco ($n)"
 
+  # 0) Sem nenhum projeto, a Biblioteca nao cobra: sem filtro, seletor sem destaque.
+  Invoke-Isper 'open_library_window' '{ meeting: null }' | Out-Null
+  Wait-IsperWindow 'library.html' | Out-Null
+  Wait-Js 'library.html' $libJs { param($s) @($s.items).Count -ge 2 } | Out-Null
+  Pick-Meeting 'Revisao do backlog'
+  $z = Wait-Js 'library.html' $libJs { param($s) $s.sel }
+  Check ($null -eq $z.filter -and $z.sel -and -not $z.sel.unset -and $z.sel.text -eq 'Sem projeto') "sem projetos, nada de filtro nem de cobranca ('$($z.sel.text)')"
+
   # 1) Configuracoes -> Projetos: vazio, criar com apelidos.
   Invoke-Isper 'open_settings_window' "{ section: 'projetos' }" | Out-Null
   Wait-IsperWindow 'settings.html' | Out-Null
@@ -184,6 +192,7 @@ try {
   EvJson 'today.html' 'JSON.stringify((() => { const li = [...document.querySelectorAll("#list-planned > li.task")].find(x => x.querySelector(".title").textContent === "Revisar backlog com o time"); const s = li.querySelector(".acts select"); s.value = [...s.options].find(o => o.textContent === "Portal do Cliente").value; s.dispatchEvent(new Event("change")); return true; })())' | Out-Null
   $t1 = Wait-Js 'today.html' $todayJs { param($s) (@($s.planned) | Where-Object { $_.title -eq 'Revisar backlog com o time' }).proj }
   Check ((@($t1.planned) | Where-Object { $_.title -eq 'Revisar backlog com o time' }).proj -eq 'Portal do Cliente') "o selo Portal do Cliente aparece na tarefa ('$($t1.toast)')"
+  Ev 'today.html' 'document.getElementById("list-planned").scrollIntoView({ block: "center" })' | Out-Null
   Shot 'today.html' 'projects-today.png'
   Set-Select 'today.html' '#projfilter' 'MRP' | Out-Null
   $t2 = Wait-Js 'today.html' $todayJs { param($s) -not (@($s.planned) | Where-Object { $_.title -eq 'Revisar backlog com o time' }) }

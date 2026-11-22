@@ -114,7 +114,8 @@ pub(crate) fn meeting_project_set(
 
 /// Depois que o título da reunião assenta (a IA, o nome do arquivo): o
 /// projeto cujo nome ou apelido aparece nele, se a reunião ainda não tem e a
-/// pessoa não decidiu. Devolve se a reunião ficou com projeto. Um erro aqui
+/// pessoa não decidiu. Devolve `false` só quando vale perguntar: a reunião
+/// ficou sem projeto e há projetos para escolher. Um erro aqui
 /// não pode derrubar o salvar: vira aviso no log.
 pub(crate) fn suggest_from_title(app: &AppHandle, meeting_id: i64, title: &str) -> bool {
     let done = open_assist().and_then(|s| {
@@ -123,7 +124,8 @@ pub(crate) fn suggest_from_title(app: &AppHandle, meeting_id: i64, title: &str) 
             let _ = app.emit(PROJECTS_EVENT, ());
             let _ = app.emit(TASKS_EVENT, ());
         }
-        Ok(s.meeting_project(meeting_id)?.project_id.is_some())
+        // Sem projeto nenhum cadastrado, não há o que perguntar.
+        Ok(s.meeting_project(meeting_id)?.project_id.is_some() || s.projects(false)?.is_empty())
     });
     done.unwrap_or_else(|e| {
         tracing::warn!(

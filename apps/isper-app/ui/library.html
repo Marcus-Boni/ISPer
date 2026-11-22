@@ -456,11 +456,13 @@
   function projectLine(id, projectId, suggested) {
     const box = el('div', 'dproj');
     const label = el('label', null, t('library.project.label'));
-    const s = el('select', 'field field-sm' + (projectId ? '' : ' unset'));
+    const choosable = projects.some((p) => !p.archived_at);
+    // Só chama atenção quando há o que escolher.
+    const s = el('select', 'field field-sm' + (projectId || !choosable ? '' : ' unset'));
     s.id = 'mproject';
     label.htmlFor = s.id;
     const opt = (value, text) => { const o = el('option', null, text); o.value = value; return o; };
-    s.appendChild(opt('', t(projects.some((p) => !p.archived_at) ? 'library.project.none-pick' : 'library.project.none')));
+    s.appendChild(opt('', t(choosable ? 'library.project.none-pick' : 'library.project.none')));
     for (const p of projects) {
       if (p.archived_at && p.id !== projectId) continue;
       const o = opt(p.id, p.archived_at ? t('library.project.archived', { p: p.name }) : p.name);
@@ -1095,7 +1097,9 @@
     await loadProjects();
     $('list').dataset.sig = '';
     refresh(true);
-    if (tab === 'meetings' && selected != null && !(document.activeElement && document.activeElement.id === 'mproject')) showMeeting(selected, { keepScroll: true });
+    // O evento também vem de salvamentos em segundo plano: com algo em foco
+    // na reunião (título, falante, busca, seletor), ela não é redesenhada.
+    if (tab === 'meetings' && selected != null && !$('detail').contains(document.activeElement)) showMeeting(selected, { keepScroll: true });
   });
   document.addEventListener('isper-i18n', () => loadProjects());
   loadProjects().then(() => { refresh(); selectPending(); });
