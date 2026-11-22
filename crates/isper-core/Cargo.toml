@@ -36,7 +36,7 @@ symphonia = { version = "0.6.1", default-features = false, features = ["aac", "f
 # existem no Windows. No celular a captura é nativa (Fase 9.2) e o núcleo
 # compila sem isto.
 [target.'cfg(windows)'.dependencies]
-wasapi = "0.25.0"
+wasapi = "0.27.0"
 # UI Automation (nomes da chamada do Teams, `speaker_names::uia`): a mesma
 # versão que o Tauri/WebView2 já compilam, só com as features a mais.
 windows = { version = "0.62.2", features = [
