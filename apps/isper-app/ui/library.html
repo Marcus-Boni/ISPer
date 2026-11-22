@@ -86,6 +86,11 @@
   .badge.proj { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-2); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dproj { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: -6px 0 14px; font-size: 12.5px; color: var(--muted); }
   .dproj select { width: auto; max-width: 260px; }
+  /* Otimizar (Fase 11.3): o alternador Otimizada/Original. */
+  .seg-toggle { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--panel-2); }
+  .seg-toggle button { font: inherit; font-size: 12px; font-weight: 500; padding: 3px 11px; border: none; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
+  .seg-toggle button:hover { color: var(--ink); }
+  .seg-toggle button[aria-checked="true"] { background: var(--panel); color: var(--ink); box-shadow: var(--shadow-1); }
   .dproj select.unset { border-color: color-mix(in srgb, var(--warn) 60%, transparent); color: var(--warn); }
 
   #detail { overflow-y: auto; padding: 24px 30px; position: relative; }
@@ -497,6 +502,59 @@
     return box;
   }
 
+  // ------------------------------------------- otimizar (Fase 11.3)
+  const meetingView = {};      // id → 'clean' | 'orig', o que o alternador mostra
+  const optimizing = {};       // id → { done, total } enquanto a IA limpa
+  // A fala limpa no lugar da original; a que era só hesitação ("") sai.
+  const cleanSegments = (segments) => segments
+    .filter(s => s.clean_text !== '')
+    .map(s => (s.clean_text != null ? { ...s, text: s.clean_text } : s));
+  function optimizeLabel(id, optimized) {
+    const p = optimizing[id];
+    if (p) return p.total ? t('library.optimize.progress', { done: p.done, total: p.total }) : t('library.optimize.running');
+    return t(optimized ? 'library.optimize.again' : 'library.optimize');
+  }
+  function optimizeButton(id, optimized) {
+    const b = el('button', 'btn btn-ghost', optimizeLabel(id, optimized));
+    b.id = 'optimize';
+    b.title = t('library.optimize.title');
+    b.disabled = !!optimizing[id];
+    b.addEventListener('click', async () => {
+      optimizing[id] = { done: 0, total: 0 };
+      b.disabled = true; b.textContent = optimizeLabel(id, optimized);
+      try {
+        const n = await invoke('optimize_meeting', { id });
+        meetingView[id] = 'clean';
+        toast(t('library.optimize.done', { n }), 'ok');
+      } catch (e) { toast(t('library.optimize.failed', { e }), 'err'); }
+      delete optimizing[id];
+      if (selected === id) showMeeting(id, { keepScroll: true });
+    });
+    return b;
+  }
+  function viewToggle(id, view) {
+    const box = el('div', 'seg-toggle');
+    box.setAttribute('role', 'radiogroup');
+    box.setAttribute('aria-label', t('library.optimize.view-aria'));
+    for (const [v, key] of [['clean', 'library.optimize.view-clean'], ['orig', 'library.optimize.view-orig']]) {
+      const b = el('button', null, t(key));
+      b.type = 'button';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(view === v));
+      b.dataset.v = v;
+      b.addEventListener('click', () => { if (view !== v) { meetingView[id] = v; showMeeting(id, { keepScroll: true }); } });
+      box.appendChild(b);
+    }
+    return box;
+  }
+  listen('isper-optimize', (e) => {
+    const p = e.payload || {};
+    if (!optimizing[p.id]) return;
+    optimizing[p.id] = { done: p.done, total: p.total };
+    const b = $('optimize');
+    if (b && selected === p.id) b.textContent = optimizeLabel(p.id, false);
+  });
+
   async function showMeeting(id, opts = {}) {
     const d = $('detail');
     let det;
@@ -513,7 +571,12 @@
       d.classList.remove('filtering');
       if (!det) { d.appendChild(placeholder(t('library.not-found'))); return; }
       const m = det.meeting;
-      const groups = groupSpeech(det.segments, true);
+      // "Otimizar" (Fase 11.3): com a versão limpa, a tela, copiar e exportar
+      // seguem o alternador; a original nunca sai do banco.
+      const optimized = det.segments.some(s => s.clean_text != null);
+      const view = optimized ? (meetingView[id] || 'clean') : 'orig';
+      const segs = view === 'clean' ? cleanSegments(det.segments) : det.segments;
+      const groups = groupSpeech(segs, true);
       const hasDetected = groups.some(g => g.detected);
       // Cores por ordem de aparição — nomes personalizados continuam coloridos.
       const order = [];
@@ -524,7 +587,7 @@
         return 'p' + (Math.min(i, 4) + 1);
       };
       // Copiar transcript leva os rótulos da ata, nunca os nomes detectados.
-      const transcriptText = () => groupSpeech(det.segments, false).map(g => '[' + fmtClock(g.start_secs) + '] ' + speaker(g.speaker) + ': ' + g.text).join('\n');
+      const transcriptText = () => groupSpeech(segs, false).map(g => '[' + fmtClock(g.start_secs) + '] ' + speaker(g.speaker) + ': ' + g.text).join('\n');
 
       const head = el('div', 'dhead');
       const h2 = el('h2', '', m.title);
@@ -567,6 +630,8 @@
         bSum.addEventListener('click', () => copyText(det.summary, bSum, t('library.summary-copied')));
         actions.appendChild(bSum);
       }
+      actions.appendChild(optimizeButton(id, optimized));
+      if (optimized) actions.appendChild(viewToggle(id, view));
       const bTx = el('button', 'btn btn-ghost', t('library.copy-transcript'));
       bTx.addEventListener('click', () => copyText(transcriptText(), bTx, t('library.transcript-copied')));
       actions.appendChild(bTx);
@@ -576,7 +641,7 @@
         b.title = fmt === 'srt' ? t('library.export.srt') : t('library.export.docx');
         b.addEventListener('click', async () => {
           UI.busy(b, true);
-          try { const path = await invoke('export_meeting', { id, format: fmt }); UI.busy(b, false); UI.flash(b, t('common.saved')); toast(t('library.exported', { path }), 'ok', 4000); }
+          try { const path = await invoke('export_meeting', { id, format: fmt, clean: view === 'clean' }); UI.busy(b, false); UI.flash(b, t('common.saved')); toast(t('library.exported', { path }), 'ok', 4000); }
           catch (e) { UI.busy(b, false); toast(t('library.export-failed', { e }), 'err'); }
         });
         actions.appendChild(b);

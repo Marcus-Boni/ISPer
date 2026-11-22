@@ -17,7 +17,7 @@ use isper_assist::{
     Actor, AssistStore, Clock, MemoryKind, NewMemory, NewTask, SystemClock, Task, TaskPatch,
     TaskStatus,
 };
-use isper_core::store::MeetingStore;
+use isper_core::store::{MeetingStore, StoredSegment};
 use isper_llm::ToolSpec;
 use isper_llm::agent::{Permission, Source, ToolOutcome};
 use serde_json::{Value, json};
@@ -116,6 +116,15 @@ fn task_json(t: &Task, today: NaiveDate) -> Value {
 /// `12:34`, ou `1:02:10` com hora.
 fn clock(secs: f32) -> String {
     isper_llm::meeting_actions::clock(secs)
+}
+
+/// O que a fala diz para o assistente: a versão do "Otimizar" (Fase 11.3)
+/// quando ela existe e não ficou vazia; senão, a original.
+fn said(s: &StoredSegment) -> &str {
+    s.clean_text
+        .as_deref()
+        .filter(|c| !c.is_empty())
+        .unwrap_or(&s.text)
 }
 
 fn meeting_ref(id: i64, at: Option<f32>) -> String {
@@ -639,7 +648,7 @@ impl LocalTools {
                         kind: "reuniao".into(),
                         label: format!("{} · {}", d.meeting.title, clock(s.start_secs)),
                     });
-                    json!({"ref": reference, "minuto": clock(s.start_secs), "quem": s.speaker, "texto": s.text})
+                    json!({"ref": reference, "minuto": clock(s.start_secs), "quem": s.speaker, "texto": said(s)})
                 })
                 .collect();
             out["trechos"] = json!(hits);
@@ -652,7 +661,9 @@ impl LocalTools {
                     size += s.text.len();
                     size < TRANSCRIPT_CHARS
                 })
-                .map(|s| json!({"minuto": clock(s.start_secs), "quem": s.speaker, "texto": s.text}))
+                .map(
+                    |s| json!({"minuto": clock(s.start_secs), "quem": s.speaker, "texto": said(s)}),
+                )
                 .collect();
             out["transcricao_inicio"] = json!(excerpt);
         }

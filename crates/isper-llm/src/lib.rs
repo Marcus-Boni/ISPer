@@ -15,6 +15,7 @@
 
 pub mod agent;
 pub mod chat;
+mod cleanup;
 pub mod copilot;
 pub mod embeddings;
 mod insights;
@@ -29,6 +30,7 @@ pub mod tasks;
 pub mod testing;
 
 pub use chat::{ChatMessage, ChatReply, StopReason, ToolCall, ToolResult, ToolSpec};
+pub use cleanup::{CleanInput, clean_transcript};
 pub use copilot::{
     CardKind, CardStatus, CardUrgency, CopilotAnalysis, CopilotCard, CopilotInput,
     FILTER_MIN_WORDS, FILTER_THRESHOLD, FilterVerdict, FocusHint, TriggerKind, analyze_meeting,

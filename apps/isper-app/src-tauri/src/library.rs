@@ -2,7 +2,7 @@
 
 use crate::prelude::*;
 use isper_core::meeting::{self, SegmentRef};
-use isper_core::store::{MeetingDetail, MeetingRow, MeetingStore};
+use isper_core::store::{MeetingDetail, MeetingRow, MeetingStore, StoredSegment};
 
 #[tauri::command]
 pub(crate) fn list_meetings(query: Option<String>) -> Result<Vec<MeetingRow>, String> {
@@ -100,6 +100,17 @@ pub(crate) fn segment_refs(detail: &MeetingDetail) -> Vec<SegmentRef<'_>> {
         .collect()
 }
 
+/// A transcrição na versão do "Otimizar": a fala limpa no lugar da original,
+/// e a que era só hesitação sai. As sem versão limpa ficam como estão.
+pub(crate) fn use_clean_text(segments: &mut Vec<StoredSegment>) {
+    segments.retain(|s| s.clean_text.as_deref() != Some(""));
+    for s in segments.iter_mut() {
+        if let Some(c) = s.clean_text.take() {
+            s.text = c;
+        }
+    }
+}
+
 /// Uma regravação de `.md` por vez.
 ///
 /// Várias partes do app regravam a ata a partir do banco — o fim da reunião
@@ -179,14 +190,23 @@ pub(crate) fn rewrite_markdown_with_summary(store: &MeetingStore, id: i64, summa
 }
 
 /// Exporta a reunião ao lado do `.md` (SRT, DOCX ou MD) e abre o arquivo.
-/// Devolve o caminho gravado.
+/// Com `clean`, vai a versão do "Otimizar" (Fase 11.3), num arquivo
+/// `-otimizada` ao lado. Devolve o caminho gravado.
 #[tauri::command]
-pub(crate) fn export_meeting(id: i64, format: String) -> Result<String, String> {
+pub(crate) fn export_meeting(
+    id: i64,
+    format: String,
+    clean: Option<bool>,
+) -> Result<String, String> {
     let store = open_store().map_err(|e| e.to_string())?;
-    let detail = store
+    let mut detail = store
         .get_meeting(id)
         .map_err(|e| e.to_string())?
         .ok_or("reunião não encontrada")?;
+    let clean = clean.unwrap_or(false);
+    if clean {
+        use_clean_text(&mut detail.segments);
+    }
     let refs = segment_refs(&detail);
     let m = &detail.meeting;
     let (ext, bytes): (&str, Vec<u8>) = match format.to_lowercase().as_str() {
@@ -211,7 +231,13 @@ pub(crate) fn export_meeting(id: i64, format: String) -> Result<String, String> 
             .map_err(|e| e.to_string())?
             .join(format!("reuniao-{id}")),
     };
-    let out = base.with_extension(ext);
+    let out = if clean {
+        let mut name = base.file_name().unwrap_or_default().to_os_string();
+        name.push("-otimizada");
+        base.with_file_name(name).with_extension(ext)
+    } else {
+        base.with_extension(ext)
+    };
     std::fs::write(&out, bytes).map_err(|e| e.to_string())?;
     // Revela o arquivo no Explorer em vez de abri-lo: SRT/DOCX podem não ter
     // programa associado, e o diálogo "com qual app?" no meio do fluxo irrita.
@@ -219,6 +245,56 @@ pub(crate) fn export_meeting(id: i64, format: String) -> Result<String, String> 
         .arg(format!("/select,{}", out.to_string_lossy()))
         .spawn();
     Ok(out.display().to_string())
+}
+
+/// Evento do progresso do "Otimizar": `{ id, done, total }` em lotes.
+pub(crate) const OPTIMIZE_EVENT: &str = "isper-optimize";
+
+/// "Otimizar" (Fase 11.3): a IA limpa cada fala (hesitações, repetições,
+/// falsos começos, erro de transcrição) e a versão limpa fica ao lado da
+/// original. Só o texto das falas sai da máquina. Devolve quantas falas
+/// ganharam versão limpa.
+#[tauri::command]
+pub(crate) async fn optimize_meeting(app: AppHandle, id: i64) -> Result<usize, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let provider = isper_llm::provider_from_settings(&isper_llm::load_settings()).map_err(
+            |e| match e {
+                isper_llm::LlmError::NotConfigured => {
+                    crate::i18n::tr(&app, "library.optimize.no-ai")
+                }
+                e => e.to_string(),
+            },
+        )?;
+        let store = open_store().map_err(|e| e.to_string())?;
+        let lines: Vec<isper_llm::CleanInput> = store
+            .segments_for_cleanup(id)
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|(id, speaker, text)| isper_llm::CleanInput { id, speaker, text })
+            .collect();
+        if lines.is_empty() {
+            return Err(crate::i18n::tr(&app, "library.no-transcript"));
+        }
+        let clean = isper_llm::clean_transcript(provider.as_ref(), &lines, |done, total| {
+            let _ = app.emit(
+                OPTIMIZE_EVENT,
+                json!({ "id": id, "done": done, "total": total }),
+            );
+        })
+        .map_err(|e| e.to_string())?;
+        let n = store
+            .set_clean_texts(id, &clean)
+            .map_err(|e| e.to_string())?;
+        tracing::info!(
+            meeting_id = id,
+            falas = n,
+            via = provider.name(),
+            "reunião otimizada"
+        );
+        Ok(n)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Remove do histórico; o arquivo .md continua na pasta (decisão do usuário).
@@ -304,6 +380,7 @@ mod tests {
                 end_secs: 9.0,
                 text: "Fechamos em quarenta mil.".into(),
                 detected_speaker: None,
+                clean_text: None,
             }],
             moments: Vec::new(),
             decisions: vec![StoredDecision {

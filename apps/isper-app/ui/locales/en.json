@@ -480,6 +480,17 @@
   "library.not-found": "meeting not found",
   "library.notes.heading": "Your notes (Copilot)",
   "library.open-md": "Open .md",
+  "library.optimize": "Optimize",
+  "library.optimize.again": "Optimize again",
+  "library.optimize.done": "Meeting optimized: {n} lines cleaned. The original is still under \"Original\".",
+  "library.optimize.failed": "Couldn't optimize: {e}",
+  "library.optimize.no-ai": "Set up AI in Settings → Intelligence to optimize.",
+  "library.optimize.progress": "Optimizing… {done}/{total}",
+  "library.optimize.running": "Optimizing…",
+  "library.optimize.title": "AI cleans each line (hesitations, repetitions, false starts and transcription errors) without changing what was said; ambiguous bits get [?]. The original stays saved. Only the text leaves your PC.",
+  "library.optimize.view-aria": "Which version of the transcript to show",
+  "library.optimize.view-clean": "Optimized",
+  "library.optimize.view-orig": "Original",
   "library.participants": {
     "one": "{n} participant",
     "other": "{n} participants"

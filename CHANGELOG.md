@@ -12,6 +12,13 @@ bata com ela.
 ## [Unreleased]
 
 ### Adicionado
+- **Otimizar a reunião.** Na Biblioteca, "Otimizar" pede à IA uma versão
+  limpa de cada fala: sem hesitações, repetições e falsos começos, com os
+  erros de transcrição corrigidos e o trecho ambíguo marcado com [?], sem
+  mudar o que foi dito. A original continua guardada; o alternador
+  Otimizada/Original troca a tela, e copiar e exportar levam a versão que
+  está nela. O assistente cita a fala limpa. O banco passa para a versão 11
+  (uma cópia da anterior é guardada antes de migrar).
 - **Projetos na tela.** Em Configurações → Projetos você cria, renomeia,
   dá cor e apelidos e arquiva os seus projetos, e traz do OptTime só os que
   escolher (um de mesmo nome é ligado, não duplicado). A Biblioteca mostra o
