@@ -7,15 +7,23 @@
 # Hoje, a tarefa ganha o projeto pelo seletor, o selo aparece e o filtro do
 # dia esconde as de outro projeto. O ingles tem as chaves.
 #
-#   .\tools\e2e\projects.ps1 -Exe <caminho do exe>
+#   .\tools\e2e\projects.ps1 -Exe <caminho do exe> [-Shots <pasta>]
 #
 # A sugestao pelo titulo (reuniao sem convite) e coberta pelos testes do
 # isper-assist: aqui nao ha gravacao. Nada sai do PC: o OptTime e um processo
 # node local, encerrado no fim.
 #
 # ASCII puro de proposito: o PowerShell 5.1 le .ps1 sem BOM como ANSI.
-param([string]$Exe)
+param([string]$Exe, [string]$Shots)
 . "$PSScriptRoot\common.ps1"
+
+# A tela como ficou, para conferir o desenho (so com -Shots).
+function Shot([string]$Window, [string]$File) {
+  if (-not $Shots) { return }
+  New-Item -ItemType Directory -Force $Shots | Out-Null
+  Start-Sleep -Milliseconds 400
+  & node (Join-Path $PSScriptRoot 'cdp-shot.mjs') $Window (Join-Path $Shots $File) | Out-Null
+}
 
 $exe = Get-IsperExe $Exe
 "projects: $exe"
@@ -123,12 +131,14 @@ try {
   Ev 'settings.html' 'document.getElementById("projot").click()' | Out-Null
   $s7 = Wait-Js 'settings.html' $setJs { param($s) $s.otbox -and @($s.otlist).Count -eq 2 }
   Check (@(@($s7.otlist) | Where-Object { $_.checked -and $_.disabled -and $_.text -like '*no ISPer' }).Count -eq 2) "trazer de novo mostra os 2 como ja no ISPer"
+  Ev 'settings.html' 'document.getElementById("projetos").scrollIntoView({ block: "start" })' | Out-Null
+  Shot 'settings.html' 'projects-settings.png'
   Ev 'settings.html' 'document.getElementById("projotcancel").click()' | Out-Null
 
   # 4) Arquivar com Desfazer, e arquivar de vez.
   Click-Proj 'Estoque' 'Arquivar' | Out-Null
   $s8 = Wait-Js 'settings.html' $setJs { param($s) @($s.archived).Count -eq 1 }
-  Check (@($s8.archived) -contains 'Estoque' -and $s8.toast -like 'Projeto arquivado*') "Arquivar leva Estoque para os arquivados ('$($s8.toast)')"
+  Check (@($s8.archived) -contains 'Estoque' -and $s8.toast -like '*Projeto arquivado*') "Arquivar leva Estoque para os arquivados ('$($s8.toast)')"
   EvJson 'settings.html' 'JSON.stringify((() => { const b = [...document.querySelectorAll(".toast-act")].pop(); if (!b) return false; b.click(); return true; })())' | Out-Null
   $s9 = Wait-Js 'settings.html' $setJs { param($s) @($s.archived).Count -eq 0 -and @($s.rows).Count -eq 3 }
   Check (@($s9.archived).Count -eq 0 -and (Find-Proj $s9 'Estoque')) "o Desfazer traz Estoque de volta"
@@ -143,12 +153,14 @@ try {
   Pick-Meeting 'Revisao do backlog'
   $l1 = Wait-Js 'library.html' $libJs { param($s) $s.sel }
   Check ($l1.sel.unset -and $l1.sel.text -eq 'Sem projeto: escolha qual' -and -not (@($l1.sel.options) -contains 'Estoque')) "sem projeto, o seletor chama a escolha ('$($l1.sel.text)')"
+  Shot 'library.html' 'projects-library-unset.png'
   Check (Set-Select 'library.html' '#mproject' 'MRP') "escolher MRP no seletor"
   $l2 = Wait-Js 'library.html' $libJs { param($s) (@($s.items) | Where-Object { $_.title -eq 'Revisao do backlog' }).proj -eq 'MRP' }
   Check ((@($l2.items) | Where-Object { $_.title -eq 'Revisao do backlog' }).proj -eq 'MRP' -and $l2.toast -like '*MRP*') "o selo MRP aparece na lista ('$($l2.toast)')"
   $mp = Invoke-Isper 'meeting_project_get' '{ meetingId: 9001 }' 'library.html'
   Check ($mp.project_id -and -not $mp.suggested) "marcado pela pessoa: nao e sugestao"
   Check ($l2.sel -and -not $l2.sel.unset -and -not (@($l2.chips) -contains 'sugerido')) "o seletor sai do destaque, sem 'sugerido'"
+  Shot 'library.html' 'projects-library.png'
 
   # 6) O filtro: Sem projeto, um projeto, todos.
   Set-Select 'library.html' '#projfilter' 'Sem projeto' | Out-Null
@@ -162,15 +174,17 @@ try {
   Check (@($f3.items).Count -ge 2) "Todos volta a lista inteira"
 
   # 7) Hoje: a tarefa ganha o projeto, o selo e o filtro do dia.
-  Invoke-Isper 'task_add_text' "{ text: 'Revisar backlog com o time', fallback: null }" 'library.html' | Out-Null
-  Invoke-Isper 'task_add_text' "{ text: 'Planilha do estoque', fallback: null }" 'library.html' | Out-Null
+  $day = Get-Date -Format 'yyyy-MM-dd'
+  Invoke-Isper 'task_add_text' "{ text: 'Revisar backlog com o time', fallback: '$day' }" 'library.html' | Out-Null
+  Invoke-Isper 'task_add_text' "{ text: 'Planilha do estoque', fallback: '$day' }" 'library.html' | Out-Null
   Invoke-Isper 'open_today_window' | Out-Null
   Wait-IsperWindow 'today.html' | Out-Null
   $t0 = Wait-Js 'today.html' $todayJs { param($s) @($s.planned).Count -ge 2 -and $s.filter }
-  Check ((@($t0.planned) | Where-Object { $_.title -eq 'Revisar backlog com o time' }).select) "a tarefa tem o seletor de projeto"
+  Check ([bool](@($t0.planned) | Where-Object { $_.title -eq 'Revisar backlog com o time' -and $_.select })) "a tarefa tem o seletor de projeto"
   EvJson 'today.html' 'JSON.stringify((() => { const li = [...document.querySelectorAll("#list-planned > li.task")].find(x => x.querySelector(".title").textContent === "Revisar backlog com o time"); const s = li.querySelector(".acts select"); s.value = [...s.options].find(o => o.textContent === "Portal do Cliente").value; s.dispatchEvent(new Event("change")); return true; })())' | Out-Null
   $t1 = Wait-Js 'today.html' $todayJs { param($s) (@($s.planned) | Where-Object { $_.title -eq 'Revisar backlog com o time' }).proj }
   Check ((@($t1.planned) | Where-Object { $_.title -eq 'Revisar backlog com o time' }).proj -eq 'Portal do Cliente') "o selo Portal do Cliente aparece na tarefa ('$($t1.toast)')"
+  Shot 'today.html' 'projects-today.png'
   Set-Select 'today.html' '#projfilter' 'MRP' | Out-Null
   $t2 = Wait-Js 'today.html' $todayJs { param($s) -not (@($s.planned) | Where-Object { $_.title -eq 'Revisar backlog com o time' }) }
   Check (-not (@($t2.planned) | Where-Object { $_.title -like 'Revisar*' -or $_.title -like 'Planilha*' })) "o filtro MRP esconde as de outro projeto e as sem projeto"
