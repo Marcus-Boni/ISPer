@@ -39,6 +39,8 @@ Invoke-Isper 'task_add' "{ task: { title: 'Ler o ADR 0021' } }" 'today.html' | O
 # Janela dos cartoes da captura de tarefas, com um cartao (recuo local).
 Invoke-Isper 'capture_text' "{ text: 'amanha as 15h ligar pro contador' }" 'today.html' | Out-Null
 Wait-IsperWindow 'capture.html' | Out-Null
+Invoke-Isper 'open_projects_window' | Out-Null
+Wait-IsperWindow 'projects.html' | Out-Null
 Invoke-Isper 'open_settings_window' | Out-Null
 Wait-IsperWindow 'settings.html' | Out-Null
 Invoke-Isper 'open_onboarding_window' | Out-Null
@@ -68,6 +70,7 @@ foreach ($theme in 'dark', 'light') {
   Test-Page 'home.html' "Inicio ($theme)"
   Test-Page 'library.html' "Biblioteca$(if ($hasMeeting) { ' com reuniao aberta' }) ($theme)"
   Test-Page 'today.html' "Hoje ($theme)"
+  Test-Page 'projects.html' "Projetos ($theme)"
   Test-Page 'capture.html' "Captura de tarefas ($theme)"
   Test-Page 'settings.html' "Configuracoes ($theme)"
   Test-Page 'onboarding.html' "Primeira configuracao ($theme)"
@@ -77,13 +80,13 @@ Test-Page 'http://tauri.localhost/' 'Indicador'
 Test-Page 'copilot.html' 'Copilot'
 
 # ---- reflow (WCAG 1.4.10): nenhuma janela abre rolagem horizontal no tamanho padrao
-foreach ($w in @('home.html', 'today.html', 'library.html', 'settings.html', 'onboarding.html', 'copilot.html')) {
+foreach ($w in @('home.html', 'today.html', 'library.html', 'projects.html', 'settings.html', 'onboarding.html', 'copilot.html')) {
   $rf = EvJson $w 'JSON.stringify({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth })'
   Check ($rf.sw -le $rf.cw + 1) "$w sem rolagem horizontal ($($rf.sw) de $($rf.cw) px)"
 }
 
 # ---- volta de Tab com teclado de verdade
-$script:Views = @{ 'home.html' = 'home'; 'today.html' = 'today'; 'library.html' = 'library'; 'settings.html' = 'settings'; 'onboarding.html' = 'onboarding' }
+$script:Views = @{ 'home.html' = 'home'; 'today.html' = 'today'; 'library.html' = 'library'; 'projects.html' = 'projects'; 'settings.html' = 'settings'; 'onboarding.html' = 'onboarding' }
 function Test-Keyboard([string]$Target, [string]$Label, [string]$Media = '', [string]$View = '') {
   # Telas da janela principal (ADR 0020): o Tab passa pela barra lateral e pela
   # tela, como num navegador. A volta completa tem os controles das duas, e o
@@ -113,6 +116,7 @@ Test-Keyboard 'home.html' 'Inicio'
 Test-Keyboard 'app.html' 'Barra lateral da janela' '' 'home'
 Test-Keyboard 'library.html' 'Biblioteca'
 Test-Keyboard 'today.html' 'Hoje'
+Test-Keyboard 'projects.html' 'Projetos'
 Test-Keyboard 'settings.html' 'Configuracoes'
 # "Avancado" (details) abre pelo teclado e o que ele mostra entra na volta.
 Ev 'settings.html' 'document.querySelector("details summary").focus(), "ok"' | Out-Null

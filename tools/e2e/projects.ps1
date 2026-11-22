@@ -202,6 +202,42 @@ try {
   Check ((@($t3.planned) | Where-Object { $_.title -eq 'Planilha do estoque' }) -and -not (@($t3.planned) | Where-Object { $_.title -like 'Revisar*' })) "Sem projeto mostra a Planilha e nao a do Portal"
   Set-Select 'today.html' '#projfilter' 'Todos os projetos' | Out-Null
 
+  # 7b) A tela Projetos (Fase 11.2): a lista, a pagina do projeto, arrumar
+  # "Sem projeto" no lugar e excluir com Desfazer.
+  Invoke-Isper 'open_projects_window' | Out-Null
+  Wait-IsperWindow 'projects.html' | Out-Null
+  $pj = 'JSON.stringify({ side: [...document.querySelectorAll(".pitem")].map(b => ({ name: b.querySelector(".name").textContent, n: b.querySelector(".n").textContent, on: b.getAttribute("aria-current") === "true" })), h2: (document.querySelector("#page h2") || {}).textContent || null, tiles: [...document.querySelectorAll(".tile .v")].map(x => x.textContent), meetings: [...document.querySelectorAll(".mrow .title")].map(x => x.textContent), tasks: [...document.querySelectorAll(".tasks .t")].map(x => x.textContent), toast: ' + $lastToast + ' })'
+  function Pick-Project([string]$Name) {
+    $n = ConvertTo-Json $Name
+    EvJson 'projects.html' ('JSON.stringify((() => { const b = [...document.querySelectorAll(".pitem")].find(x => x.querySelector(".name").textContent === ' + $n + '); if (!b) return false; b.click(); return true; })())') | Out-Null
+  }
+  $p0 = Wait-Js 'projects.html' $pj { param($s) $s.h2 -and @($s.meetings).Count -ge 1 }
+  $sideNames = @($p0.side | ForEach-Object { $_.name })
+  Check ((($sideNames | Select-Object -First 3) -join '|') -eq 'MRP|Portal do Cliente|Sem projeto' -and ($sideNames -contains 'Estoque')) "a lista tem os ativos, Sem projeto e o arquivado ($($sideNames -join ', '))"
+  Check ($p0.h2 -eq 'MRP' -and (@($p0.meetings) -contains 'Revisao do backlog') -and @($p0.tiles)[0] -eq '1') "abre no primeiro projeto, com a reuniao dele ($($p0.h2): $(@($p0.meetings) -join ', '))"
+  Pick-Project 'Portal do Cliente'
+  $p1 = Wait-Js 'projects.html' $pj { param($s) $s.h2 -eq 'Portal do Cliente' }
+  Check ((@($p1.tasks) -contains 'Revisar backlog com o time') -and @($p1.meetings).Count -eq 0) "Portal do Cliente mostra a tarefa aberta e nenhuma reuniao"
+  Pick-Project 'Sem projeto'
+  $p2 = Wait-Js 'projects.html' $pj { param($s) $s.h2 -eq 'Sem projeto' }
+  Check (@($p2.meetings) -contains 'Conversa avulsa') "Sem projeto mostra a reuniao a organizar"
+  EvJson 'projects.html' 'JSON.stringify((() => { const r = [...document.querySelectorAll(".mrow")].find(x => x.querySelector(".title").textContent === "Conversa avulsa"); const s = r.querySelector("select"); s.value = [...s.options].find(o => o.textContent === "Portal do Cliente").value; s.dispatchEvent(new Event("change")); return true; })())' | Out-Null
+  $p3 = Wait-Js 'projects.html' $pj { param($s) $s.h2 -eq 'Sem projeto' -and -not (@($s.meetings) -contains 'Conversa avulsa') }
+  Check (-not (@($p3.meetings) -contains 'Conversa avulsa') -and $p3.toast -like '*Portal do Cliente*') "Mover para tira a reuniao de Sem projeto ('$($p3.toast)')"
+  Pick-Project 'Portal do Cliente'
+  $p4 = Wait-Js 'projects.html' $pj { param($s) $s.h2 -eq 'Portal do Cliente' -and (@($s.meetings) -contains 'Conversa avulsa') }
+  Check (@($p4.meetings) -contains 'Conversa avulsa') "e ela aparece no Portal do Cliente"
+  EvJson 'projects.html' 'JSON.stringify((() => { const r = [...document.querySelectorAll(".mrow")].find(x => x.querySelector(".title").textContent === "Conversa avulsa"); [...r.querySelectorAll("button")].find(b => b.textContent === "Excluir").click(); return true; })())' | Out-Null
+  $p5 = Wait-Js 'projects.html' $pj { param($s) -not (@($s.meetings) -contains 'Conversa avulsa') }
+  Check (-not (@($p5.meetings) -contains 'Conversa avulsa') -and $p5.toast -like '*exclu*') "Excluir tira a reuniao, com aviso ('$($p5.toast)')"
+  EvJson 'projects.html' 'JSON.stringify((() => { const b = [...document.querySelectorAll(".toast-act")].pop(); if (!b) return false; b.click(); return true; })())' | Out-Null
+  $p6 = Wait-Js 'projects.html' $pj { param($s) @($s.meetings) -contains 'Conversa avulsa' }
+  Check (@($p6.meetings) -contains 'Conversa avulsa') "o Desfazer traz a reuniao de volta"
+  $ov = Invoke-Isper 'projects_overview' 'undefined' 'projects.html'
+  $sum = [int]$ov.no_project.meetings + (@($ov.active) + @($ov.archived) | Measure-Object -Property meetings -Sum).Sum
+  Check ($sum -eq [int]$ov.total_meetings) "cada reuniao conta em exatamente um grupo ($sum de $($ov.total_meetings))"
+  Shot 'projects.html' 'projects-page.png'
+
   # 8) Em ingles, as chaves existem.
   Invoke-Isper 'set_ui_lang' "{ lang: 'en' }" | Out-Null
   Start-Sleep -Milliseconds 800
@@ -209,7 +245,7 @@ try {
   Check ($en.h -eq 'Projects' -and $en.ph -eq 'Project name') "em ingles: '$($en.h)', '$($en.ph)'"
   Invoke-Isper 'set_ui_lang' "{ lang: 'pt-BR' }" | Out-Null
 
-  foreach ($w in 'settings.html', 'library.html', 'today.html') {
+  foreach ($w in 'settings.html', 'library.html', 'today.html', 'projects.html') {
     $errs = @(Get-JsErrors $w)
     Check (@($errs | Where-Object { $_ }).Count -eq 0) "$w sem erros de JS$(Format-JsErrors $errs)"
   }

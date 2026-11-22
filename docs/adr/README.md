@@ -36,6 +36,7 @@ entenda *por que* o código é como é antes de mudá-lo.
 | [0027](0027-nomes-da-chamada-do-teams.md) | Nomes dos falantes lidos da janela do Teams, só na Biblioteca e só com evidência | aceita (piloto) | 20/11/2026 |
 | [0028](0028-otimizar-a-transcricao.md) | "Otimizar": versão limpa de cada fala ao lado da original, limpeza fiel, só no botão | aceita | 22/11/2026 |
 | [0029](0029-reuniao-pronta-para-agente.md) | A reunião pronta para agente: Markdown à parte com cabeçalho e contexto, nome padronizado, sem mexer na ata | aceita | 22/11/2026 |
+| [0030](0030-tela-projetos.md) | A tela Projetos: as reuniões organizadas por projeto, com "Sem projeto" para arrumar, no lugar das pastas | aceita | 22/11/2026 |
 
 ## Como escrever um ADR
 

@@ -26,8 +26,8 @@
   const body = document.body;
   const stage = $('stage');
 
-  const VIEWS = { home: 'home.html', today: 'today.html', library: 'library.html', settings: 'settings.html', onboarding: 'onboarding.html' };
-  const NAMES = { home: 'shell.nav.home', today: 'shell.nav.today', library: 'shell.nav.library', settings: 'shell.nav.settings', onboarding: 'window.onboarding' };
+  const VIEWS = { home: 'home.html', today: 'today.html', library: 'library.html', projects: 'projects.html', settings: 'settings.html', onboarding: 'onboarding.html' };
+  const NAMES = { home: 'shell.nav.home', today: 'shell.nav.today', library: 'shell.nav.library', projects: 'shell.nav.projects', settings: 'shell.nav.settings', onboarding: 'window.onboarding' };
   // Seções das Configurações (id do card em settings.html → título).
   const SECTIONS = [
     ['aparencia', 'settings.aparencia.titulo'],
@@ -447,6 +447,7 @@
       { group: 'shell.palette.group.nav', icon: 'home', label: t('shell.nav.home'), hint: 'Ctrl+1', run: () => show('home') },
       { group: 'shell.palette.group.nav', icon: 'check', label: t('shell.nav.today'), hint: 'Ctrl+T', keywords: t('shell.cmd.today-keywords'), run: () => show('today') },
       { group: 'shell.palette.group.nav', icon: 'book', label: t('shell.cmd.meetings'), hint: 'Ctrl+2', run: () => show('library', { tab: 'meetings' }) },
+      { group: 'shell.palette.group.nav', icon: 'folder', label: t('shell.nav.projects'), keywords: t('shell.cmd.projects-keywords'), run: () => show('projects') },
       { group: 'shell.palette.group.nav', icon: 'mic', label: t('shell.cmd.dictations'), run: () => show('library', { tab: 'dictations' }) },
       { group: 'shell.palette.group.nav', icon: 'gear', label: t('shell.nav.settings'), hint: 'Ctrl+,', run: () => show('settings') },
       { group: 'shell.palette.group.nav', icon: 'spark', label: t('shell.cmd.copilot'), hint: 'Ctrl+3', run: () => invoke('open_copilot_window') },

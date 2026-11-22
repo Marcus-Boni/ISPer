@@ -12,6 +12,12 @@ bata com ela.
 ## [Unreleased]
 
 ### Adicionado
+- **A tela Projetos.** Um item novo na barra lateral reúne as suas reuniões
+  por projeto, no lugar das pastas: cada projeto mostra quantas reuniões e
+  quanto tempo teve, as tarefas abertas, o que se validou nas reuniões e as
+  reuniões por mês com o começo do resumo; clicar abre na Biblioteca. "Sem
+  projeto" junta as que faltam organizar, com "Mover para…" em cada uma, e
+  dá para excluir do histórico com Desfazer.
 - **Reunião pronta para agente.** "Copiar para agente" na Biblioteca copia a
   reunião inteira em Markdown para colar noutro agente de IA: cabeçalho com
   data, projeto e participantes, uma linha explicando quem é "Eu" e

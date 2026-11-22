@@ -1005,6 +1005,20 @@ impl MeetingStore {
         Ok(rows)
     }
 
+    /// O resumo de uma reunião, sem ler as falas (a página do projeto mostra
+    /// o começo dele em cada reunião).
+    pub fn meeting_summary(&self, meeting_id: i64) -> Result<Option<String>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT summary FROM meetings WHERE id = ?1",
+                params![meeting_id],
+                |r| r.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .flatten())
+    }
+
     /// Guarda o resumo gerado por IA (Fase 5).
     pub fn set_summary(&self, meeting_id: i64, summary: &str) -> Result<()> {
         self.conn.execute(

@@ -594,6 +594,27 @@ impl AssistStore {
         Ok(found)
     }
 
+    /// As tarefas ainda abertas (ou na caixa de entrada) de um projeto, as
+    /// com dia primeiro (Fase 11.2, a página do projeto).
+    pub fn open_tasks_in_project(&self, project_id: &str) -> Result<Vec<crate::Task>> {
+        self.tasks_where(
+            "status IN ('open', 'inbox') AND project_id = ?1
+             ORDER BY planned_on IS NULL, planned_on, due_on IS NULL, due_on, created_at, id",
+            params![project_id],
+        )
+    }
+
+    /// Quantas tarefas abertas (ou na caixa de entrada) cada projeto tem.
+    pub fn open_task_counts(&self) -> Result<Vec<(String, i64)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT project_id, COUNT(*) FROM tasks
+              WHERE status IN ('open', 'inbox') AND project_id IS NOT NULL
+              GROUP BY project_id",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// A reunião sem evento da agenda (a chamada sem convite, o áudio
     /// importado, a gravação do celular) também ganha projeto quando o nome ou
     /// um apelido aparece no título. Nada muda se ela já tem projeto ou se a
@@ -871,6 +892,37 @@ mod tests {
             .set_meeting_project(3, Some(&mrp.id), Actor::User)
             .unwrap();
         assert!(!mp.suggested);
+    }
+
+    #[test]
+    fn tarefas_abertas_por_projeto_e_a_contagem() {
+        let store = store();
+        let p = store
+            .create_project(named("Portal", &[]), Actor::User)
+            .unwrap();
+        let mk = |title: &str, project: Option<&str>| {
+            store
+                .create_task(
+                    crate::NewTask {
+                        project_id: project.map(String::from),
+                        ..crate::NewTask::titled(title)
+                    },
+                    Actor::User,
+                )
+                .unwrap()
+        };
+        let a = mk("A", Some(&p.id));
+        mk("B", Some(&p.id));
+        mk("Sem projeto", None);
+        store
+            .set_status(&a.id, crate::TaskStatus::Done, Actor::User)
+            .unwrap();
+        let open = store.open_tasks_in_project(&p.id).unwrap();
+        assert_eq!(
+            open.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(),
+            ["B"]
+        );
+        assert_eq!(store.open_task_counts().unwrap(), [(p.id.clone(), 1)]);
     }
 
     #[test]
