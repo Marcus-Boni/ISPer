@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ISPer — Projetos</title>
+<script src="assets/boot.js"></script>
+<script src="assets/i18n.js"></script>
+<link rel="stylesheet" href="assets/base.css">
+<style>
+  body { display: grid; grid-template-rows: auto 1fr; height: 100vh; overflow: hidden; }
+  .bar .summary { color: var(--muted); font-size: 12.5px; margin: 0; }
+  main { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 0; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } #side { max-height: 38vh; border-right: none; border-bottom: 1px solid var(--line); } }
+
+  /* ---- a lista de projetos ---- */
+  #side { overflow-y: auto; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 50%, transparent); padding: 10px 0 18px; }
+  .plist { list-style: none; margin: 0; padding: 0; }
+  .pitem {
+    position: relative; display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center;
+    width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: none; cursor: pointer;
+    padding: 10px 16px 10px 18px; transition: background var(--dur-2);
+  }
+  .pitem::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); transform: scaleY(0); transition: transform var(--dur-3) var(--ease-spring); }
+  .pitem:hover { background: var(--panel); }
+  .pitem[aria-current="true"] { background: var(--panel-2); }
+  .pitem[aria-current="true"]::before { transform: scaleY(1); }
+  .pitem .name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pitem .n { font: 12px var(--font-mono); color: var(--muted); }
+  .pitem .sub { grid-column: 2 / -1; font-size: 12px; color: var(--muted); }
+  .pitem.todo .n { color: var(--warn); font-weight: 600; }
+  .pdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: var(--muted-2); flex: none; }
+  .side-h { font-size: 10.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 14px 18px 4px; }
+  .side-arch summary { cursor: pointer; }
+  .side-empty { padding: 8px 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+  /* ---- a página do projeto ---- */
+  #page { overflow-y: auto; padding: 24px 30px 40px; }
+  .phead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .phead .pdot { width: 14px; height: 14px; }
+  .phead h2 { font-family: var(--font-display); font-size: 26px; font-weight: 500; letter-spacing: -.015em; margin: 0; line-height: 1.15; }
+  .phead .btn { margin-left: auto; }
+  .paliases { color: var(--muted); font-size: 12.5px; margin: 4px 0 0 26px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 18px 0 6px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; }
+  .tile .v { font: 600 20px var(--font-display); font-variant-numeric: tabular-nums; }
+  .tile .k { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  h3.eyebrow { margin: 26px 0 10px; display: flex; align-items: baseline; gap: 8px; }
+  h3.eyebrow .c { font: 11px var(--font-mono); color: var(--muted); letter-spacing: 0; }
+  .lead { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 6px 0 0; max-width: 70ch; }
+
+  .tasks, .decs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .tasks li, .decs li { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); font-size: 13.5px; }
+  .tasks .t, .decs .t { flex: 1 1 240px; min-width: 0; }
+  .decs .k { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 6px; border-radius: 4px; background: var(--panel-3); color: var(--ink-2); }
+  .decs .k.decision { background: var(--good-soft); color: var(--good); }
+  .decs .k.risk { background: var(--warn-soft); color: var(--warn); }
+  .linkish { background: none; border: none; padding: 0; font: inherit; font-size: 12px; color: var(--accent-2); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+  .mtools { display: flex; gap: 8px; align-items: center; margin: 0 0 6px; }
+  .mtools .field { max-width: 320px; }
+  .month { font-size: 12px; font-weight: 600; color: var(--muted); margin: 18px 0 6px; }
+  .mlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .mrow {
+    display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 4px 14px; align-items: start;
+    padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel);
+    cursor: pointer; transition: border-color var(--dur-2), background var(--dur-2);
+  }
+  .mrow:hover, .mrow:focus-within { border-color: var(--line-2); background: var(--panel-2); }
+  .mrow .when { font: 12px var(--font-mono); color: var(--muted); line-height: 1.5; }
+  .mrow .title { font-weight: 600; }
+  .mrow .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .mrow .ex { grid-column: 2 / -1; font-size: 13px; color: var(--ink-2); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .mrow .acts { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .mrow select { width: auto; max-width: 200px; padding: 4px 8px; font-size: 12.5px; }
+  @media (max-width: 620px) { .mrow { grid-template-columns: 1fr; } .mrow .ex { grid-column: 1; } .mrow .acts { justify-content: flex-start; } }
+  .none { color: var(--muted); font-size: 13px; padding: 10px 0; }
+  .placeholder { color: var(--muted); padding: 60px 20px; text-align: center; display: grid; gap: 12px; justify-items: center; line-height: 1.5; }
+  .placeholder .empty-art { width: 56px; }
+</style>
+</head>
+<body class="atmos">
+<header class="bar">
+  <h1 class="page-title" data-i18n="shell.nav.projects">Projetos</h1>
+  <div class="spacer"></div>
+  <p class="summary" id="summary" role="status" aria-live="polite"></p>
+  <button class="btn btn-ghost btn-sm" type="button" id="manage" data-i18n="projects.manage">Gerenciar projetos</button>
+</header>
+<main>
+  <nav id="side" aria-label="Projetos" data-i18n-attr="aria-label:projects.side-aria"></nav>
+  <section id="page" aria-live="polite"></section>
+</main>
+<script src="assets/ui.js"></script>
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
+  const $ = (id) => document.getElementById(id);
+  const { el, toast, fmtClock } = UI;
+  const lang = () => (window.I18N && window.I18N.lang) || 'pt-BR';
+
+  // A tela Projetos (Fase 11.2, ADR 0030): as reuniões organizadas por
+  // projeto, sem pasta nenhuma. É uma lente: cuidar dos projetos fica nas
+  // Configurações, e a reunião abre na Biblioteca.
+  let overview = null;
+  let selected = undefined;     // id do projeto; null = "sem projeto"
+  let picked = false;           // a pessoa escolheu (senão, segue o primeiro ativo)
+  let page = null;
+  let filter = '';
+
+  const hours = (secs) => {
+    const m = Math.round(secs / 60);
+    return m < 60 ? t('projects.minutes', { n: m }) : t('projects.hours', { h: Math.floor(m / 60), m: String(m % 60).padStart(2, '0') });
+  };
+  const shortDay = (startedAt) => (startedAt || '').slice(0, 5);
+  function dot(p) {
+    const d = el('span', 'pdot');
+    d.setAttribute('aria-hidden', 'true');
+    if (p && p.color) d.style.background = p.color;
+    return d;
+  }
+  function art(text) {
+    const box = el('div', 'placeholder');
+    const a = el('div', 'empty-art'); a.append(el('i'), el('i'), el('i'));
+    box.append(a, el('span', null, text));
+    return box;
+  }
+
+  // ------------------------------------------------------------- lista
+  function item(key, p, name, meetings, sub, todo) {
+    const b = el('button', 'pitem' + (todo ? ' todo' : ''));
+    b.type = 'button';
+    b.dataset.key = key;
+    b.setAttribute('aria-current', String(selected === (key === '' ? null : key)));
+    const n = el('span', 'n num', String(meetings));
+    n.setAttribute('aria-label', t('projects.meetings-n', { n: meetings }));
+    b.append(p === undefined ? el('span') : dot(p), el('span', 'name', name), n);
+    if (sub) b.appendChild(el('span', 'sub', sub));
+    b.addEventListener('click', () => { picked = true; select(key === '' ? null : key); });
+    const li = el('li'); li.appendChild(b);
+    return li;
+  }
+  function cardSub(c) {
+    const parts = [];
+    if (c.open_tasks) parts.push(t('projects.tasks-n', { n: c.open_tasks }));
+    if (c.last_meeting) parts.push(t('projects.last', { d: shortDay(c.last_meeting) }));
+    return parts.join(' · ');
+  }
+  function renderSide() {
+    const side = $('side');
+    side.replaceChildren();
+    const o = overview;
+    if (!o.active.length && !o.archived.length) {
+      side.appendChild(el('p', 'side-empty', t('projects.side-empty')));
+    }
+    if (o.active.length) {
+      const ul = el('ul', 'plist');
+      for (const c of o.active) ul.appendChild(item(c.project.id, c.project, c.project.name, c.meetings, cardSub(c)));
+      side.appendChild(ul);
+    }
+    side.appendChild(el('div', 'side-h', t('projects.to-organize')));
+    const ul = el('ul', 'plist');
+    ul.appendChild(item('', undefined, t('projects.no-project'), o.no_project.meetings,
+      o.no_project.meetings ? t('projects.no-project-sub') : t('projects.no-project-clear'), o.no_project.meetings > 0));
+    side.appendChild(ul);
+    if (o.archived.length) {
+      const det = el('details', 'side-arch');
+      const sum = el('summary', 'side-h', t('projects.archived', { n: o.archived.length }));
+      const al = el('ul', 'plist');
+      for (const c of o.archived) al.appendChild(item(c.project.id, c.project, c.project.name, c.meetings, cardSub(c)));
+      det.append(sum, al);
+      if (o.archived.some((c) => c.project.id === selected)) det.open = true;
+      side.appendChild(det);
+    }
+    $('summary').textContent = t('projects.summary', { n: o.total_meetings, p: o.active.length, s: o.no_project.meetings });
+  }
+
+  // ------------------------------------------------------------ página
+  function tile(v, k) {
+    const d = el('div', 'tile');
+    d.append(el('div', 'v', v), el('div', 'k', k));
+    return d;
+  }
+  const openMeeting = (id, at) => invoke('open_meeting_at', { meetingId: id, at: at == null ? null : at }).catch((e) => toast(t('common.error', { e }), 'err'));
+
+  // Mês da reunião a partir de "dd/mm/aaaa hh:mm".
+  function monthOf(startedAt) {
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(startedAt || '');
+    if (!m) return { key: '?', label: t('projects.no-date') };
+    const label = new Date(Number(m[3]), Number(m[2]) - 1, 1).toLocaleDateString(lang(), { month: 'long', year: 'numeric' });
+    // Só a primeira letra: "novembro de 2026" → "Novembro de 2026".
+    return { key: m[3] + m[2], label: label.charAt(0).toUpperCase() + label.slice(1) };
+  }
+
+  function projectSelect(m) {
+    const s = el('select', 'field');
+    s.setAttribute('aria-label', t('projects.pick-aria', { m: m.title }));
+    const opt = (v, label) => { const o = el('option', null, label); o.value = v; return o; };
+    s.appendChild(opt('', t('projects.pick')));
+    for (const c of overview.active) s.appendChild(opt(c.project.id, c.project.name));
+    s.addEventListener('click', (ev) => ev.stopPropagation());
+    s.addEventListener('change', async () => {
+      if (!s.value) return;
+      const name = s.options[s.selectedIndex].textContent;
+      try {
+        await invoke('meeting_project_set', { meetingId: m.id, projectId: s.value });
+        toast(t('projects.moved', { p: name }), 'ok');
+      } catch (e) { toast(t('common.error', { e }), 'err'); }
+      reload();
+    });
+    return s;
+  }
+
+  function meetingRow(m) {
+    const li = el('li', 'mrow');
+    li.tabIndex = 0;
+    li.setAttribute('role', 'button');
+    li.setAttribute('aria-label', t('projects.open-aria', { m: m.title, d: m.started_at }));
+    const when = el('div', 'when');
+    when.append(el('div', null, shortDay(m.started_at)), el('div', null, (m.started_at || '').slice(11, 16)));
+    const main = el('div');
+    main.appendChild(el('div', 'title', m.title));
+    const meta = el('div', 'meta');
+    meta.appendChild(el('span', 'chip', fmtClock(m.duration_secs)));
+    if (m.has_summary) meta.appendChild(el('span', 'chip chip-ok', t('library.ai-summary')));
+    if (m.decisions) meta.appendChild(el('span', 'chip chip-info', t('projects.validated-n', { n: m.decisions })));
+    if (m.source_name) meta.appendChild(el('span', 'chip', t('library.source.chip')));
+    main.appendChild(meta);
+    const acts = el('div', 'acts');
+    if (!page.project && overview.active.length) acts.appendChild(projectSelect(m));
+    const del = el('button', 'btn btn-ghost btn-sm', t('projects.delete'));
+    del.type = 'button';
+    del.setAttribute('aria-label', t('projects.delete-aria', { m: m.title }));
+    del.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      let sched;
+      try { sched = await invoke('delete_meeting', { id: m.id }); }
+      catch (e) { toast(t('common.error', { e }), 'err'); return; }
+      reload();
+      UI.undoable(t('projects.deleted', { m: m.title }), sched, async (ok) => {
+        if (!ok) { toast(t('library.too-late-meeting'), 'err'); return; }
+        reload();
+        toast(t('library.restored'), 'ok');
+      });
+    });
+    acts.appendChild(del);
+    li.append(when, main, acts);
+    if (m.summary_excerpt) li.appendChild(el('p', 'ex', m.summary_excerpt));
+    li.addEventListener('click', () => openMeeting(m.id));
+    li.addEventListener('keydown', (ev) => { if (ev.target === li && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); openMeeting(m.id); } });
+    return li;
+  }
+
+  function renderMeetings(box) {
+    box.replaceChildren();
+    const q = filter.trim().toLowerCase();
+    const list = page.meetings.filter((m) => !q || (m.title + ' ' + (m.summary_excerpt || '')).toLowerCase().includes(q));
+    if (!page.meetings.length) {
+      box.appendChild(el('p', 'none', page.project ? t('projects.no-meetings') : t('projects.no-project-clear')));
+      return;
+    }
+    if (!list.length) { box.appendChild(el('p', 'none', t('projects.no-match', { q: filter }))); return; }
+    let month = null, ul = null;
+    for (const m of list) {
+      const mo = monthOf(m.started_at);
+      if (mo.key !== month) {
+        month = mo.key;
+        box.appendChild(el('div', 'month', mo.label));
+        ul = el('ul', 'mlist');
+        box.appendChild(ul);
+      }
+      ul.appendChild(meetingRow(m));
+    }
+  }
+
+  function taskLine(task) {
+    const li = el('li');
+    li.appendChild(el('span', 't', task.title));
+    if (task.planned_on) li.appendChild(el('span', 'chip', t('projects.task-day', { d: task.planned_on.slice(8, 10) + '/' + task.planned_on.slice(5, 7) })));
+    if (task.due_on) li.appendChild(el('span', 'chip chip-warn', t('projects.task-due', { d: task.due_on.slice(8, 10) + '/' + task.due_on.slice(5, 7) })));
+    if (task.status === 'inbox') li.appendChild(el('span', 'chip chip-info', t('projects.task-inbox')));
+    return li;
+  }
+
+  const KIND = { decision: 'projects.kind.decision', action: 'projects.kind.action', risk: 'projects.kind.risk', question: 'projects.kind.question' };
+  function decisionLine(d) {
+    const li = el('li');
+    li.appendChild(el('span', 'k ' + d.kind, t(KIND[d.kind] || KIND.decision)));
+    const txt = el('span', 't', d.title);
+    if (d.owner) txt.append(' · ' + d.owner);
+    if (d.due_date) txt.append(' · ' + d.due_date);
+    li.appendChild(txt);
+    const go = el('button', 'linkish', t('projects.from-meeting', { m: d.meeting_title, d: shortDay(d.started_at), at: fmtClock(d.at_secs) }));
+    go.type = 'button';
+    go.addEventListener('click', () => openMeeting(d.meeting_id, d.at_secs));
+    li.appendChild(go);
+    return li;
+  }
+
+  function renderPage() {
+    const box = $('page');
+    UI.swap(box, () => {
+      box.replaceChildren();
+      if (!overview.active.length && !overview.archived.length && !overview.total_meetings) {
+        const p = art(t('projects.empty-all'));
+        const b = el('button', 'btn btn-primary', t('projects.create'));
+        b.type = 'button';
+        b.addEventListener('click', manage);
+        p.appendChild(b);
+        box.appendChild(p);
+        return;
+      }
+      if (!page) { box.appendChild(art(t('projects.select'))); return; }
+      const p = page.project;
+      const head = el('div', 'phead');
+      head.append(dot(p), el('h2', null, p ? p.name : t('projects.no-project')));
+      if (p && p.external_ref && p.external_ref.startsWith('opttime:')) head.appendChild(el('span', 'chip chip-info', t('settings.projetos.opttime-chip')));
+      if (p && p.archived_at) head.appendChild(el('span', 'chip', t('projects.archived-chip')));
+      box.appendChild(head);
+      if (p && p.aliases.length) box.appendChild(el('p', 'paliases', t('settings.projetos.aliases', { a: p.aliases.join(', ') })));
+      if (!p) box.appendChild(el('p', 'lead', t('projects.no-project-lead')));
+
+      const s = page.stats;
+      const tiles = el('div', 'tiles');
+      tiles.append(
+        tile(String(s.meetings), t('projects.tile.meetings')),
+        tile(hours(s.meeting_secs), t('projects.tile.time')),
+      );
+      if (p) tiles.appendChild(tile(String(page.tasks.length), t('projects.tile.tasks')));
+      tiles.appendChild(tile(s.last_meeting ? shortDay(s.last_meeting) : '—', t('projects.tile.last')));
+      box.appendChild(tiles);
+
+      if (p) {
+        const h = el('h3', 'eyebrow', t('projects.tasks'));
+        h.appendChild(el('span', 'c', String(page.tasks.length)));
+        box.appendChild(h);
+        if (page.tasks.length) {
+          const ul = el('ul', 'tasks');
+          page.tasks.forEach((x) => ul.appendChild(taskLine(x)));
+          box.appendChild(ul);
+          const go = el('button', 'linkish', t('projects.open-today'));
+          go.type = 'button';
+          go.style.marginTop = '8px';
+          go.addEventListener('click', () => window.ISPER_SHELL && window.ISPER_SHELL.open && window.ISPER_SHELL.open('today'));
+          box.appendChild(go);
+        } else box.appendChild(el('p', 'none', t('projects.no-tasks')));
+      }
+
+      if (page.decisions.length) {
+        const h = el('h3', 'eyebrow', t('projects.decisions'));
+        h.appendChild(el('span', 'c', String(page.decisions.length)));
+        box.appendChild(h);
+        const ul = el('ul', 'decs');
+        page.decisions.forEach((d) => ul.appendChild(decisionLine(d)));
+        box.appendChild(ul);
+      }
+
+      const hm = el('h3', 'eyebrow', t('projects.meetings'));
+      hm.appendChild(el('span', 'c', String(page.meetings.length)));
+      box.appendChild(hm);
+      const list = el('div');
+      if (page.meetings.length > 5) {
+        const tools = el('div', 'mtools');
+        const q = el('input', 'field');
+        q.type = 'search';
+        q.id = 'pfilter';
+        q.value = filter;
+        q.placeholder = t('projects.filter-ph');
+        q.setAttribute('aria-label', t('projects.filter-ph'));
+        q.addEventListener('input', () => { filter = q.value; renderMeetings(list); });
+        tools.appendChild(q);
+        box.appendChild(tools);
+      }
+      renderMeetings(list);
+      box.appendChild(list);
+    });
+  }
+
+  // --------------------------------------------------------- dados
+  async function select(key) {
+    if (selected !== key) filter = '';
+    selected = key;
+    document.querySelectorAll('.pitem').forEach((b) => b.setAttribute('aria-current', String((b.dataset.key === '' ? null : b.dataset.key) === key)));
+    try { page = await invoke('project_page', { projectId: key }); }
+    catch (e) { toast(t('common.error', { e }), 'err'); page = null; }
+    renderPage();
+  }
+
+  let seq = 0;
+  async function reload() {
+    const mine = ++seq;
+    let next;
+    try { next = await invoke('projects_overview'); } catch (e) { toast(t('common.error', { e }), 'err'); return; }
+    if (mine !== seq) return;
+    overview = next;
+    // Escolhido sumiu (arquivado e esquecido, ou primeira vez): o primeiro
+    // ativo; sem projetos, "sem projeto".
+    const all = [...overview.active, ...overview.archived].map((c) => c.project.id);
+    if (!picked || selected === undefined || (selected !== null && !all.includes(selected))) {
+      selected = overview.active.length ? overview.active[0].project.id : null;
+    }
+    // Digitando no filtro: a lista espera.
+    if (document.activeElement && document.activeElement.id === 'pfilter') return;
+    renderSide();
+    await select(selected);
+  }
+
+  function manage() { invoke('open_settings_window', { section: 'projetos' }).catch((e) => toast(t('common.error', { e }), 'err')); }
+  $('manage').addEventListener('click', manage);
+
+  // A tela fica viva no iframe: volta atualizada, e acompanha o que muda.
+  document.addEventListener('isper-view', (e) => { if (e.detail && e.detail.active) reload(); });
+  document.addEventListener('isper-i18n', () => { if (overview) { renderSide(); renderPage(); } });
+  for (const ev of ['isper-projects', 'isper-tasks', 'isper-import']) listen(ev, () => reload());
+  reload();
+</script>
+</body>
+</html>

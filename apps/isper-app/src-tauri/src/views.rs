@@ -17,10 +17,11 @@ use crate::prelude::*;
 pub(crate) const MAIN: &str = "main";
 
 /// As telas da janela principal (`<tela>.html` em `ui/`).
-pub(crate) const VIEWS: [&str; 5] = [
+pub(crate) const VIEWS: [&str; 6] = [
     "home",
     "today",
     "library",
+    "projects",
     "settings",
     crate::onboarding::LABEL,
 ];
@@ -369,6 +370,7 @@ pub(crate) fn title_key(view: &str) -> &'static str {
     match view {
         "today" => "window.today",
         "library" => "window.library",
+        "projects" => "window.projects",
         "settings" => "window.settings",
         v if v == crate::onboarding::LABEL => "window.onboarding",
         "copilot" => "window.copilot",
